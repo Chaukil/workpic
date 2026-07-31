@@ -47,7 +47,12 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('addJobBtn').addEventListener('click', openAddJobModal);
     document.getElementById('saveJobBtn').addEventListener('click', saveJob);
     document.getElementById('deleteJobBtn').addEventListener('click', deleteJob);
-    document.getElementById('textColor').addEventListener('change', changeTextColor);
+    const textColorInput = document.getElementById('textColor');
+    textColorInput.addEventListener('input', changeTextColor);
+    textColorInput.addEventListener('change', changeTextColor);
+    const highlightColorInput = document.getElementById('highlightColor');
+    highlightColorInput.addEventListener('input', applyHighlightColor);
+    highlightColorInput.addEventListener('change', applyHighlightColor);
     document.getElementById('searchJob').addEventListener('input', handleSearch);
     document.getElementById('exportPdfBtn').addEventListener('click', exportToPDF);
     document.getElementById('showSunday').addEventListener('change', toggleSunday);
@@ -98,9 +103,83 @@ window.formatText = function(command) {
 
 function changeTextColor() {
     const color = document.getElementById('textColor').value;
+    const editor = document.getElementById('jobDescription');
+    const selection = window.getSelection();
+
+    if (selection && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        const selectedText = range.toString().trim();
+
+        if (selectedText) {
+            document.execCommand('foreColor', false, color);
+            editor.focus();
+            return;
+        }
+    }
+
     document.execCommand('foreColor', false, color);
-    document.getElementById('jobDescription').focus();
+    editor.focus();
 }
+
+window.applyHighlightColor = function() {
+    const color = document.getElementById('highlightColor').value;
+    document.execCommand('hiliteColor', false, color);
+    document.getElementById('jobDescription').focus();
+};
+
+window.insertTable = function() {
+    const editor = document.getElementById('jobDescription');
+    const selection = window.getSelection();
+    const selectedText = selection && selection.rangeCount > 0 ? selection.toString().trim() : '';
+
+    if (!selectedText) {
+        alert('⚠️ Vui lòng bôi đen đoạn văn bản cần chuyển thành bảng trước khi dùng chức năng này!');
+        editor.focus();
+        return;
+    }
+
+    const rows = selectedText
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .filter(Boolean);
+
+    if (rows.length === 0) {
+        alert('⚠️ Vui lòng bôi đen đoạn văn bản có nội dung trước khi dùng chức năng này!');
+        editor.focus();
+        return;
+    }
+
+    const parseCells = (row) => {
+        const byPipe = row.split('|').map(cell => cell.trim()).filter(Boolean);
+        if (byPipe.length > 1) return byPipe;
+
+        const byTab = row.split('\t').map(cell => cell.trim()).filter(Boolean);
+        if (byTab.length > 1) return byTab;
+
+        return [row];
+    };
+
+    const tableHtml = `
+        <table style="border-collapse: collapse; width: auto; max-width: 100%; margin: 0.5rem 0; table-layout: auto;">
+            ${rows.map(row => {
+                const safeCells = parseCells(row);
+                return `<tr>${safeCells.map(cell => `<td style="border: 1px solid #dee2e6; padding: 0.25rem 0.5rem; white-space: nowrap; font-size: 0.95em;">${cell}</td>`).join('')}</tr>`;
+            }).join('')}
+        </table>
+    `;
+
+    if (selection && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        range.deleteContents();
+        range.insertNode(document.createRange().createContextualFragment(tableHtml));
+    } else {
+        editor.focus();
+        document.execCommand('insertHTML', false, tableHtml);
+    }
+
+    selection && selection.removeAllRanges();
+    editor.focus();
+};
 
 // Toggle Sunday Display
 function toggleSunday(e) {

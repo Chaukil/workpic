@@ -500,6 +500,14 @@ body {
     transform: scale(1.01);
 }
 
+.editor-content span {
+    border-radius: 0.25rem;
+}
+
+.editor-content span[style*="border"] {
+    display: inline-block;
+}
+
 /* Modal Enhancements */
 .modal-xl {
     max-width: 90%;
@@ -971,5 +979,5 @@ body {
 
 /* Future jobs - Keep vibrant (default) */
 .schedule-item.future {
-    /* Default styles - no changes needed */
+    opacity: 1;
 }
