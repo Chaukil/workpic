@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Schedule Manager</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="styles.css">
+    <!-- jsPDF Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+    <!-- Notification Container -->
+    <div id="notificationContainer" class="notification-container"></div>
+
+    <div class="container-fluid p-2">
+        <div class="row">
+            <!-- Left Sidebar - Legend & Job List -->
+            <div class="col-lg-3 col-md-4" id="sidebar">
+                <!-- Legend -->
+                <div class="card shadow-sm mb-2">
+                    <div class="card-header bg-info text-white">
+                        <h6 class="mb-0"><i class="bi bi-info-circle"></i> Chú Thích</h6>
+                    </div>
+                    <div class="card-body p-2">
+                        <div class="legend-item">
+                            <span class="legend-color daily"></span>
+                            <span>Daily</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color weekly"></span>
+                            <span>Weekly</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color biweekly"></span>
+                            <span>Biweekly</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color monthly"></span>
+                            <span>Monthly</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color quarterly"></span>
+                            <span>Quarterly</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Job List -->
+                <div class="card shadow-sm">
+                    <div class="card-header bg-secondary text-white">
+                        <h6 class="mb-0"><i class="bi bi-list-task"></i> Danh Sách Jobs</h6>
+                    </div>
+                    <div class="card-body p-2">
+                        <!-- Search Box -->
+                        <div class="mb-2">
+                            <input type="text" class="form-control form-control-sm" id="searchJob" placeholder="🔍 Tìm kiếm job...">
+                        </div>
+                        
+                        <!-- Buttons Row -->
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <button class="btn btn-add-job w-100" id="addJobBtn">
+                                    <i class="bi bi-plus-circle-fill"></i>
+                                    <span>Thêm Job</span>
+                                    <div class="btn-shine"></div>
+                                </button>
+                            </div>
+                            <div class="col-6">
+                                <button class="btn btn-export-pdf w-100" id="exportPdfBtn">
+                                    <i class="bi bi-file-earmark-pdf-fill"></i>
+                                    <span>Xuất PDF</span>
+                                    <div class="btn-shine"></div>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div id="jobList" class="job-list">
+                            <!-- Jobs will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content - Calendar View -->
+            <div class="col-lg-9 col-md-8" id="mainContent">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <!-- Toggle Sidebar Button -->
+                            <button class="btn btn-toggle-sidebar" id="toggleSidebarBtn" title="Ẩn/Hiện Sidebar">
+                                <i class="bi bi-layout-sidebar-inset"></i>
+                            </button>
+                            <h6 class="mb-0"><i class="bi bi-calendar3"></i> Lịch</h6>
+                        </div>
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" id="showSunday" checked>
+                            <label class="form-check-label text-white small" for="showSunday">
+                                Chủ Nhật
+                            </label>
+                        </div>
+                    </div>
+                    <div class="card-body p-1">
+                        <div class="table-responsive">
+                            <table class="table table-bordered schedule-table mb-0">
+                                <thead>
+                                    <tr id="scheduleHeader">
+                                        <!-- Will be generated by JS -->
+                                    </tr>
+                                </thead>
+                                <tbody id="scheduleBody">
+                                    <!-- Schedule will be loaded here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Add/Edit Job -->
+<div class="modal fade" id="jobModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-gradient-primary text-white">
+                <h5 class="modal-title" id="modalTitle">
+                    <i class="bi bi-plus-circle-fill"></i> Thêm Job Mới
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="jobForm">
+                    <input type="hidden" id="jobId">
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Tiêu Đề Job *</label>
+                            <input type="text" class="form-control" id="jobTitle" required>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">Loại Job *</label>
+                            <select class="form-select" id="jobType" required>
+                                <option value="daily">Daily (Hàng ngày)</option>
+                                <option value="weekly">Weekly (Hàng tuần)</option>
+                                <option value="biweekly">Biweekly (2 tuần/lần)</option>
+                                <option value="monthly">Monthly (Hàng tháng)</option>
+                                <option value="quarterly">Quarterly (Hàng quý)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-bold">Ngày Bắt Đầu *</label>
+                            <input type="date" class="form-control" id="jobDate" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-bold">Giờ Thực Hiện *</label>
+                            <input type="time" class="form-control" id="jobTime" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-bold">Làm Chủ Nhật?</label>
+                            <div class="form-check form-switch mt-2">
+                                <input class="form-check-input" type="checkbox" id="workOnSunday">
+                                <label class="form-check-label" for="workOnSunday">
+                                    Có làm vào Chủ Nhật
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Nội Dung Chi Tiết</label>
+                        <div class="editor-toolbar mb-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="formatText('bold')">
+                                <i class="bi bi-type-bold"></i> Bold
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="formatText('italic')">
+                                <i class="bi bi-type-italic"></i> Italic
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="formatText('underline')">
+                                <i class="bi bi-type-underline"></i> Underline
+                            </button>
+                            <label class="btn btn-sm btn-outline-secondary">
+                                <i class="bi bi-palette-fill"></i> Color
+                                <input type="color" id="textColor" style="display:none;">
+                            </label>
+                        </div>
+                        <div id="jobDescription" class="form-control editor-content" contenteditable="true" style="min-height: 180px;">
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <div class="form-check form-switch">
+                                <input type="checkbox" class="form-check-input" id="enableNotification" checked>
+                                <label class="form-check-label fw-bold" for="enableNotification">
+                                    <i class="bi bi-bell-fill"></i> Bật thông báo khi đến giờ thực hiện
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="form-check form-switch">
+                                <input type="checkbox" class="form-check-input" id="isPaused">
+                                <label class="form-check-label fw-bold" for="isPaused">
+                                    <i class="bi bi-pause-circle-fill"></i> Tạm dừng job này
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-cancel" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Hủy
+                </button>
+                <button type="button" class="btn btn-delete" id="deleteJobBtn" style="display:none;">
+                    <i class="bi bi-trash-fill"></i> Xóa Job
+                    <div class="btn-shine"></div>
+                </button>
+                <button type="button" class="btn btn-save" id="saveJobBtn">
+                    <i class="bi bi-check-circle-fill"></i> Lưu Job
+                    <div class="btn-shine"></div>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+    <!-- Modal for View Job Content Only -->
+    <div class="modal fade" id="viewJobModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-gradient-info text-white">
+                    <h5 class="modal-title" id="viewModalTitle">
+                        <i class="bi bi-eye-fill"></i> Chi Tiết Job
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="viewModalBody">
+                    <!-- Content will be loaded here -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-cancel" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Đóng
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module" src="app.js"></script>
+</body>
+</html>
