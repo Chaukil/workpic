@@ -36,6 +36,38 @@ let notificationCheckInterval;
 let firestoreConnected = false;
 let showSunday = true;
 let sidebarVisible = true;
+let pendingConfirmCallback = null;
+let currentTheme = 'light';
+
+function applyTheme(theme) {
+    currentTheme = theme;
+    document.body.classList.toggle('theme-dark', theme === 'dark');
+    document.body.classList.toggle('theme-light', theme === 'light');
+    document.documentElement.setAttribute('data-theme', theme);
+
+    const toggleBtn = document.getElementById('themeToggleBtn');
+    if (toggleBtn) {
+        const icon = toggleBtn.querySelector('i');
+        const label = toggleBtn.querySelector('span');
+        if (theme === 'dark') {
+            toggleBtn.setAttribute('aria-pressed', 'true');
+            icon.className = 'bi bi-sun-fill';
+            if (label) label.textContent = 'Chế độ sáng';
+        } else {
+            toggleBtn.setAttribute('aria-pressed', 'false');
+            icon.className = 'bi bi-moon-fill';
+            if (label) label.textContent = 'Chế độ tối';
+        }
+    }
+
+    localStorage.setItem('workpic-theme', theme);
+}
+
+function initTheme() {
+    const savedTheme = localStorage.getItem('workpic-theme');
+    const preferredTheme = savedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    applyTheme(preferredTheme);
+}
 
 // Initialize App
 document.addEventListener('DOMContentLoaded', function() {
@@ -57,7 +89,32 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('exportPdfBtn').addEventListener('click', exportToPDF);
     document.getElementById('showSunday').addEventListener('change', toggleSunday);
     document.getElementById('toggleSidebarBtn').addEventListener('click', toggleSidebar);
+    document.getElementById('themeToggleBtn').addEventListener('click', () => {
+        applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
+    });
+    document.getElementById('confirmCancelBtn').addEventListener('click', hideConfirmModal);
+    document.getElementById('confirmModal').addEventListener('click', (event) => {
+        if (event.target.id === 'confirmModal') {
+            hideConfirmModal();
+        }
+    });
+    document.getElementById('confirmOkBtn').addEventListener('click', () => {
+        if (typeof pendingConfirmCallback === 'function') {
+            const callback = pendingConfirmCallback;
+            pendingConfirmCallback = null;
+            hideConfirmModal();
+            callback();
+        } else {
+            hideConfirmModal();
+        }
+    });
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            hideConfirmModal();
+        }
+    });
     
+    initTheme();
     requestNotificationPermission();
 
     // Request notification permission
@@ -764,7 +821,7 @@ function openViewJobModal(job) {
         ` : ''}
         <div class="mb-3">
             <strong><i class="bi bi-file-text"></i> Nội dung:</strong>
-            <div class="border rounded p-3 mt-2" style="background-color: #f8f9fa; max-height: 300px; overflow-y: auto;">
+            <div class="view-job-content mt-2">
                 ${job.description || '<em class="text-muted">Không có nội dung</em>'}
             </div>
         </div>
@@ -842,12 +899,12 @@ async function saveJob() {
     const isPaused = document.getElementById('isPaused').checked; // NEW
     
     if (!title || !date || !time) {
-        alert('⚠️ Vui lòng điền đầy đủ thông tin bắt buộc!');
+        showNotification('Thiếu thông tin', 'Vui lòng điền đầy đủ thông tin bắt buộc.', false, 'warning');
         return;
     }
     
     if (!firestoreConnected) {
-        alert('❌ Chưa kết nối Firestore!');
+        showNotification('Chưa kết nối', 'Hiện tại chưa kết nối được Firestore. Vui lòng thử lại sau.', false, 'danger');
         return;
     }
     
@@ -886,7 +943,7 @@ async function saveJob() {
         jobModal.hide();
     } catch (error) {
         console.error('❌ Lỗi khi lưu job:', error);
-        alert('❌ Có lỗi xảy ra: ' + error.message);
+        showNotification('Lỗi', 'Có lỗi xảy ra khi lưu job. Vui lòng thử lại.', false, 'danger');
         
         const saveBtn = document.getElementById('saveJobBtn');
         saveBtn.innerHTML = '<i class="bi bi-check-circle-fill"></i> Lưu Job';
@@ -902,30 +959,36 @@ async function deleteJob() {
     const jobToDelete = jobs.find(j => j.id === currentEditingJobId);
     const jobTitle = jobToDelete ? jobToDelete.title : 'job này';
     
-    if (!confirm(`🗑️ Bạn có chắc chắn muốn xóa "${jobTitle}"?`)) return;
-    
-    try {
-        const deleteBtn = document.getElementById('deleteJobBtn');
-        const originalHTML = deleteBtn.innerHTML;
-        deleteBtn.innerHTML = '<span class="loading"></span> Đang xóa...';
-        deleteBtn.disabled = true;
-        
-        const jobRef = doc(db, 'jobs', currentEditingJobId);
-        await deleteDoc(jobRef);
-        console.log('✅ Job đã được xóa:', currentEditingJobId);
-        showNotification('Đã xóa', `Job "${jobTitle}" đã được xóa!`);
-        
-        deleteBtn.innerHTML = originalHTML;
-        deleteBtn.disabled = false;
-        jobModal.hide();
-    } catch (error) {
-        console.error('❌ Lỗi khi xóa job:', error);
-        alert('❌ Có lỗi xảy ra: ' + error.message);
-        
-        const deleteBtn = document.getElementById('deleteJobBtn');
-        deleteBtn.innerHTML = '<i class="bi bi-trash-fill"></i> Xóa Job';
-        deleteBtn.disabled = false;
-    }
+    showConfirmDialog({
+        title: 'Xác nhận xóa',
+        message: `Bạn có chắc chắn muốn xóa job "${jobTitle}"?`,
+        confirmText: 'Xóa ngay',
+        confirmClass: 'btn-delete',
+        onConfirm: async () => {
+            try {
+                const deleteBtn = document.getElementById('deleteJobBtn');
+                const originalHTML = deleteBtn.innerHTML;
+                deleteBtn.innerHTML = '<span class="loading"></span> Đang xóa...';
+                deleteBtn.disabled = true;
+                
+                const jobRef = doc(db, 'jobs', currentEditingJobId);
+                await deleteDoc(jobRef);
+                console.log('✅ Job đã được xóa:', currentEditingJobId);
+                showNotification('Đã xóa', `Job "${jobTitle}" đã được xóa!`, false, 'success');
+                
+                deleteBtn.innerHTML = originalHTML;
+                deleteBtn.disabled = false;
+                jobModal.hide();
+            } catch (error) {
+                console.error('❌ Lỗi khi xóa job:', error);
+                showNotification('Lỗi', 'Có lỗi xảy ra khi xóa job. Vui lòng thử lại.', false, 'danger');
+                
+                const deleteBtn = document.getElementById('deleteJobBtn');
+                deleteBtn.innerHTML = '<i class="bi bi-trash-fill"></i> Xóa Job';
+                deleteBtn.disabled = false;
+            }
+        }
+    });
 }
 
 // Toggle Sidebar Visibility
@@ -976,21 +1039,56 @@ function loadSidebarState() {
     }
 }
 
+function showConfirmDialog({ title = 'Xác nhận', message = 'Bạn có chắc chắn muốn tiếp tục?', confirmText = 'Xác nhận', confirmClass = 'btn-save', onConfirm }) {
+    const modal = document.getElementById('confirmModal');
+    const titleEl = document.getElementById('confirmModalTitle');
+    const messageEl = document.getElementById('confirmModalMessage');
+    const okBtn = document.getElementById('confirmOkBtn');
+
+    titleEl.textContent = title;
+    messageEl.textContent = message;
+    okBtn.textContent = confirmText;
+    okBtn.className = `btn ${confirmClass} btn-sm`;
+    pendingConfirmCallback = typeof onConfirm === 'function' ? onConfirm : null;
+
+    modal.classList.add('show');
+    modal.setAttribute('aria-hidden', 'false');
+    setTimeout(() => okBtn.focus(), 50);
+}
+
+function hideConfirmModal() {
+    const modal = document.getElementById('confirmModal');
+    if (!modal) return;
+
+    modal.classList.remove('show');
+    modal.setAttribute('aria-hidden', 'true');
+    pendingConfirmCallback = null;
+}
+
 // Show Notification
-function showNotification(title, message, isSystemNotification = false) {
+function showNotification(title, message, isSystemNotification = false, type = 'info') {
     const container = document.getElementById('notificationContainer');
     
     const notification = document.createElement('div');
-    notification.className = 'notification';
+    notification.className = `notification notification-${type}`;
+
+    const typeConfig = {
+        success: { icon: 'bi-check-circle-fill', accent: '#16a34a' },
+        warning: { icon: 'bi-exclamation-triangle-fill', accent: '#f59e0b' },
+        danger: { icon: 'bi-x-circle-fill', accent: '#dc2626' },
+        info: { icon: 'bi-bell-fill', accent: '#667eea' }
+    };
+
+    const config = typeConfig[type] || typeConfig.info;
     notification.innerHTML = `
-        <div class="notification-icon">
-            <i class="bi bi-bell-fill"></i>
+        <div class="notification-icon" style="color:${config.accent}">
+            <i class="bi ${config.icon}"></i>
         </div>
         <div class="notification-content">
             <h6>${title}</h6>
             <p>${message}</p>
         </div>
-        <button class="notification-close">&times;</button>
+        <button class="notification-close" aria-label="Đóng thông báo">&times;</button>
     `;
     
     const closeBtn = notification.querySelector('.notification-close');
