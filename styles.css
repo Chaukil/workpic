@@ -4,6 +4,7 @@
     --biweekly-color: #3b82f6;
     --monthly-color: #f59e0b;
     --quarterly-color: #8b5cf6;
+    --yearly-color: #ec4899;
     --font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     --bg: #f4f7fb;
     --surface: #ffffff;
@@ -42,7 +43,9 @@ body.theme-dark {
 body {
     background: linear-gradient(135deg, #eef4ff 0%, #f8fafc 100%);
     min-height: 100vh;
-    padding-bottom: 1rem;
+    height: 100vh;
+    overflow: hidden;
+    padding: 0;
     font-size: 13px;
     color: var(--text);
     transition: background 0.25s ease, color 0.25s ease;
@@ -64,9 +67,14 @@ body.theme-dark .notification {
 }
 
 .app-shell {
-    max-width: 1600px;
+    width: 100%;
+    height: 100vh;
+    max-width: none;
     margin: 0 auto;
-    padding: 1rem;
+    padding: clamp(0.45rem, 1.1vw, 0.7rem);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 .topbar {
@@ -74,13 +82,17 @@ body.theme-dark .notification {
     justify-content: space-between;
     align-items: center;
     gap: 1rem;
-    padding: 1rem 1.2rem;
-    margin-bottom: 0.8rem;
+    padding: clamp(0.8rem, 1.3vw, 1.05rem);
+    margin-bottom: 0.45rem;
     border: 1px solid var(--border);
-    border-radius: 18px;
+    border-radius: 16px;
     background: rgba(255, 255, 255, 0.92);
     box-shadow: var(--shadow);
     backdrop-filter: blur(10px);
+    position: sticky;
+    top: 0;
+    z-index: 1100;
+    flex-shrink: 0;
 }
 
 body.theme-dark .topbar {
@@ -150,6 +162,14 @@ body.theme-dark .topbar {
 
 .container-fluid {
     animation: fadeIn 0.5s ease-in;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.container-fluid > .row {
+    height: 100%;
+    margin: 0;
 }
 
 @keyframes fadeIn {
@@ -239,7 +259,7 @@ body.theme-dark .theme-toggle {
 }
 
 .card-body {
-    padding: 0.85rem;
+    padding: 0.75rem;
 }
 
 /* Gradient Headers */
@@ -391,12 +411,68 @@ body.theme-dark .btn-cancel {
     transform: translateY(-1px);
 }
 
+/* Out of Schedule Jobs */
+.out-of-schedule-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    align-items: flex-start;
+}
+
+.out-of-schedule-card {
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 0.45rem 0.8rem;
+    background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+    box-shadow: 0 3px 8px rgba(15, 23, 42, 0.06);
+    max-width: 100%;
+    min-width: 0;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.out-of-schedule-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 12px rgba(15, 23, 42, 0.1);
+}
+
+.out-of-schedule-card.paused {
+    opacity: 0.72;
+    border-style: dashed;
+}
+
+.out-of-schedule-card-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 /* Job List */
+.job-list-card {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    min-height: 240px;
+}
+
+.job-list-card .card-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
 .job-list {
-    max-height: 420px;
+    flex: 1 1 auto;
+    min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
     padding-right: 4px;
+    margin-bottom: 0;
 }
 
 .job-item {
@@ -431,6 +507,7 @@ body.theme-dark .job-item {
 .job-item.biweekly::before { background-color: var(--biweekly-color); }
 .job-item.monthly::before { background-color: var(--monthly-color); }
 .job-item.quarterly::before { background-color: var(--quarterly-color); }
+.job-item.yearly::before { background-color: var(--yearly-color); }
 
 .job-item:hover {
     background: linear-gradient(90deg, rgba(37, 99, 235, 0.08) 0%, rgba(255,255,255,0) 100%);
@@ -492,12 +569,13 @@ body.theme-dark .job-item {
 .legend-item {
     display: flex;
     align-items: center;
-    margin-bottom: 0.45rem;
+    margin-bottom: 0.28rem;
     animation: slideInLeft 0.5s ease;
-    font-size: 0.8rem;
+    font-size: 0.76rem;
     transition: all 0.2s ease;
-    padding: 0.35rem 0.45rem;
-    border-radius: 10px;
+    padding: 0.24rem 0.35rem;
+    border-radius: 9px;
+    line-height: 1.2;
 }
 
 @keyframes slideInLeft {
@@ -518,12 +596,13 @@ body.theme-dark .job-item {
 
 .legend-color {
     display: inline-block;
-    width: 16px;
-    height: 16px;
-    border-radius: 4px;
-    margin-right: 0.5rem;
+    width: 13px;
+    height: 13px;
+    border-radius: 3px;
+    margin-right: 0.4rem;
     box-shadow: 0 2px 6px rgba(0,0,0,0.3);
     transition: all 0.3s ease;
+    flex-shrink: 0;
 }
 
 .legend-item:hover .legend-color {
@@ -535,6 +614,7 @@ body.theme-dark .job-item {
 .legend-color.biweekly { background-color: var(--biweekly-color); }
 .legend-color.monthly { background-color: var(--monthly-color); }
 .legend-color.quarterly { background-color: var(--quarterly-color); }
+.legend-color.yearly { background-color: var(--yearly-color); }
 
 /* Schedule Table */
 .schedule-table {
@@ -650,6 +730,7 @@ body.theme-dark .schedule-table td:hover {
 .schedule-item.biweekly { background: linear-gradient(135deg, var(--biweekly-color) 0%, #6bcee5 100%); }
 .schedule-item.monthly { background: linear-gradient(135deg, var(--monthly-color) 0%, #f9ca5d 100%); }
 .schedule-item.quarterly { background: linear-gradient(135deg, var(--quarterly-color) 0%, #7f3ed1 100%); }
+.schedule-item.yearly { background: linear-gradient(135deg, var(--yearly-color) 0%, #fb7185 100%); }
 
 .schedule-item:hover {
     transform: translateY(-2px);
@@ -1031,6 +1112,13 @@ body.theme-dark .view-job-content * {
 }
 
 /* Responsive */
+@media (max-width: 1200px) {
+    .app-shell {
+        padding-left: 0.9rem;
+        padding-right: 0.9rem;
+    }
+}
+
 @media (max-width: 992px) {
     body {
         font-size: 11px;
@@ -1159,6 +1247,13 @@ body.theme-dark .view-job-content * {
 #sidebar {
     transition: all 0.25s ease;
     transform-origin: left center;
+    position: sticky;
+    top: 0.35rem;
+    align-self: flex-start;
+    max-height: calc(100vh - 1rem);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 0.25rem;
 }
 
 #sidebar.hidden {
@@ -1176,6 +1271,11 @@ body.theme-dark .view-job-content * {
 /* Main Content Expanded State */
 #mainContent {
     transition: all 0.25s ease;
+    height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 0.25rem;
+    padding-bottom: 0.5rem;
 }
 
 #mainContent.expanded {

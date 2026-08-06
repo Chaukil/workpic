@@ -76,7 +76,8 @@ document.addEventListener('DOMContentLoaded', function() {
     viewJobModal = new bootstrap.Modal(document.getElementById('viewJobModal'));
     
     // Event Listeners
-    document.getElementById('addJobBtn').addEventListener('click', openAddJobModal);
+    document.getElementById('addJobBtn').addEventListener('click', () => openAddJobModal(false));
+    document.getElementById('addOutOfScheduleBtn').addEventListener('click', () => openAddJobModal(true));
     document.getElementById('saveJobBtn').addEventListener('click', saveJob);
     document.getElementById('deleteJobBtn').addEventListener('click', deleteJob);
     const textColorInput = document.getElementById('textColor');
@@ -86,6 +87,7 @@ document.addEventListener('DOMContentLoaded', function() {
     highlightColorInput.addEventListener('input', applyHighlightColor);
     highlightColorInput.addEventListener('change', applyHighlightColor);
     document.getElementById('searchJob').addEventListener('input', handleSearch);
+    document.getElementById('isOutOfSchedule').addEventListener('change', toggleOutOfScheduleFields);
     document.getElementById('exportPdfBtn').addEventListener('click', exportToPDF);
     document.getElementById('showSunday').addEventListener('change', toggleSunday);
     document.getElementById('toggleSidebarBtn').addEventListener('click', toggleSidebar);
@@ -149,6 +151,20 @@ function requestNotificationPermission() {
         }
     } else {
         console.warn('❌ Browser không hỗ trợ Notifications API');
+    }
+}
+
+function toggleOutOfScheduleFields() {
+    const isOutOfSchedule = document.getElementById('isOutOfSchedule').checked;
+    const scheduleFields = document.getElementById('scheduleFields');
+    const jobTitle = document.getElementById('jobTitle');
+
+    if (scheduleFields) {
+        scheduleFields.classList.toggle('d-none', isOutOfSchedule);
+    }
+
+    if (jobTitle) {
+        jobTitle.placeholder = isOutOfSchedule ? 'Nhập tiêu đề job phát sinh...' : 'Nhập tiêu đề job...';
     }
 }
 
@@ -353,7 +369,8 @@ async function exportToPDF() {
             weekly: [78, 205, 196],
             biweekly: [69, 183, 209],
             monthly: [247, 183, 49],
-            quarterly: [95, 39, 205]
+            quarterly: [95, 39, 205],
+            yearly: [236, 72, 153]
         };
 
         activeJobs.forEach((job, index) => {
@@ -396,7 +413,8 @@ async function exportToPDF() {
                 weekly: 'Weekly',
                 biweekly: 'Biweekly',
                 monthly: 'Monthly',
-                quarterly: 'Quarterly'
+                quarterly: 'Quarterly',
+                yearly: 'Yearly'
             };
             const typeLabel = typeLabels[job.type] || job.type;
             const badgeWidth = pdf.getTextWidth(typeLabel) + 6;
@@ -528,6 +546,7 @@ function loadJobs() {
             filteredJobs = jobs;
             renderJobList();
             renderSchedule();
+            renderOutOfScheduleJobs();
         }, 
         (error) => {
             console.error('❌ Lỗi khi lắng nghe Firestore:', error);
@@ -586,6 +605,9 @@ function getJobOccurrences(job, startDate, endDate) {
             case 'quarterly':
                 currentDate.setMonth(currentDate.getMonth() + 3);
                 break;
+            case 'yearly':
+                currentDate.setFullYear(currentDate.getFullYear() + 1);
+                break;
             default:
                 return occurrences;
         }
@@ -633,6 +655,45 @@ function renderJobList() {
     });
 }
 
+function renderOutOfScheduleJobs() {
+    const container = document.getElementById('outOfScheduleList');
+    if (!container) return;
+
+    const outOfScheduleJobs = jobs.filter(job => job.isOutOfSchedule === true);
+
+    if (outOfScheduleJobs.length === 0) {
+        container.innerHTML = '<div class="empty-state empty-state-sm"><i class="bi bi-lightning-charge"></i><br>Chưa có job ngoài lịch nào</div>';
+        return;
+    }
+
+    container.innerHTML = '';
+
+    outOfScheduleJobs.forEach(job => {
+        const card = document.createElement('div');
+        card.className = `out-of-schedule-card ${job.isPaused ? 'paused' : ''}`;
+        card.innerHTML = `
+            <div class="out-of-schedule-card-title" title="${job.title}">${job.title}</div>
+        `;
+
+        card.addEventListener('click', () => openEditJobModal(job));
+        container.appendChild(card);
+    });
+}
+
+async function toggleOutOfScheduleJob(job) {
+    try {
+        const jobRef = doc(db, 'jobs', job.id);
+        await updateDoc(jobRef, {
+            isPaused: !job.isPaused,
+            updatedAt: new Date().toISOString()
+        });
+        showNotification(job.isPaused ? 'Đã bật lại job' : 'Đã dừng job', job.isPaused ? `Job "${job.title}" đã được bật lại.` : `Job "${job.title}" đã được dừng.` , false, job.isPaused ? 'success' : 'warning');
+    } catch (error) {
+        console.error('❌ Lỗi khi đổi trạng thái job ngoài lịch:', error);
+        showNotification('Lỗi', 'Không thể đổi trạng thái job.', false, 'danger');
+    }
+}
+
 // Render Schedule Calendar (2 tuần tới) - FIXED PAST/TODAY/FUTURE LOGIC
 function renderSchedule() {
     const scheduleBody = document.getElementById('scheduleBody');
@@ -670,11 +731,11 @@ function renderSchedule() {
         scheduleHeader.appendChild(th);
     });
     
-    // Tạo map các jobs theo ngày (FILTER OUT PAUSED JOBS)
+    // Tạo map các jobs theo ngày (FILTER OUT PAUSED JOBS + OUT-OF-SCHEDULE JOBS)
     const jobsByDate = {};
     
-    // Only include active (non-paused) jobs
-    const activeJobs = jobs.filter(job => job.isPaused !== true);
+    // Only include active (non-paused) jobs that belong to the fixed schedule
+    const activeJobs = jobs.filter(job => job.isPaused !== true && job.isOutOfSchedule !== true);
     
     activeJobs.forEach(job => {
         const endDate = new Date(startDate);
@@ -837,7 +898,9 @@ function getTypeBadgeColor(type) {
         weekly: 'info',
         biweekly: 'primary',
         monthly: 'warning',
-        quarterly: 'secondary'
+        quarterly: 'secondary',
+        yearly: 'pink',
+        custom: 'warning'
     };
     return colors[type] || 'secondary';
 }
@@ -848,15 +911,19 @@ function getTypeLabel(type) {
         weekly: 'Weekly',
         biweekly: 'Biweekly',
         monthly: 'Monthly',
-        quarterly: 'Quarterly'
+        quarterly: 'Quarterly',
+        yearly: 'Yearly',
+        custom: 'Ngoài lịch'
     };
     return labels[type] || type;
 }
 
 // Open Add Job Modal
-function openAddJobModal() {
+function openAddJobModal(isOutOfSchedule = false) {
     currentEditingJobId = null;
-    document.getElementById('modalTitle').innerHTML = '<i class="bi bi-plus-circle-fill"></i> Thêm Job Mới';
+    document.getElementById('modalTitle').innerHTML = isOutOfSchedule
+        ? '<i class="bi bi-lightning-charge-fill"></i> Thêm Job Ngoài Lịch'
+        : '<i class="bi bi-plus-circle-fill"></i> Thêm Job Mới';
     document.getElementById('jobForm').reset();
     document.getElementById('jobDescription').innerHTML = '';
     document.getElementById('deleteJobBtn').style.display = 'none';
@@ -866,6 +933,8 @@ function openAddJobModal() {
     document.getElementById('jobTime').value = now.toTimeString().slice(0, 5);
     document.getElementById('workOnSunday').checked = false; // Default: KHÔNG làm CN
     document.getElementById('isPaused').checked = false;
+    document.getElementById('isOutOfSchedule').checked = isOutOfSchedule;
+    toggleOutOfScheduleFields();
 
     jobModal.show();
 }
@@ -879,10 +948,15 @@ function openEditJobModal(job) {
     document.getElementById('jobDate').value = job.date;
     document.getElementById('jobTime').value = job.time;
     document.getElementById('jobDescription').innerHTML = job.description || '';
-    document.getElementById('enableNotification').checked = job.enableNotification !== false;
+    const notificationToggle = document.getElementById('enableNotification');
+    if (notificationToggle) {
+        notificationToggle.checked = job.enableNotification !== false;
+    }
     document.getElementById('workOnSunday').checked = job.workOnSunday !== false;
     document.getElementById('isPaused').checked = job.isPaused === true; // NEW
+    document.getElementById('isOutOfSchedule').checked = job.isOutOfSchedule === true;
     document.getElementById('deleteJobBtn').style.display = 'block';
+    toggleOutOfScheduleFields();
     
     jobModal.show();
 }
@@ -894,11 +968,23 @@ async function saveJob() {
     const date = document.getElementById('jobDate').value;
     const time = document.getElementById('jobTime').value;
     const description = document.getElementById('jobDescription').innerHTML;
-    const enableNotification = document.getElementById('enableNotification').checked;
+    const notificationToggle = document.getElementById('enableNotification');
+    const enableNotification = notificationToggle ? notificationToggle.checked : true;
     const workOnSunday = document.getElementById('workOnSunday').checked;
     const isPaused = document.getElementById('isPaused').checked; // NEW
+    const isOutOfSchedule = document.getElementById('isOutOfSchedule').checked;
     
-    if (!title || !date || !time) {
+    if (!title) {
+        showNotification('Thiếu thông tin', 'Vui lòng nhập tiêu đề job.', false, 'warning');
+        return;
+    }
+
+    const now = new Date();
+    const effectiveDate = isOutOfSchedule ? (date || now.toISOString().split('T')[0]) : date;
+    const effectiveTime = isOutOfSchedule ? (time || now.toTimeString().slice(0, 5)) : time;
+    const effectiveType = isOutOfSchedule ? 'custom' : type;
+
+    if (!isOutOfSchedule && (!effectiveDate || !effectiveTime)) {
         showNotification('Thiếu thông tin', 'Vui lòng điền đầy đủ thông tin bắt buộc.', false, 'warning');
         return;
     }
@@ -910,13 +996,14 @@ async function saveJob() {
     
     const jobData = {
         title,
-        type,
-        date,
-        time,
+        type: effectiveType,
+        date: effectiveDate,
+        time: effectiveTime,
         description,
         enableNotification,
         workOnSunday,
         isPaused, // NEW
+        isOutOfSchedule,
         updatedAt: new Date().toISOString()
     };
     
@@ -1125,11 +1212,16 @@ function checkNotifications() {
         if (job.isPaused === true) {
             return;
         }
+
+        const isOutOfSchedule = job.isOutOfSchedule === true;
+        if (isOutOfSchedule) {
+            return;
+        }
         
         if (job.enableNotification !== false) {
-            const occurrences = getJobOccurrences(job, now, now);
+            const isDue = getJobOccurrences(job, now, now).length > 0 && job.time === currentTime;
             
-            if (occurrences.length > 0 && job.time === currentTime) {
+            if (isDue) {
                 const notificationKey = `notified_${job.id}_${currentDate}_${currentTime}`;
                 if (!localStorage.getItem(notificationKey)) {
                     // Show in-app notification
@@ -1176,7 +1268,8 @@ function createNotification(job) {
         weekly: 'Weekly',
         biweekly: 'Biweekly',
         monthly: 'Monthly',
-        quarterly: 'Quarterly'
+        quarterly: 'Quarterly',
+        custom: 'Ngoài lịch'
     };
     
     const typeLabel = typeLabels[job.type] || job.type;

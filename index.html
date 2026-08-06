@@ -60,31 +60,49 @@
                         <h6 class="mb-0"><i class="bi bi-info-circle"></i> Chú Thích</h6>
                     </div>
                     <div class="card-body p-2">
-                        <div class="legend-item">
-                            <span class="legend-color daily"></span>
-                            <span>Daily</span>
-                        </div>
-                        <div class="legend-item">
-                            <span class="legend-color weekly"></span>
-                            <span>Weekly</span>
-                        </div>
-                        <div class="legend-item">
-                            <span class="legend-color biweekly"></span>
-                            <span>Biweekly</span>
-                        </div>
-                        <div class="legend-item">
-                            <span class="legend-color monthly"></span>
-                            <span>Monthly</span>
-                        </div>
-                        <div class="legend-item">
-                            <span class="legend-color quarterly"></span>
-                            <span>Quarterly</span>
+                        <div class="row g-1">
+                            <div class="col-6">
+                                <div class="legend-item">
+                                    <span class="legend-color daily"></span>
+                                    <span>Daily</span>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="legend-item">
+                                    <span class="legend-color weekly"></span>
+                                    <span>Weekly</span>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="legend-item">
+                                    <span class="legend-color biweekly"></span>
+                                    <span>Biweekly</span>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="legend-item">
+                                    <span class="legend-color monthly"></span>
+                                    <span>Monthly</span>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="legend-item">
+                                    <span class="legend-color quarterly"></span>
+                                    <span>Quarterly</span>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="legend-item">
+                                    <span class="legend-color yearly"></span>
+                                    <span>Yearly</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Job List -->
-                <div class="card shadow-sm">
+                <div class="card shadow-sm job-list-card">
                     <div class="card-header bg-secondary text-white">
                         <h6 class="mb-0"><i class="bi bi-list-task"></i> Danh Sách Jobs</h6>
                     </div>
@@ -152,6 +170,23 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="card shadow-sm mt-3">
+                    <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-lightning-charge-fill"></i>
+                            <h6 class="mb-0">Job Ngoài Lịch</h6>
+                        </div>
+                        <button class="btn btn-sm btn-outline-dark" id="addOutOfScheduleBtn" type="button">
+                            <i class="bi bi-plus-circle"></i> Thêm
+                        </button>
+                    </div>
+                    <div class="card-body p-3">
+                        <div id="outOfScheduleList" class="out-of-schedule-list">
+                            <!-- Out-of-schedule jobs will be loaded here -->
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
         </div>
@@ -171,13 +206,25 @@
                 <form id="jobForm">
                     <input type="hidden" id="jobId">
                     
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
+                    <div class="row align-items-end">
+                        <div class="col-md-7 mb-3">
                             <label class="form-label fw-bold">Tiêu Đề Job *</label>
                             <input type="text" class="form-control" id="jobTitle" required>
                         </div>
 
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-5 mb-3">
+                            <div class="form-check form-switch mt-2">
+                                <input class="form-check-input" type="checkbox" id="isOutOfSchedule">
+                                <label class="form-check-label fw-bold" for="isOutOfSchedule">
+                                    <i class="bi bi-lightning-charge-fill"></i> Job ngoài lịch
+                                </label>
+                            </div>
+                            <div class="form-text">Dùng cho công việc phát sinh, không cố định theo lịch lặp.</div>
+                        </div>
+                    </div>
+
+                    <div id="scheduleFields" class="row">
+                        <div class="col-md-4 mb-3">
                             <label class="form-label fw-bold">Loại Job *</label>
                             <select class="form-select" id="jobType" required>
                                 <option value="daily">Daily (Hàng ngày)</option>
@@ -185,11 +232,9 @@
                                 <option value="biweekly">Biweekly (2 tuần/lần)</option>
                                 <option value="monthly">Monthly (Hàng tháng)</option>
                                 <option value="quarterly">Quarterly (Hàng quý)</option>
+                                <option value="yearly">Yearly (Hàng năm)</option>
                             </select>
                         </div>
-                    </div>
-
-                    <div class="row">
                         <div class="col-md-4 mb-3">
                             <label class="form-label fw-bold">Ngày Bắt Đầu *</label>
                             <input type="date" class="form-control" id="jobDate" required>
@@ -198,7 +243,7 @@
                             <label class="form-label fw-bold">Giờ Thực Hiện *</label>
                             <input type="time" class="form-control" id="jobTime" required>
                         </div>
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-12 mb-3">
                             <label class="form-label fw-bold">Làm Chủ Nhật?</label>
                             <div class="form-check form-switch mt-2">
                                 <input class="form-check-input" type="checkbox" id="workOnSunday">
@@ -239,15 +284,7 @@
                     </div>
 
                     <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <div class="form-check form-switch">
-                                <input type="checkbox" class="form-check-input" id="enableNotification" checked>
-                                <label class="form-check-label fw-bold" for="enableNotification">
-                                    <i class="bi bi-bell-fill"></i> Bật thông báo khi đến giờ thực hiện
-                                </label>
-                            </div>
-                        </div>
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-12 mb-3">
                             <div class="form-check form-switch">
                                 <input type="checkbox" class="form-check-input" id="isPaused">
                                 <label class="form-check-label fw-bold" for="isPaused">
