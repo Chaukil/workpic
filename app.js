@@ -38,6 +38,8 @@ let showSunday = true;
 let sidebarVisible = true;
 let pendingConfirmCallback = null;
 let currentTheme = 'light';
+let uiRefreshInterval = null;
+let lastUiRefreshMinute = null;
 
 function applyTheme(theme) {
     currentTheme = theme;
@@ -118,6 +120,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     initTheme();
     requestNotificationPermission();
+    startUiRefreshLoop();
 
     // Request notification permission
     if ('Notification' in window) {
@@ -1357,6 +1360,38 @@ if ('serviceWorker' in navigator) {
 }
 
 
+function startUiRefreshLoop() {
+    if (uiRefreshInterval) {
+        clearInterval(uiRefreshInterval);
+    }
+
+    refreshUiForCurrentTime();
+
+    uiRefreshInterval = setInterval(() => {
+        refreshUiForCurrentTime();
+    }, 15000);
+
+    window.addEventListener('focus', refreshUiForCurrentTime);
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+            refreshUiForCurrentTime();
+        }
+    });
+}
+
+function refreshUiForCurrentTime() {
+    const now = new Date();
+    const minuteKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}-${now.getHours()}-${now.getMinutes()}`;
+
+    if (lastUiRefreshMinute === minuteKey) {
+        return;
+    }
+
+    lastUiRefreshMinute = minuteKey;
+    renderSchedule();
+    checkNotifications();
+}
+
 function startNotificationCheck() {
     checkNotifications();
     notificationCheckInterval = setInterval(checkNotifications, 60000);
@@ -1375,5 +1410,8 @@ function formatDateShort(date) {
 window.addEventListener('beforeunload', () => {
     if (notificationCheckInterval) {
         clearInterval(notificationCheckInterval);
+    }
+    if (uiRefreshInterval) {
+        clearInterval(uiRefreshInterval);
     }
 });
