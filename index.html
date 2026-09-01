@@ -39,69 +39,46 @@
                 <p class="topbar-eyebrow">WorkPIC</p>
                 <h1>Job Schedule Manager</h1>
                 <p class="topbar-subtitle">Quản lý lịch công việc rõ ràng, gọn gàng và nhất quán</p>
+                <div class="topbar-legend" aria-label="Chú thích loại job">
+                    <span class="legend-inline-title">Chú Thích</span>
+                    <div class="legend-item">
+                        <span class="legend-color daily"></span>
+                        <span>Daily</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color weekly"></span>
+                        <span>Weekly</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color biweekly"></span>
+                        <span>Biweekly</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color monthly"></span>
+                        <span>Monthly</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color quarterly"></span>
+                        <span>Quarterly</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color yearly"></span>
+                        <span>Yearly</span>
+                    </div>
+                </div>
             </div>
             <div class="topbar-badges">
                 <button type="button" class="theme-toggle" id="themeToggleBtn" aria-pressed="false">
                     <i class="bi bi-moon-fill"></i>
                     <span>Chế độ tối</span>
                 </button>
-                <span class="badge-pill">Google-inspired</span>
-                <span class="badge-pill">Todo-style clarity</span>
             </div>
         </header>
 
         <div class="container-fluid p-2">
             <div class="row">
-            <!-- Left Sidebar - Legend & Job List -->
+            <!-- Left Sidebar - Job List -->
             <div class="col-lg-3 col-md-4" id="sidebar">
-                <!-- Legend -->
-                <div class="card shadow-sm mb-2">
-                    <div class="card-header bg-info text-white">
-                        <h6 class="mb-0"><i class="bi bi-info-circle"></i> Chú Thích</h6>
-                    </div>
-                    <div class="card-body p-2">
-                        <div class="row g-1">
-                            <div class="col-6">
-                                <div class="legend-item">
-                                    <span class="legend-color daily"></span>
-                                    <span>Daily</span>
-                                </div>
-                            </div>
-                            <div class="col-6">
-                                <div class="legend-item">
-                                    <span class="legend-color weekly"></span>
-                                    <span>Weekly</span>
-                                </div>
-                            </div>
-                            <div class="col-6">
-                                <div class="legend-item">
-                                    <span class="legend-color biweekly"></span>
-                                    <span>Biweekly</span>
-                                </div>
-                            </div>
-                            <div class="col-6">
-                                <div class="legend-item">
-                                    <span class="legend-color monthly"></span>
-                                    <span>Monthly</span>
-                                </div>
-                            </div>
-                            <div class="col-6">
-                                <div class="legend-item">
-                                    <span class="legend-color quarterly"></span>
-                                    <span>Quarterly</span>
-                                </div>
-                            </div>
-                            <div class="col-6">
-                                <div class="legend-item">
-                                    <span class="legend-color yearly"></span>
-                                    <span>Yearly</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Job List -->
                 <div class="card shadow-sm job-list-card">
                     <div class="card-header bg-secondary text-white">
                         <h6 class="mb-0"><i class="bi bi-list-task"></i> Danh Sách Jobs</h6>

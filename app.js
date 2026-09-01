@@ -41,6 +41,212 @@ let currentTheme = 'light';
 let uiRefreshInterval = null;
 let lastUiRefreshMinute = null;
 
+// Voice Notification Settings - Simple with Google TTS support
+let voiceNotificationSettings = {
+    enabled: localStorage.getItem('workpic-voice-enabled') === 'true',
+    language: 'vi-VN', // Default to Vietnamese
+    googleApiKey: localStorage.getItem('workpic-google-api-key') || '',
+    apiKeyAsked: localStorage.getItem('workpic-api-key-asked') === 'true' // Track if API key was asked before
+};
+let currentAudio = null;
+
+// Simple Voice Notification Manager
+const VoiceNotificationManager = {
+    init() {
+        // Initialize Web Speech API
+        this.loadBrowserVoice();
+    },
+
+    loadBrowserVoice() {
+        // Ensure Web Speech API is available
+        if (!window.speechSynthesis) {
+            console.warn('⚠️ Web Speech API not supported in this browser');
+        }
+    },
+
+    async speak(text) {
+        if (!voiceNotificationSettings.enabled) return;
+
+        // Try Google TTS first if API key is provided
+        if (voiceNotificationSettings.googleApiKey) {
+            const success = await this.speakWithGoogleTTS(text);
+            if (success) return;
+        }
+
+        // Fallback to Web Speech API
+        this.speakWithWebSpeechAPI(text);
+    },
+
+    async speakWithGoogleTTS(text) {
+        try {
+            // Stop any current playback
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio = null;
+            }
+
+            const response = await fetch('https://texttospeech.googleapis.com/v1/text:synthesize?key=' + voiceNotificationSettings.googleApiKey, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    input: { text: text },
+                    voice: {
+                        languageCode: voiceNotificationSettings.language,
+                        name: voiceNotificationSettings.language === 'vi-VN' ? 'vi-VN-Neural2-A' : 'en-US-Neural2-C',
+                        ssmlGender: 'FEMALE'
+                    },
+                    audioConfig: {
+                        audioEncoding: 'MP3',
+                        speakingRate: 0.9,
+                        volumeGainDb: 2
+                    }
+                })
+            });
+
+            if (!response.ok) {
+                console.warn('⚠️ Google TTS API error:', response.status, response.statusText, 'falling back to browser voice');
+                if (response.status === 401 || response.status === 403) {
+                    this.clearInvalidGoogleKey('API key Google không hợp lệ hoặc chưa bật Cloud Text-to-Speech API trong project.');
+                }
+                return false;
+            }
+
+            const data = await response.json();
+            
+            if (data.audioContent) {
+                const audioData = Uint8Array.from(atob(data.audioContent), c => c.charCodeAt(0));
+                const audioBlob = new Blob([audioData], { type: 'audio/mpeg' });
+                const audioUrl = URL.createObjectURL(audioBlob);
+                
+                currentAudio = new Audio(audioUrl);
+                currentAudio.play().catch(err => {
+                    console.error('❌ Audio playback error:', err);
+                });
+                return true;
+            }
+        } catch (error) {
+            console.warn('⚠️ Google TTS error:', error);
+            return false;
+        }
+    },
+
+    clearInvalidGoogleKey(reason) {
+        const hadGoogleKey = !!voiceNotificationSettings.googleApiKey;
+        voiceNotificationSettings.googleApiKey = '';
+        voiceNotificationSettings.apiKeyAsked = false;
+        localStorage.removeItem('workpic-google-api-key');
+        localStorage.setItem('workpic-api-key-asked', 'false');
+
+        if (hadGoogleKey) {
+            showNotification('⚠️ Giọng nói Google không khả dụng', `${reason} Đã chuyển sang giọng nói trình duyệt.`, false, 'warning');
+        }
+    },
+
+    speakWithWebSpeechAPI(text) {
+        try {
+            // Cancel any ongoing speech
+            if (window.speechSynthesis) {
+                window.speechSynthesis.cancel();
+            }
+
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = voiceNotificationSettings.language;
+            utterance.rate = 0.9;
+            utterance.pitch = 1;
+            utterance.volume = 1;
+
+            if (window.speechSynthesis) {
+                window.speechSynthesis.speak(utterance);
+            }
+        } catch (error) {
+            console.error('❌ Web Speech API error:', error);
+        }
+    },
+
+    toggle(forceAskApiKey = false) {
+        const shouldEnable = !voiceNotificationSettings.enabled;
+        voiceNotificationSettings.enabled = shouldEnable;
+        
+        // If enabling voice and the key has not yet been asked for or forced to update
+        if (voiceNotificationSettings.enabled && (!voiceNotificationSettings.apiKeyAsked || forceAskApiKey)) {
+            const result = this.askForApiKey();
+            if (!result) {
+                voiceNotificationSettings.enabled = false;
+                showNotification('🔇 Giọng Nói Tắt', 'Bạn đã hủy việc thiết lập giọng nói Google.', false, 'info');
+            } else {
+                voiceNotificationSettings.apiKeyAsked = true;
+                localStorage.setItem('workpic-api-key-asked', 'true');
+            }
+        } else if (voiceNotificationSettings.enabled) {
+            // Show status message
+            if (voiceNotificationSettings.googleApiKey) {
+                showNotification('🎧 Giọng Nói Bật', 'Dùng giọng nói Google (Shift+Click để thay đổi API)', false, 'success');
+            } else {
+                showNotification('🔊 Giọng Nói Bật', 'Dùng giọng nói Browser (Shift+Click để thêm Google API)', false, 'info');
+            }
+        } else {
+            showNotification('🔇 Giọng Nói Tắt', 'Thông báo không phát âm thanh', false, 'info');
+        }
+        
+        localStorage.setItem('workpic-voice-enabled', voiceNotificationSettings.enabled);
+        this.updateUI();
+    },
+
+    askForApiKey() {
+        const currentKey = voiceNotificationSettings.googleApiKey || '';
+        const prompt_text = currentKey 
+            ? 'Thay đổi Google Cloud Text-to-Speech API key:\n\nAPI key hiện tại: ' + currentKey.substring(0, 10) + '...\n\n(Để trống để dùng giọng nói browser mặc định)\n\nHướng dẫn: https://cloud.google.com/docs/authentication/api-keys'
+            : 'Để sử dụng giọng nói Google (chất lượng cao và dễ nghe hơn):\n\nNhập Google Cloud Text-to-Speech API key:\n\n(Để trống để dùng giọng nói browser mặc định)\n\nHướng dẫn: https://cloud.google.com/docs/authentication/api-keys';
+        
+        const apiKey = prompt(prompt_text, currentKey);
+        
+        if (apiKey === null) {
+            return false;
+        }
+
+        const trimmedKey = apiKey.trim();
+        if (trimmedKey) {
+            const googleApiKeyPattern = /^AIza[0-9A-Za-z\-_]{35}$/;
+            if (!googleApiKeyPattern.test(trimmedKey)) {
+                showNotification('⚠️ API key không hợp lệ', 'Google Cloud API key phải có định dạng AIza... và project phải bật Text-to-Speech API.', false, 'warning');
+                voiceNotificationSettings.googleApiKey = '';
+                localStorage.removeItem('workpic-google-api-key');
+                return false;
+            }
+
+            voiceNotificationSettings.googleApiKey = trimmedKey;
+            localStorage.setItem('workpic-google-api-key', trimmedKey);
+            showNotification('API Key Đã Lưu', 'Giọng nói Google sẽ được dùng từ bây giờ', false, 'success');
+            return true;
+        }
+
+        // User pressed OK with empty input - clear API key
+        voiceNotificationSettings.googleApiKey = '';
+        localStorage.removeItem('workpic-google-api-key');
+        showNotification('Chuyển sang Giọng Nói Browser', 'Sẽ dùng giọng nói mặc định của trình duyệt', false, 'info');
+        return true;
+    },
+
+    updateUI() {
+        const toggleBtn = document.getElementById('voiceToggleBtn');
+        if (toggleBtn) {
+            toggleBtn.setAttribute('aria-pressed', voiceNotificationSettings.enabled);
+            const icon = toggleBtn.querySelector('i');
+            const label = toggleBtn.querySelector('span');
+            
+            if (voiceNotificationSettings.enabled) {
+                icon.className = 'bi bi-volume-up-fill';
+                if (label) label.textContent = 'Giọng nói bật';
+            } else {
+                icon.className = 'bi bi-voicemail';
+                if (label) label.textContent = 'Giọng nói tắt';
+            }
+        }
+    }
+};
+
 function applyTheme(theme) {
     currentTheme = theme;
     document.body.classList.toggle('theme-dark', theme === 'dark');
@@ -96,6 +302,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('themeToggleBtn').addEventListener('click', () => {
         applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
     });
+    
     document.getElementById('confirmCancelBtn').addEventListener('click', hideConfirmModal);
     document.getElementById('confirmModal').addEventListener('click', (event) => {
         if (event.target.id === 'confirmModal') {
@@ -1202,6 +1409,7 @@ function showNotification(title, message, isSystemNotification = false, type = '
             icon: 'https://cdn-icons-png.flaticon.com/512/2972/2972185.png'
         });
     }
+    
 }
 
 // Check Notifications - WITH DESKTOP NOTIFICATIONS
@@ -1277,7 +1485,7 @@ function createNotification(job) {
     
     const typeLabel = typeLabels[job.type] || job.type;
     
-    // Create notification with options
+    // Create notification with options (removed actions - not supported by standard Notification API)
     const notification = new Notification('🔔 Nhắc Nhở Job - Job Schedule Manager', {
         body: `${job.title}\n⏰ ${job.time} - ${typeLabel}`,
         icon: 'https://cdn-icons-png.flaticon.com/512/2972/2972185.png',
@@ -1290,19 +1498,7 @@ function createNotification(job) {
             jobId: job.id,
             jobTitle: job.title,
             jobTime: job.time
-        },
-        actions: [ // Action buttons (if supported by browser)
-            {
-                action: 'view',
-                title: 'Xem chi tiết',
-                icon: 'https://cdn-icons-png.flaticon.com/512/709/709612.png'
-            },
-            {
-                action: 'close',
-                title: 'Đóng',
-                icon: 'https://cdn-icons-png.flaticon.com/512/1828/1828778.png'
-            }
-        ]
+        }
     });
     
     // Handle notification click
