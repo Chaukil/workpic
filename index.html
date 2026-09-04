@@ -14,6 +14,28 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
+    <div id="authScreen" class="auth-screen">
+        <div class="auth-panel">
+            <p class="topbar-eyebrow">WorkPIC</p>
+            <h1>Job Schedule Manager</h1>
+            <p class="auth-subtitle">Đăng nhập để quản lý lịch công việc của bạn.</p>
+            <div class="auth-tabs" role="tablist">
+                <button type="button" class="auth-tab active" id="loginTab">Đăng nhập</button>
+                <button type="button" class="auth-tab" id="registerTab">Đăng ký</button>
+            </div>
+            <form id="authForm">
+                <label class="form-label" for="authEmail">Email</label>
+                <input class="form-control" type="email" id="authEmail" autocomplete="email" required>
+                <label class="form-label mt-3" for="authPassword">Mật khẩu</label>
+                <input class="form-control" type="password" id="authPassword" autocomplete="current-password" minlength="6" required>
+                <label class="form-label mt-3 d-none" id="authNameLabel" for="authName">Tên hiển thị</label>
+                <input class="form-control d-none" type="text" id="authName" autocomplete="name">
+                <button class="btn btn-save w-100 mt-4" type="submit" id="authSubmitBtn">Đăng nhập</button>
+                <p class="auth-error" id="authError" role="alert"></p>
+            </form>
+        </div>
+    </div>
+
     <!-- Notification Container -->
     <div id="notificationContainer" class="notification-container"></div>
 
@@ -68,6 +90,15 @@
                 </div>
             </div>
             <div class="topbar-badges">
+                <div class="user-menu">
+                    <span class="user-email" id="currentUserEmail"></span>
+                    <button type="button" class="btn btn-sm btn-outline-warning" id="migrateLegacyJobsBtn" title="Gán các job chưa có user">
+                        <i class="bi bi-person-plus-fill"></i> Gán job cũ
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="logoutBtn">
+                        <i class="bi bi-box-arrow-right"></i> Đăng xuất
+                    </button>
+                </div>
                 <button type="button" class="theme-toggle" id="themeToggleBtn" aria-pressed="false">
                     <i class="bi bi-moon-fill"></i>
                     <span>Chế độ tối</span>
@@ -91,14 +122,20 @@
                         
                         <!-- Buttons Row -->
                         <div class="row g-2 mb-2">
-                            <div class="col-6">
+                            <div class="col-md-4 col-6">
                                 <button class="btn btn-add-job w-100" id="addJobBtn">
                                     <i class="bi bi-plus-circle-fill"></i>
                                     <span>Thêm Job</span>
                                     <div class="btn-shine"></div>
                                 </button>
                             </div>
-                            <div class="col-6">
+                            <div class="col-md-4 col-6">
+                                <button class="btn btn-view-data w-100" id="viewDataBtn" type="button">
+                                    <i class="bi bi-eye-fill"></i>
+                                    <span>Xem</span>
+                                </button>
+                            </div>
+                            <div class="col-md-4 col-6">
                                 <button class="btn btn-export-pdf w-100" id="exportPdfBtn">
                                     <i class="bi bi-file-earmark-pdf-fill"></i>
                                     <span>Xuất PDF</span>
@@ -307,6 +344,53 @@
                     <button type="button" class="btn btn-cancel" data-bs-dismiss="modal">
                         <i class="bi bi-x-circle"></i> Đóng
                     </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="migrateLegacyJobsModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title"><i class="bi bi-person-plus-fill"></i> Gán job cũ</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Chuyển toàn bộ job chưa có user cho tài khoản được chọn.</p>
+                    <p class="mb-3">Số job chưa có user: <strong id="legacyJobCount">Đang kiểm tra...</strong></p>
+                    <label class="form-label fw-bold" for="legacyTargetUser">User nhận job</label>
+                    <select class="form-select" id="legacyTargetUser">
+                        <option value="">Đang tải user...</option>
+                    </select>
+                    <p class="form-text">Chức năng này chỉ dùng một lần để xử lý dữ liệu cũ.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-cancel" data-bs-dismiss="modal">Hủy</button>
+                    <button type="button" class="btn btn-save" id="confirmMigrateLegacyJobsBtn">
+                        <i class="bi bi-check-circle-fill"></i> Gán toàn bộ
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="viewDataModal" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-gradient-info text-white">
+                    <h5 class="modal-title"><i class="bi bi-bar-chart-fill"></i> User và job đang thực hiện</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <section class="view-data-section">
+                        <h6><i class="bi bi-people-fill"></i> Danh sách user</h6>
+                        <div id="usersViewList" class="table-responsive"></div>
+                    </section>
+                    <section class="view-data-section mt-4">
+                        <h6><i class="bi bi-play-circle-fill"></i> Job đang thực hiện của tôi</h6>
+                        <div id="activeJobsViewList" class="table-responsive"></div>
+                    </section>
                 </div>
             </div>
         </div>

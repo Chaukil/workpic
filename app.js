@@ -1,7 +1,9 @@
 // Firebase Configuration - Chỉ sử dụng Firestore
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, getDocs, onSnapshot, enableIndexedDbPersistence } 
+import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, getDocs, onSnapshot, enableIndexedDbPersistence, query, where, writeBatch } 
     from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } 
+    from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyC8sCCoiCxm5cRJukyks0hNXRk7Quoq2HU",
@@ -16,6 +18,7 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
 // Enable offline persistence
 enableIndexedDbPersistence(db).catch((err) => {
@@ -40,6 +43,13 @@ let pendingConfirmCallback = null;
 let currentTheme = 'light';
 let uiRefreshInterval = null;
 let lastUiRefreshMinute = null;
+let currentUser = null;
+let unsubscribeJobs = null;
+let authMode = 'login';
+let currentViewingJobId = null;
+let migrateLegacyJobsModal;
+let legacyJobs = [];
+let viewDataModal;
 
 // Voice Notification Settings - Simple with Google TTS support
 let voiceNotificationSettings = {
@@ -277,11 +287,97 @@ function initTheme() {
     applyTheme(preferredTheme);
 }
 
+function setAuthMode(mode) {
+    authMode = mode;
+    const isRegister = mode === 'register';
+    document.getElementById('loginTab').classList.toggle('active', !isRegister);
+    document.getElementById('registerTab').classList.toggle('active', isRegister);
+    document.getElementById('authNameLabel').classList.toggle('d-none', !isRegister);
+    document.getElementById('authName').classList.toggle('d-none', !isRegister);
+    document.getElementById('authName').required = isRegister;
+    document.getElementById('authSubmitBtn').textContent = isRegister ? 'Tạo tài khoản' : 'Đăng nhập';
+    document.getElementById('authError').textContent = '';
+}
+
+function showAuthError(error) {
+    const messages = {
+        'auth/configuration-not-found': 'Firebase Authentication chưa được cấu hình. Hãy bật Identity Platform và phương thức Email/Password trong Firebase Console.',
+        'auth/invalid-credential': 'Email hoặc mật khẩu không đúng.',
+        'auth/email-already-in-use': 'Email này đã được đăng ký.',
+        'auth/invalid-email': 'Email không hợp lệ.',
+        'auth/weak-password': 'Mật khẩu cần có ít nhất 6 ký tự.'
+    };
+    document.getElementById('authError').textContent = messages[error.code] || 'Không thể xác thực. Vui lòng thử lại.';
+}
+
+async function handleAuthSubmit(event) {
+    event.preventDefault();
+    const email = document.getElementById('authEmail').value.trim();
+    const password = document.getElementById('authPassword').value;
+    const name = document.getElementById('authName').value.trim();
+    const submitButton = document.getElementById('authSubmitBtn');
+    submitButton.disabled = true;
+    document.getElementById('authError').textContent = '';
+
+    try {
+        if (authMode === 'register') {
+            const credential = await createUserWithEmailAndPassword(auth, email, password);
+            await addDoc(collection(db, 'users'), {
+                uid: credential.user.uid,
+                email,
+                displayName: name || email.split('@')[0],
+                createdAt: new Date().toISOString()
+            });
+        } else {
+            await signInWithEmailAndPassword(auth, email, password);
+        }
+        document.getElementById('authForm').reset();
+    } catch (error) {
+        console.error('Authentication error:', error);
+        showAuthError(error);
+    } finally {
+        submitButton.disabled = false;
+    }
+}
+
+function handleAuthenticatedUser(user) {
+    currentUser = user;
+    document.getElementById('authScreen').classList.add('d-none');
+    document.getElementById('currentUserEmail').textContent = user.email || '';
+    initializeAuthenticatedApp();
+}
+
+function handleSignedOut() {
+    currentUser = null;
+    if (unsubscribeJobs) {
+        unsubscribeJobs();
+        unsubscribeJobs = null;
+    }
+    jobs = [];
+    filteredJobs = [];
+    document.getElementById('authScreen').classList.remove('d-none');
+    document.getElementById('currentUserEmail').textContent = '';
+    renderJobList();
+    renderSchedule();
+    renderOutOfScheduleJobs();
+}
+
+function initializeAuthenticatedApp() {
+    requestNotificationPermission();
+    startUiRefreshLoop();
+    testFirestoreConnection().then(() => {
+        loadJobs();
+        startNotificationCheck();
+    });
+}
+
 // Initialize App
 document.addEventListener('DOMContentLoaded', function() {
     
     jobModal = new bootstrap.Modal(document.getElementById('jobModal'));
     viewJobModal = new bootstrap.Modal(document.getElementById('viewJobModal'));
+    migrateLegacyJobsModal = new bootstrap.Modal(document.getElementById('migrateLegacyJobsModal'));
+    viewDataModal = new bootstrap.Modal(document.getElementById('viewDataModal'));
     
     // Event Listeners
     document.getElementById('addJobBtn').addEventListener('click', () => openAddJobModal(false));
@@ -302,6 +398,13 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('themeToggleBtn').addEventListener('click', () => {
         applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
     });
+    document.getElementById('loginTab').addEventListener('click', () => setAuthMode('login'));
+    document.getElementById('registerTab').addEventListener('click', () => setAuthMode('register'));
+    document.getElementById('authForm').addEventListener('submit', handleAuthSubmit);
+    document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth));
+    document.getElementById('migrateLegacyJobsBtn').addEventListener('click', openLegacyMigrationModal);
+    document.getElementById('confirmMigrateLegacyJobsBtn').addEventListener('click', migrateLegacyJobs);
+    document.getElementById('viewDataBtn').addEventListener('click', openViewDataModal);
     
     document.getElementById('confirmCancelBtn').addEventListener('click', hideConfirmModal);
     document.getElementById('confirmModal').addEventListener('click', (event) => {
@@ -326,21 +429,8 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     initTheme();
-    requestNotificationPermission();
-    startUiRefreshLoop();
-
-    // Request notification permission
-    if ('Notification' in window) {
-        Notification.requestPermission().then(permission => {
-        });
-    }
-    
-    // Test connection first
-    testFirestoreConnection().then(() => {
-        loadJobs();
-        startNotificationCheck();
-    });
     loadSidebarState();
+    onAuthStateChanged(auth, user => user ? handleAuthenticatedUser(user) : handleSignedOut());
 });
 
 function requestNotificationPermission() {
@@ -488,8 +578,16 @@ function handleSearch(e) {
 
 // Export to PDF - Enhanced Version (EXCLUDE PAUSED JOBS)
 async function exportToPDF() {
-    // Filter out paused jobs
-    const activeJobs = jobs.filter(job => job.isPaused !== true);
+    const activeJobs = jobs.filter(job =>
+        currentUser &&
+        job.ownerId === currentUser.uid &&
+        job.isPaused !== true &&
+        job.isOutOfSchedule !== true
+    ).sort((firstJob, secondJob) => {
+        const weekdayDifference = getWeekdayIndex(firstJob.date) - getWeekdayIndex(secondJob.date);
+        if (weekdayDifference !== 0) return weekdayDifference;
+        return String(firstJob.time || '').localeCompare(String(secondJob.time || ''));
+    });
     
     if (activeJobs.length === 0) {
         alert('📋 Không có job đang hoạt động để xuất PDF!');
@@ -708,7 +806,8 @@ function formatDateVN(date) {
 // Test Firestore Connection
 async function testFirestoreConnection() {
     try {
-        const testCollection = collection(db, 'jobs');
+        if (!currentUser) return false;
+        const testCollection = query(collection(db, 'jobs'), where('ownerId', '==', currentUser.uid));
         const snapshot = await getDocs(testCollection);
         
         firestoreConnected = true;
@@ -729,21 +828,23 @@ async function testFirestoreConnection() {
 
 // Load Jobs from Firestore
 function loadJobs() {
-    if (!firestoreConnected) {
+    if (!firestoreConnected || !currentUser) {
         console.warn('⚠️ Chưa kết nối Firestore');
         return;
     }
     
-    const jobsCollection = collection(db, 'jobs');
+    const jobsCollection = query(collection(db, 'jobs'), where('ownerId', '==', currentUser.uid));
     
-    onSnapshot(jobsCollection, 
+    if (unsubscribeJobs) unsubscribeJobs();
+    unsubscribeJobs = onSnapshot(jobsCollection, 
         (snapshot) => {
             jobs = [];
             snapshot.forEach((doc) => {
-                jobs.push({
+                const job = {
                     id: doc.id,
                     ...doc.data()
-                });
+                };
+                if (!job.ownerId || job.ownerId === currentUser.uid) jobs.push(job);
             });
             
             // Sắp xếp theo ngày tạo
@@ -1063,6 +1164,7 @@ function renderSchedule() {
 
 // Open View Job Modal (Hiển thị trạng thái tạm dừng)
 function openViewJobModal(job) {
+    currentViewingJobId = job.id;
     document.getElementById('viewModalTitle').innerHTML = `
         <i class="bi bi-eye-fill"></i> ${job.title}
         ${job.isPaused ? '<span class="paused-indicator"><i class="bi bi-pause-circle-fill"></i> Đang tạm dừng</span>' : ''}
@@ -1096,9 +1198,224 @@ function openViewJobModal(job) {
                 ${job.description || '<em class="text-muted">Không có nội dung</em>'}
             </div>
         </div>
+        <div class="mb-3">
+            <label class="form-label fw-bold" for="transferUserSelect"><i class="bi bi-person-check-fill"></i> Chuyển job cho user khác</label>
+            <div class="input-group">
+                <select class="form-select" id="transferUserSelect">
+                    <option value="">Chọn user nhận job...</option>
+                </select>
+                <button type="button" class="btn btn-outline-primary" id="transferJobBtn"><i class="bi bi-send-fill"></i> Chuyển</button>
+            </div>
+        </div>
     `;
-    
+    document.getElementById('transferJobBtn').addEventListener('click', transferJob);
+    loadTransferUsers();
     viewJobModal.show();
+}
+
+async function loadTransferUsers() {
+    const select = document.getElementById('transferUserSelect');
+    if (!select || !currentUser) return;
+    select.innerHTML = '<option value="">Đang tải user...</option>';
+    try {
+        const snapshot = await getDocs(collection(db, 'users'));
+        const users = [];
+        snapshot.forEach(userDoc => {
+            const user = userDoc.data();
+            if (user.uid && user.uid !== currentUser.uid) users.push(user);
+        });
+        select.innerHTML = users.length
+            ? '<option value="">Chọn user nhận job...</option>'
+            : '<option value="">Chưa có user khác</option>';
+        users.sort((a, b) => (a.displayName || a.email).localeCompare(b.displayName || b.email));
+        users.forEach(user => {
+            const option = document.createElement('option');
+            option.value = user.uid;
+            option.textContent = user.displayName ? `${user.displayName} (${user.email})` : user.email;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Lỗi tải danh sách user:', error);
+        select.innerHTML = '<option value="">Không tải được danh sách user</option>';
+    }
+}
+
+async function openViewDataModal() {
+    const usersContainer = document.getElementById('usersViewList');
+    const jobsContainer = document.getElementById('activeJobsViewList');
+    usersContainer.innerHTML = '<p class="text-muted">Đang tải danh sách user...</p>';
+    jobsContainer.innerHTML = '<p class="text-muted">Đang tải job...</p>';
+    viewDataModal.show();
+
+    const activeJobs = jobs.filter(job =>
+        currentUser &&
+        job.ownerId === currentUser.uid &&
+        job.isPaused !== true &&
+        job.isOutOfSchedule !== true
+    ).sort((firstJob, secondJob) => {
+        const weekdayDifference = getWeekdayIndex(firstJob.date) - getWeekdayIndex(secondJob.date);
+        if (weekdayDifference !== 0) return weekdayDifference;
+        return String(firstJob.time || '').localeCompare(String(secondJob.time || ''));
+    });
+
+    if (activeJobs.length === 0) {
+        jobsContainer.innerHTML = '<p class="text-muted">Không có job đang thực hiện.</p>';
+    } else {
+        jobsContainer.innerHTML = `
+            <table class="table table-sm table-bordered align-middle">
+                <thead><tr><th>Tiêu đề</th><th>Loại</th><th>Thứ thực hiện</th><th>Giờ</th></tr></thead>
+                <tbody>${activeJobs.map(job => `
+                    <tr>
+                        <td>${escapeHtml(job.title)}</td>
+                        <td><span class="job-type-label ${escapeHtml(job.type)}">${escapeHtml(getTypeLabel(job.type))}</span></td>
+                        <td>${escapeHtml(getWeekdayLabel(job.date))}</td>
+                        <td>${escapeHtml(job.time || '-')}</td>
+                    </tr>`).join('')}</tbody>
+            </table>`;
+    }
+
+    try {
+        const usersSnapshot = await getDocs(collection(db, 'users'));
+        const users = [];
+        usersSnapshot.forEach(userDoc => users.push(userDoc.data()));
+        users.sort((a, b) => (a.displayName || a.email).localeCompare(b.displayName || b.email));
+        usersContainer.innerHTML = users.length
+            ? `<table class="table table-sm table-bordered align-middle">
+                <thead><tr><th>Tên</th><th>Email</th><th>Trạng thái</th></tr></thead>
+                <tbody>${users.map(user => `
+                    <tr>
+                        <td>${escapeHtml(user.displayName || '-')}</td>
+                        <td>${escapeHtml(user.email || '-')}</td>
+                        <td>${user.uid === currentUser.uid ? '<span class="badge bg-success">Đang đăng nhập</span>' : '<span class="badge bg-secondary">User</span>'}</td>
+                    </tr>`).join('')}</tbody>
+            </table>`
+            : '<p class="text-muted">Chưa có user nào.</p>';
+    } catch (error) {
+        console.error('Lỗi tải danh sách user:', error);
+        usersContainer.innerHTML = '<p class="text-danger">Không thể tải danh sách user. Kiểm tra Firestore Rules.</p>';
+    }
+}
+
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>'"]/g, character => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        "'": '&#39;',
+        '"': '&quot;'
+    }[character]));
+}
+
+function getWeekdayLabel(dateValue) {
+    const weekdayIndex = getWeekdayIndex(dateValue);
+    if (weekdayIndex < 0) return '-';
+    return ['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật'][weekdayIndex];
+}
+
+function getWeekdayIndex(dateValue) {
+    const [year, month, day] = String(dateValue || '').split('-').map(Number);
+    if (!year || !month || !day) return -1;
+    const sundayFirstIndex = new Date(year, month - 1, day).getDay();
+    return sundayFirstIndex === 0 ? 6 : sundayFirstIndex - 1;
+}
+
+async function openLegacyMigrationModal() {
+    const targetSelect = document.getElementById('legacyTargetUser');
+    const countLabel = document.getElementById('legacyJobCount');
+    targetSelect.innerHTML = '<option value="">Đang tải user...</option>';
+    countLabel.textContent = 'Đang kiểm tra...';
+    migrateLegacyJobsModal.show();
+
+    try {
+        const [jobsSnapshot, usersSnapshot] = await Promise.all([
+            getDocs(collection(db, 'jobs')),
+            getDocs(collection(db, 'users'))
+        ]);
+        legacyJobs = [];
+        jobsSnapshot.forEach(jobDoc => {
+            const data = jobDoc.data();
+            if (!data.ownerId) legacyJobs.push({ id: jobDoc.id, ...data });
+        });
+        countLabel.textContent = legacyJobs.length;
+
+        const users = [];
+        usersSnapshot.forEach(userDoc => {
+            const user = userDoc.data();
+            if (user.uid) users.push(user);
+        });
+        users.sort((a, b) => (a.displayName || a.email).localeCompare(b.displayName || b.email));
+        targetSelect.innerHTML = users.length
+            ? '<option value="">Chọn user nhận job...</option>'
+            : '<option value="">Chưa có user nào</option>';
+        users.forEach(user => {
+            const option = document.createElement('option');
+            option.value = user.uid;
+            option.textContent = user.displayName ? `${user.displayName} (${user.email})` : user.email;
+            targetSelect.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Lỗi tải job cũ:', error);
+        countLabel.textContent = 'Không tải được';
+        targetSelect.innerHTML = '<option value="">Kiểm tra lại Firestore Rules</option>';
+    }
+}
+
+async function migrateLegacyJobs() {
+    const targetUid = document.getElementById('legacyTargetUser').value;
+    if (!targetUid) {
+        showNotification('Thiếu thông tin', 'Hãy chọn user nhận job.', false, 'warning');
+        return;
+    }
+    if (!legacyJobs.length) {
+        showNotification('Không có dữ liệu', 'Không còn job nào chưa có user.', false, 'info');
+        migrateLegacyJobsModal.hide();
+        return;
+    }
+
+    const button = document.getElementById('confirmMigrateLegacyJobsBtn');
+    button.disabled = true;
+    try {
+        for (let index = 0; index < legacyJobs.length; index += 500) {
+            const batch = writeBatch(db);
+            legacyJobs.slice(index, index + 500).forEach(job => {
+                batch.update(doc(db, 'jobs', job.id), {
+                    ownerId: targetUid,
+                    updatedAt: new Date().toISOString()
+                });
+            });
+            await batch.commit();
+        }
+        showNotification('Đã gán job cũ', `Đã chuyển ${legacyJobs.length} job cho user được chọn.`, false, 'success');
+        legacyJobs = [];
+        migrateLegacyJobsModal.hide();
+    } catch (error) {
+        console.error('Lỗi gán job cũ:', error);
+        showNotification('Lỗi', 'Không thể gán job cũ. Hãy kiểm tra Firestore Rules tạm thời.', false, 'danger');
+    } finally {
+        button.disabled = false;
+    }
+}
+
+async function transferJob() {
+    const jobId = currentViewingJobId || currentEditingJobId;
+    const targetUid = document.getElementById('transferUserSelect').value;
+    const job = jobs.find(item => item.id === jobId);
+    if (!jobId || !targetUid || !job) {
+        showNotification('Thiếu thông tin', 'Hãy chọn user nhận job trước.', false, 'warning');
+        return;
+    }
+    try {
+        await updateDoc(doc(db, 'jobs', jobId), {
+            ownerId: targetUid,
+            updatedAt: new Date().toISOString()
+        });
+        viewJobModal.hide();
+        currentViewingJobId = null;
+        showNotification('Đã chuyển job', `Job "${job.title}" đã được chuyển cho user khác.`, false, 'success');
+    } catch (error) {
+        console.error('Lỗi chuyển job:', error);
+        showNotification('Lỗi', 'Không thể chuyển job. Vui lòng thử lại.', false, 'danger');
+    }
 }
 
 
@@ -1214,7 +1531,8 @@ async function saveJob() {
         workOnSunday,
         isPaused, // NEW
         isOutOfSchedule,
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
+        ownerId: currentUser.uid
     };
     
     try {
@@ -1225,6 +1543,7 @@ async function saveJob() {
         
         if (currentEditingJobId) {
             const jobRef = doc(db, 'jobs', currentEditingJobId);
+            delete jobData.ownerId;
             await updateDoc(jobRef, jobData);
             console.log('✅ Job đã được cập nhật:', currentEditingJobId);
             showNotification('Thành công', `Job "${title}" đã được ${isPaused ? 'tạm dừng' : 'cập nhật'}!`);
