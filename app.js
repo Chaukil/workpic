@@ -1,6 +1,6 @@
 // Firebase Configuration - Chỉ sử dụng Firestore
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, getDocs, onSnapshot, enableIndexedDbPersistence, query, where, writeBatch } 
+import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, getDocs, onSnapshot, enableIndexedDbPersistence, query, where, writeBatch, arrayUnion } 
     from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } 
     from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -19,15 +19,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
-
-// Enable offline persistence
-enableIndexedDbPersistence(db).catch((err) => {
-    if (err.code == 'failed-precondition') {
-        console.warn('⚠️ Multiple tabs open, persistence can only be enabled in one tab at a time.');
-    } else if (err.code == 'unimplemented') {
-        console.warn('⚠️ The current browser does not support offline persistence');
-    }
-});
 
 // Global Variables
 let jobModal;
@@ -50,212 +41,12 @@ let currentViewingJobId = null;
 let migrateLegacyJobsModal;
 let legacyJobs = [];
 let viewDataModal;
-
-// Voice Notification Settings - Simple with Google TTS support
-let voiceNotificationSettings = {
-    enabled: localStorage.getItem('workpic-voice-enabled') === 'true',
-    language: 'vi-VN', // Default to Vietnamese
-    googleApiKey: localStorage.getItem('workpic-google-api-key') || '',
-    apiKeyAsked: localStorage.getItem('workpic-api-key-asked') === 'true' // Track if API key was asked before
-};
-let currentAudio = null;
-
-// Simple Voice Notification Manager
-const VoiceNotificationManager = {
-    init() {
-        // Initialize Web Speech API
-        this.loadBrowserVoice();
-    },
-
-    loadBrowserVoice() {
-        // Ensure Web Speech API is available
-        if (!window.speechSynthesis) {
-            console.warn('⚠️ Web Speech API not supported in this browser');
-        }
-    },
-
-    async speak(text) {
-        if (!voiceNotificationSettings.enabled) return;
-
-        // Try Google TTS first if API key is provided
-        if (voiceNotificationSettings.googleApiKey) {
-            const success = await this.speakWithGoogleTTS(text);
-            if (success) return;
-        }
-
-        // Fallback to Web Speech API
-        this.speakWithWebSpeechAPI(text);
-    },
-
-    async speakWithGoogleTTS(text) {
-        try {
-            // Stop any current playback
-            if (currentAudio) {
-                currentAudio.pause();
-                currentAudio = null;
-            }
-
-            const response = await fetch('https://texttospeech.googleapis.com/v1/text:synthesize?key=' + voiceNotificationSettings.googleApiKey, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    input: { text: text },
-                    voice: {
-                        languageCode: voiceNotificationSettings.language,
-                        name: voiceNotificationSettings.language === 'vi-VN' ? 'vi-VN-Neural2-A' : 'en-US-Neural2-C',
-                        ssmlGender: 'FEMALE'
-                    },
-                    audioConfig: {
-                        audioEncoding: 'MP3',
-                        speakingRate: 0.9,
-                        volumeGainDb: 2
-                    }
-                })
-            });
-
-            if (!response.ok) {
-                console.warn('⚠️ Google TTS API error:', response.status, response.statusText, 'falling back to browser voice');
-                if (response.status === 401 || response.status === 403) {
-                    this.clearInvalidGoogleKey('API key Google không hợp lệ hoặc chưa bật Cloud Text-to-Speech API trong project.');
-                }
-                return false;
-            }
-
-            const data = await response.json();
-            
-            if (data.audioContent) {
-                const audioData = Uint8Array.from(atob(data.audioContent), c => c.charCodeAt(0));
-                const audioBlob = new Blob([audioData], { type: 'audio/mpeg' });
-                const audioUrl = URL.createObjectURL(audioBlob);
-                
-                currentAudio = new Audio(audioUrl);
-                currentAudio.play().catch(err => {
-                    console.error('❌ Audio playback error:', err);
-                });
-                return true;
-            }
-        } catch (error) {
-            console.warn('⚠️ Google TTS error:', error);
-            return false;
-        }
-    },
-
-    clearInvalidGoogleKey(reason) {
-        const hadGoogleKey = !!voiceNotificationSettings.googleApiKey;
-        voiceNotificationSettings.googleApiKey = '';
-        voiceNotificationSettings.apiKeyAsked = false;
-        localStorage.removeItem('workpic-google-api-key');
-        localStorage.setItem('workpic-api-key-asked', 'false');
-
-        if (hadGoogleKey) {
-            showNotification('⚠️ Giọng nói Google không khả dụng', `${reason} Đã chuyển sang giọng nói trình duyệt.`, false, 'warning');
-        }
-    },
-
-    speakWithWebSpeechAPI(text) {
-        try {
-            // Cancel any ongoing speech
-            if (window.speechSynthesis) {
-                window.speechSynthesis.cancel();
-            }
-
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = voiceNotificationSettings.language;
-            utterance.rate = 0.9;
-            utterance.pitch = 1;
-            utterance.volume = 1;
-
-            if (window.speechSynthesis) {
-                window.speechSynthesis.speak(utterance);
-            }
-        } catch (error) {
-            console.error('❌ Web Speech API error:', error);
-        }
-    },
-
-    toggle(forceAskApiKey = false) {
-        const shouldEnable = !voiceNotificationSettings.enabled;
-        voiceNotificationSettings.enabled = shouldEnable;
-        
-        // If enabling voice and the key has not yet been asked for or forced to update
-        if (voiceNotificationSettings.enabled && (!voiceNotificationSettings.apiKeyAsked || forceAskApiKey)) {
-            const result = this.askForApiKey();
-            if (!result) {
-                voiceNotificationSettings.enabled = false;
-                showNotification('🔇 Giọng Nói Tắt', 'Bạn đã hủy việc thiết lập giọng nói Google.', false, 'info');
-            } else {
-                voiceNotificationSettings.apiKeyAsked = true;
-                localStorage.setItem('workpic-api-key-asked', 'true');
-            }
-        } else if (voiceNotificationSettings.enabled) {
-            // Show status message
-            if (voiceNotificationSettings.googleApiKey) {
-                showNotification('🎧 Giọng Nói Bật', 'Dùng giọng nói Google (Shift+Click để thay đổi API)', false, 'success');
-            } else {
-                showNotification('🔊 Giọng Nói Bật', 'Dùng giọng nói Browser (Shift+Click để thêm Google API)', false, 'info');
-            }
-        } else {
-            showNotification('🔇 Giọng Nói Tắt', 'Thông báo không phát âm thanh', false, 'info');
-        }
-        
-        localStorage.setItem('workpic-voice-enabled', voiceNotificationSettings.enabled);
-        this.updateUI();
-    },
-
-    askForApiKey() {
-        const currentKey = voiceNotificationSettings.googleApiKey || '';
-        const prompt_text = currentKey 
-            ? 'Thay đổi Google Cloud Text-to-Speech API key:\n\nAPI key hiện tại: ' + currentKey.substring(0, 10) + '...\n\n(Để trống để dùng giọng nói browser mặc định)\n\nHướng dẫn: https://cloud.google.com/docs/authentication/api-keys'
-            : 'Để sử dụng giọng nói Google (chất lượng cao và dễ nghe hơn):\n\nNhập Google Cloud Text-to-Speech API key:\n\n(Để trống để dùng giọng nói browser mặc định)\n\nHướng dẫn: https://cloud.google.com/docs/authentication/api-keys';
-        
-        const apiKey = prompt(prompt_text, currentKey);
-        
-        if (apiKey === null) {
-            return false;
-        }
-
-        const trimmedKey = apiKey.trim();
-        if (trimmedKey) {
-            const googleApiKeyPattern = /^AIza[0-9A-Za-z\-_]{35}$/;
-            if (!googleApiKeyPattern.test(trimmedKey)) {
-                showNotification('⚠️ API key không hợp lệ', 'Google Cloud API key phải có định dạng AIza... và project phải bật Text-to-Speech API.', false, 'warning');
-                voiceNotificationSettings.googleApiKey = '';
-                localStorage.removeItem('workpic-google-api-key');
-                return false;
-            }
-
-            voiceNotificationSettings.googleApiKey = trimmedKey;
-            localStorage.setItem('workpic-google-api-key', trimmedKey);
-            showNotification('API Key Đã Lưu', 'Giọng nói Google sẽ được dùng từ bây giờ', false, 'success');
-            return true;
-        }
-
-        // User pressed OK with empty input - clear API key
-        voiceNotificationSettings.googleApiKey = '';
-        localStorage.removeItem('workpic-google-api-key');
-        showNotification('Chuyển sang Giọng Nói Browser', 'Sẽ dùng giọng nói mặc định của trình duyệt', false, 'info');
-        return true;
-    },
-
-    updateUI() {
-        const toggleBtn = document.getElementById('voiceToggleBtn');
-        if (toggleBtn) {
-            toggleBtn.setAttribute('aria-pressed', voiceNotificationSettings.enabled);
-            const icon = toggleBtn.querySelector('i');
-            const label = toggleBtn.querySelector('span');
-            
-            if (voiceNotificationSettings.enabled) {
-                icon.className = 'bi bi-volume-up-fill';
-                if (label) label.textContent = 'Giọng nói bật';
-            } else {
-                icon.className = 'bi bi-voicemail';
-                if (label) label.textContent = 'Giọng nói tắt';
-            }
-        }
-    }
-};
+let userProfileModal;
+let transferConfirmModal;
+let pendingTransferJob = null;
+let pendingTransferFromUser = null;
+let pendingTransferRequestId = null;
+let pendingTransferRequestData = null;
 
 function applyTheme(theme) {
     currentTheme = theme;
@@ -340,11 +131,142 @@ async function handleAuthSubmit(event) {
     }
 }
 
-function handleAuthenticatedUser(user) {
+
+async function handleAuthenticatedUser(user) {
     currentUser = user;
+    
+    // Fetch user data from Firestore
+    const userData = await getUserData(user.uid);
+    
+    if (userData && userData.displayName) {
+        // Store displayName in currentUser for easy access
+        currentUser.displayName = userData.displayName;
+    } else {
+        // Fallback to email-derived name or auth displayName
+        currentUser.displayName = user.displayName || user.email?.split('@')[0] || 'User';
+    }
+    
     document.getElementById('authScreen').classList.add('d-none');
-    document.getElementById('currentUserEmail').textContent = user.email || '';
+    updateUserProfileUI();
     initializeAuthenticatedApp();
+}
+
+/**
+ * Fetch user data from Firestore based on UID
+ * Returns { displayName, email, uid, ... } or null if not found
+ */
+async function getUserData(uid) {
+    try {
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where('uid', '==', uid));
+        const snapshot = await getDocs(q);
+        
+        if (!snapshot.empty) {
+            const userDoc = snapshot.docs[0];
+            return userDoc.data();
+        } else {
+            console.warn('No user document found for UID:', uid);
+            return null;
+        }
+    } catch (error) {
+        console.error('Error fetching user data:', error);
+        return null;
+    }
+}
+
+function updateUserProfileUI() {
+    if (!currentUser) return;
+    
+    // Use displayName from Firestore (already fetched in handleAuthenticatedUser)
+    const displayName = currentUser.displayName || currentUser.email?.split('@')[0] || 'User';
+    
+    document.getElementById('userDisplayName').textContent = displayName;
+    
+    // Load avatar từ localStorage
+    const savedAvatar = localStorage.getItem(`avatar_${currentUser.uid}`);
+    const avatarImg = document.getElementById('userAvatar');
+    if (savedAvatar) {
+        avatarImg.src = savedAvatar;
+    } else {
+        // Avatar mặc định
+        avatarImg.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=3b82f6&color=fff&size=28`;
+    }
+}
+
+function openUserProfileModal() {
+    if (!currentUser) return;
+    
+    document.getElementById('profileEmail').textContent = currentUser.email || '---';
+    document.getElementById('profileUid').textContent = currentUser.uid || '---';
+    
+    // Use displayName from Firestore
+    const displayName = currentUser.displayName || currentUser.email?.split('@')[0] || '';
+    document.getElementById('profileDisplayName').value = displayName;
+    
+    // Load avatar
+    const savedAvatar = localStorage.getItem(`avatar_${currentUser.uid}`);
+    const avatarImg = document.getElementById('profileAvatar');
+    if (savedAvatar) {
+        avatarImg.src = savedAvatar;
+    } else {
+        avatarImg.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=3b82f6&color=fff&size=120`;
+    }
+    
+    userProfileModal.show();
+}
+
+async function saveUserProfile() {
+    const newDisplayName = document.getElementById('profileDisplayName').value.trim();
+    if (!newDisplayName) {
+        showNotification('Thiếu thông tin', 'Vui lòng nhập tên hiển thị.', false, 'warning');
+        return;
+    }
+    
+    try {
+        // Update Firestore
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where('uid', '==', currentUser.uid));
+        const snapshot = await getDocs(q);
+        
+        if (!snapshot.empty) {
+            const userDoc = snapshot.docs[0];
+            await updateDoc(doc(db, 'users', userDoc.id), {
+                displayName: newDisplayName,
+                updatedAt: new Date().toISOString()
+            });
+        }
+        
+        // Update currentUser object
+        currentUser.displayName = newDisplayName;
+        
+        // Refresh UI
+        updateUserProfileUI();
+        showNotification('Thành công', 'Đã cập nhật tên hiển thị!', false, 'success');
+        userProfileModal.hide();
+    } catch (error) {
+        console.error('Lỗi cập nhật profile:', error);
+        showNotification('Lỗi', 'Không thể cập nhật tên hiển thị.', false, 'danger');
+    }
+}
+
+
+// Thêm function đổi avatar
+function changeAvatar(file) {
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const avatarData = e.target.result;
+        // Lưu vào localStorage
+        localStorage.setItem(`avatar_${currentUser.uid}`, avatarData);
+        
+        // Cập nhật UI
+        document.getElementById('userAvatar').src = avatarData;
+        document.getElementById('profileAvatar').src = avatarData;
+        
+        showNotification('Thành công', 'Đã cập nhật ảnh đại diện!', false, 'success');
+    };
+    reader.readAsDataURL(file);
 }
 
 function handleSignedOut() {
@@ -356,7 +278,6 @@ function handleSignedOut() {
     jobs = [];
     filteredJobs = [];
     document.getElementById('authScreen').classList.remove('d-none');
-    document.getElementById('currentUserEmail').textContent = '';
     renderJobList();
     renderSchedule();
     renderOutOfScheduleJobs();
@@ -368,28 +289,34 @@ function initializeAuthenticatedApp() {
     testFirestoreConnection().then(() => {
         loadJobs();
         startNotificationCheck();
+        listenTransferRequests();
     });
 }
 
-// Initialize App
+// Trong DOMContentLoaded event listener, THÊM CHECK NULL
 document.addEventListener('DOMContentLoaded', function() {
     
     jobModal = new bootstrap.Modal(document.getElementById('jobModal'));
     viewJobModal = new bootstrap.Modal(document.getElementById('viewJobModal'));
     migrateLegacyJobsModal = new bootstrap.Modal(document.getElementById('migrateLegacyJobsModal'));
     viewDataModal = new bootstrap.Modal(document.getElementById('viewDataModal'));
+    userProfileModal = new bootstrap.Modal(document.getElementById('userProfileModal'));
+    transferConfirmModal = new bootstrap.Modal(document.getElementById('transferConfirmModal'));
     
     // Event Listeners
     document.getElementById('addJobBtn').addEventListener('click', () => openAddJobModal(false));
     document.getElementById('addOutOfScheduleBtn').addEventListener('click', () => openAddJobModal(true));
     document.getElementById('saveJobBtn').addEventListener('click', saveJob);
     document.getElementById('deleteJobBtn').addEventListener('click', deleteJob);
+    
     const textColorInput = document.getElementById('textColor');
     textColorInput.addEventListener('input', changeTextColor);
     textColorInput.addEventListener('change', changeTextColor);
+    
     const highlightColorInput = document.getElementById('highlightColor');
     highlightColorInput.addEventListener('input', applyHighlightColor);
     highlightColorInput.addEventListener('change', applyHighlightColor);
+    
     document.getElementById('searchJob').addEventListener('input', handleSearch);
     document.getElementById('isOutOfSchedule').addEventListener('change', toggleOutOfScheduleFields);
     document.getElementById('exportPdfBtn').addEventListener('click', exportToPDF);
@@ -398,11 +325,11 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('themeToggleBtn').addEventListener('click', () => {
         applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
     });
+    
     document.getElementById('loginTab').addEventListener('click', () => setAuthMode('login'));
     document.getElementById('registerTab').addEventListener('click', () => setAuthMode('register'));
     document.getElementById('authForm').addEventListener('submit', handleAuthSubmit);
     document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth));
-    document.getElementById('migrateLegacyJobsBtn').addEventListener('click', openLegacyMigrationModal);
     document.getElementById('confirmMigrateLegacyJobsBtn').addEventListener('click', migrateLegacyJobs);
     document.getElementById('viewDataBtn').addEventListener('click', openViewDataModal);
     
@@ -422,6 +349,23 @@ document.addEventListener('DOMContentLoaded', function() {
             hideConfirmModal();
         }
     });
+
+    document.getElementById('userProfileBtn').addEventListener('click', openUserProfileModal);
+    document.getElementById('saveProfileBtn').addEventListener('click', saveUserProfile);
+    document.getElementById('changeAvatarBtn').addEventListener('click', () => {
+        document.getElementById('avatarFileInput').click();
+    });
+    document.getElementById('avatarFileInput').addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            changeAvatar(e.target.files[0]);
+        }
+        e.target.value = '';
+    });
+    
+    // Transfer confirmation
+    document.getElementById('transferAcceptBtn').addEventListener('click', acceptTransfer);
+    document.getElementById('transferRejectBtn').addEventListener('click', rejectTransfer);
+
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {
             hideConfirmModal();
@@ -432,6 +376,7 @@ document.addEventListener('DOMContentLoaded', function() {
     loadSidebarState();
     onAuthStateChanged(auth, user => user ? handleAuthenticatedUser(user) : handleSignedOut());
 });
+
 
 function requestNotificationPermission() {
     if ('Notification' in window) {
@@ -1161,8 +1106,7 @@ function renderSchedule() {
     }
 }
 
-
-// Open View Job Modal (Hiển thị trạng thái tạm dừng)
+// Sửa function openViewJobModal - phần transfer
 function openViewJobModal(job) {
     currentViewingJobId = job.id;
     document.getElementById('viewModalTitle').innerHTML = `
@@ -1278,18 +1222,21 @@ async function openViewDataModal() {
         const usersSnapshot = await getDocs(collection(db, 'users'));
         const users = [];
         usersSnapshot.forEach(userDoc => users.push(userDoc.data()));
-        users.sort((a, b) => (a.displayName || a.email).localeCompare(b.displayName || b.email));
-        usersContainer.innerHTML = users.length
+        // Chỉ hiển thị user đang đăng nhập (currentUser), ẩn các user khác
+        // để tránh danh sách user dài đẩy phần "Job đang thực hiện" xuống dưới.
+        const loggedInUsers = users.filter(user => user.uid === currentUser.uid);
+        loggedInUsers.sort((a, b) => (a.displayName || a.email).localeCompare(b.displayName || b.email));
+        usersContainer.innerHTML = loggedInUsers.length
             ? `<table class="table table-sm table-bordered align-middle">
                 <thead><tr><th>Tên</th><th>Email</th><th>Trạng thái</th></tr></thead>
-                <tbody>${users.map(user => `
+                <tbody>${loggedInUsers.map(user => `
                     <tr>
                         <td>${escapeHtml(user.displayName || '-')}</td>
                         <td>${escapeHtml(user.email || '-')}</td>
-                        <td>${user.uid === currentUser.uid ? '<span class="badge bg-success">Đang đăng nhập</span>' : '<span class="badge bg-secondary">User</span>'}</td>
+                        <td><span class="badge bg-success">Đang đăng nhập</span></td>
                     </tr>`).join('')}</tbody>
             </table>`
-            : '<p class="text-muted">Chưa có user nào.</p>';
+            : '<p class="text-muted">Không có user nào đang đăng nhập.</p>';
     } catch (error) {
         console.error('Lỗi tải danh sách user:', error);
         usersContainer.innerHTML = '<p class="text-danger">Không thể tải danh sách user. Kiểm tra Firestore Rules.</p>';
@@ -1396,28 +1343,149 @@ async function migrateLegacyJobs() {
     }
 }
 
+// Sửa function transferJob - thêm cơ chế xác nhận
 async function transferJob() {
     const jobId = currentViewingJobId || currentEditingJobId;
     const targetUid = document.getElementById('transferUserSelect').value;
     const job = jobs.find(item => item.id === jobId);
+    
     if (!jobId || !targetUid || !job) {
         showNotification('Thiếu thông tin', 'Hãy chọn user nhận job trước.', false, 'warning');
         return;
     }
+    
+    // Lưu thông tin để xác nhận sau
+    pendingTransferJob = {
+        jobId: jobId,
+        jobTitle: job.title,
+        targetUid: targetUid,
+        fromUid: currentUser.uid,
+        fromEmail: currentUser.email,
+        timestamp: new Date().toISOString()
+    };
+    
+    // Tạo thông báo cho người nhận (trong Firestore)
     try {
-        await updateDoc(doc(db, 'jobs', jobId), {
-            ownerId: targetUid,
-            updatedAt: new Date().toISOString()
+        await addDoc(collection(db, 'transferRequests'), {
+            jobId: jobId,
+            jobTitle: job.title,
+            fromUid: currentUser.uid,
+            fromEmail: currentUser.email,
+            fromName: currentUser.displayName || currentUser.email,
+            toUid: targetUid,
+            status: 'pending', // pending, accepted, rejected
+            timestamp: new Date().toISOString()
         });
+        
+        showNotification('Đã gửi yêu cầu', `Đã gửi yêu cầu chuyển job "${job.title}" đến user. Vui lòng chờ xác nhận.`, false, 'success');
         viewJobModal.hide();
         currentViewingJobId = null;
-        showNotification('Đã chuyển job', `Job "${job.title}" đã được chuyển cho user khác.`, false, 'success');
+        
+        // Hiển thị modal chờ xác nhận (tùy chọn)
+        // showTransferPendingModal();
     } catch (error) {
-        console.error('Lỗi chuyển job:', error);
-        showNotification('Lỗi', 'Không thể chuyển job. Vui lòng thử lại.', false, 'danger');
+        console.error('Lỗi gửi yêu cầu chuyển job:', error);
+        showNotification('Lỗi', 'Không thể gửi yêu cầu chuyển job.', false, 'danger');
     }
 }
 
+// Thêm function lắng nghe yêu cầu chuyển job
+function listenTransferRequests() {
+    if (!currentUser) return;
+    
+    const q = query(
+        collection(db, 'transferRequests'),
+        where('toUid', '==', currentUser.uid),
+        where('status', '==', 'pending')
+    );
+    
+    onSnapshot(q, (snapshot) => {
+        snapshot.forEach((doc) => {
+            const request = doc.data();
+            // Hiển thị thông báo cho người dùng
+            showTransferConfirmModal(doc.id, request);
+        });
+    });
+}
+
+// Thêm function hiển thị modal xác nhận chuyển job
+function showTransferConfirmModal(requestId, request) {
+    document.getElementById('transferConfirmMessage').innerHTML = `
+        <strong>${request.fromName || request.fromEmail}</strong> muốn chuyển job 
+        <strong>"${request.jobTitle}"</strong> cho bạn.<br>
+        <small class="text-muted">Gửi lúc: ${new Date(request.timestamp).toLocaleString('vi-VN')}</small>
+    `;
+    
+    // Lưu request ID để xử lý sau
+    pendingTransferRequestId = requestId;
+    pendingTransferRequestData = request;
+    
+    transferConfirmModal.show();
+}
+
+// Thêm function chấp nhận chuyển job
+async function acceptTransfer() {
+    if (!pendingTransferRequestId || !pendingTransferRequestData) return;
+    
+    try {
+        // Cập nhật trạng thái request
+        await updateDoc(doc(db, 'transferRequests', pendingTransferRequestId), {
+            status: 'accepted',
+            respondedAt: new Date().toISOString()
+        });
+        
+        // Chuyển job cho người nhận
+        const jobRef = doc(db, 'jobs', pendingTransferRequestData.jobId);
+        await updateDoc(jobRef, {
+            ownerId: currentUser.uid,
+            transferHistory: arrayUnion({
+                from: pendingTransferRequestData.fromUid,
+                to: currentUser.uid,
+                timestamp: new Date().toISOString()
+            }),
+            updatedAt: new Date().toISOString()
+        });
+        
+        showNotification('Đã nhận job', `Bạn đã nhận job "${pendingTransferRequestData.jobTitle}"!`, false, 'success');
+        transferConfirmModal.hide();
+        pendingTransferRequestId = null;
+        pendingTransferRequestData = null;
+    } catch (error) {
+        console.error('Lỗi nhận job:', error);
+        showNotification('Lỗi', 'Không thể nhận job.', false, 'danger');
+    }
+}
+
+// Thêm function từ chối chuyển job
+async function rejectTransfer() {
+    if (!pendingTransferRequestId || !pendingTransferRequestData) return;
+    
+    try {
+        // Cập nhật trạng thái request
+        await updateDoc(doc(db, 'transferRequests', pendingTransferRequestId), {
+            status: 'rejected',
+            respondedAt: new Date().toISOString()
+        });
+        
+        // Gửi thông báo cho người gửi (có thể thêm vào notifications collection)
+        await addDoc(collection(db, 'notifications'), {
+            userId: pendingTransferRequestData.fromUid,
+            type: 'transfer_rejected',
+            message: `${currentUser.displayName || currentUser.email} đã từ chối nhận job "${pendingTransferRequestData.jobTitle}"`,
+            jobId: pendingTransferRequestData.jobId,
+            timestamp: new Date().toISOString(),
+            read: false
+        });
+        
+        showNotification('Đã từ chối', `Bạn đã từ chối nhận job "${pendingTransferRequestData.jobTitle}".`, false, 'warning');
+        transferConfirmModal.hide();
+        pendingTransferRequestId = null;
+        pendingTransferRequestData = null;
+    } catch (error) {
+        console.error('Lỗi từ chối job:', error);
+        showNotification('Lỗi', 'Không thể từ chối job.', false, 'danger');
+    }
+}
 
 function getTypeBadgeColor(type) {
     const colors = {
@@ -1725,7 +1793,7 @@ function showNotification(title, message, isSystemNotification = false, type = '
     if (isSystemNotification && 'Notification' in window && Notification.permission === 'granted') {
         new Notification(title, {
             body: message,
-            icon: 'https://cdn-icons-png.flaticon.com/512/2972/2972185.png'
+            icon: 'https://cdn-icons-png.flaticon.com/512/1189/11890970.png'
         });
     }
     

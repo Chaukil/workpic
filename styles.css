@@ -491,11 +491,24 @@ body.theme-dark #searchJob::placeholder {
 .view-data-section .table {
     margin-bottom: 0;
     color: var(--text);
+    --bs-table-bg: transparent;
+    --bs-table-color: var(--text);
+    --bs-table-border-color: var(--border);
 }
 
 .view-data-section th {
     background: var(--surface-muted);
+    color: var(--text);
     white-space: nowrap;
+}
+
+.view-data-section td {
+    border-color: var(--border);
+}
+
+body.theme-dark .text-muted,
+body.theme-dark .form-text {
+    color: var(--muted) !important;
 }
 
 .job-type-label {
@@ -576,7 +589,7 @@ body.theme-dark .btn-cancel {
     border: 1px solid var(--border);
     border-radius: 999px;
     padding: 0.45rem 0.8rem;
-    background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+    background: var(--surface);
     box-shadow: 0 3px 8px rgba(15, 23, 42, 0.06);
     max-width: 100%;
     min-width: 0;
@@ -601,6 +614,7 @@ body.theme-dark .btn-cancel {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    
 }
 
 /* Job List */
@@ -611,6 +625,7 @@ body.theme-dark .btn-cancel {
     min-height: 0;
     min-height: 240px;
     height: calc(100% - 180px);
+
 }
 
 .job-list-card .card-body {
@@ -1414,6 +1429,105 @@ body.theme-dark .view-job-content * {
     .job-item .btn-edit {
         padding: 0.15rem 0.4rem;
     }
+}
+
+/* User Profile Button */
+.user-profile-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0.7rem 0.3rem 0.4rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface-muted);
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.78rem;
+}
+
+.user-profile-btn:hover {
+    background: var(--surface);
+    border-color: var(--primary);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
+}
+
+.user-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: var(--surface-strong);
+    border: 2px solid var(--border);
+    transition: border-color 0.2s ease;
+}
+
+.user-profile-btn:hover .user-avatar {
+    border-color: var(--primary);
+}
+
+.user-name {
+    font-weight: 600;
+    color: var(--text);
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.user-profile-btn .bi-chevron-down {
+    font-size: 0.6rem;
+    color: var(--muted);
+}
+
+/* Profile Avatar */
+.profile-avatar-container {
+    position: relative;
+    display: inline-block;
+}
+
+.profile-avatar-img {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 4px solid var(--primary);
+    background: var(--surface-strong);
+}
+
+.btn-avatar-edit {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: white;
+    border: 2px solid white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.btn-avatar-edit:hover {
+    transform: scale(1.1);
+    background: #2563eb;
+}
+
+.btn-avatar-edit i {
+    font-size: 0.9rem;
+}
+
+.form-control-static {
+    padding: 0.4rem 0.6rem;
+    background: var(--surface-muted);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    color: var(--text);
+    margin: 0;
 }
 /* Toggle Sidebar Button */
 .btn-toggle-sidebar {
