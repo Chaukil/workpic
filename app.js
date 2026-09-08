@@ -47,6 +47,8 @@ let pendingTransferJob = null;
 let pendingTransferFromUser = null;
 let pendingTransferRequestId = null;
 let pendingTransferRequestData = null;
+let currentJobIsPaused = false;
+let currentTransferMode = 'transfer';
 
 function applyTheme(theme) {
     currentTheme = theme;
@@ -290,17 +292,32 @@ function initializeAuthenticatedApp() {
         loadJobs();
         startNotificationCheck();
         listenTransferRequests();
+        listenUserNotifications();
     });
 }
 
 // Trong DOMContentLoaded event listener, THÊM CHECK NULL
 document.addEventListener('DOMContentLoaded', function() {
     
-    jobModal = new bootstrap.Modal(document.getElementById('jobModal'));
-    viewJobModal = new bootstrap.Modal(document.getElementById('viewJobModal'));
+   jobModal = new bootstrap.Modal(document.getElementById('jobModal'), {
+        backdrop: true,
+        keyboard: true,
+        focus: true
+    });
+    
+    viewJobModal = new bootstrap.Modal(document.getElementById('viewJobModal'), {
+        backdrop: true,
+        keyboard: true,
+        focus: true
+    });
+    
+    userProfileModal = new bootstrap.Modal(document.getElementById('userProfileModal'), {
+        backdrop: true,
+        keyboard: true,
+        focus: true
+    });
     migrateLegacyJobsModal = new bootstrap.Modal(document.getElementById('migrateLegacyJobsModal'));
     viewDataModal = new bootstrap.Modal(document.getElementById('viewDataModal'));
-    userProfileModal = new bootstrap.Modal(document.getElementById('userProfileModal'));
     transferConfirmModal = new bootstrap.Modal(document.getElementById('transferConfirmModal'));
     
     // Event Listeners
@@ -365,6 +382,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Transfer confirmation
     document.getElementById('transferAcceptBtn').addEventListener('click', acceptTransfer);
     document.getElementById('transferRejectBtn').addEventListener('click', rejectTransfer);
+
+    document.getElementById('pauseJobBtn').addEventListener('click', togglePauseJob);
 
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {
@@ -1106,9 +1125,47 @@ function renderSchedule() {
     }
 }
 
-// Sửa function openViewJobModal - phần transfer
+function updateTransferMode() {
+    const modeTransfer = document.getElementById('transferModeTransfer');
+    const modeCopy = document.getElementById('transferModeCopy');
+    const btnText = document.getElementById('transferJobBtnText');
+    const btn = document.getElementById('transferJobBtn');
+    
+    if (modeTransfer && modeTransfer.checked) {
+        currentTransferMode = 'transfer';
+        btnText.textContent = 'Chuyển';
+        btn.className = 'btn btn-primary';
+        btn.querySelector('i').className = 'bi bi-send-fill';
+    } else if (modeCopy && modeCopy.checked) {
+        currentTransferMode = 'copy';
+        btnText.textContent = 'Copy';
+        btn.className = 'btn btn-success';
+        btn.querySelector('i').className = 'bi bi-copy';
+    }
+}
+
+window.toggleTransferSection = function() {
+    const section = document.getElementById('transferSection');
+    const btn = document.getElementById('toggleTransferSectionBtn');
+    
+    if (section) {
+        const isVisible = section.classList.contains('show');
+        
+        if (isVisible) {
+            section.classList.remove('show');
+            btn.innerHTML = '<i class="bi bi-arrow-left-right"></i> Chuyển/Copy Job';
+        } else {
+            section.classList.add('show');
+            btn.innerHTML = '<i class="bi bi-x-circle"></i> Đóng phần chuyển/copy';
+        }
+    }
+};
+
+// Sửa function openViewJobModal
 function openViewJobModal(job) {
     currentViewingJobId = job.id;
+    currentTransferMode = 'transfer';
+    
     document.getElementById('viewModalTitle').innerHTML = `
         <i class="bi bi-eye-fill"></i> ${job.title}
         ${job.isPaused ? '<span class="paused-indicator"><i class="bi bi-pause-circle-fill"></i> Đang tạm dừng</span>' : ''}
@@ -1142,20 +1199,87 @@ function openViewJobModal(job) {
                 ${job.description || '<em class="text-muted">Không có nội dung</em>'}
             </div>
         </div>
-        <div class="mb-3">
-            <label class="form-label fw-bold" for="transferUserSelect"><i class="bi bi-person-check-fill"></i> Chuyển job cho user khác</label>
-            <div class="input-group">
+        
+        <!-- Transfer Section - Hidden by default -->
+        <div class="transfer-section" id="transferSection">
+            <div class="transfer-section-header">
+                <h6><i class="bi bi-arrow-left-right"></i> Chuyển/Copy Job</h6>
+                <button type="button" class="transfer-section-close" onclick="toggleTransferSection()">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label fw-bold" for="transferUserSelect">
+                    <i class="bi bi-person-check-fill"></i> Chọn user nhận job
+                </label>
                 <select class="form-select" id="transferUserSelect">
                     <option value="">Chọn user nhận job...</option>
                 </select>
-                <button type="button" class="btn btn-outline-primary" id="transferJobBtn"><i class="bi bi-send-fill"></i> Chuyển</button>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label fw-bold">Chọn hành động:</label>
+                <div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="transferMode" id="transferModeTransfer" value="transfer" checked>
+                        <label class="form-check-label" for="transferModeTransfer">
+                            <i class="bi bi-arrow-right-circle-fill text-primary"></i> Chuyển job
+                        </label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="transferMode" id="transferModeCopy" value="copy">
+                        <label class="form-check-label" for="transferModeCopy">
+                            <i class="bi bi-copy text-success"></i> Copy job
+                        </label>
+                    </div>
+                </div>
+                <small class="form-text text-muted d-block mt-2">
+                    <i class="bi bi-info-circle"></i> 
+                    <strong>Chuyển:</strong> Job sẽ không còn ở bạn. 
+                    <strong>Copy:</strong> Job vẫn ở bạn và user kia.
+                </small>
+            </div>
+            
+            <div class="d-grid gap-2">
+                <button type="button" class="btn btn-primary" id="transferJobBtn">
+                    <i class="bi bi-send-fill"></i> <span id="transferJobBtnText">Chuyển</span>
+                </button>
             </div>
         </div>
     `;
-    document.getElementById('transferJobBtn').addEventListener('click', transferJob);
+    
+    // Show toggle button
+    const toggleBtn = document.getElementById('toggleTransferSectionBtn');
+    toggleBtn.style.display = 'inline-block';
+    
+    // Add event listeners
+    toggleBtn.onclick = toggleTransferSection;
+    
+    const transferBtn = document.getElementById('transferJobBtn');
+    const transferModeTransfer = document.getElementById('transferModeTransfer');
+    const transferModeCopy = document.getElementById('transferModeCopy');
+    
+    if (transferBtn) transferBtn.addEventListener('click', transferJob);
+    if (transferModeTransfer) transferModeTransfer.addEventListener('change', updateTransferMode);
+    if (transferModeCopy) transferModeCopy.addEventListener('change', updateTransferMode);
+    
     loadTransferUsers();
     viewJobModal.show();
 }
+
+document.getElementById('viewJobModal').addEventListener('hidden.bs.modal', function () {
+    const section = document.getElementById('transferSection');
+    const btn = document.getElementById('toggleTransferSectionBtn');
+    
+    if (section) section.classList.remove('show');
+    if (btn) {
+        btn.innerHTML = '<i class="bi bi-arrow-left-right"></i> Chuyển/Copy Job';
+        btn.style.display = 'none';
+    }
+    
+    currentViewingJobId = null;
+});
 
 async function loadTransferUsers() {
     const select = document.getElementById('transferUserSelect');
@@ -1343,7 +1467,6 @@ async function migrateLegacyJobs() {
     }
 }
 
-// Sửa function transferJob - thêm cơ chế xác nhận
 async function transferJob() {
     const jobId = currentViewingJobId || currentEditingJobId;
     const targetUid = document.getElementById('transferUserSelect').value;
@@ -1354,38 +1477,48 @@ async function transferJob() {
         return;
     }
     
-    // Lưu thông tin để xác nhận sau
-    pendingTransferJob = {
-        jobId: jobId,
-        jobTitle: job.title,
-        targetUid: targetUid,
-        fromUid: currentUser.uid,
-        fromEmail: currentUser.email,
-        timestamp: new Date().toISOString()
-    };
+    const mode = currentTransferMode; // 'transfer' hoặc 'copy'
+    const actionText = mode === 'transfer' ? 'chuyển' : 'copy';
+    const actionTextPast = mode === 'transfer' ? 'chuyển' : 'sao chép';
     
-    // Tạo thông báo cho người nhận (trong Firestore)
     try {
+        // Tạo transfer request
         await addDoc(collection(db, 'transferRequests'), {
             jobId: jobId,
             jobTitle: job.title,
+            jobData: { // Lưu toàn bộ job data để copy
+                title: job.title,
+                type: job.type,
+                date: job.date,
+                time: job.time,
+                description: job.description,
+                enableNotification: job.enableNotification,
+                workOnSunday: job.workOnSunday,
+                isPaused: job.isPaused,
+                isOutOfSchedule: job.isOutOfSchedule
+            },
             fromUid: currentUser.uid,
             fromEmail: currentUser.email,
             fromName: currentUser.displayName || currentUser.email,
             toUid: targetUid,
-            status: 'pending', // pending, accepted, rejected
+            mode: mode, // 'transfer' hoặc 'copy'
+            status: 'pending',
             timestamp: new Date().toISOString()
         });
         
-        showNotification('Đã gửi yêu cầu', `Đã gửi yêu cầu chuyển job "${job.title}" đến user. Vui lòng chờ xác nhận.`, false, 'success');
+        showNotification(
+            'Đã gửi yêu cầu', 
+            `Đã gửi yêu cầu ${actionText} job "${job.title}" đến user. Vui lòng chờ xác nhận.`, 
+            false, 
+            'success'
+        );
+        
         viewJobModal.hide();
         currentViewingJobId = null;
         
-        // Hiển thị modal chờ xác nhận (tùy chọn)
-        // showTransferPendingModal();
     } catch (error) {
-        console.error('Lỗi gửi yêu cầu chuyển job:', error);
-        showNotification('Lỗi', 'Không thể gửi yêu cầu chuyển job.', false, 'danger');
+        console.error(`Lỗi gửi yêu cầu ${actionText} job:`, error);
+        showNotification('Lỗi', `Không thể gửi yêu cầu ${actionText} job.`, false, 'danger');
     }
 }
 
@@ -1408,24 +1541,32 @@ function listenTransferRequests() {
     });
 }
 
-// Thêm function hiển thị modal xác nhận chuyển job
 function showTransferConfirmModal(requestId, request) {
+    const mode = request.mode || 'transfer';
+    const actionText = mode === 'transfer' ? 'chuyển' : 'copy';
+    const modeIcon = mode === 'transfer' 
+        ? '<i class="bi bi-arrow-right-circle-fill text-primary"></i>' 
+        : '<i class="bi bi-copy text-success"></i>';
+    
     document.getElementById('transferConfirmMessage').innerHTML = `
-        <strong>${request.fromName || request.fromEmail}</strong> muốn chuyển job 
+        ${modeIcon}
+        <strong>${request.fromName || request.fromEmail}</strong> muốn <strong>${actionText}</strong> job 
         <strong>"${request.jobTitle}"</strong> cho bạn.<br>
         <small class="text-muted">Gửi lúc: ${new Date(request.timestamp).toLocaleString('vi-VN')}</small>
+        ${mode === 'copy' ? '<br><small class="text-info"><i class="bi bi-info-circle"></i> Lưu ý: Đây là bản copy, job gốc vẫn ở người gửi.</small>' : ''}
     `;
     
-    // Lưu request ID để xử lý sau
     pendingTransferRequestId = requestId;
     pendingTransferRequestData = request;
     
     transferConfirmModal.show();
 }
 
-// Thêm function chấp nhận chuyển job
 async function acceptTransfer() {
     if (!pendingTransferRequestId || !pendingTransferRequestData) return;
+    
+    const mode = pendingTransferRequestData.mode || 'transfer';
+    const actionText = mode === 'transfer' ? 'chuyển' : 'copy';
     
     try {
         // Cập nhật trạng thái request
@@ -1434,31 +1575,69 @@ async function acceptTransfer() {
             respondedAt: new Date().toISOString()
         });
         
-        // Chuyển job cho người nhận
-        const jobRef = doc(db, 'jobs', pendingTransferRequestData.jobId);
-        await updateDoc(jobRef, {
-            ownerId: currentUser.uid,
-            transferHistory: arrayUnion({
-                from: pendingTransferRequestData.fromUid,
-                to: currentUser.uid,
-                timestamp: new Date().toISOString()
-            }),
-            updatedAt: new Date().toISOString()
-        });
+        if (mode === 'transfer') {
+            // CHUYỂN: Update ownerId của job gốc
+            const jobRef = doc(db, 'jobs', pendingTransferRequestData.jobId);
+            await updateDoc(jobRef, {
+                ownerId: currentUser.uid,
+                transferHistory: arrayUnion({
+                    from: pendingTransferRequestData.fromUid,
+                    to: currentUser.uid,
+                    mode: 'transfer',
+                    timestamp: new Date().toISOString()
+                }),
+                updatedAt: new Date().toISOString()
+            });
+        } else {
+            // COPY: Tạo job mới cho người nhận
+            const newJobData = {
+                ...pendingTransferRequestData.jobData,
+                ownerId: currentUser.uid,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                copiedFrom: pendingTransferRequestData.jobId,
+                copyHistory: [{
+                    from: pendingTransferRequestData.fromUid,
+                    to: currentUser.uid,
+                    timestamp: new Date().toISOString()
+                }]
+            };
+            
+            await addDoc(collection(db, 'jobs'), newJobData);
+            
+            // Gửi notification cho người copy rằng đã thành công
+            await addDoc(collection(db, 'notifications'), {
+                userId: pendingTransferRequestData.fromUid,
+                type: 'copy_success',
+                message: `${currentUser.displayName || currentUser.email} đã chấp nhận copy job "${pendingTransferRequestData.jobTitle}"`,
+                jobId: pendingTransferRequestData.jobId,
+                timestamp: new Date().toISOString(),
+                read: false
+            });
+        }
         
-        showNotification('Đã nhận job', `Bạn đã nhận job "${pendingTransferRequestData.jobTitle}"!`, false, 'success');
+        showNotification(
+            'Đã nhận job', 
+            `Bạn đã nhận ${mode === 'transfer' ? '' : 'bản copy của '}job "${pendingTransferRequestData.jobTitle}"!`, 
+            false, 
+            'success'
+        );
+        
         transferConfirmModal.hide();
         pendingTransferRequestId = null;
         pendingTransferRequestData = null;
+        
     } catch (error) {
         console.error('Lỗi nhận job:', error);
         showNotification('Lỗi', 'Không thể nhận job.', false, 'danger');
     }
 }
 
-// Thêm function từ chối chuyển job
 async function rejectTransfer() {
     if (!pendingTransferRequestId || !pendingTransferRequestData) return;
+    
+    const mode = pendingTransferRequestData.mode || 'transfer';
+    const actionText = mode === 'transfer' ? 'chuyển' : 'copy';
     
     try {
         // Cập nhật trạng thái request
@@ -1467,20 +1646,27 @@ async function rejectTransfer() {
             respondedAt: new Date().toISOString()
         });
         
-        // Gửi thông báo cho người gửi (có thể thêm vào notifications collection)
+        // Gửi thông báo cho người gửi
         await addDoc(collection(db, 'notifications'), {
             userId: pendingTransferRequestData.fromUid,
-            type: 'transfer_rejected',
-            message: `${currentUser.displayName || currentUser.email} đã từ chối nhận job "${pendingTransferRequestData.jobTitle}"`,
+            type: mode === 'transfer' ? 'transfer_rejected' : 'copy_rejected',
+            message: `${currentUser.displayName || currentUser.email} đã từ chối ${actionText} job "${pendingTransferRequestData.jobTitle}"`,
             jobId: pendingTransferRequestData.jobId,
             timestamp: new Date().toISOString(),
             read: false
         });
         
-        showNotification('Đã từ chối', `Bạn đã từ chối nhận job "${pendingTransferRequestData.jobTitle}".`, false, 'warning');
+        showNotification(
+            'Đã từ chối', 
+            `Bạn đã từ chối ${actionText} job "${pendingTransferRequestData.jobTitle}".`, 
+            false, 
+            'warning'
+        );
+        
         transferConfirmModal.hide();
         pendingTransferRequestId = null;
         pendingTransferRequestData = null;
+        
     } catch (error) {
         console.error('Lỗi từ chối job:', error);
         showNotification('Lỗi', 'Không thể từ chối job.', false, 'danger');
@@ -1516,18 +1702,19 @@ function getTypeLabel(type) {
 // Open Add Job Modal
 function openAddJobModal(isOutOfSchedule = false) {
     currentEditingJobId = null;
+    currentJobIsPaused = false;
     document.getElementById('modalTitle').innerHTML = isOutOfSchedule
         ? '<i class="bi bi-lightning-charge-fill"></i> Thêm Job Ngoài Lịch'
         : '<i class="bi bi-plus-circle-fill"></i> Thêm Job Mới';
     document.getElementById('jobForm').reset();
     document.getElementById('jobDescription').innerHTML = '';
     document.getElementById('deleteJobBtn').style.display = 'none';
+    document.getElementById('pauseJobBtn').style.display = 'none'; // NEW
     
     const now = new Date();
     document.getElementById('jobDate').value = now.toISOString().split('T')[0];
     document.getElementById('jobTime').value = now.toTimeString().slice(0, 5);
-    document.getElementById('workOnSunday').checked = false; // Default: KHÔNG làm CN
-    document.getElementById('isPaused').checked = false;
+    document.getElementById('workOnSunday').checked = false;
     document.getElementById('isOutOfSchedule').checked = isOutOfSchedule;
     toggleOutOfScheduleFields();
 
@@ -1537,26 +1724,61 @@ function openAddJobModal(isOutOfSchedule = false) {
 // Open Edit Job Modal
 function openEditJobModal(job) {
     currentEditingJobId = job.id;
+    currentJobIsPaused = job.isPaused === true;
+    
     document.getElementById('modalTitle').innerHTML = '<i class="bi bi-pencil-fill"></i> Chỉnh Sửa Job';
     document.getElementById('jobTitle').value = job.title;
     document.getElementById('jobType').value = job.type;
     document.getElementById('jobDate').value = job.date;
     document.getElementById('jobTime').value = job.time;
     document.getElementById('jobDescription').innerHTML = job.description || '';
+    
     const notificationToggle = document.getElementById('enableNotification');
     if (notificationToggle) {
         notificationToggle.checked = job.enableNotification !== false;
     }
+    
     document.getElementById('workOnSunday').checked = job.workOnSunday !== false;
-    document.getElementById('isPaused').checked = job.isPaused === true; // NEW
     document.getElementById('isOutOfSchedule').checked = job.isOutOfSchedule === true;
     document.getElementById('deleteJobBtn').style.display = 'block';
-    toggleOutOfScheduleFields();
     
+    // Update pause button
+    const pauseBtn = document.getElementById('pauseJobBtn');
+    const pauseBtnText = document.getElementById('pauseJobBtnText');
+    pauseBtn.style.display = 'block';
+    
+    if (currentJobIsPaused) {
+        pauseBtn.classList.add('active');
+        pauseBtnText.textContent = 'Bật lại';
+        pauseBtn.querySelector('i').className = 'bi bi-play-circle-fill';
+    } else {
+        pauseBtn.classList.remove('active');
+        pauseBtnText.textContent = 'Tạm dừng';
+        pauseBtn.querySelector('i').className = 'bi bi-pause-circle-fill';
+    }
+    
+    toggleOutOfScheduleFields();
     jobModal.show();
 }
 
-// Save Job
+function togglePauseJob() {
+    currentJobIsPaused = !currentJobIsPaused;
+    
+    const pauseBtn = document.getElementById('pauseJobBtn');
+    const pauseBtnText = document.getElementById('pauseJobBtnText');
+    
+    if (currentJobIsPaused) {
+        pauseBtn.classList.add('active');
+        pauseBtnText.textContent = 'Bật lại';
+        pauseBtn.querySelector('i').className = 'bi bi-play-circle-fill';
+    } else {
+        pauseBtn.classList.remove('active');
+        pauseBtnText.textContent = 'Tạm dừng';
+        pauseBtn.querySelector('i').className = 'bi bi-pause-circle-fill';
+    }
+}
+
+// Sửa function saveJob
 async function saveJob() {
     const title = document.getElementById('jobTitle').value.trim();
     const type = document.getElementById('jobType').value;
@@ -1566,7 +1788,7 @@ async function saveJob() {
     const notificationToggle = document.getElementById('enableNotification');
     const enableNotification = notificationToggle ? notificationToggle.checked : true;
     const workOnSunday = document.getElementById('workOnSunday').checked;
-    const isPaused = document.getElementById('isPaused').checked; // NEW
+    const isPaused = currentJobIsPaused; // Lấy từ state thay vì checkbox
     const isOutOfSchedule = document.getElementById('isOutOfSchedule').checked;
     
     if (!title) {
@@ -1597,7 +1819,7 @@ async function saveJob() {
         description,
         enableNotification,
         workOnSunday,
-        isPaused, // NEW
+        isPaused,
         isOutOfSchedule,
         updatedAt: new Date().toISOString(),
         ownerId: currentUser.uid
@@ -1633,6 +1855,33 @@ async function saveJob() {
         saveBtn.innerHTML = '<i class="bi bi-check-circle-fill"></i> Lưu Job';
         saveBtn.disabled = false;
     }
+}
+
+function listenUserNotifications() {
+    if (!currentUser) return;
+    
+    const q = query(
+        collection(db, 'notifications'),
+        where('userId', '==', currentUser.uid),
+        where('read', '==', false)
+    );
+    
+    onSnapshot(q, (snapshot) => {
+        snapshot.forEach((doc) => {
+            const notification = doc.data();
+            
+            // Show notification
+            showNotification(
+                'Thông báo',
+                notification.message,
+                false,
+                notification.type === 'transfer_rejected' ? 'warning' : 'info'
+            );
+            
+            // Mark as read
+            updateDoc(doc.ref, { read: true });
+        });
+    });
 }
 
 
