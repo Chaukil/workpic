@@ -2598,3 +2598,285 @@ body.theme-dark .modal-backdrop.show {
     margin: 0.4rem 0 0.1rem 0;
     padding-left: 0.2rem;
 }
+
+/* ============================================================
+   QUICK CHAT - Filter bar (tìm kiếm/lọc)
+   ============================================================ */
+.quick-chat-filter-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.6rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+}
+
+.quick-chat-search-input {
+    width: 100%;
+    font-size: 0.78rem;
+    padding: 0.35rem 0.6rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface-muted);
+    color: var(--text);
+}
+
+.quick-chat-search-input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.quick-chat-filter-select {
+    flex: 1;
+    font-size: 0.75rem;
+    padding: 0.3rem 0.4rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface-muted);
+    color: var(--text);
+}
+
+.quick-chat-filter-bar > div,
+.quick-chat-filter-row {
+    display: flex;
+    gap: 0.4rem;
+}
+
+/* ============================================================
+   QUICK CHAT - Deadline
+   ============================================================ */
+.quick-chat-input-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
+}
+
+.quick-chat-deadline-row {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.68rem;
+    color: var(--muted);
+}
+
+.quick-chat-deadline-input {
+    font-size: 0.7rem;
+    padding: 0.15rem 0.3rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface-muted);
+    color: var(--text);
+}
+
+.quick-chat-status-pill.deadline {
+    background: rgba(139, 92, 246, 0.15);
+    color: #7c3aed;
+}
+
+.quick-chat-status-pill.deadline-overdue {
+    background: rgba(239, 68, 68, 0.18);
+    color: var(--danger);
+    font-weight: 700;
+}
+
+.quick-chat-bubble.deadline-passed {
+    border-color: var(--danger);
+    box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.2);
+}
+
+/* ============================================================
+   QUICK CHAT - Reactions + Comments
+   ============================================================ */
+.quick-chat-reactions-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin-top: 0.5rem;
+}
+
+.quick-chat-reaction-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.12rem 0.45rem;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface-muted);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    color: var(--text);
+}
+
+.quick-chat-reaction-btn:hover {
+    background: var(--surface-strong);
+}
+
+.quick-chat-reaction-btn.reacted {
+    background: var(--primary-soft);
+    border-color: var(--primary);
+}
+
+.quick-chat-reaction-count {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--muted);
+}
+
+.quick-chat-comments {
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px dashed var(--border);
+}
+
+.quick-chat-comment-item {
+    display: flex;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    margin-bottom: 0.35rem;
+    align-items: flex-start;
+}
+
+.quick-chat-comment-avatar {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--surface-strong);
+    color: var(--text);
+    font-size: 0.6rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    text-transform: uppercase;
+}
+
+.quick-chat-comment-body {
+    background: var(--surface-muted);
+    border-radius: 10px;
+    padding: 0.3rem 0.55rem;
+    flex: 1;
+}
+
+.quick-chat-comment-author {
+    font-weight: 700;
+    font-size: 0.7rem;
+    color: var(--text);
+    margin-right: 0.3rem;
+}
+
+.quick-chat-comment-text {
+    font-size: 0.75rem;
+    color: var(--text);
+    word-break: break-word;
+}
+
+.quick-chat-comment-more {
+    font-size: 0.68rem;
+    color: var(--primary);
+    cursor: pointer;
+    margin-bottom: 0.3rem;
+    display: inline-block;
+}
+
+.quick-chat-comment-form {
+    display: flex;
+    gap: 0.3rem;
+    margin-top: 0.3rem;
+}
+
+.quick-chat-comment-input {
+    flex: 1;
+    font-size: 0.75rem;
+    padding: 0.3rem 0.5rem;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+}
+
+.quick-chat-comment-send {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: none;
+    background: var(--primary);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    font-size: 0.72rem;
+}
+
+/* ============================================================
+   QUICK CHAT - Edit / Delete owner icons
+   ============================================================ */
+.quick-chat-owner-tools {
+    display: flex;
+    gap: 0.25rem;
+    margin-left: 0.3rem;
+}
+
+.quick-chat-owner-tools button {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.72rem;
+    transition: all 0.15s ease;
+}
+
+.quick-chat-owner-tools button:hover {
+    background: var(--surface-strong);
+    color: var(--text);
+}
+
+.quick-chat-owner-tools .delete-btn:hover {
+    color: var(--danger);
+}
+
+.quick-chat-edit-form {
+    margin-top: 0.4rem;
+}
+
+.quick-chat-edit-form textarea {
+    width: 100%;
+    font-size: 0.82rem;
+    padding: 0.4rem 0.55rem;
+    border-radius: 10px;
+    border: 1px solid var(--primary);
+    background: var(--surface);
+    color: var(--text);
+    resize: vertical;
+    min-height: 50px;
+}
+
+.quick-chat-edit-form .quick-chat-deadline-row {
+    margin-top: 0.35rem;
+}
+
+.quick-chat-edit-form-actions {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 0.4rem;
+}
+
+.quick-chat-edited-tag {
+    font-size: 0.65rem;
+    color: var(--muted);
+    font-style: italic;
+    margin-left: 0.3rem;
+}

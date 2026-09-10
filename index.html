@@ -505,6 +505,26 @@
                             <p>Xem riêng job bạn đang làm và đã hoàn thành trong khung chat.</p>
                         </div>
                         <div class="guide-item">
+                            <i class="bi bi-funnel-fill"></i>
+                            <h6>Tìm kiếm & lọc</h6>
+                            <p>Lọc job theo trạng thái, người phụ trách hoặc gõ từ khóa trong khung chat.</p>
+                        </div>
+                        <div class="guide-item">
+                            <i class="bi bi-alarm-fill"></i>
+                            <h6>Deadline job</h6>
+                            <p>Đặt hạn chót khi tạo job, quá giờ mà chưa xong sẽ tô đỏ cảnh báo.</p>
+                        </div>
+                        <div class="guide-item">
+                            <i class="bi bi-emoji-smile-fill"></i>
+                            <h6>Reaction & bình luận</h6>
+                            <p>Thả emoji, viết bình luận ngắn ngay trên từng job trong chat.</p>
+                        </div>
+                        <div class="guide-item">
+                            <i class="bi bi-pencil-square"></i>
+                            <h6>Sửa / xóa job</h6>
+                            <p>Người tạo job có thể chỉnh sửa nội dung hoặc xóa job trong ngày.</p>
+                        </div>
+                        <div class="guide-item">
                             <i class="bi bi-person-circle"></i>
                             <h6>Tài khoản</h6>
                             <p>Đổi avatar, tên hiển thị, đăng xuất — tất cả trong 1 nút.</p>
@@ -568,11 +588,31 @@
                 <i class="bi bi-person-fill"></i> Của tôi
             </button>
         </div>
+        <div class="quick-chat-filter-bar">
+            <input type="text" id="quickChatSearchInput" class="quick-chat-search-input" placeholder="🔍 Tìm nội dung job...">
+            <select id="quickChatStatusFilter" class="quick-chat-filter-select">
+                <option value="all">Tất cả trạng thái</option>
+                <option value="open">Chưa nhận</option>
+                <option value="invited">Đã chỉ định</option>
+                <option value="claimed">Đang làm</option>
+                <option value="completed">Hoàn thành</option>
+            </select>
+            <select id="quickChatAssigneeFilter" class="quick-chat-filter-select">
+                <option value="all">Tất cả người phụ trách</option>
+            </select>
+        </div>
         <div class="quick-chat-messages" id="quickChatMessages">
             <p class="quick-chat-empty">Chưa có job phát sinh nào trong hôm nay. Hãy nhập bên dưới để báo cho mọi người!</p>
         </div>
         <div class="quick-chat-input-row">
-            <textarea id="quickChatInput" class="quick-chat-input" rows="1" placeholder="Nhập nội dung job phát sinh trong ngày..."></textarea>
+            <div class="quick-chat-input-col">
+                <textarea id="quickChatInput" class="quick-chat-input" rows="1" placeholder="Nhập nội dung job phát sinh trong ngày..."></textarea>
+                <div class="quick-chat-deadline-row">
+                    <i class="bi bi-alarm"></i>
+                    <span>Hạn chót (tùy chọn):</span>
+                    <input type="time" id="quickChatDeadlineInput" class="quick-chat-deadline-input">
+                </div>
+            </div>
             <button type="button" class="quick-chat-send-btn" id="quickChatSendBtn" title="Gửi">
                 <i class="bi bi-send-fill"></i>
             </button>

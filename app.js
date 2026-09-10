@@ -1,6 +1,6 @@
 // Firebase Configuration - Chỉ sử dụng Firestore
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, getDocs, onSnapshot, enableIndexedDbPersistence, query, where, writeBatch, arrayUnion } 
+import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, getDocs, onSnapshot, enableIndexedDbPersistence, query, where, writeBatch, arrayUnion, arrayRemove } 
     from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } 
     from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -66,6 +66,10 @@ let pendingQuickInviteData = null;
 let shownInviteKeys = {};
 let guideModal;
 let quickChatActiveTab = 'all';
+let quickChatSearchText = '';
+let quickChatStatusFilter = 'all';
+let quickChatAssigneeFilter = 'all';
+const QUICK_CHAT_REACTIONS = ['👍', '❤️', '😂', '🔥'];
 
 function applyTheme(theme) {
     currentTheme = theme;
@@ -311,6 +315,10 @@ function handleSignedOut() {
     cachedUsersForAssign = null;
     pendingQuickInviteId = null;
     pendingQuickInviteData = null;
+    quickChatSearchText = '';
+    quickChatStatusFilter = 'all';
+    quickChatAssigneeFilter = 'all';
+    quickChatActiveTab = 'all';
     closeQuickChatPanel();
     document.getElementById('authScreen').classList.remove('d-none');
     renderJobList();
@@ -2166,6 +2174,12 @@ function renderQuickJobBubble(job) {
     const today = todayKey();
     const isOverdue = status === 'open' && job.dateKey && job.dateKey !== today;
 
+    // Deadline: chỉ tính trễ hạn khi job của hôm nay và chưa hoàn thành
+    let deadlinePassed = false;
+    if (job.deadline && status !== 'completed' && job.dateKey === today) {
+        deadlinePassed = nowTimeHHmm() > job.deadline;
+    }
+
     let statusPillHtml = '';
     let actionsHtml = '';
 
@@ -2236,16 +2250,92 @@ function renderQuickJobBubble(job) {
         statusPillHtml = `<span class="quick-chat-status-pill completed"><i class="bi bi-check2-circle"></i> Hoàn thành bởi ${escapeHtml(job.assigneeName || '')}${job.time ? ' · lúc ' + escapeHtml(job.time) : ''}</span>`;
     }
 
+    let deadlinePillHtml = '';
+    if (job.deadline) {
+        deadlinePillHtml = deadlinePassed
+            ? `<span class="quick-chat-status-pill deadline-overdue"><i class="bi bi-alarm-fill"></i> Trễ hạn (${escapeHtml(job.deadline)})</span>`
+            : `<span class="quick-chat-status-pill deadline"><i class="bi bi-alarm"></i> Hạn: ${escapeHtml(job.deadline)}</span>`;
+    }
+
+    // Reaction bar
+    const reactions = job.reactions || {};
+    const reactionButtonsHtml = QUICK_CHAT_REACTIONS.map(emoji => {
+        const uids = reactions[emoji] || [];
+        const reacted = currentUser && uids.includes(currentUser.uid);
+        return `
+            <button type="button" class="quick-chat-reaction-btn ${reacted ? 'reacted' : ''}" data-action="react" data-id="${job.id}" data-emoji="${emoji}">
+                ${emoji}${uids.length > 0 ? `<span class="quick-chat-reaction-count">${uids.length}</span>` : ''}
+            </button>
+        `;
+    }).join('');
+
+    // Comments
+    const comments = job.comments || [];
+    const commentsHtml = comments.length > 0
+        ? `<div class="quick-chat-comments">${comments.map(c => `
+            <div class="quick-chat-comment-item">
+                <div class="quick-chat-comment-avatar">${getInitials(c.name)}</div>
+                <div class="quick-chat-comment-body">
+                    <span class="quick-chat-comment-author">${escapeHtml(c.name || '')}</span>
+                    <span class="quick-chat-comment-text">${escapeHtml(c.text || '')}</span>
+                </div>
+            </div>
+        `).join('')}</div>`
+        : '';
+
+    const commentFormHtml = `
+        <div class="quick-chat-comment-form">
+            <input type="text" class="quick-chat-comment-input" id="commentInput-${job.id}" placeholder="Viết bình luận ngắn...">
+            <button type="button" class="quick-chat-comment-send" data-action="add-comment" data-id="${job.id}" title="Gửi bình luận">
+                <i class="bi bi-send-fill"></i>
+            </button>
+        </div>
+    `;
+
+    // Owner tools: sửa / xóa (chỉ người tạo)
+    const ownerToolsHtml = isOwn ? `
+        <div class="quick-chat-owner-tools">
+            <button type="button" data-action="show-edit" data-id="${job.id}" title="Sửa"><i class="bi bi-pencil-fill"></i></button>
+            <button type="button" class="delete-btn" data-action="delete" data-id="${job.id}" title="Xóa"><i class="bi bi-trash-fill"></i></button>
+        </div>
+    ` : '';
+
+    const editedTagHtml = job.edited ? '<span class="quick-chat-edited-tag">(đã chỉnh sửa)</span>' : '';
+
+    const editFormHtml = `
+        <div class="quick-chat-edit-form d-none" id="editForm-${job.id}">
+            <textarea id="editContent-${job.id}">${escapeHtml(job.content || '')}</textarea>
+            <div class="quick-chat-deadline-row">
+                <i class="bi bi-alarm"></i>
+                <span>Hạn chót:</span>
+                <input type="time" id="editDeadline-${job.id}" class="quick-chat-deadline-input" value="${job.deadline || ''}">
+            </div>
+            <div class="quick-chat-edit-form-actions">
+                <button type="button" class="btn btn-sm btn-success" data-action="save-edit" data-id="${job.id}">
+                    <i class="bi bi-check-lg"></i> Lưu
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-action="cancel-edit" data-id="${job.id}">
+                    <i class="bi bi-x-lg"></i> Hủy
+                </button>
+            </div>
+        </div>
+    `;
+
     return `
-        <div class="quick-chat-bubble ${isOwn ? 'own' : ''} status-${status} ${isOverdue ? 'overdue' : ''}" data-job-id="${job.id}">
+        <div class="quick-chat-bubble ${isOwn ? 'own' : ''} status-${status} ${isOverdue ? 'overdue' : ''} ${deadlinePassed ? 'deadline-passed' : ''}" data-job-id="${job.id}">
             <div class="quick-chat-bubble-head">
                 <div class="quick-chat-avatar">${getInitials(job.createdByName)}</div>
                 <span class="quick-chat-author">${escapeHtml(job.createdByName || 'Ẩn danh')}</span>
-                <span class="quick-chat-time">${timeAgoVN(job.createdAt)}</span>
+                <span class="quick-chat-time">${timeAgoVN(job.createdAt)}${editedTagHtml}</span>
+                ${ownerToolsHtml}
             </div>
-            <p class="quick-chat-content">${escapeHtml(job.content || '')}</p>
-            <div class="quick-chat-status-row">${statusPillHtml}</div>
+            <p class="quick-chat-content" id="content-${job.id}">${escapeHtml(job.content || '')}</p>
+            ${editFormHtml}
+            <div class="quick-chat-status-row">${statusPillHtml}${deadlinePillHtml}</div>
             ${actionsHtml}
+            <div class="quick-chat-reactions-row">${reactionButtonsHtml}</div>
+            ${commentsHtml}
+            ${commentFormHtml}
         </div>
     `;
 }
@@ -2259,19 +2349,65 @@ function setQuickChatTab(tab) {
     renderQuickChat();
 }
 
+function applyQuickChatFilters(list) {
+    return list.filter(job => {
+        if (quickChatSearchText && !(job.content || '').toLowerCase().includes(quickChatSearchText.toLowerCase())) {
+            return false;
+        }
+        if (quickChatStatusFilter !== 'all' && (job.status || 'open') !== quickChatStatusFilter) {
+            return false;
+        }
+        if (quickChatAssigneeFilter !== 'all' && job.assigneeUid !== quickChatAssigneeFilter) {
+            return false;
+        }
+        return true;
+    });
+}
+
+function populateAssigneeFilterOptions() {
+    const select = document.getElementById('quickChatAssigneeFilter');
+    if (!select) return;
+    const current = select.value;
+
+    const seen = new Map();
+    quickJobsList.forEach(j => {
+        if (j.assigneeUid && j.assigneeName) seen.set(j.assigneeUid, j.assigneeName);
+    });
+
+    select.innerHTML = '<option value="all">Tất cả người phụ trách</option>' +
+        Array.from(seen.entries())
+            .sort((a, b) => a[1].localeCompare(b[1]))
+            .map(([uid, name]) => `<option value="${uid}">${escapeHtml(name)}</option>`)
+            .join('');
+
+    if (Array.from(seen.keys()).includes(current) || current === 'all') {
+        select.value = current;
+    } else {
+        select.value = 'all';
+        quickChatAssigneeFilter = 'all';
+    }
+}
+
 function renderQuickChat() {
     const container = document.getElementById('quickChatMessages');
     if (!container) return;
 
+    populateAssigneeFilterOptions();
+
     const shouldScroll = container.scrollTop + container.clientHeight >= container.scrollHeight - 40;
+    const hasActiveFilter = quickChatSearchText || quickChatStatusFilter !== 'all' || quickChatAssigneeFilter !== 'all';
 
     if (quickChatActiveTab === 'mine') {
         if (!currentUser) return;
-        const inProgress = quickJobsList.filter(j => j.assigneeUid === currentUser.uid && j.status === 'claimed');
-        const done = quickJobsList.filter(j => j.assigneeUid === currentUser.uid && j.status === 'completed');
+        const mineBase = quickJobsList.filter(j => j.assigneeUid === currentUser.uid);
+        const filtered = applyQuickChatFilters(mineBase);
+        const inProgress = filtered.filter(j => j.status === 'claimed');
+        const done = filtered.filter(j => j.status === 'completed');
 
         if (inProgress.length === 0 && done.length === 0) {
-            container.innerHTML = '<p class="quick-chat-empty">Bạn chưa nhận job nào. Sang tab "Chung" để nhận job!</p>';
+            container.innerHTML = hasActiveFilter
+                ? '<p class="quick-chat-empty">Không tìm thấy job phù hợp bộ lọc.</p>'
+                : '<p class="quick-chat-empty">Bạn chưa nhận job nào. Sang tab "Chung" để nhận job!</p>';
             return;
         }
 
@@ -2286,11 +2422,14 @@ function renderQuickChat() {
         }
         container.innerHTML = html;
     } else {
-        if (quickJobsList.length === 0) {
-            container.innerHTML = '<p class="quick-chat-empty">Chưa có job phát sinh nào. Hãy nhập bên dưới để báo cho mọi người!</p>';
+        const filtered = applyQuickChatFilters(quickJobsList);
+        if (filtered.length === 0) {
+            container.innerHTML = hasActiveFilter
+                ? '<p class="quick-chat-empty">Không tìm thấy job phù hợp bộ lọc.</p>'
+                : '<p class="quick-chat-empty">Chưa có job phát sinh nào. Hãy nhập bên dưới để báo cho mọi người!</p>';
             return;
         }
-        container.innerHTML = quickJobsList.map(renderQuickJobBubble).join('');
+        container.innerHTML = filtered.map(renderQuickJobBubble).join('');
     }
 
     if (shouldScroll) {
@@ -2306,9 +2445,11 @@ function formatDateShortDMY(dateKey) {
 
 async function sendQuickJob() {
     const input = document.getElementById('quickChatInput');
+    const deadlineInput = document.getElementById('quickChatDeadlineInput');
     if (!input || !currentUser) return;
     const content = input.value.trim();
     if (!content) return;
+    const deadline = deadlineInput && deadlineInput.value ? deadlineInput.value : null;
 
     const sendBtn = document.getElementById('quickChatSendBtn');
     if (sendBtn) sendBtn.disabled = true;
@@ -2324,14 +2465,19 @@ async function sendQuickJob() {
             assigneeUid: null,
             assigneeName: null,
             time: null,
+            deadline,
             invitedUid: null,
             invitedName: null,
             invitedBy: null,
             invitedByName: null,
-            invitedAt: null
+            invitedAt: null,
+            reactions: {},
+            comments: [],
+            edited: false
         });
         input.value = '';
         input.style.height = 'auto';
+        if (deadlineInput) deadlineInput.value = '';
     } catch (error) {
         console.error('Lỗi gửi job trong ngày:', error);
         showNotification('Lỗi', 'Không thể gửi job. Vui lòng thử lại.', false, 'danger');
@@ -2588,13 +2734,111 @@ async function quickChatReject(jobId) {
     }
 }
 
+// Reaction (thả emoji) - toggle
+async function quickChatToggleReaction(jobId, emoji) {
+    if (!currentUser) return;
+    const job = quickJobsList.find(j => j.id === jobId);
+    if (!job) return;
+    const uids = (job.reactions && job.reactions[emoji]) || [];
+    const hasReacted = uids.includes(currentUser.uid);
+
+    try {
+        await updateDoc(doc(db, 'quickJobs', jobId), {
+            [`reactions.${emoji}`]: hasReacted ? arrayRemove(currentUser.uid) : arrayUnion(currentUser.uid)
+        });
+    } catch (error) {
+        console.error('Lỗi thả reaction:', error);
+    }
+}
+
+// Thêm bình luận ngắn
+async function quickChatAddComment(jobId) {
+    if (!currentUser) return;
+    const input = document.getElementById(`commentInput-${jobId}`);
+    if (!input) return;
+    const text = input.value.trim();
+    if (!text) return;
+
+    try {
+        await updateDoc(doc(db, 'quickJobs', jobId), {
+            comments: arrayUnion({
+                uid: currentUser.uid,
+                name: currentUser.displayName || currentUser.email,
+                text,
+                at: new Date().toISOString()
+            })
+        });
+        input.value = '';
+    } catch (error) {
+        console.error('Lỗi gửi bình luận:', error);
+        showNotification('Lỗi', 'Không thể gửi bình luận.', false, 'danger');
+    }
+}
+
+// Sửa job trong ngày (chỉ người tạo)
+function quickChatShowEditForm(jobId) {
+    const bubble = document.querySelector(`.quick-chat-bubble[data-job-id="${jobId}"]`);
+    if (!bubble) return;
+    const form = document.getElementById(`editForm-${jobId}`);
+    const content = document.getElementById(`content-${jobId}`);
+    if (form) form.classList.remove('d-none');
+    if (content) content.classList.add('d-none');
+}
+
+function quickChatCancelEditForm() {
+    renderQuickChat();
+}
+
+async function quickChatSaveEdit(jobId) {
+    const contentInput = document.getElementById(`editContent-${jobId}`);
+    const deadlineInput = document.getElementById(`editDeadline-${jobId}`);
+    if (!contentInput) return;
+    const newContent = contentInput.value.trim();
+    if (!newContent) {
+        showNotification('Thiếu nội dung', 'Nội dung job không được để trống.', false, 'warning');
+        return;
+    }
+
+    try {
+        await updateDoc(doc(db, 'quickJobs', jobId), {
+            content: newContent,
+            deadline: deadlineInput && deadlineInput.value ? deadlineInput.value : null,
+            edited: true,
+            editedAt: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('Lỗi sửa job:', error);
+        showNotification('Lỗi', 'Không thể lưu chỉnh sửa.', false, 'danger');
+    }
+}
+
+// Xóa job trong ngày (chỉ người tạo)
+async function quickChatDeleteJob(jobId) {
+    const job = quickJobsList.find(j => j.id === jobId);
+    if (!job || !currentUser) return;
+    if (job.createdBy !== currentUser.uid) return;
+
+    if (!confirm(`Xóa job "${job.content}"? Hành động này không thể hoàn tác.`)) return;
+
+    try {
+        await deleteDoc(doc(db, 'quickJobs', jobId));
+        showNotification('Đã xóa', 'Job đã được xóa khỏi khung chat.', false, 'success');
+    } catch (error) {
+        console.error('Lỗi xóa job:', error);
+        showNotification('Lỗi', 'Không thể xóa job.', false, 'danger');
+    }
+}
+
 function openQuickChatPanel() {
     const panel = document.getElementById('quickChatPanel');
     const toggle = document.getElementById('quickChatToggleBtn');
     if (!panel) return;
     quickChatPanelOpen = true;
     panel.classList.add('show');
-    if (toggle) toggle.classList.add('active');
+    if (toggle) {
+        toggle.classList.add('active');
+        toggle.classList.add('d-none');
+    }
     quickChatUnreadCount = 0;
     updateQuickChatBadge();
     setTimeout(() => {
@@ -2609,7 +2853,10 @@ function closeQuickChatPanel() {
     if (!panel) return;
     quickChatPanelOpen = false;
     panel.classList.remove('show');
-    if (toggle) toggle.classList.remove('active');
+    if (toggle) {
+        toggle.classList.remove('active');
+        toggle.classList.remove('d-none');
+    }
 }
 
 function toggleQuickChatPanel() {
@@ -2632,10 +2879,32 @@ function initQuickChatUi() {
     const tabAll = document.getElementById('quickChatTabAll');
     const tabMine = document.getElementById('quickChatTabMine');
     const guideBtn = document.getElementById('guideBtn');
+    const searchInput = document.getElementById('quickChatSearchInput');
+    const statusFilter = document.getElementById('quickChatStatusFilter');
+    const assigneeFilter = document.getElementById('quickChatAssigneeFilter');
 
     if (tabAll) tabAll.addEventListener('click', () => setQuickChatTab('all'));
     if (tabMine) tabMine.addEventListener('click', () => setQuickChatTab('mine'));
     if (guideBtn) guideBtn.addEventListener('click', () => guideModal.show());
+
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            quickChatSearchText = searchInput.value.trim();
+            renderQuickChat();
+        });
+    }
+    if (statusFilter) {
+        statusFilter.addEventListener('change', () => {
+            quickChatStatusFilter = statusFilter.value;
+            renderQuickChat();
+        });
+    }
+    if (assigneeFilter) {
+        assigneeFilter.addEventListener('change', () => {
+            quickChatAssigneeFilter = assigneeFilter.value;
+            renderQuickChat();
+        });
+    }
 
     if (toggleBtn) toggleBtn.addEventListener('click', toggleQuickChatPanel);
     if (closeBtn) closeBtn.addEventListener('click', closeQuickChatPanel);
@@ -2679,6 +2948,21 @@ function initQuickChatUi() {
             else if (action === 'cancel-invite') quickChatCancelInvite(jobId);
             else if (action === 'complete') quickChatComplete(jobId);
             else if (action === 'reject') quickChatReject(jobId);
+            else if (action === 'react') quickChatToggleReaction(jobId, btn.dataset.emoji);
+            else if (action === 'add-comment') quickChatAddComment(jobId);
+            else if (action === 'show-edit') quickChatShowEditForm(jobId);
+            else if (action === 'cancel-edit') quickChatCancelEditForm(jobId);
+            else if (action === 'save-edit') quickChatSaveEdit(jobId);
+            else if (action === 'delete') quickChatDeleteJob(jobId);
+        });
+
+        // Enter để gửi bình luận nhanh
+        messages.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.target.classList.contains('quick-chat-comment-input')) {
+                e.preventDefault();
+                const jobId = e.target.id.replace('commentInput-', '');
+                quickChatAddComment(jobId);
+            }
         });
     }
 
@@ -2690,6 +2974,19 @@ function initQuickChatUi() {
             notifDropdownOpen = false;
             dropdown.classList.remove('show');
         }
+    });
+
+    // Click ra ngoài khung chat "Job trong ngày" -> tự động ẩn
+    document.addEventListener('click', (e) => {
+        const panel = document.getElementById('quickChatPanel');
+        const toggle = document.getElementById('quickChatToggleBtn');
+        if (!quickChatPanelOpen || !panel) return;
+        if (panel.contains(e.target)) return;
+        if (toggle && toggle.contains(e.target)) return;
+        // Không đóng nếu đang thao tác trên modal chỉ định job (backdrop static)
+        const inviteModalEl = document.getElementById('quickJobInviteModal');
+        if (inviteModalEl && inviteModalEl.contains(e.target)) return;
+        closeQuickChatPanel();
     });
 }
 
