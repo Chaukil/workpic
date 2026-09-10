@@ -89,14 +89,30 @@
             </div>
             <div class="topbar-badges">
                 <div class="user-menu">
+                    <!-- Guide Button -->
+                    <button type="button" class="notif-bell-btn" id="guideBtn" title="Hướng dẫn sử dụng">
+                        <i class="bi bi-info-circle-fill"></i>
+                    </button>
+                    <!-- Notification Bell -->
+                    <div class="notif-menu">
+                        <button type="button" class="notif-bell-btn" id="notifBellBtn" title="Thông báo">
+                            <i class="bi bi-bell-fill"></i>
+                            <span class="notif-badge d-none" id="notifBadge">0</span>
+                        </button>
+                        <div class="notif-dropdown" id="notifDropdown">
+                            <div class="notif-dropdown-header">
+                                <span><i class="bi bi-bell-fill"></i> Thông báo (30 ngày gần nhất)</span>
+                            </div>
+                            <div class="notif-dropdown-list" id="notifList">
+                                <p class="text-muted text-center p-3 mb-0">Không có thông báo</p>
+                            </div>
+                        </div>
+                    </div>
                     <!-- User Profile Button -->
                     <button class="user-profile-btn" id="userProfileBtn" title="Thông tin tài khoản">
                         <img id="userAvatar" class="user-avatar" src="" alt="Avatar">
                         <span id="userDisplayName" class="user-name"></span>
                         <i class="bi bi-chevron-down"></i>
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="logoutBtn">
-                        <i class="bi bi-box-arrow-right"></i> Đăng xuất
                     </button>
                 </div>
                 <button type="button" class="theme-toggle" id="themeToggleBtn" aria-pressed="false">
@@ -411,6 +427,9 @@
                     </div>
                 </div>
                 <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-danger" id="logoutBtn">
+                        <i class="bi bi-box-arrow-right"></i> Đăng xuất
+                    </button>
                     <button type="button" class="btn btn-cancel" data-bs-dismiss="modal">Đóng</button>
                 </div>
             </div>
@@ -439,6 +458,126 @@
             </div>
         </div>
     </div>
+
+    <!-- Guide Modal -->
+    <div class="modal fade" id="guideModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-gradient-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-info-circle-fill"></i> Hướng dẫn sử dụng</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="guide-grid">
+                        <div class="guide-item">
+                            <i class="bi bi-calendar2-week-fill"></i>
+                            <h6>Lịch làm việc</h6>
+                            <p>Thêm, sửa, xem job theo ngày / tuần / tháng.</p>
+                        </div>
+                        <div class="guide-item">
+                            <i class="bi bi-arrow-left-right"></i>
+                            <h6>Chuyển / Copy job</h6>
+                            <p>Chuyển hẳn hoặc sao chép job cho người khác, cần người nhận xác nhận.</p>
+                        </div>
+                        <div class="guide-item">
+                            <i class="bi bi-bell-fill"></i>
+                            <h6>Thông báo</h6>
+                            <p>Chuông góc trên hiện các hoạt động 30 ngày gần nhất, đếm số chưa đọc.</p>
+                        </div>
+                        <div class="guide-item">
+                            <i class="bi bi-chat-dots-fill"></i>
+                            <h6>Job trong ngày</h6>
+                            <p>Khung chat báo job phát sinh real-time, ai cũng thấy và nhận được.</p>
+                        </div>
+                        <div class="guide-item">
+                            <i class="bi bi-person-plus-fill"></i>
+                            <h6>Chỉ định người nhận</h6>
+                            <p>Giao job trong ngày cho 1 người cụ thể, họ nhận hoặc từ chối.</p>
+                        </div>
+                        <div class="guide-item">
+                            <i class="bi bi-exclamation-triangle-fill"></i>
+                            <h6>Cảnh báo quá hạn</h6>
+                            <p>Job trong ngày chưa ai nhận, qua ngày sẽ tô đỏ để nhắc nhở.</p>
+                        </div>
+                        <div class="guide-item">
+                            <i class="bi bi-list-check"></i>
+                            <h6>Tab "Của tôi"</h6>
+                            <p>Xem riêng job bạn đang làm và đã hoàn thành trong khung chat.</p>
+                        </div>
+                        <div class="guide-item">
+                            <i class="bi bi-person-circle"></i>
+                            <h6>Tài khoản</h6>
+                            <p>Đổi avatar, tên hiển thị, đăng xuất — tất cả trong 1 nút.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-cancel" data-bs-dismiss="modal">Đã hiểu</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Job Invite Modal -->
+    <div class="modal fade" id="quickJobInviteModal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-md">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-person-plus-fill"></i> Bạn được chỉ định nhận job</h5>
+                </div>
+                <div class="modal-body">
+                    <p id="quickJobInviteMessage" class="mb-3">Bạn có muốn nhận job này không?</p>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-success flex-grow-1" id="quickJobInviteAcceptBtn">
+                            <i class="bi bi-check-circle-fill"></i> Nhận
+                        </button>
+                        <button class="btn btn-danger flex-grow-1" id="quickJobInviteRejectBtn">
+                            <i class="bi bi-x-circle-fill"></i> Từ chối
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Chat Toggle Button (nổi góc phải) -->
+    <button type="button" class="quick-chat-toggle" id="quickChatToggleBtn" title="Job trong ngày">
+        <i class="bi bi-chat-dots-fill"></i>
+        <span class="quick-chat-badge d-none" id="quickChatBadge">0</span>
+    </button>
+
+    <!-- Quick Chat Panel: Job trong ngày (real-time) -->
+    <aside class="quick-chat-panel" id="quickChatPanel">
+        <div class="quick-chat-header">
+            <div class="quick-chat-header-title">
+                <i class="bi bi-lightning-charge-fill"></i>
+                <div>
+                    <h6>Job trong ngày</h6>
+                    <small id="quickChatDateLabel">Hôm nay</small>
+                </div>
+            </div>
+            <button type="button" class="quick-chat-close" id="quickChatCloseBtn" aria-label="Đóng">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <div class="quick-chat-tabs">
+            <button type="button" class="quick-chat-tab active" id="quickChatTabAll" data-tab="all">
+                <i class="bi bi-people-fill"></i> Chung
+            </button>
+            <button type="button" class="quick-chat-tab" id="quickChatTabMine" data-tab="mine">
+                <i class="bi bi-person-fill"></i> Của tôi
+            </button>
+        </div>
+        <div class="quick-chat-messages" id="quickChatMessages">
+            <p class="quick-chat-empty">Chưa có job phát sinh nào trong hôm nay. Hãy nhập bên dưới để báo cho mọi người!</p>
+        </div>
+        <div class="quick-chat-input-row">
+            <textarea id="quickChatInput" class="quick-chat-input" rows="1" placeholder="Nhập nội dung job phát sinh trong ngày..."></textarea>
+            <button type="button" class="quick-chat-send-btn" id="quickChatSendBtn" title="Gửi">
+                <i class="bi bi-send-fill"></i>
+            </button>
+        </div>
+    </aside>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script type="module" src="app.js"></script>
