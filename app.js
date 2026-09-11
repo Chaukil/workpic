@@ -69,7 +69,6 @@ let quickChatActiveTab = 'all';
 let quickChatSearchText = '';
 let quickChatStatusFilter = 'all';
 let quickChatAssigneeFilter = 'all';
-const QUICK_CHAT_REACTIONS = ['👍', '❤️', '😂', '🔥'];
 
 function applyTheme(theme) {
     currentTheme = theme;
@@ -2257,41 +2256,6 @@ function renderQuickJobBubble(job) {
             : `<span class="quick-chat-status-pill deadline"><i class="bi bi-alarm"></i> Hạn: ${escapeHtml(job.deadline)}</span>`;
     }
 
-    // Reaction bar
-    const reactions = job.reactions || {};
-    const reactionButtonsHtml = QUICK_CHAT_REACTIONS.map(emoji => {
-        const uids = reactions[emoji] || [];
-        const reacted = currentUser && uids.includes(currentUser.uid);
-        return `
-            <button type="button" class="quick-chat-reaction-btn ${reacted ? 'reacted' : ''}" data-action="react" data-id="${job.id}" data-emoji="${emoji}">
-                ${emoji}${uids.length > 0 ? `<span class="quick-chat-reaction-count">${uids.length}</span>` : ''}
-            </button>
-        `;
-    }).join('');
-
-    // Comments
-    const comments = job.comments || [];
-    const commentsHtml = comments.length > 0
-        ? `<div class="quick-chat-comments">${comments.map(c => `
-            <div class="quick-chat-comment-item">
-                <div class="quick-chat-comment-avatar">${getInitials(c.name)}</div>
-                <div class="quick-chat-comment-body">
-                    <span class="quick-chat-comment-author">${escapeHtml(c.name || '')}</span>
-                    <span class="quick-chat-comment-text">${escapeHtml(c.text || '')}</span>
-                </div>
-            </div>
-        `).join('')}</div>`
-        : '';
-
-    const commentFormHtml = `
-        <div class="quick-chat-comment-form">
-            <input type="text" class="quick-chat-comment-input" id="commentInput-${job.id}" placeholder="Viết bình luận ngắn...">
-            <button type="button" class="quick-chat-comment-send" data-action="add-comment" data-id="${job.id}" title="Gửi bình luận">
-                <i class="bi bi-send-fill"></i>
-            </button>
-        </div>
-    `;
-
     // Owner tools: sửa / xóa (chỉ người tạo)
     const ownerToolsHtml = isOwn ? `
         <div class="quick-chat-owner-tools">
@@ -2333,9 +2297,6 @@ function renderQuickJobBubble(job) {
             ${editFormHtml}
             <div class="quick-chat-status-row">${statusPillHtml}${deadlinePillHtml}</div>
             ${actionsHtml}
-            <div class="quick-chat-reactions-row">${reactionButtonsHtml}</div>
-            ${commentsHtml}
-            ${commentFormHtml}
         </div>
     `;
 }
@@ -2471,8 +2432,6 @@ async function sendQuickJob() {
             invitedBy: null,
             invitedByName: null,
             invitedAt: null,
-            reactions: {},
-            comments: [],
             edited: false
         });
         input.value = '';
@@ -2734,47 +2693,6 @@ async function quickChatReject(jobId) {
     }
 }
 
-// Reaction (thả emoji) - toggle
-async function quickChatToggleReaction(jobId, emoji) {
-    if (!currentUser) return;
-    const job = quickJobsList.find(j => j.id === jobId);
-    if (!job) return;
-    const uids = (job.reactions && job.reactions[emoji]) || [];
-    const hasReacted = uids.includes(currentUser.uid);
-
-    try {
-        await updateDoc(doc(db, 'quickJobs', jobId), {
-            [`reactions.${emoji}`]: hasReacted ? arrayRemove(currentUser.uid) : arrayUnion(currentUser.uid)
-        });
-    } catch (error) {
-        console.error('Lỗi thả reaction:', error);
-    }
-}
-
-// Thêm bình luận ngắn
-async function quickChatAddComment(jobId) {
-    if (!currentUser) return;
-    const input = document.getElementById(`commentInput-${jobId}`);
-    if (!input) return;
-    const text = input.value.trim();
-    if (!text) return;
-
-    try {
-        await updateDoc(doc(db, 'quickJobs', jobId), {
-            comments: arrayUnion({
-                uid: currentUser.uid,
-                name: currentUser.displayName || currentUser.email,
-                text,
-                at: new Date().toISOString()
-            })
-        });
-        input.value = '';
-    } catch (error) {
-        console.error('Lỗi gửi bình luận:', error);
-        showNotification('Lỗi', 'Không thể gửi bình luận.', false, 'danger');
-    }
-}
-
 // Sửa job trong ngày (chỉ người tạo)
 function quickChatShowEditForm(jobId) {
     const bubble = document.querySelector(`.quick-chat-bubble[data-job-id="${jobId}"]`);
@@ -2948,21 +2866,10 @@ function initQuickChatUi() {
             else if (action === 'cancel-invite') quickChatCancelInvite(jobId);
             else if (action === 'complete') quickChatComplete(jobId);
             else if (action === 'reject') quickChatReject(jobId);
-            else if (action === 'react') quickChatToggleReaction(jobId, btn.dataset.emoji);
-            else if (action === 'add-comment') quickChatAddComment(jobId);
             else if (action === 'show-edit') quickChatShowEditForm(jobId);
             else if (action === 'cancel-edit') quickChatCancelEditForm(jobId);
             else if (action === 'save-edit') quickChatSaveEdit(jobId);
             else if (action === 'delete') quickChatDeleteJob(jobId);
-        });
-
-        // Enter để gửi bình luận nhanh
-        messages.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && e.target.classList.contains('quick-chat-comment-input')) {
-                e.preventDefault();
-                const jobId = e.target.id.replace('commentInput-', '');
-                quickChatAddComment(jobId);
-            }
         });
     }
 
