@@ -18,6 +18,18 @@
     --success: #16a34a;
     --danger: #ef4444;
     --shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+
+    /* Unified type scale — mọi font-size trong file này nên dùng 1 trong các biến sau
+       thay vì tự đặt số rem tùy tiện, để cỡ chữ nhất quán toàn app. */
+    --fs-3xs: 0.68rem;   /* ~10.9px - badge/pill nhỏ nhất */
+    --fs-2xs: 0.72rem;   /* ~11.5px - label phụ, timestamp */
+    --fs-xs:  0.78rem;   /* ~12.5px - text phụ, chú thích */
+    --fs-sm:  0.85rem;   /* ~13.6px - text phụ trong card/list */
+    --fs-base:0.92rem;   /* ~14.7px - text nội dung chính */
+    --fs-md:  1rem;      /* 16px - tiêu đề nhỏ, nút chính */
+    --fs-lg:  1.28rem;   /* ~20.5px - tiêu đề card/modal */
+    --fs-xl:  1.45rem;   /* ~23.2px - tiêu đề lớn */
+    --fs-2xl: 1.55rem;   /* ~24.8px - tiêu đề trang (H1) */
 }
 
 body.theme-dark {
@@ -80,7 +92,7 @@ body {
 .auth-panel h1 {
     margin: 0;
     color: var(--text);
-    font-size: 1.55rem;
+    font-size: var(--fs-2xl);
 }
 
 .auth-subtitle {
@@ -117,7 +129,7 @@ body {
     min-height: 1.25rem;
     margin: 0.75rem 0 0;
     color: var(--danger);
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
 }
 
 .user-menu {
@@ -130,7 +142,7 @@ body {
     max-width: 220px;
     overflow: hidden;
     color: var(--muted);
-    font-size: 0.74rem;
+    font-size: var(--fs-xs);
     font-weight: 600;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -200,7 +212,7 @@ body.theme-dark .topbar {
 
 .topbar-eyebrow {
     margin: 0 0 0.2rem;
-    font-size: 0.7rem;
+    font-size: var(--fs-2xs);
     font-weight: 700;
     letter-spacing: 0.16em;
     text-transform: uppercase;
@@ -209,7 +221,7 @@ body.theme-dark .topbar {
 
 .topbar h1 {
     margin: 0;
-    font-size: 1.24rem;
+    font-size: var(--fs-lg);
     letter-spacing: -0.03em;
     font-weight: 700;
     color: var(--text);
@@ -217,7 +229,7 @@ body.theme-dark .topbar {
 
 .topbar-subtitle {
     margin: 0.2rem 0 0;
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     color: var(--muted);
 }
 
@@ -236,7 +248,7 @@ body.theme-dark .topbar {
     border: 1px solid var(--border);
     background: var(--surface-muted);
     color: var(--muted);
-    font-size: 0.74rem;
+    font-size: var(--fs-xs);
     font-weight: 600;
 }
 
@@ -250,7 +262,7 @@ body.theme-dark .topbar {
     background: var(--surface-muted);
     color: var(--text);
     padding: 0.45rem 0.7rem;
-    font-size: 0.74rem;
+    font-size: var(--fs-xs);
     font-weight: 600;
     cursor: pointer;
     transition: background 0.2s ease, border-color 0.2s ease;
@@ -366,7 +378,7 @@ body.theme-dark .theme-toggle {
 
 .card-header h6 {
     margin: 0;
-    font-size: 0.9rem;
+    font-size: var(--fs-base);
     font-weight: 700;
     color: var(--text);
 }
@@ -386,7 +398,7 @@ body.theme-dark .theme-toggle {
 
 /* Search Box */
 #searchJob {
-    font-size: 0.75rem;
+    font-size: var(--fs-xs);
     padding: 0.46rem 0.7rem;
     border-radius: 10px;
     border: 1px solid var(--border);
@@ -429,7 +441,7 @@ body.theme-dark #searchJob::placeholder {
     border: none;
     padding: 0.55rem 0.75rem;
     box-shadow: 0 8px 16px rgba(59, 130, 246, 0.10);
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     color: #fff;
 }
 
@@ -455,11 +467,11 @@ body.theme-dark #searchJob::placeholder {
 }
 
 .btn-add-job i, .btn-view-data i, .btn-export-pdf i {
-    font-size: 0.9rem;
+    font-size: var(--fs-base);
 }
 
 .btn-add-job span, .btn-view-data span, .btn-export-pdf span {
-    font-size: 0.75rem;
+    font-size: var(--fs-xs);
 }
 
 /* Button Shine Effect */
@@ -471,7 +483,7 @@ body.theme-dark #searchJob::placeholder {
     height: 100%;
     background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
     transition: left 0.5s;
-    font-size: 0.75rem;
+    font-size: var(--fs-xs);
 }
 
 .btn-add-job:hover .btn-shine,
@@ -517,7 +529,7 @@ body.theme-dark .form-text {
     padding: 0.25rem 0.5rem;
     border-radius: 0.35rem;
     color: #fff;
-    font-size: 0.75rem;
+    font-size: var(--fs-xs);
     font-weight: 700;
     text-align: center;
 }
@@ -535,7 +547,7 @@ body.theme-dark .form-text {
     color: white;
     border: none;
     padding: 0.5rem 0.75rem;
-    font-size: 0.78rem;
+    font-size: var(--fs-xs);
     box-shadow: 0 6px 16px rgba(22, 163, 74, 0.2);
 }
 
@@ -549,7 +561,7 @@ body.theme-dark .form-text {
     color: white;
     border: none;
     padding: 0.5rem 0.75rem;
-    font-size: 0.78rem;
+    font-size: var(--fs-xs);
     box-shadow: 0 6px 16px rgba(220, 38, 38, 0.2);
 }
 
@@ -563,7 +575,7 @@ body.theme-dark .form-text {
     color: #0f172a;
     border: 1px solid var(--border);
     padding: 0.5rem 0.75rem;
-    font-size: 0.78rem;
+    font-size: var(--fs-xs);
     box-shadow: none;
 }
 
@@ -608,7 +620,7 @@ body.theme-dark .btn-cancel {
 }
 
 .out-of-schedule-card-title {
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     font-weight: 700;
     color: var(--text);
     white-space: nowrap;
@@ -693,7 +705,7 @@ body.theme-dark .job-item {
 .job-item h6 {
     margin-bottom: 0.25rem;
     font-weight: 700;
-    font-size: 0.84rem;
+    font-size: var(--fs-sm);
     transition: color 0.2s ease;
     word-wrap: break-word;
 }
@@ -712,12 +724,12 @@ body.theme-dark .job-item {
 
 .job-item small {
     color: var(--muted);
-    font-size: 0.72rem;
+    font-size: var(--fs-2xs);
     flex: 1;
 }
 
 .job-item .btn-edit {
-    font-size: 0.7rem;
+    font-size: var(--fs-2xs);
     padding: 0.22rem 0.5rem;
     border-radius: 8px;
     transition: all 0.2s ease;
@@ -748,7 +760,7 @@ body.theme-dark .job-item {
     align-items: center;
     gap: 0.35rem;
     animation: slideInLeft 0.4s ease;
-    font-size: 0.72rem;
+    font-size: var(--fs-2xs);
     transition: all 0.2s ease;
     padding: 0.2rem 0.38rem;
     border-radius: 999px;
@@ -797,7 +809,7 @@ body.theme-dark .job-item {
 
 /* Schedule Table */
 .schedule-table {
-    font-size: 0.75rem;
+    font-size: var(--fs-xs);
     border-collapse: separate;
     border-spacing: 0 0.35rem;
 }
@@ -808,7 +820,7 @@ body.theme-dark .job-item {
     text-align: center;
     padding: 0.55rem;
     font-weight: 700;
-    font-size: 0.78rem;
+    font-size: var(--fs-xs);
     border: 1px solid rgba(148, 163, 184, 0.22);
     border-radius: 10px;
 }
@@ -845,7 +857,7 @@ body.theme-dark .schedule-table td:hover {
 .schedule-table .date-header {
     font-weight: 600;
     margin-bottom: 0.3rem;
-    font-size: 0.75rem;
+    font-size: var(--fs-xs);
     color: #495057;
 }
 
@@ -875,7 +887,7 @@ body.theme-dark .schedule-table td:hover {
 
 .schedule-item h6 {
     margin: 0;
-    font-size: 0.75rem;
+    font-size: var(--fs-xs);
     color: white;
     font-weight: 600;
     white-space: nowrap;
@@ -886,7 +898,7 @@ body.theme-dark .schedule-table td:hover {
 
 .schedule-item small {
     color: rgba(255,255,255,0.95);
-    font-size: 0.65rem;
+    font-size: var(--fs-3xs);
     text-shadow: 0 1px 2px rgba(0,0,0,0.2);
 }
 
@@ -901,7 +913,7 @@ body.theme-dark .schedule-table td:hover {
 
 .editor-toolbar .btn {
     padding: 0.4rem 0.8rem;
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     margin-right: 0.3rem;
     border-radius: 6px;
     transition: all 0.3s ease;
@@ -915,7 +927,7 @@ body.theme-dark .schedule-table td:hover {
 .editor-content {
     border-radius: 0 0 12px 12px;
     transition: all 0.2s ease;
-    font-size: 0.9rem;
+    font-size: var(--fs-base);
     padding: 0.75rem;
     border: 1px solid var(--border);
     background: var(--surface);
@@ -1031,7 +1043,7 @@ body.theme-dark .modal-backdrop.show {
 }
 
 .modal-title {
-    font-size: 1rem;
+    font-size: var(--fs-md);
     font-weight: 700;
 }
 
@@ -1048,13 +1060,13 @@ body.theme-dark .modal-backdrop.show {
 /* Form Elements */
 .form-label {
     margin-bottom: 0.4rem;
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     font-weight: 600;
     color: var(--text);
 }
 
 .form-control, .form-select {
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     padding: 0.45rem 0.6rem;
     border-radius: 10px;
     border: 1px solid var(--border);
@@ -1073,7 +1085,7 @@ body.theme-dark .modal-backdrop.show {
     color: white;
     border: none;
     padding: 0.5rem 0.75rem;
-    font-size: 0.78rem;
+    font-size: var(--fs-xs);
     box-shadow: 0 6px 16px rgba(245, 158, 11, 0.2);
     position: relative;
     overflow: hidden;
@@ -1194,7 +1206,7 @@ body.theme-dark .modal-backdrop.show {
     background: transparent;
     border: none;
     color: var(--muted);
-    font-size: 1.25rem;
+    font-size: var(--fs-lg);
     cursor: pointer;
     transition: all 0.2s ease;
     padding: 0.25rem;
@@ -1262,7 +1274,7 @@ body.theme-dark .modal-backdrop.show {
 }
 
 .form-check-inline .form-check-label {
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
@@ -1346,7 +1358,7 @@ body.theme-dark .modal-backdrop.show {
     border-radius: 50%;
     display: grid;
     place-items: center;
-    font-size: 1.4rem;
+    font-size: var(--fs-xl);
     color: white;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
@@ -1364,7 +1376,7 @@ body.theme-dark .modal-backdrop.show {
 .confirm-modal-body p {
     margin: 0;
     color: #64748b;
-    font-size: 0.92rem;
+    font-size: var(--fs-base);
     line-height: 1.5;
 }
 
@@ -1399,7 +1411,7 @@ body.theme-dark .modal-backdrop.show {
     display: flex;
     align-items: flex-start;
     gap: 0.8rem;
-    font-size: 0.9rem;
+    font-size: var(--fs-base);
     border: 1px solid rgba(148, 163, 184, 0.2);
 }
 
@@ -1434,7 +1446,7 @@ body.theme-dark .modal-backdrop.show {
 }
 
 .notification-icon {
-    font-size: 1.5rem;
+    font-size: var(--fs-2xl);
     color: #667eea;
     animation: bellRing 0.5s ease;
 }
@@ -1449,12 +1461,12 @@ body.theme-dark .modal-backdrop.show {
     margin: 0;
     font-weight: 700;
     color: #333;
-    font-size: 1rem;
+    font-size: var(--fs-md);
 }
 
 .notification-content p {
     margin: 0.3rem 0 0 0;
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     color: #666;
 }
 
@@ -1462,7 +1474,7 @@ body.theme-dark .modal-backdrop.show {
     margin-left: auto;
     background: none;
     border: none;
-    font-size: 1.5rem;
+    font-size: var(--fs-2xl);
     color: #999;
     cursor: pointer;
     transition: all 0.3s ease;
@@ -1513,7 +1525,7 @@ body.theme-dark .modal-backdrop.show {
     text-align: center;
     padding: 1rem;
     color: #6c757d;
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
 }
 
 /* Responsive */
@@ -1526,38 +1538,38 @@ body.theme-dark .modal-backdrop.show {
 
 @media (max-width: 992px) {
     body {
-        font-size: 11px;
+        font-size: var(--fs-3xs);
     }
     
     .card-header h6 {
-        font-size: 0.8rem;
+        font-size: var(--fs-sm);
     }
     
     .legend-item {
-        font-size: 0.7rem;
+        font-size: var(--fs-2xs);
     }
     
     .job-item h6 {
-        font-size: 0.75rem;
+        font-size: var(--fs-xs);
     }
     
     .job-item small {
-        font-size: 0.65rem;
+        font-size: var(--fs-3xs);
     }
     
     .btn-add-job, .btn-export-pdf {
-        font-size: 0.7rem;
+        font-size: var(--fs-2xs);
         padding: 0.4rem 0.5rem;
     }
     
     .btn-add-job span, .btn-export-pdf span {
-        font-size: 0.7rem;
+        font-size: var(--fs-2xs);
     }
 }
 
 @media (max-width: 768px) {
     body {
-        font-size: 11px;
+        font-size: var(--fs-3xs);
     }
 
     h1, h2, h3, h4, h5, h6, p, span, label, button, input, select, textarea, small {
@@ -1632,16 +1644,16 @@ body.theme-dark .modal-backdrop.show {
     .btn-edit,
     .notification-content p,
     .notification-content h6 {
-        font-size: 0.72rem;
+        font-size: var(--fs-2xs);
     }
 
     .topbar .theme-toggle {
-        font-size: 0.72rem;
+        font-size: var(--fs-2xs);
         padding: 0.4rem 0.7rem;
     }
 
     .schedule-table {
-        font-size: 0.66rem;
+        font-size: var(--fs-3xs);
     }
     
     .schedule-table th {
@@ -1658,7 +1670,7 @@ body.theme-dark .modal-backdrop.show {
     }
     
     .date-header {
-        font-size: 0.66rem !important;
+        font-size: var(--fs-3xs) !important;
     }
     
     .notification-container {
@@ -1676,7 +1688,7 @@ body.theme-dark .modal-backdrop.show {
     }
     
     .btn-add-job i, .btn-export-pdf i {
-        font-size: 0.72rem;
+        font-size: var(--fs-2xs);
     }
     
     .job-item .btn-edit {
@@ -1696,7 +1708,7 @@ body.theme-dark .modal-backdrop.show {
     color: var(--text);
     cursor: pointer;
     transition: all 0.2s ease;
-    font-size: 0.78rem;
+    font-size: var(--fs-xs);
 }
 
 .user-profile-btn:hover {
@@ -1729,7 +1741,7 @@ body.theme-dark .modal-backdrop.show {
 }
 
 .user-profile-btn .bi-chevron-down {
-    font-size: 0.6rem;
+    font-size: var(--fs-3xs);
     color: var(--muted);
 }
 
@@ -1771,7 +1783,7 @@ body.theme-dark .modal-backdrop.show {
 }
 
 .btn-avatar-edit i {
-    font-size: 0.9rem;
+    font-size: var(--fs-base);
 }
 
 .form-control-static {
@@ -1791,7 +1803,7 @@ body.theme-dark .modal-backdrop.show {
     border-radius: 8px;
     transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    font-size: 1rem;
+    font-size: var(--fs-md);
 }
 
 .btn-toggle-sidebar:hover {
@@ -1871,7 +1883,7 @@ body.theme-dark .modal-backdrop.show {
 @media (max-width: 768px) {
     .btn-toggle-sidebar {
         padding: 0.3rem 0.5rem;
-        font-size: 0.9rem;
+        font-size: var(--fs-base);
     }
 
     .modal-dialog {
@@ -1923,7 +1935,7 @@ body.theme-dark .modal-backdrop.show {
     display: inline-block;
     background: #6c757d;
     color: white;
-    font-size: 0.65rem;
+    font-size: var(--fs-3xs);
     padding: 0.1rem 0.4rem;
     border-radius: 4px;
     margin-left: 0.3rem;
@@ -1936,7 +1948,7 @@ body.theme-dark .modal-backdrop.show {
     color: white;
     padding: 0.4rem 0.8rem;
     border-radius: 6px;
-    font-size: 0.9rem;
+    font-size: var(--fs-base);
     font-weight: 600;
     margin-left: 0.5rem;
     animation: pulseGray 2s infinite;
@@ -2017,7 +2029,7 @@ body.theme-dark .modal-backdrop.show {
     background: var(--surface-muted);
     color: var(--text);
     cursor: pointer;
-    font-size: 1rem;
+    font-size: var(--fs-md);
     transition: all 0.2s ease;
 }
 
@@ -2051,7 +2063,7 @@ body.theme-dark .modal-backdrop.show {
     border-radius: 999px;
     background: var(--danger);
     color: #fff;
-    font-size: 0.65rem;
+    font-size: var(--fs-3xs);
     font-weight: 700;
     line-height: 18px;
     text-align: center;
@@ -2084,7 +2096,7 @@ body.theme-dark .modal-backdrop.show {
     padding: 0.85rem 1rem;
     border-bottom: 1px solid var(--border);
     font-weight: 700;
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     color: var(--text);
     background: var(--surface-muted);
     flex-shrink: 0;
@@ -2121,7 +2133,7 @@ body.theme-dark .modal-backdrop.show {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.95rem;
+    font-size: var(--fs-base);
     color: #fff;
 }
 
@@ -2131,15 +2143,87 @@ body.theme-dark .modal-backdrop.show {
 }
 
 .notif-item-message {
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     color: var(--text);
     margin: 0 0 0.2rem 0;
     line-height: 1.4;
 }
 
 .notif-item-time {
-    font-size: 0.7rem;
+    font-size: var(--fs-2xs);
     color: var(--muted);
+}
+
+/* Pending actions - chuyển/copy job hoặc chỉ định job chưa xác nhận, có thể lỡ miss
+   popup ban đầu nên hiển thị lại ở đây để người dùng bấm xem lại. */
+.notif-pending-section {
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-muted);
+    flex-shrink: 0;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.notif-pending-title {
+    padding: 0.6rem 1rem 0.3rem;
+    font-size: var(--fs-2xs);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--danger);
+}
+
+.notif-pending-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.6rem 1rem;
+}
+
+.notif-pending-item-icon {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--fs-sm);
+    color: #fff;
+    background: var(--primary);
+}
+
+.notif-pending-item-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.notif-pending-item-message {
+    font-size: var(--fs-sm);
+    color: var(--text);
+    line-height: 1.35;
+}
+
+.notif-pending-item-time {
+    font-size: var(--fs-3xs);
+    color: var(--muted);
+}
+
+.notif-pending-review-btn {
+    flex-shrink: 0;
+    border: none;
+    border-radius: 999px;
+    padding: 0.3rem 0.7rem;
+    background: var(--primary);
+    color: #fff;
+    font-size: var(--fs-2xs);
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.notif-pending-review-btn:hover {
+    filter: brightness(1.08);
 }
 
 /* ============================================================
@@ -2155,7 +2239,7 @@ body.theme-dark .modal-backdrop.show {
     border: none;
     background: linear-gradient(135deg, var(--primary), #6366f1);
     color: #fff;
-    font-size: 1.35rem;
+    font-size: var(--fs-xl);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2183,7 +2267,7 @@ body.theme-dark .modal-backdrop.show {
     border-radius: 999px;
     background: var(--danger);
     color: #fff;
-    font-size: 0.7rem;
+    font-size: var(--fs-2xs);
     font-weight: 700;
     line-height: 20px;
     text-align: center;
@@ -2228,18 +2312,18 @@ body.theme-dark .modal-backdrop.show {
 }
 
 .quick-chat-header-title i {
-    font-size: 1.3rem;
+    font-size: var(--fs-lg);
 }
 
 .quick-chat-header-title h6 {
     margin: 0;
     font-weight: 700;
-    font-size: 0.95rem;
+    font-size: var(--fs-base);
 }
 
 .quick-chat-header-title small {
     opacity: 0.85;
-    font-size: 0.72rem;
+    font-size: var(--fs-2xs);
 }
 
 .quick-chat-close {
@@ -2274,7 +2358,7 @@ body.theme-dark .modal-backdrop.show {
 .quick-chat-empty {
     text-align: center;
     color: var(--muted);
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     margin: auto 0;
     padding: 1rem;
 }
@@ -2315,7 +2399,7 @@ body.theme-dark .modal-backdrop.show {
     border-radius: 50%;
     background: var(--primary);
     color: #fff;
-    font-size: 0.7rem;
+    font-size: var(--fs-2xs);
     font-weight: 700;
     display: flex;
     align-items: center;
@@ -2326,18 +2410,18 @@ body.theme-dark .modal-backdrop.show {
 
 .quick-chat-author {
     font-weight: 700;
-    font-size: 0.78rem;
+    font-size: var(--fs-xs);
     color: var(--text);
 }
 
 .quick-chat-time {
-    font-size: 0.68rem;
+    font-size: var(--fs-3xs);
     color: var(--muted);
     margin-left: auto;
 }
 
 .quick-chat-content {
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     color: var(--text);
     line-height: 1.45;
     margin: 0 0 0.55rem 0;
@@ -2350,7 +2434,7 @@ body.theme-dark .modal-backdrop.show {
     align-items: center;
     flex-wrap: wrap;
     gap: 0.4rem;
-    font-size: 0.72rem;
+    font-size: var(--fs-2xs);
 }
 
 .quick-chat-status-pill {
@@ -2395,7 +2479,7 @@ body.theme-dark .modal-backdrop.show {
 }
 
 .quick-chat-actions .btn {
-    font-size: 0.72rem;
+    font-size: var(--fs-2xs);
     padding: 0.28rem 0.6rem;
 }
 
@@ -2406,10 +2490,51 @@ body.theme-dark .modal-backdrop.show {
     align-items: center;
 }
 
+.quick-chat-transfer-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    margin-top: 0.5rem;
+    padding: 0.55rem;
+    border-radius: 10px;
+    border: 1px dashed var(--border);
+    background: var(--surface-muted);
+}
+
+.quick-chat-transfer-form-row {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+}
+
+.quick-chat-transfer-mode {
+    display: flex;
+    gap: 0.9rem;
+    font-size: var(--fs-2xs);
+    color: var(--text);
+}
+
+.quick-chat-transfer-mode label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    cursor: pointer;
+}
+
+.quick-chat-transfer-select {
+    flex: 1;
+    font-size: var(--fs-xs);
+    padding: 0.28rem 0.4rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+}
+
 .quick-chat-claim-form input[type="time"],
 .quick-chat-assign-select {
     flex: 1;
-    font-size: 0.78rem;
+    font-size: var(--fs-xs);
     padding: 0.28rem 0.4rem;
     border-radius: 8px;
     border: 1px solid var(--border);
@@ -2453,7 +2578,7 @@ body.theme-dark .modal-backdrop.show {
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 0.55rem 0.75rem;
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     background: var(--surface-muted);
     color: var(--text);
     font-family: var(--font-family);
@@ -2524,7 +2649,7 @@ body.theme-dark .modal-backdrop.show {
 }
 
 .guide-item i {
-    font-size: 1.5rem;
+    font-size: var(--fs-2xl);
     color: var(--primary);
     margin-bottom: 0.4rem;
     display: inline-block;
@@ -2532,13 +2657,13 @@ body.theme-dark .modal-backdrop.show {
 
 .guide-item h6 {
     font-weight: 700;
-    font-size: 0.83rem;
+    font-size: var(--fs-sm);
     margin: 0 0 0.25rem 0;
     color: var(--text);
 }
 
 .guide-item p {
-    font-size: 0.72rem;
+    font-size: var(--fs-2xs);
     color: var(--muted);
     margin: 0;
     line-height: 1.4;
@@ -2573,7 +2698,7 @@ body.theme-dark .modal-backdrop.show {
     border-radius: 999px;
     background: var(--surface-muted);
     color: var(--muted);
-    font-size: 0.75rem;
+    font-size: var(--fs-xs);
     font-weight: 600;
     cursor: pointer;
     transition: all 0.15s ease;
@@ -2590,7 +2715,7 @@ body.theme-dark .modal-backdrop.show {
 }
 
 .quick-chat-mine-section-title {
-    font-size: 0.72rem;
+    font-size: var(--fs-2xs);
     font-weight: 700;
     color: var(--muted);
     text-transform: uppercase;
@@ -2614,7 +2739,7 @@ body.theme-dark .modal-backdrop.show {
 
 .quick-chat-search-input {
     width: 100%;
-    font-size: 0.78rem;
+    font-size: var(--fs-xs);
     padding: 0.35rem 0.6rem;
     border-radius: 8px;
     border: 1px solid var(--border);
@@ -2629,7 +2754,7 @@ body.theme-dark .modal-backdrop.show {
 
 .quick-chat-filter-select {
     flex: 1;
-    font-size: 0.75rem;
+    font-size: var(--fs-xs);
     padding: 0.3rem 0.4rem;
     border-radius: 8px;
     border: 1px solid var(--border);
@@ -2658,12 +2783,12 @@ body.theme-dark .modal-backdrop.show {
     display: flex;
     align-items: center;
     gap: 0.3rem;
-    font-size: 0.68rem;
+    font-size: var(--fs-3xs);
     color: var(--muted);
 }
 
 .quick-chat-deadline-input {
-    font-size: 0.7rem;
+    font-size: var(--fs-2xs);
     padding: 0.15rem 0.3rem;
     border-radius: 6px;
     border: 1px solid var(--border);
@@ -2707,7 +2832,7 @@ body.theme-dark .modal-backdrop.show {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    font-size: 0.72rem;
+    font-size: var(--fs-2xs);
     transition: all 0.15s ease;
 }
 
@@ -2726,7 +2851,7 @@ body.theme-dark .modal-backdrop.show {
 
 .quick-chat-edit-form textarea {
     width: 100%;
-    font-size: 0.82rem;
+    font-size: var(--fs-sm);
     padding: 0.4rem 0.55rem;
     border-radius: 10px;
     border: 1px solid var(--primary);
@@ -2747,7 +2872,7 @@ body.theme-dark .modal-backdrop.show {
 }
 
 .quick-chat-edited-tag {
-    font-size: 0.65rem;
+    font-size: var(--fs-3xs);
     color: var(--muted);
     font-style: italic;
     margin-left: 0.3rem;

@@ -100,6 +100,10 @@
                             <span class="notif-badge d-none" id="notifBadge">0</span>
                         </button>
                         <div class="notif-dropdown" id="notifDropdown">
+                            <div class="notif-pending-section d-none" id="notifPendingSection">
+                                <div class="notif-pending-title"><i class="bi bi-exclamation-triangle-fill"></i> Chờ bạn xác nhận</div>
+                                <div id="notifPendingList"></div>
+                            </div>
                             <div class="notif-dropdown-header">
                                 <span><i class="bi bi-bell-fill"></i> Thông báo (30 ngày gần nhất)</span>
                             </div>
@@ -459,6 +463,29 @@
         </div>
     </div>
 
+    <!-- Quick Job Transfer/Copy Confirmation Modal -->
+    <div class="modal fade" id="quickJobTransferConfirmModal" tabindex="-1">
+        <div class="modal-dialog modal-md">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title"><i class="bi bi-arrow-left-right"></i> Xác nhận chuyển/copy job trong ngày</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="quickJobTransferConfirmMessage" class="mb-3">Bạn có muốn nhận job này không?</p>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-success flex-grow-1" id="quickJobTransferAcceptBtn">
+                            <i class="bi bi-check-circle-fill"></i> Nhận
+                        </button>
+                        <button class="btn btn-danger flex-grow-1" id="quickJobTransferRejectBtn">
+                            <i class="bi bi-x-circle-fill"></i> Từ chối
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Guide Modal -->
     <div class="modal fade" id="guideModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
@@ -477,12 +504,12 @@
                         <div class="guide-item">
                             <i class="bi bi-arrow-left-right"></i>
                             <h6>Chuyển / Copy job</h6>
-                            <p>Chuyển hẳn hoặc sao chép job cho người khác, cần người nhận xác nhận.</p>
+                            <p>Chuyển hẳn hoặc sao chép job cho người khác, cần người nhận xác nhận. Áp dụng cho cả job thường và job trong ngày đang làm.</p>
                         </div>
                         <div class="guide-item">
                             <i class="bi bi-bell-fill"></i>
                             <h6>Thông báo</h6>
-                            <p>Chuông góc trên hiện các hoạt động 30 ngày gần nhất, đếm số chưa đọc.</p>
+                            <p>Chuông góc trên hiện các hoạt động 30 ngày gần nhất, đếm số chưa đọc. Nếu lỡ miss lời mời/yêu cầu chuyển-copy job, mục "Chờ bạn xác nhận" trên cùng cho phép xem lại và xác nhận bất cứ lúc nào.</p>
                         </div>
                         <div class="guide-item">
                             <i class="bi bi-chat-dots-fill"></i>

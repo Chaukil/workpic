@@ -69,6 +69,17 @@ let quickChatActiveTab = 'all';
 let quickChatSearchText = '';
 let quickChatStatusFilter = 'all';
 let quickChatAssigneeFilter = 'all';
+// Chuyển/Copy job trong ngày (quick job transfer)
+let quickJobTransferConfirmModal;
+let pendingQuickJobTransferId = null;
+let pendingQuickJobTransferData = null;
+let unsubscribeQuickJobTransferRequests = null;
+let quickJobTransferRequestsList = [];
+// Danh sách các yêu cầu chuyển/copy job (thường) đang chờ mình xác nhận —
+// dùng để hiển thị lại trong chuông thông báo nếu người dùng lỡ miss popup.
+let pendingTransferRequestsList = [];
+let transferRequestsInitialLoadDone = false;
+let quickJobTransferInitialLoadDone = false;
 
 function applyTheme(theme) {
     currentTheme = theme;
@@ -305,6 +316,10 @@ function handleSignedOut() {
         unsubscribeQuickJobs();
         unsubscribeQuickJobs = null;
     }
+    if (unsubscribeQuickJobTransferRequests) {
+        unsubscribeQuickJobTransferRequests();
+        unsubscribeQuickJobTransferRequests = null;
+    }
     jobs = [];
     filteredJobs = [];
     notificationsList = [];
@@ -314,6 +329,12 @@ function handleSignedOut() {
     cachedUsersForAssign = null;
     pendingQuickInviteId = null;
     pendingQuickInviteData = null;
+    pendingQuickJobTransferId = null;
+    pendingQuickJobTransferData = null;
+    quickJobTransferRequestsList = [];
+    pendingTransferRequestsList = [];
+    transferRequestsInitialLoadDone = false;
+    quickJobTransferInitialLoadDone = false;
     quickChatSearchText = '';
     quickChatStatusFilter = 'all';
     quickChatAssigneeFilter = 'all';
@@ -334,6 +355,7 @@ function initializeAuthenticatedApp() {
         listenTransferRequests();
         listenUserNotifications();
         listenQuickJobs();
+        listenQuickJobTransferRequests();
     });
 }
 
@@ -364,6 +386,7 @@ document.addEventListener('DOMContentLoaded', function() {
         backdrop: 'static',
         keyboard: false
     });
+    quickJobTransferConfirmModal = new bootstrap.Modal(document.getElementById('quickJobTransferConfirmModal'));
     guideModal = new bootstrap.Modal(document.getElementById('guideModal'));
 
     initQuickChatUi();
@@ -430,6 +453,31 @@ document.addEventListener('DOMContentLoaded', function() {
     // Transfer confirmation
     document.getElementById('transferAcceptBtn').addEventListener('click', acceptTransfer);
     document.getElementById('transferRejectBtn').addEventListener('click', rejectTransfer);
+
+    // Quick job (job trong ngày) transfer/copy confirmation
+    document.getElementById('quickJobTransferAcceptBtn').addEventListener('click', acceptQuickJobTransfer);
+    document.getElementById('quickJobTransferRejectBtn').addEventListener('click', rejectQuickJobTransfer);
+
+    // Danh sách "Chờ bạn xác nhận" trong chuông thông báo - bấm "Xem lại" để mở lại modal
+    document.getElementById('notifPendingList').addEventListener('click', (event) => {
+        const btn = event.target.closest('[data-review-type]');
+        if (!btn) return;
+        const type = btn.dataset.reviewType;
+        const id = btn.dataset.reviewId;
+        notifDropdownOpen = false;
+        document.getElementById('notifDropdown').classList.remove('show');
+
+        if (type === 'transfer') {
+            const request = pendingTransferRequestsList.find(r => r.id === id);
+            if (request) showTransferConfirmModal(request.id, request);
+        } else if (type === 'quickjob_invite') {
+            const job = quickJobsList.find(j => j.id === id);
+            if (job) showQuickInviteModal(job);
+        } else if (type === 'quickjob_transfer') {
+            const request = quickJobTransferRequestsList.find(r => r.id === id);
+            if (request) showQuickJobTransferConfirmModal(request.id, request);
+        }
+    });
 
     document.getElementById('pauseJobBtn').addEventListener('click', togglePauseJob);
 
@@ -998,7 +1046,7 @@ function renderOutOfScheduleJobs() {
             <div class="out-of-schedule-card-title" title="${job.title}">${job.title}</div>
         `;
 
-        card.addEventListener('click', () => openEditJobModal(job));
+        card.addEventListener('click', () => openViewJobModal(job));
         container.appendChild(card);
     });
 }
@@ -1573,19 +1621,37 @@ async function transferJob() {
 // Thêm function lắng nghe yêu cầu chuyển job
 function listenTransferRequests() {
     if (!currentUser) return;
-    
+    transferRequestsInitialLoadDone = false;
+
     const q = query(
         collection(db, 'transferRequests'),
         where('toUid', '==', currentUser.uid),
         where('status', '==', 'pending')
     );
-    
+
     onSnapshot(q, (snapshot) => {
-        snapshot.forEach((doc) => {
-            const request = doc.data();
-            // Hiển thị thông báo cho người dùng
-            showTransferConfirmModal(doc.id, request);
-        });
+        pendingTransferRequestsList = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        // Chỉ tự động bật popup cho yêu cầu MỚI (added) sau khi đã load lần đầu,
+        // tránh việc mở lại popup lặp lại cho các yêu cầu đã có sẵn (đã bị lỡ/đóng trước đó).
+        if (transferRequestsInitialLoadDone) {
+            snapshot.docChanges().forEach(change => {
+                if (change.type === 'added') {
+                    const request = { id: change.doc.id, ...change.doc.data() };
+                    showTransferConfirmModal(request.id, request);
+                }
+            });
+        } else {
+            // Lần load đầu tiên (vừa đăng nhập / mở app): nếu có sẵn yêu cầu đang chờ
+            // thì vẫn hiện popup cho yêu cầu gần nhất để không bị bỏ sót.
+            if (pendingTransferRequestsList.length > 0) {
+                const latest = [...pendingTransferRequestsList].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+                showTransferConfirmModal(latest.id, latest);
+            }
+        }
+        transferRequestsInitialLoadDone = true;
+
+        renderNotifDropdown();
     });
 }
 
@@ -1726,6 +1792,245 @@ async function rejectTransfer() {
     } catch (error) {
         console.error('Lỗi từ chối job:', error);
         showNotification('Lỗi', 'Không thể từ chối job.', false, 'danger');
+    }
+}
+
+// ============================================================
+// Chuyển / Copy job TRONG NGÀY (quickJobs) - áp dụng cùng cơ chế
+// với chuyển/copy job thường, kèm khả năng xem lại nếu lỡ miss.
+// ============================================================
+
+function listenQuickJobTransferRequests() {
+    if (!currentUser) return;
+    quickJobTransferInitialLoadDone = false;
+
+    const q = query(
+        collection(db, 'quickJobTransferRequests'),
+        where('toUid', '==', currentUser.uid),
+        where('status', '==', 'pending')
+    );
+
+    if (unsubscribeQuickJobTransferRequests) unsubscribeQuickJobTransferRequests();
+    unsubscribeQuickJobTransferRequests = onSnapshot(q, (snapshot) => {
+        quickJobTransferRequestsList = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        if (quickJobTransferInitialLoadDone) {
+            snapshot.docChanges().forEach(change => {
+                if (change.type === 'added') {
+                    const request = { id: change.doc.id, ...change.doc.data() };
+                    showQuickJobTransferConfirmModal(request.id, request);
+                }
+            });
+        } else if (quickJobTransferRequestsList.length > 0) {
+            const latest = [...quickJobTransferRequestsList].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+            showQuickJobTransferConfirmModal(latest.id, latest);
+        }
+        quickJobTransferInitialLoadDone = true;
+
+        renderNotifDropdown();
+    }, (error) => {
+        console.error('Lỗi lắng nghe yêu cầu chuyển job trong ngày:', error);
+    });
+}
+
+function showQuickJobTransferConfirmModal(requestId, request) {
+    const mode = request.mode || 'transfer';
+    const actionText = mode === 'transfer' ? 'chuyển' : 'copy';
+    const modeIcon = mode === 'transfer'
+        ? '<i class="bi bi-arrow-right-circle-fill text-primary"></i>'
+        : '<i class="bi bi-copy text-success"></i>';
+
+    document.getElementById('quickJobTransferConfirmMessage').innerHTML = `
+        ${modeIcon}
+        <strong>${escapeHtml(request.fromName || request.fromEmail || '')}</strong> muốn <strong>${actionText}</strong> job trong ngày
+        <strong>"${escapeHtml(request.jobContent || '')}"</strong> cho bạn.<br>
+        <small class="text-muted">Gửi lúc: ${new Date(request.timestamp).toLocaleString('vi-VN')}</small>
+        ${mode === 'copy' ? '<br><small class="text-info"><i class="bi bi-info-circle"></i> Lưu ý: Đây là bản copy, job gốc vẫn ở người gửi.</small>' : ''}
+    `;
+
+    pendingQuickJobTransferId = requestId;
+    pendingQuickJobTransferData = request;
+
+    quickJobTransferConfirmModal.show();
+}
+
+async function acceptQuickJobTransfer() {
+    if (!pendingQuickJobTransferId || !pendingQuickJobTransferData) return;
+    const request = pendingQuickJobTransferData;
+    const mode = request.mode || 'transfer';
+    const time = nowTimeHHmm();
+
+    try {
+        await updateDoc(doc(db, 'quickJobTransferRequests', pendingQuickJobTransferId), {
+            status: 'accepted',
+            respondedAt: new Date().toISOString()
+        });
+
+        if (mode === 'transfer') {
+            await updateDoc(doc(db, 'quickJobs', request.quickJobId), {
+                assigneeUid: currentUser.uid,
+                assigneeName: currentUser.displayName || currentUser.email,
+                status: 'claimed',
+                transferHistory: arrayUnion({
+                    from: request.fromUid,
+                    to: currentUser.uid,
+                    mode: 'transfer',
+                    timestamp: new Date().toISOString()
+                }),
+                updatedAt: new Date().toISOString()
+            });
+
+            await pushNotification(
+                request.fromUid,
+                'quickjob_transfer_accepted',
+                `${currentUser.displayName || currentUser.email} đã chấp nhận nhận job trong ngày "${request.jobContent}"`
+            );
+        } else {
+            const snap = request.jobSnapshot || {};
+            await addDoc(collection(db, 'quickJobs'), {
+                content: snap.content || request.jobContent || '',
+                deadline: snap.deadline || null,
+                dateKey: snap.dateKey || todayKey(),
+                status: 'claimed',
+                assigneeUid: currentUser.uid,
+                assigneeName: currentUser.displayName || currentUser.email,
+                time,
+                createdBy: currentUser.uid,
+                createdByName: currentUser.displayName || currentUser.email,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                copiedFromQuickJobId: request.quickJobId,
+                copyHistory: [{
+                    from: request.fromUid,
+                    to: currentUser.uid,
+                    timestamp: new Date().toISOString()
+                }]
+            });
+
+            await pushNotification(
+                request.fromUid,
+                'quickjob_copy_accepted',
+                `${currentUser.displayName || currentUser.email} đã chấp nhận copy job trong ngày "${request.jobContent}"`
+            );
+        }
+
+        showNotification(
+            'Đã nhận job',
+            `Bạn đã nhận ${mode === 'transfer' ? '' : 'bản copy của '}job trong ngày "${request.jobContent}"!`,
+            false,
+            'success'
+        );
+
+        quickJobTransferConfirmModal.hide();
+        pendingQuickJobTransferId = null;
+        pendingQuickJobTransferData = null;
+    } catch (error) {
+        console.error('Lỗi nhận job trong ngày (chuyển/copy):', error);
+        showNotification('Lỗi', 'Không thể nhận job.', false, 'danger');
+    }
+}
+
+async function rejectQuickJobTransfer() {
+    if (!pendingQuickJobTransferId || !pendingQuickJobTransferData) return;
+    const request = pendingQuickJobTransferData;
+    const mode = request.mode || 'transfer';
+    const actionText = mode === 'transfer' ? 'chuyển' : 'copy';
+
+    try {
+        await updateDoc(doc(db, 'quickJobTransferRequests', pendingQuickJobTransferId), {
+            status: 'rejected',
+            respondedAt: new Date().toISOString()
+        });
+
+        await pushNotification(
+            request.fromUid,
+            mode === 'transfer' ? 'quickjob_transfer_rejected' : 'quickjob_copy_rejected',
+            `${currentUser.displayName || currentUser.email} đã từ chối ${actionText} job trong ngày "${request.jobContent}"`
+        );
+
+        showNotification('Đã từ chối', `Bạn đã từ chối ${actionText} job trong ngày "${request.jobContent}".`, false, 'warning');
+
+        quickJobTransferConfirmModal.hide();
+        pendingQuickJobTransferId = null;
+        pendingQuickJobTransferData = null;
+    } catch (error) {
+        console.error('Lỗi từ chối chuyển/copy job trong ngày:', error);
+        showNotification('Lỗi', 'Không thể từ chối job.', false, 'danger');
+    }
+}
+
+async function quickChatShowTransferForm(jobId) {
+    const form = document.getElementById(`transferForm-${jobId}`);
+    const bubble = document.querySelector(`.quick-chat-bubble[data-job-id="${jobId}"]`);
+    if (form) form.classList.remove('d-none');
+    if (bubble) {
+        const actionsWrap = bubble.querySelector('[data-claimed-actions]');
+        if (actionsWrap) actionsWrap.classList.add('d-none');
+    }
+
+    const select = document.getElementById(`transferSelect-${jobId}`);
+    if (!select) return;
+    try {
+        const users = await fetchUsersExceptMe();
+        select.innerHTML = users.length
+            ? '<option value="">Chọn người nhận...</option>'
+            : '<option value="">Chưa có user khác</option>';
+        users.forEach(u => {
+            const option = document.createElement('option');
+            option.value = u.uid;
+            option.dataset.name = u.displayName || u.email;
+            option.textContent = u.displayName ? `${u.displayName} (${u.email})` : u.email;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Lỗi tải danh sách user:', error);
+        select.innerHTML = '<option value="">Không tải được danh sách</option>';
+    }
+}
+
+function quickChatCancelTransferForm() {
+    renderQuickChat();
+}
+
+async function quickChatConfirmTransfer(jobId) {
+    const select = document.getElementById(`transferSelect-${jobId}`);
+    const modeInput = document.querySelector(`input[name="transferMode-${jobId}"]:checked`);
+    if (!select || !select.value) {
+        showNotification('Thiếu thông tin', 'Hãy chọn người nhận job.', false, 'warning');
+        return;
+    }
+    const job = quickJobsList.find(j => j.id === jobId);
+    if (!job || !currentUser) return;
+
+    const targetUid = select.value;
+    const targetName = select.selectedOptions[0].dataset.name || select.selectedOptions[0].textContent;
+    const mode = modeInput ? modeInput.value : 'transfer';
+    const actionText = mode === 'transfer' ? 'chuyển' : 'copy';
+
+    try {
+        await addDoc(collection(db, 'quickJobTransferRequests'), {
+            quickJobId: jobId,
+            jobContent: job.content || '',
+            jobSnapshot: {
+                content: job.content || '',
+                deadline: job.deadline || null,
+                dateKey: job.dateKey || todayKey()
+            },
+            fromUid: currentUser.uid,
+            fromEmail: currentUser.email,
+            fromName: currentUser.displayName || currentUser.email,
+            toUid: targetUid,
+            toName: targetName,
+            mode,
+            status: 'pending',
+            timestamp: new Date().toISOString()
+        });
+
+        showNotification('Đã gửi yêu cầu', `Đã gửi yêu cầu ${actionText} job "${job.content}" đến ${targetName}. Vui lòng chờ xác nhận.`, false, 'success');
+        renderQuickChat();
+    } catch (error) {
+        console.error(`Lỗi gửi yêu cầu ${actionText} job trong ngày:`, error);
+        showNotification('Lỗi', `Không thể gửi yêu cầu ${actionText} job.`, false, 'danger');
     }
 }
 
@@ -1961,8 +2266,83 @@ const NOTIF_TYPE_CONFIG = {
     quickjob_claimed: { icon: 'bi-hand-thumbs-up-fill', color: '#f59e0b', label: 'Nhận job' },
     quickjob_invited: { icon: 'bi-person-plus-fill', color: '#3b82f6', label: 'Chỉ định job' },
     quickjob_completed: { icon: 'bi-check2-circle', color: '#16a34a', label: 'Hoàn thành job' },
-    quickjob_rejected: { icon: 'bi-x-circle-fill', color: '#dc2626', label: 'Từ chối job' }
+    quickjob_rejected: { icon: 'bi-x-circle-fill', color: '#dc2626', label: 'Từ chối job' },
+    quickjob_transfer_accepted: { icon: 'bi-check-circle-fill', color: '#16a34a', label: 'Chấp nhận job' },
+    quickjob_transfer_rejected: { icon: 'bi-x-circle-fill', color: '#dc2626', label: 'Từ chối job' },
+    quickjob_copy_accepted: { icon: 'bi-copy', color: '#16a34a', label: 'Copy job' },
+    quickjob_copy_rejected: { icon: 'bi-x-circle-fill', color: '#dc2626', label: 'Từ chối copy' }
 };
+
+// Gom các yêu cầu/lời mời đang CHỜ MÌNH xác nhận (chuyển job, copy job, chỉ định job
+// trong ngày) - kể cả khi popup ban đầu đã bị lỡ/đóng - để hiện lại trong chuông thông báo.
+function getPendingActionItems() {
+    if (!currentUser) return [];
+    const items = [];
+
+    pendingTransferRequestsList.forEach(r => {
+        const mode = r.mode || 'transfer';
+        items.push({
+            reviewType: 'transfer',
+            id: r.id,
+            timestamp: r.timestamp,
+            icon: mode === 'transfer' ? 'bi-arrow-right-circle-fill' : 'bi-copy',
+            message: `${r.fromName || r.fromEmail} muốn ${mode === 'transfer' ? 'chuyển' : 'copy'} job "${r.jobTitle}" cho bạn`
+        });
+    });
+
+    quickJobsList
+        .filter(j => j.status === 'invited' && j.invitedUid === currentUser.uid)
+        .forEach(j => {
+            items.push({
+                reviewType: 'quickjob_invite',
+                id: j.id,
+                timestamp: j.invitedAt || j.createdAt,
+                icon: 'bi-person-plus-fill',
+                message: `${j.invitedByName || 'Một người dùng'} đã chỉ định bạn nhận job trong ngày "${j.content}"`
+            });
+        });
+
+    quickJobTransferRequestsList.forEach(r => {
+        const mode = r.mode || 'transfer';
+        items.push({
+            reviewType: 'quickjob_transfer',
+            id: r.id,
+            timestamp: r.timestamp,
+            icon: mode === 'transfer' ? 'bi-arrow-right-circle-fill' : 'bi-copy',
+            message: `${r.fromName || r.fromEmail} muốn ${mode === 'transfer' ? 'chuyển' : 'copy'} job trong ngày "${r.jobContent}" cho bạn`
+        });
+    });
+
+    items.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    return items;
+}
+
+function renderPendingActionsSection() {
+    const section = document.getElementById('notifPendingSection');
+    const listEl = document.getElementById('notifPendingList');
+    if (!section || !listEl) return [];
+
+    const items = getPendingActionItems();
+    if (items.length === 0) {
+        section.classList.add('d-none');
+        listEl.innerHTML = '';
+        return items;
+    }
+
+    section.classList.remove('d-none');
+    listEl.innerHTML = items.map(item => `
+        <div class="notif-pending-item">
+            <div class="notif-pending-item-icon"><i class="bi ${item.icon}"></i></div>
+            <div class="notif-pending-item-body">
+                <p class="notif-pending-item-message mb-0">${escapeHtml(item.message)}</p>
+                <span class="notif-pending-item-time">${timeAgoVN(item.timestamp)}</span>
+            </div>
+            <button type="button" class="notif-pending-review-btn" data-review-type="${item.reviewType}" data-review-id="${item.id}">Xem lại</button>
+        </div>
+    `).join('');
+
+    return items;
+}
 
 function renderNotifDropdown() {
     const list = document.getElementById('notifList');
@@ -1970,12 +2350,14 @@ function renderNotifDropdown() {
     const bell = document.getElementById('notifBellBtn');
     if (!list || !badge || !bell) return;
 
+    const pendingItems = renderPendingActionsSection();
+
     const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
     const recent = notificationsList
         .filter(n => new Date(n.timestamp).getTime() >= thirtyDaysAgo)
         .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-    const unreadCount = notificationsList.filter(n => !n.read).length;
+    const unreadCount = notificationsList.filter(n => !n.read).length + pendingItems.length;
     if (unreadCount > 0) {
         badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
         badge.classList.remove('d-none');
@@ -2125,6 +2507,7 @@ function listenQuickJobs() {
         updateQuickChatBadge();
         renderQuickChat();
         checkPendingQuickInvite();
+        renderNotifDropdown();
     }, (error) => {
         console.error('Lỗi lắng nghe job trong ngày:', error);
     });
@@ -2235,13 +2618,41 @@ function renderQuickJobBubble(job) {
         statusPillHtml = `<span class="quick-chat-status-pill claimed"><i class="bi bi-person-check-fill"></i> ${escapeHtml(job.assigneeName || '')}${job.time ? ' · nhận lúc ' + escapeHtml(job.time) : ''}</span>`;
         if (isAssignee) {
             actionsHtml = `
-                <div class="quick-chat-actions">
+                <div class="quick-chat-actions" data-claimed-actions>
                     <button type="button" class="btn btn-sm btn-success" data-action="complete" data-id="${job.id}">
                         <i class="bi bi-check2-circle"></i> Hoàn thành
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-action="show-transfer" data-id="${job.id}">
+                        <i class="bi bi-arrow-left-right"></i> Chuyển/Copy
                     </button>
                     <button type="button" class="btn btn-sm btn-outline-danger" data-action="reject" data-id="${job.id}">
                         <i class="bi bi-x-circle"></i> Từ chối
                     </button>
+                </div>
+                <div class="quick-chat-transfer-form d-none" id="transferForm-${job.id}">
+                    <div class="quick-chat-transfer-form-row">
+                        <select class="quick-chat-transfer-select" id="transferSelect-${job.id}">
+                            <option value="">Đang tải user...</option>
+                        </select>
+                    </div>
+                    <div class="quick-chat-transfer-mode">
+                        <label>
+                            <input type="radio" name="transferMode-${job.id}" value="transfer" checked>
+                            <i class="bi bi-arrow-right-circle-fill text-primary"></i> Chuyển
+                        </label>
+                        <label>
+                            <input type="radio" name="transferMode-${job.id}" value="copy">
+                            <i class="bi bi-copy text-success"></i> Copy
+                        </label>
+                    </div>
+                    <div class="quick-chat-transfer-form-row">
+                        <button type="button" class="btn btn-sm btn-success" data-action="confirm-transfer" data-id="${job.id}">
+                            <i class="bi bi-send-fill"></i> Gửi yêu cầu
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-action="cancel-transfer" data-id="${job.id}">
+                            <i class="bi bi-x-lg"></i> Hủy
+                        </button>
+                    </div>
                 </div>
             `;
         }
@@ -2866,6 +3277,9 @@ function initQuickChatUi() {
             else if (action === 'cancel-invite') quickChatCancelInvite(jobId);
             else if (action === 'complete') quickChatComplete(jobId);
             else if (action === 'reject') quickChatReject(jobId);
+            else if (action === 'show-transfer') quickChatShowTransferForm(jobId);
+            else if (action === 'cancel-transfer') quickChatCancelTransferForm(jobId);
+            else if (action === 'confirm-transfer') quickChatConfirmTransfer(jobId);
             else if (action === 'show-edit') quickChatShowEditForm(jobId);
             else if (action === 'cancel-edit') quickChatCancelEditForm(jobId);
             else if (action === 'save-edit') quickChatSaveEdit(jobId);
