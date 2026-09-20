@@ -41,6 +41,10 @@ let currentViewingJobId = null;
 let migrateLegacyJobsModal;
 let legacyJobs = [];
 let viewDataModal;
+let checkDueModal;
+let checkDueOldRows = null;
+let checkDueNewRows = null;
+let checkDueResultRows = [];
 let userProfileModal;
 let transferConfirmModal;
 let pendingTransferJob = null;
@@ -381,6 +385,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     migrateLegacyJobsModal = new bootstrap.Modal(document.getElementById('migrateLegacyJobsModal'));
     viewDataModal = new bootstrap.Modal(document.getElementById('viewDataModal'));
+    checkDueModal = new bootstrap.Modal(document.getElementById('checkDueModal'));
     transferConfirmModal = new bootstrap.Modal(document.getElementById('transferConfirmModal'));
     quickJobInviteModal = new bootstrap.Modal(document.getElementById('quickJobInviteModal'), {
         backdrop: 'static',
@@ -420,6 +425,15 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth));
     document.getElementById('confirmMigrateLegacyJobsBtn').addEventListener('click', migrateLegacyJobs);
     document.getElementById('viewDataBtn').addEventListener('click', openViewDataModal);
+    document.getElementById('checkDueBtn').addEventListener('click', openCheckDueModal);
+    document.getElementById('checkDueCompareBtn').addEventListener('click', runCheckDueCompare);
+    document.getElementById('checkDueClearBtn').addEventListener('click', clearCheckDueForm);
+    document.getElementById('checkDueCopyBtn').addEventListener('click', copyCheckDueResult);
+    document.getElementById('checkDueOldFile').addEventListener('change', (e) => handleCheckDueFile(e, 'old'));
+    document.getElementById('checkDueNewFile').addEventListener('change', (e) => handleCheckDueFile(e, 'new'));
+    // Live update badge số dòng khi dán dữ liệu
+    document.getElementById('checkDueOldPaste').addEventListener('input', scheduleCheckDuePasteBadgeUpdate);
+    document.getElementById('checkDueNewPaste').addEventListener('input', scheduleCheckDuePasteBadgeUpdate);
     
     document.getElementById('confirmCancelBtn').addEventListener('click', hideConfirmModal);
     document.getElementById('confirmModal').addEventListener('click', (event) => {
@@ -1471,6 +1485,495 @@ function escapeHtml(value) {
         "'": '&#39;',
         '"': '&quot;'
     }[character]));
+}
+
+// ============================================================
+// Check Change Due (chuyển đổi từ macro VBA CompareFGMO)
+// Nhận diện cột thông minh theo NỘI DUNG dữ liệu, không phụ thuộc
+// tên cột hay thứ tự cột (vì 2 nguồn dữ liệu có thể đặt tên/khác thứ tự):
+//   - FG_MO: bắt đầu bằng "MX" hoặc "MY"
+//   - FG_DUE: dạng "1yymmdd" (7 số, bắt đầu bằng 1)
+//   - FG_JOBNO: phần còn lại, dạng "LINE MSS" (vd "S226 093026"),
+//     chỉ phần LINE (token đầu tiên) được dùng để so sánh.
+// ============================================================
+
+const CHECK_DUE_MO_REGEX = /^(MX|MY)/i;
+const CHECK_DUE_DUE_REGEX = /^1\d{6}(\.0)?$/;
+
+function openCheckDueModal() {
+    checkDueModal.show();
+    updateCheckDueStep(checkDueResultRows.length ? 3 : 1);
+    if (!document.getElementById('checkDueStatus').textContent.trim()) {
+        updateCheckDueStatus('Sẵn sàng so sánh');
+    }
+}
+
+function clearCheckDueForm() {
+    document.getElementById('checkDueOldPaste').value = '';
+    document.getElementById('checkDueNewPaste').value = '';
+    document.getElementById('checkDueOldFile').value = '';
+    document.getElementById('checkDueNewFile').value = '';
+
+    ['checkDueOldFileInfo', 'checkDueNewFileInfo'].forEach(id => {
+        const el = document.getElementById(id);
+        el.textContent = 'Chưa chọn file';
+        el.classList.remove('has-file');
+    });
+
+    checkDueOldRows = null;
+    checkDueNewRows = null;
+    checkDueResultRows = [];
+
+    setCheckDueSourceBadge('old', 0);
+    setCheckDueSourceBadge('new', 0);
+
+    document.getElementById('checkDueLoading').style.display = 'none';
+    document.getElementById('checkDueResultTable').classList.remove('check-due-result-animate');
+    document.getElementById('checkDueResultSection').style.display = 'none';
+
+    updateCheckDueStep(1);
+    updateCheckDueStatus('Sẵn sàng so sánh');
+}
+
+function updateCheckDueStatus(message) {
+    const el = document.getElementById('checkDueStatus');
+    if (!el) return;
+    const text = message || '';
+    el.innerHTML = text
+        ? `<i class="bi bi-info-circle"></i> ${escapeHtml(text)}`
+        : `<i class="bi bi-info-circle"></i> Sẵn sàng so sánh`;
+}
+
+function updateCheckDueStep(step) {
+    document.querySelectorAll('#checkDueSteps .check-due-step').forEach(el => {
+        el.classList.toggle('active', Number(el.dataset.step) === step);
+    });
+}
+
+function setCheckDueSourceBadge(which, count) {
+    const ids = which === 'old'
+        ? ['checkDueOldPasteBadge', 'checkDueOldFileBadge']
+        : ['checkDueNewPasteBadge', 'checkDueNewFileBadge'];
+    ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = count > 0 ? `${count} dòng` : '0 dòng';
+        el.classList.toggle('has-data', count > 0);
+    });
+}
+
+let checkDueBadgeTimer = null;
+function scheduleCheckDuePasteBadgeUpdate() {
+    clearTimeout(checkDueBadgeTimer);
+    checkDueBadgeTimer = setTimeout(() => {
+        const oldText = document.getElementById('checkDueOldPaste').value;
+        const newText = document.getElementById('checkDueNewPaste').value;
+        setCheckDueSourceBadge('old', oldText.trim() ? parsePastedRows(oldText).length : 0);
+        setCheckDueSourceBadge('new', newText.trim() ? parsePastedRows(newText).length : 0);
+    }, 180);
+}
+
+/**
+ * Giống VBA FormatDue: chuyển chuỗi "1yymmdd" (7 ký tự) -> "mm/dd/yy".
+ * Nếu không đúng format thì trả nguyên chuỗi gốc.
+ */
+function formatDue(dueStr) {
+    const value = String(dueStr ?? '').trim().replace(/\.0$/, '');
+    if (/^1\d{6}$/.test(value)) {
+        const yy = value.substring(1, 3);
+        const mm = value.substring(3, 5);
+        const dd = value.substring(5, 7);
+        return `${mm}/${dd}/${yy}`;
+    }
+    return value;
+}
+
+/**
+ * Tách phần LINE (token đầu tiên) khỏi cell "LINE MSS" (vd "S226 093026" -> "S226").
+ */
+function extractLineCode(jobnoCell) {
+    const text = String(jobnoCell ?? '').trim();
+    if (!text) return '';
+    return text.split(/\s+/)[0] || '';
+}
+
+/**
+ * Nhận diện 1 dòng dữ liệu (mảng các ô/token, thứ tự bất kỳ) thành
+ * { FG_MO, FG_DUE, FG_JOBNO } dựa theo NỘI DUNG, không dựa theo vị trí cột.
+ * Trả về null nếu dòng không chứa FG_MO hợp lệ (vd dòng header, dòng trống).
+ */
+function classifyRowTokens(rawTokens) {
+    const tokens = (rawTokens || [])
+        .map(cell => String(cell ?? '').trim())
+        .filter(cell => cell !== '');
+    if (tokens.length === 0) return null;
+
+    let moToken = null;
+    let dueToken = null;
+    const rest = [];
+
+    tokens.forEach(token => {
+        if (moToken === null && CHECK_DUE_MO_REGEX.test(token)) {
+            moToken = token;
+            return;
+        }
+        if (dueToken === null && CHECK_DUE_DUE_REGEX.test(token)) {
+            dueToken = token;
+            return;
+        }
+        rest.push(token);
+    });
+
+    if (!moToken) return null; // không có FG_MO -> không phải dòng dữ liệu hợp lệ (bỏ qua, kể cả header)
+
+    return {
+        FG_MO: moToken.toUpperCase(),
+        FG_DUE: dueToken || '',
+        FG_JOBNO: rest.join(' ').trim()
+    };
+}
+
+/**
+ * Tách 1 dòng text thành các ô: ưu tiên Tab, sau đó dấu phẩy,
+ * cuối cùng là 2+ khoảng trắng liên tiếp (giữ nguyên khoảng trắng đơn
+ * bên trong ô "LINE MSS").
+ */
+function splitDelimitedLine(line) {
+    if (line.includes('\t')) return line.split('\t');
+    if (line.includes(',')) return line.split(',');
+    return line.split(/\s{2,}/);
+}
+
+/**
+ * Parse dữ liệu dạng bảng copy/paste (Tab/phẩy/khoảng trắng kép cách cột),
+ * tự nhận diện cột theo nội dung, không quan tâm thứ tự cột hay tên header.
+ */
+function parsePastedRows(text) {
+    const lines = String(text || '')
+        .split(/\r\n|\r|\n/)
+        .map(line => line.trim())
+        .filter(line => line.length > 0);
+
+    const rows = [];
+    lines.forEach(line => {
+        const row = classifyRowTokens(splitDelimitedLine(line));
+        if (row) rows.push(row);
+    });
+    return rows;
+}
+
+/**
+ * Chuẩn hoá mảng 2 chiều (từ CSV hoặc SheetJS) thành { FG_MO, FG_DUE, FG_JOBNO }[],
+ * tự nhận diện cột theo nội dung (bỏ qua dòng header tự động vì header
+ * không khớp pattern FG_MO/FG_DUE).
+ */
+function normalizeMatrixRows(matrix) {
+    if (!matrix || matrix.length === 0) return [];
+    const rows = [];
+    matrix.forEach(cols => {
+        const row = classifyRowTokens(cols);
+        if (row) rows.push(row);
+    });
+    return rows;
+}
+
+function parseCsvText(text) {
+    return String(text || '')
+        .split(/\r\n|\r|\n/)
+        .filter(line => line.trim().length > 0)
+        .map(line => splitDelimitedLine(line));
+}
+
+/**
+ * Tên sheet gợi ý cho dữ liệu Ban_dau / CanDoi, dùng để tự nhận diện
+ * khi 1 file Excel chứa sẵn cả 2 sheet.
+ */
+const CHECK_DUE_OLD_SHEET_HINTS = ['ban_dau', 'bandau', 'ban dau', 'old', 'cu', 'cũ', 'truoc', 'trước'];
+const CHECK_DUE_NEW_SHEET_HINTS = ['can_doi', 'candoi', 'can doi', 'cần đổi', 'new', 'moi', 'mới', 'sau'];
+
+function guessSheetRole(sheetName) {
+    const name = sheetName.toLowerCase();
+    if (CHECK_DUE_OLD_SHEET_HINTS.some(hint => name.includes(hint))) return 'old';
+    if (CHECK_DUE_NEW_SHEET_HINTS.some(hint => name.includes(hint))) return 'new';
+    return null;
+}
+
+function sheetToRows(workbook, sheetName) {
+    const sheet = workbook.Sheets[sheetName];
+    const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
+    return normalizeMatrixRows(matrix);
+}
+
+/**
+ * Đọc 1 file (.csv hoặc .xlsx) một cách "thông minh":
+ * - CSV / 1 sheet: trả { old: rows, new: null } (chỉ điền vào bên đang upload).
+ * - Excel nhiều sheet: nếu nhận diện được sheet nào là Ban_dau/CanDoi theo tên,
+ *   hoặc chỉ có đúng 2 sheet, sẽ trả về CẢ HAI { old: rows, new: rows } luôn,
+ *   không cần upload thêm file thứ 2.
+ */
+function readTableFileSmart(file) {
+    return new Promise((resolve, reject) => {
+        const isCsv = /\.(csv|txt|prn)$/i.test(file.name);
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('Không đọc được file'));
+
+        if (isCsv) {
+            reader.onload = () => {
+                try {
+                    const rows = normalizeMatrixRows(parseCsvText(reader.result));
+                    resolve({ old: rows, new: null, sheets: 1 });
+                } catch (err) { reject(err); }
+            };
+            reader.readAsText(file, 'UTF-8');
+            return;
+        }
+
+        reader.onload = () => {
+            try {
+                const workbook = XLSX.read(reader.result, { type: 'array' });
+                const sheetNames = workbook.SheetNames;
+
+                if (sheetNames.length >= 2) {
+                    let oldSheet = sheetNames.find(name => guessSheetRole(name) === 'old');
+                    let newSheet = sheetNames.find(name => guessSheetRole(name) === 'new');
+                    // Không nhận diện được theo tên -> nếu đúng 2 sheet thì lấy theo thứ tự (sheet 1 = Ban_dau, sheet 2 = CanDoi)
+                    if ((!oldSheet || !newSheet) && sheetNames.length === 2) {
+                        oldSheet = oldSheet || sheetNames[0];
+                        newSheet = newSheet || sheetNames.find(name => name !== oldSheet) || sheetNames[1];
+                    }
+                    if (oldSheet && newSheet && oldSheet !== newSheet) {
+                        resolve({
+                            old: sheetToRows(workbook, oldSheet),
+                            new: sheetToRows(workbook, newSheet),
+                            sheets: sheetNames.length,
+                            oldSheetName: oldSheet,
+                            newSheetName: newSheet
+                        });
+                        return;
+                    }
+                }
+
+                // Chỉ 1 sheet hoặc không tách được 2 vai trò -> đọc sheet đầu tiên, điền cho bên đang upload
+                const rows = sheetToRows(workbook, sheetNames[0]);
+                resolve({ old: rows, new: null, sheets: sheetNames.length });
+            } catch (err) { reject(err); }
+        };
+        reader.readAsArrayBuffer(file);
+    });
+}
+
+async function handleCheckDueFile(event, which) {
+    const file = event.target.files && event.target.files[0];
+    const infoEl = document.getElementById(which === 'old' ? 'checkDueOldFileInfo' : 'checkDueNewFileInfo');
+    if (!file) {
+        infoEl.textContent = 'Chưa chọn file';
+        infoEl.classList.remove('has-file');
+        return;
+    }
+    infoEl.textContent = `Đang đọc "${file.name}"...`;
+    infoEl.classList.remove('has-file');
+
+    try {
+        const parsed = await readTableFileSmart(file);
+
+        if (parsed.new) {
+            // File tự chứa cả 2 sheet
+            checkDueOldRows = parsed.old;
+            checkDueNewRows = parsed.new;
+
+            infoEl.textContent = `✓ "${file.name}" · sheet "${parsed.oldSheetName}" = Ban_dau`;
+            infoEl.classList.add('has-file');
+
+            const otherInfoEl = document.getElementById(which === 'old' ? 'checkDueNewFileInfo' : 'checkDueOldFileInfo');
+            otherInfoEl.textContent = `✓ "${file.name}" · sheet "${parsed.newSheetName}" = CanDoi`;
+            otherInfoEl.classList.add('has-file');
+
+            setCheckDueSourceBadge('old', parsed.old.length);
+            setCheckDueSourceBadge('new', parsed.new.length);
+        } else {
+            if (which === 'old') checkDueOldRows = parsed.old;
+            else checkDueNewRows = parsed.old;
+
+            infoEl.textContent = `✓ "${file.name}" · ${parsed.old.length} dòng`;
+            infoEl.classList.add('has-file');
+            setCheckDueSourceBadge(which, parsed.old.length);
+        }
+
+        updateCheckDueStatus(`Đã đọc file "${file.name}".`);
+    } catch (error) {
+        console.error('Lỗi đọc file Check Due:', error);
+        infoEl.textContent = `✕ Không đọc được "${file.name}". Kiểm tra lại định dạng.`;
+        infoEl.classList.remove('has-file');
+    }
+}
+
+/**
+ * Giữ nguyên logic macro CompareFGMO, nhưng nhận diện LINE thông minh (extractLineCode)
+ * thay vì cắt cứng 4 ký tự:
+ * - So khớp theo FG_MO (duy nhất).
+ * - Bỏ qua nếu FG_MO không có trong CanDoi.
+ * - So DUE và LINE: nếu cả 2 không đổi (hoặc CanDoi rỗng) -> bỏ qua dòng đó.
+ */
+function compareFGMO(oldRows, newRows) {
+    const dict = new Map();
+    newRows.forEach(row => {
+        const key = row.FG_MO;
+        if (!key) return;
+        dict.set(key, {
+            due: String(row.FG_DUE || '').trim(),
+            line: extractLineCode(row.FG_JOBNO)
+        });
+    });
+
+    const results = [];
+    oldRows.forEach(row => {
+        const key = row.FG_MO;
+        if (!key || !dict.has(key)) return; // không có trong CanDoi -> bỏ qua
+
+        const oldDue = String(row.FG_DUE || '').trim();
+        const oldLine = extractLineCode(row.FG_JOBNO);
+        const target = dict.get(key);
+
+        const resJob = (oldLine === target.line || !target.line) ? '-' : target.line;
+        const resDue = (oldDue === target.due || !target.due) ? '-' : formatDue(target.due);
+
+        if (!(resJob === '-' && resDue === '-')) {
+            results.push({ FG_MO: key, FG_JOBNO: resJob, FG_DUE: resDue });
+        }
+    });
+    return results;
+}
+
+function getCheckDueInputRows() {
+    const isFileTabActive = document.getElementById('checkDueFileTab').classList.contains('active');
+    if (isFileTabActive) {
+        return { oldRows: checkDueOldRows, newRows: checkDueNewRows };
+    }
+    const oldText = document.getElementById('checkDueOldPaste').value;
+    const newText = document.getElementById('checkDueNewPaste').value;
+    return {
+        oldRows: parsePastedRows(oldText),
+        newRows: parsePastedRows(newText)
+    };
+}
+
+function runCheckDueCompare() {
+    const { oldRows, newRows } = getCheckDueInputRows();
+
+    if (!oldRows || oldRows.length === 0 || !newRows || newRows.length === 0) {
+        updateCheckDueStatus('Vui lòng nhập/tải đầy đủ dữ liệu Ban_dau và CanDoi trước khi so sánh.');
+        updateCheckDueStep(1);
+        return;
+    }
+
+    const compareBtn = document.getElementById('checkDueCompareBtn');
+    const loadingEl = document.getElementById('checkDueLoading');
+    const section = document.getElementById('checkDueResultSection');
+    const tableContainer = document.getElementById('checkDueResultTable');
+
+    compareBtn.disabled = true;
+    section.style.display = 'none';
+    tableContainer.innerHTML = '';
+    tableContainer.classList.remove('check-due-result-animate');
+
+    updateCheckDueStep(2);
+    loadingEl.style.display = 'flex';
+    updateCheckDueStatus('Đang so sánh dữ liệu...');
+
+    setTimeout(() => {
+        checkDueResultRows = compareFGMO(oldRows, newRows);
+        loadingEl.style.display = 'none';
+        renderCheckDueResult();
+        updateCheckDueStep(3);
+
+        tableContainer.classList.remove('check-due-result-animate');
+        void tableContainer.offsetWidth;
+        tableContainer.classList.add('check-due-result-animate');
+
+        compareBtn.disabled = false;
+        updateCheckDueStatus(`Ban_dau: ${oldRows.length} dòng · CanDoi: ${newRows.length} dòng · ${checkDueResultRows.length} thay đổi`);
+    }, 650);
+}
+
+function renderCheckDueResult() {
+    const section = document.getElementById('checkDueResultSection');
+    const countEl = document.getElementById('checkDueResultCount');
+    const statTotal = document.getElementById('checkDueStatTotal');
+    const statLine = document.getElementById('checkDueStatLine');
+    const statDue = document.getElementById('checkDueStatDue');
+    const tableContainer = document.getElementById('checkDueResultTable');
+
+    section.style.display = '';
+    countEl.textContent = checkDueResultRows.length;
+
+    const lineChanges = checkDueResultRows.filter(r => r.FG_JOBNO !== '-').length;
+    const dueChanges = checkDueResultRows.filter(r => r.FG_DUE !== '-').length;
+    statTotal.textContent = checkDueResultRows.length;
+    statLine.textContent = lineChanges;
+    statDue.textContent = dueChanges;
+
+    if (checkDueResultRows.length === 0) {
+        tableContainer.innerHTML = `
+            <div class="text-center text-muted py-4">
+                <i class="bi bi-check2-circle" style="font-size:2rem;color:#16a34a;"></i>
+                <p class="mt-2 mb-0">Không có thay đổi nào giữa Ban_dau và CanDoi.</p>
+            </div>`;
+        return;
+    }
+
+    tableContainer.innerHTML = `
+        <table class="table table-sm align-middle mb-0">
+            <thead>
+                <tr>
+                    <th style="width:28%;">FG_MO</th>
+                    <th style="width:36%;">FG_JOBNO</th>
+                    <th style="width:36%;">FG_DUE</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${checkDueResultRows.map(row => `
+                    <tr>
+                        <td>${escapeHtml(row.FG_MO)}</td>
+                        <td>${row.FG_JOBNO !== '-'
+                            ? `<span class="check-due-diff">${escapeHtml(row.FG_JOBNO)}</span>`
+                            : '<span class="check-due-same">-</span>'}</td>
+                        <td>${row.FG_DUE !== '-'
+                            ? `<span class="check-due-diff">${escapeHtml(row.FG_DUE)}</span>`
+                            : '<span class="check-due-same">-</span>'}</td>
+                    </tr>`).join('')}
+            </tbody>
+        </table>`;
+}
+
+async function copyCheckDueResult() {
+    if (!checkDueResultRows || checkDueResultRows.length === 0) {
+        updateCheckDueStatus('Chưa có kết quả để copy.');
+        return;
+    }
+    const header = 'FG_MO\tFG_JOBNO\tFG_DUE';
+    const lines = checkDueResultRows.map(row => `${row.FG_MO}\t${row.FG_JOBNO}\t${row.FG_DUE}`);
+    const text = [header, ...lines].join('\n');
+
+    try {
+        await navigator.clipboard.writeText(text);
+        updateCheckDueStatus(`Đã copy ${checkDueResultRows.length} dòng kết quả vào clipboard.`);
+    } catch (error) {
+        console.error('Lỗi copy Check Due:', error);
+        // Fallback cho trình duyệt/ngữ cảnh không hỗ trợ Clipboard API
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+            document.execCommand('copy');
+            updateCheckDueStatus(`Đã copy ${checkDueResultRows.length} dòng kết quả vào clipboard.`);
+        } catch (fallbackError) {
+            updateCheckDueStatus('Không thể copy tự động. Vui lòng bôi đen bảng và copy thủ công.');
+        }
+        document.body.removeChild(textarea);
+    }
 }
 
 function getWeekdayLabel(dateValue) {
