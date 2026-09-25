@@ -5,6 +5,7 @@
     --monthly-color: #f59e0b;
     --quarterly-color: #8b5cf6;
     --yearly-color: #ec4899;
+    --once-color: #06b6d4;
     --font-family: "Roboto", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
     --bg: #f5f7fb;
     --surface: #ffffff;
@@ -356,7 +357,7 @@ body.theme-dark #searchJob::placeholder { color: var(--muted); }
     transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
 }
 
-.btn-add-job, .btn-view-data, .btn-export-pdf, .btn-check-due {
+.btn-add-job, .btn-view-data, .btn-export-pdf, .btn-check-due, .btn-layout-menu {
     position: relative; overflow: hidden; border: none;
     padding: 0.55rem 0.75rem;
     box-shadow: 0 8px 16px rgba(59, 130, 246, 0.10);
@@ -365,18 +366,19 @@ body.theme-dark #searchJob::placeholder { color: var(--muted); }
 
 .btn-add-job { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
 .btn-check-due { background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); }
+.btn-layout-menu { background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); }
 .btn-view-data { background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%); }
 .btn-export-pdf { background: linear-gradient(135deg, #fb923c 0%, #f97316 100%); }
 
-.btn-add-job:hover, .btn-view-data:hover, .btn-export-pdf:hover, .btn-check-due:hover {
+.btn-add-job:hover, .btn-view-data:hover, .btn-export-pdf:hover, .btn-check-due:hover, .btn-layout-menu:hover {
     transform: translateY(-1px);
     box-shadow: 0 10px 18px rgba(15, 23, 42, 0.08);
 }
 
-.btn-add-job:active, .btn-view-data:active, .btn-export-pdf:active, .btn-check-due:active { transform: translateY(0); }
+.btn-add-job:active, .btn-view-data:active, .btn-export-pdf:active, .btn-check-due:active, .btn-layout-menu:active { transform: translateY(0); }
 
-.btn-add-job i, .btn-view-data i, .btn-export-pdf i, .btn-check-due i { font-size: var(--fs-base); }
-.btn-add-job span, .btn-view-data span, .btn-export-pdf span, .btn-check-due span { font-size: var(--fs-xs); }
+.btn-add-job i, .btn-view-data i, .btn-export-pdf i, .btn-check-due i, .btn-layout-menu i { font-size: var(--fs-base); }
+.btn-add-job span, .btn-view-data span, .btn-export-pdf span, .btn-check-due span, .btn-layout-menu span { font-size: var(--fs-xs); }
 
 .btn-shine {
     position: absolute; top: 0; left: -100%;
@@ -389,8 +391,116 @@ body.theme-dark #searchJob::placeholder { color: var(--muted); }
 .btn-view-data:hover .btn-shine,
 .btn-export-pdf:hover .btn-shine,
 .btn-check-due:hover .btn-shine,
+.btn-layout-menu:hover .btn-shine,
 .btn-save:hover .btn-shine,
 .btn-delete:hover .btn-shine { left: 100%; }
+
+/* ============================================================
+   LAYOUT DROPDOWN MENU (Check Due + Quay số thuyết trình...)
+   ============================================================ */
+.layout-dropdown-menu {
+    border: 1px solid var(--border); border-radius: 14px; padding: 0.5rem;
+    box-shadow: var(--shadow-float, 0 18px 42px rgba(15,23,42,.12));
+    background: var(--surface); min-width: 260px;
+}
+.layout-dropdown-item {
+    display: flex; align-items: center; gap: 0.6rem; width: 100%;
+    border: none; background: transparent; text-align: left;
+    padding: 0.55rem 0.6rem; border-radius: 10px; color: var(--text);
+    transition: background .15s ease, transform .15s ease;
+}
+.layout-dropdown-item:hover { background: var(--surface-muted); transform: translateX(2px); }
+.layout-item-ic {
+    width: 34px; height: 34px; border-radius: 9px; flex: none;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); color: #fff; font-size: var(--fs-base);
+}
+.layout-item-ic-spin { background: linear-gradient(135deg, #f59e0b 0%, #ec4899 100%); }
+.layout-item-text { display: flex; flex-direction: column; }
+.layout-item-title { font-weight: 700; font-size: var(--fs-xs); }
+.layout-item-sub { font-size: var(--fs-3xs); color: var(--muted); }
+.layout-item-note { display: flex; align-items: center; gap: 0.4rem; padding: 0.25rem 0.6rem; font-size: var(--fs-3xs); color: var(--muted); }
+
+/* ============================================================
+   PRESENTER SPIN MODAL
+   ============================================================ */
+.modal-header.modern-header-spin { background: linear-gradient(135deg, #f59e0b 0%, #ec4899 55%, #7c3aed 100%); }
+
+.spin-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; align-items: start; }
+@media (max-width: 768px) { .spin-layout { grid-template-columns: 1fr; } }
+
+.spin-wheel-col { display: flex; flex-direction: column; align-items: center; gap: 1rem; }
+
+.spin-wheel-wrap { position: relative; width: min(280px, 80vw); height: min(280px, 80vw); }
+.spin-wheel-wrap.spinning { animation: spinWheelShake .12s linear infinite; }
+@keyframes spinWheelShake {
+    0%, 100% { transform: translate(0,0); }
+    25% { transform: translate(-1px, 1px); }
+    50% { transform: translate(1px, -1px); }
+    75% { transform: translate(-1px, -1px); }
+}
+.spin-wheel-svg {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    filter: drop-shadow(0 10px 22px rgba(15,23,42,.18));
+    transition: transform 2.4s cubic-bezier(.08,.82,.13,1);
+    will-change: transform;          /* THÊM: GPU-hint */
+    transform-origin: 50% 50%;       /* THÊM: rõ ràng hơn */
+    backface-visibility: hidden;     /* THÊM: tránh render 2 mặt */
+}
+.spin-wheel-pointer { position: absolute; top: -6px; left: 50%; transform: translateX(-50%); font-size: 1.6rem; color: var(--danger); z-index: 3; filter: drop-shadow(0 2px 3px rgba(0,0,0,.25)); }
+.spin-wheel-hub {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 52px; height: 52px; border-radius: 50%; background: var(--surface); color: var(--primary);
+    display: flex; align-items: center; justify-content: center; font-size: 1.3rem;
+    box-shadow: 0 0 0 4px var(--surface-strong), 0 6px 14px rgba(15,23,42,.2); z-index: 2;
+}
+
+.spin-wheel-wrap.spinning .spin-wheel-svg {
+    filter: none;
+}
+
+.btn-spin {
+    border: none; color: #fff; font-weight: 700; padding: 0.7rem 1.6rem; border-radius: 999px;
+    background: linear-gradient(135deg, #f59e0b 0%, #ec4899 55%, #7c3aed 100%);
+    box-shadow: 0 10px 22px rgba(236, 72, 153, .3); position: relative; overflow: hidden;
+    transition: transform .15s ease;
+}
+.btn-spin:hover { transform: translateY(-2px) scale(1.02); }
+.btn-spin:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+
+.spin-result-card {
+    width: 100%; text-align: center; border-radius: 16px; padding: 1rem;
+    background: var(--primary-soft); border: 1px dashed var(--primary);
+    animation: spinResultPop .4s var(--ease-out-expo, ease-out);
+}
+@keyframes spinResultPop { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: scale(1); } }
+.spin-result-badge { font-size: var(--fs-3xs); font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: .05em; }
+.spin-result-name { font-size: var(--fs-xl); font-weight: 800; color: var(--text); margin: 0.15rem 0; }
+.spin-result-date { font-size: var(--fs-2xs); color: var(--muted); margin-bottom: 0.6rem; }
+.btn-confirm-spin {
+    border: none; color: #fff; font-weight: 700; padding: 0.5rem 1.2rem; border-radius: 999px;
+    background: var(--grad-success, linear-gradient(135deg,#10b981,#16a34a)); position: relative; overflow: hidden;
+}
+
+.spin-users-col { background: var(--surface-muted); border: 1px solid var(--border); border-radius: 14px; padding: 0.85rem; }
+.spin-users-title { display: flex; align-items: center; gap: 0.4rem; font-weight: 700; font-size: var(--fs-sm); color: var(--text); }
+.spin-users-count { margin-left: auto; background: var(--primary); color: #fff; font-size: var(--fs-3xs); font-weight: 700; padding: 0.1rem 0.5rem; border-radius: 999px; }
+.spin-users-hint { font-size: var(--fs-3xs); color: var(--muted); margin: 0.25rem 0 0.6rem; }
+.spin-users-list { max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.4rem; }
+.spin-user-chip {
+    display: flex; align-items: center; gap: 0.55rem; padding: 0.45rem 0.6rem;
+    border-radius: 10px; background: var(--surface); border: 1px solid var(--border); font-size: var(--fs-2xs);
+    transition: opacity .15s ease;
+}
+.spin-user-chip.excluded { opacity: .45; }
+.spin-user-avatar {
+    width: 26px; height: 26px; border-radius: 50%; flex: none;
+    display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: var(--fs-3xs); color: #fff;
+}
+.spin-user-name { font-weight: 600; color: var(--text); }
+.spin-user-email { display: block; font-size: var(--fs-3xs); color: var(--muted); }
 
 /* ============================================================
    CHECK CHANGE DUE MODAL — Redesigned
@@ -1092,6 +1202,7 @@ body.theme-dark .form-text { color: var(--muted) !important; }
     text-align: center;
 }
 
+.job-type-label.once { background-color: var(--once-color); }
 .job-type-label.daily { background-color: var(--daily-color); }
 .job-type-label.weekly { background-color: var(--weekly-color); }
 .job-type-label.biweekly { background-color: var(--biweekly-color); }
@@ -1200,6 +1311,7 @@ body.theme-dark .job-item { background: #1f2937; }
     transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
+.job-item.once::before { background-color: var(--once-color); }
 .job-item.daily::before { background-color: var(--daily-color); }
 .job-item.weekly::before { background-color: var(--weekly-color); }
 .job-item.biweekly::before { background-color: var(--biweekly-color); }
@@ -1280,6 +1392,7 @@ body.theme-dark .job-item { background: #1f2937; }
 
 .legend-item:hover .legend-color { transform: scale(1.2) rotate(5deg); }
 
+.legend-color.once { background-color: var(--once-color); }
 .legend-color.daily { background-color: var(--daily-color); }
 .legend-color.weekly { background-color: var(--weekly-color); }
 .legend-color.biweekly { background-color: var(--biweekly-color); }

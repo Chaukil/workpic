@@ -69,6 +69,10 @@
             <div class="topbar-legend" aria-label="Chú thích loại job">
                 <span class="legend-inline-title">Chú Thích</span>
                 <div class="legend-item">
+                    <span class="legend-color once"></span>
+                    <span>Once</span>
+                </div>
+                <div class="legend-item">
                     <span class="legend-color daily"></span>
                     <span>Daily</span>
                 </div>
@@ -158,11 +162,35 @@
                                 </button>
                             </div>
                             <div class="col-6">
-                                <button class="btn btn-check-due w-100" id="checkDueBtn" type="button">
-                                    <i class="bi bi-calendar2-check-fill"></i>
-                                    <span>Check Due</span>
-                                    <div class="btn-shine"></div>
-                                </button>
+                                <div class="dropdown w-100">
+                                    <button class="btn btn-layout-menu w-100" id="layoutMenuBtn" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                        <i class="bi bi-grid-3x3-gap-fill"></i>
+                                        <span>Layout</span>
+                                        <div class="btn-shine"></div>
+                                    </button>
+                                    <ul class="dropdown-menu layout-dropdown-menu" aria-labelledby="layoutMenuBtn">
+                                        <li>
+                                            <button class="layout-dropdown-item" id="checkDueBtn" type="button">
+                                                <span class="layout-item-ic"><i class="bi bi-calendar2-check-fill"></i></span>
+                                                <span class="layout-item-text">
+                                                    <span class="layout-item-title">Check Due</span>
+                                                    <span class="layout-item-sub">So sánh dữ liệu due</span>
+                                                </span>
+                                            </button>
+                                        </li>
+                                        <li>
+                                            <button class="layout-dropdown-item" id="presenterSpinBtn" type="button">
+                                                <span class="layout-item-ic layout-item-ic-spin"><i class="bi bi-dice-5-fill"></i></span>
+                                                <span class="layout-item-text">
+                                                    <span class="layout-item-title">Quay số thuyết trình</span>
+                                                    <span class="layout-item-sub">Chọn ngẫu nhiên người thuyết trình</span>
+                                                </span>
+                                            </button>
+                                        </li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li><span class="layout-item-note"><i class="bi bi-stars"></i> Sẽ có thêm lựa chọn khác tại đây</span></li>
+                                    </ul>
+                                </div>
                             </div>
                             <div class="col-6">
                                 <button class="btn btn-view-data w-100" id="viewDataBtn" type="button">
@@ -281,6 +309,7 @@
                         <div class="col-md-4 mb-3">
                             <label class="form-label fw-bold">Loại Job *</label>
                             <select class="form-select" id="jobType" required>
+                                <option value="once">Once (Một lần)</option>
                                 <option value="daily">Daily (Hàng ngày)</option>
                                 <option value="weekly">Weekly (Hàng tuần)</option>
                                 <option value="biweekly">Biweekly (2 tuần/lần)</option>
@@ -658,6 +687,60 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
 
                         <div id="checkDueResultTable" class="check-due-result-table"></div>
                     </section>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Presenter Spin Modal -->
+    <div class="modal fade" id="presenterSpinModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content spin-modal-content">
+                <div class="modal-header modern-header modern-header-spin">
+                    <div class="modern-header-inner">
+                        <div class="modern-header-icon"><i class="bi bi-dice-5-fill"></i></div>
+                        <div class="modern-header-text">
+                            <h5 class="modal-title mb-0">Quay Số Người Thuyết Trình</h5>
+                            <p class="modern-header-subtitle mb-0">Ngẫu nhiên & công bằng — tự động xếp lịch thứ 2 tuần</p>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="spin-layout">
+                        <div class="spin-wheel-col">
+                            <div class="spin-wheel-wrap" id="spinWheelWrap">
+                                <div class="spin-wheel-pointer"><i class="bi bi-caret-down-fill"></i></div>
+                                <svg id="spinWheelSvg" class="spin-wheel-svg" viewBox="0 0 300 300"></svg>
+                                <div class="spin-wheel-hub"><i class="bi bi-mic-fill"></i></div>
+                            </div>
+                            <button type="button" class="btn btn-spin" id="spinNowBtn">
+                                <i class="bi bi-shuffle"></i> Quay Số
+                                <div class="btn-shine"></div>
+                            </button>
+
+                            <div class="spin-result-card" id="spinResultCard" style="display:none;">
+                                <div class="spin-result-badge"><i class="bi bi-trophy-fill"></i> Kết quả</div>
+                                <div class="spin-result-name" id="spinResultName">—</div>
+                                <div class="spin-result-date" id="spinResultDate">—</div>
+                                <button type="button" class="btn btn-confirm-spin" id="confirmSpinBtn">
+                                    <i class="bi bi-check-circle-fill"></i> Xác nhận chỉ định
+                                    <div class="btn-shine"></div>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="spin-users-col">
+                            <div class="spin-users-title">
+                                <i class="bi bi-people-fill"></i> Danh sách quay số
+                                <span class="spin-users-count" id="spinUsersCount">0</span>
+                            </div>
+                            <div class="spin-users-hint">Bỏ chọn để loại người đó khỏi lượt quay này.</div>
+                            <div class="spin-users-list" id="spinUsersList">
+                                <div class="empty-state"><i class="bi bi-hourglass-split"></i><br>Đang tải danh sách user...</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

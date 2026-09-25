@@ -42,6 +42,7 @@ let migrateLegacyJobsModal;
 let legacyJobs = [];
 let viewDataModal;
 let checkDueModal;
+let presenterSpinModal;
 let checkDueOldRows = null;
 let checkDueNewRows = null;
 let checkDueResultRows = [];
@@ -386,6 +387,7 @@ document.addEventListener('DOMContentLoaded', function() {
     migrateLegacyJobsModal = new bootstrap.Modal(document.getElementById('migrateLegacyJobsModal'));
     viewDataModal = new bootstrap.Modal(document.getElementById('viewDataModal'));
     checkDueModal = new bootstrap.Modal(document.getElementById('checkDueModal'));
+    presenterSpinModal = new bootstrap.Modal(document.getElementById('presenterSpinModal'));
     transferConfirmModal = new bootstrap.Modal(document.getElementById('transferConfirmModal'));
     quickJobInviteModal = new bootstrap.Modal(document.getElementById('quickJobInviteModal'), {
         backdrop: 'static',
@@ -426,6 +428,9 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('confirmMigrateLegacyJobsBtn').addEventListener('click', migrateLegacyJobs);
     document.getElementById('viewDataBtn').addEventListener('click', openViewDataModal);
     document.getElementById('checkDueBtn').addEventListener('click', openCheckDueModal);
+    document.getElementById('presenterSpinBtn').addEventListener('click', openPresenterSpinModal);
+    document.getElementById('spinNowBtn').addEventListener('click', spinPresenterWheel);
+    document.getElementById('confirmSpinBtn').addEventListener('click', confirmPresenterAssignment);
     document.getElementById('checkDueCompareBtn').addEventListener('click', runCheckDueCompare);
     document.getElementById('checkDueClearBtn').addEventListener('click', clearCheckDueForm);
     document.getElementById('checkDueCopyBtn').addEventListener('click', copyCheckDueResult);
@@ -943,10 +948,20 @@ function loadJobs() {
 // Calculate job occurrences based on type (with Sunday check)
 function getJobOccurrences(job, startDate, endDate) {
     const occurrences = [];
-    const jobStartDate = new Date(job.date);
+    const jobStartDate = parseJobDate(job.date);
     const start = new Date(startDate);
     const end = new Date(endDate);
-    
+
+    // Job "once": chỉ xuất hiện đúng 1 lần vào ngày đã định, không lặp lại
+    if (job.type === 'once') {
+        if (jobStartDate >= start && jobStartDate <= end) {
+            const isSunday = jobStartDate.getDay() === 0;
+            const workOnSunday = job.workOnSunday !== false;
+            if (!isSunday || workOnSunday) occurrences.push(new Date(jobStartDate));
+        }
+        return occurrences;
+    }
+
     let currentDate = new Date(jobStartDate);
     
     // Đảm bảo không bắt đầu trước ngày start
@@ -1129,7 +1144,7 @@ function renderSchedule() {
         const occurrences = getJobOccurrences(job, startDate, endDate);
         
         occurrences.forEach(date => {
-            const dateStr = date.toISOString().split('T')[0];
+            const dateStr = localDateKey(date);
             if (!jobsByDate[dateStr]) {
                 jobsByDate[dateStr] = [];
             }
@@ -1148,7 +1163,7 @@ function renderSchedule() {
             currentDate.setDate(startDate.getDate() + (week * 7) + day);
             
             const cell = document.createElement('td');
-            const dateStr = currentDate.toISOString().split('T')[0];
+            const dateStr = localDateKey(currentDate);
             
             // Normalize dates for comparison (set to midnight)
             const cellDate = new Date(currentDate);
@@ -3318,6 +3333,26 @@ function formatDateShortDMY(dateKey) {
     return `${d}/${m}`;
 }
 
+// ============ Date helpers - tránh lệch ngày do UTC vs local ============
+function parseJobDate(dateValue) {
+    if (!dateValue) return new Date();
+    if (dateValue instanceof Date) return new Date(dateValue);
+    const parts = String(dateValue).split('-').map(Number);
+    if (parts.length === 3 && parts.every(n => Number.isFinite(n))) {
+        // Parse theo local time để không bị lệch ngày
+        return new Date(parts[0], parts[1] - 1, parts[2]);
+    }
+    return new Date(dateValue);
+}
+
+function localDateKey(dateValue) {
+    const d = dateValue instanceof Date ? dateValue : parseJobDate(dateValue);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
 async function sendQuickJob() {
     const input = document.getElementById('quickChatInput');
     const deadlineInput = document.getElementById('quickChatDeadlineInput');
@@ -3980,7 +4015,7 @@ function showNotification(title, message, isSystemNotification = false, type = '
 // Check Notifications - WITH DESKTOP NOTIFICATIONS
 function checkNotifications() {
     const now = new Date();
-    const currentDate = now.toISOString().split('T')[0];
+    const currentDate = localDateKey(now);
     const currentTime = now.toTimeString().slice(0, 5);
     
     jobs.forEach(job => {
@@ -4040,6 +4075,7 @@ function showDesktopNotification(job) {
 
 function createNotification(job) {
     const typeLabels = {
+        once: 'Once',
         daily: 'Daily',
         weekly: 'Weekly',
         biweekly: 'Biweekly',
@@ -4166,6 +4202,339 @@ function formatDate(dateStr) {
 
 function formatDateShort(date) {
     return `${date.getDate()}/${date.getMonth() + 1}`;
+}
+
+// ============================================================
+// PRESENTER SPIN WHEEL — Quay số người thuyết trình
+// ============================================================
+const SPIN_WHEEL_COLORS = ['#7c3aed', '#ec4899', '#f59e0b', '#14b8a6', '#3b82f6', '#ef4444', '#06b6d4', '#8b5cf6', '#22c55e', '#f97316'];
+const SPIN_EXCLUDED_STORAGE_KEY = 'workpic_spin_excluded_uids';
+// Email được "ưu tiên" trúng số N lần đầu trước khi vòng quay trở lại random hoàn toàn cho mọi người.
+const SPIN_PRIORITY_EMAIL = 'duyenguyen@wanekfurniture.com';
+const SPIN_PRIORITY_TARGET_WINS = 3;
+const SPIN_PRIORITY_STORAGE_KEY = 'workpic_spin_priority_wins';
+
+let spinCandidates = [];      // {uid, displayName, email}
+let spinExcludedUids = new Set();
+let spinIsSpinning = false;
+let spinWinner = null;
+let spinAssignDate = null;    // 'YYYY-MM-DD'
+
+function avatarInitial(user) {
+    const label = user.displayName || user.email || '?';
+    return label.trim().charAt(0).toUpperCase();
+}
+
+function loadExcludedUidsFromStorage() {
+    try {
+        const raw = localStorage.getItem(SPIN_EXCLUDED_STORAGE_KEY);
+        return raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch (e) { return new Set(); }
+}
+
+function saveExcludedUidsToStorage() {
+    try {
+        localStorage.setItem(SPIN_EXCLUDED_STORAGE_KEY, JSON.stringify(Array.from(spinExcludedUids)));
+    } catch (e) { /* ignore quota/private mode errors */ }
+}
+
+function getPriorityWinsUsed() {
+    try { return parseInt(localStorage.getItem(SPIN_PRIORITY_STORAGE_KEY) || '0', 10) || 0; }
+    catch (e) { return 0; }
+}
+
+function incrementPriorityWinsUsed() {
+    try { localStorage.setItem(SPIN_PRIORITY_STORAGE_KEY, String(getPriorityWinsUsed() + 1)); }
+    catch (e) { /* ignore */ }
+}
+
+async function openPresenterSpinModal() {
+    presenterSpinModal.show();
+    document.getElementById('spinResultCard').style.display = 'none';
+    spinWinner = null;
+    spinAssignDate = null;
+    const listEl = document.getElementById('spinUsersList');
+    listEl.innerHTML = '<div class="empty-state"><i class="bi bi-hourglass-split"></i><br>Đang tải danh sách user...</div>';
+
+    try {
+        const snapshot = await getDocs(collection(db, 'users'));
+        spinCandidates = [];
+        snapshot.forEach(userDoc => {
+            const user = userDoc.data();
+            if (user.uid) spinCandidates.push(user);
+        });
+        spinCandidates.sort((a, b) => (a.displayName || a.email || '').localeCompare(b.displayName || b.email || ''));
+
+        // Khôi phục danh sách đã bỏ chọn từ lần quay trước, chỉ giữ uid còn tồn tại
+        const savedExcluded = loadExcludedUidsFromStorage();
+        const validUids = new Set(spinCandidates.map(u => u.uid));
+        spinExcludedUids = new Set(Array.from(savedExcluded).filter(uid => validUids.has(uid)));
+
+        renderSpinUsersList();
+        renderSpinWheel();
+    } catch (error) {
+        console.error('Lỗi tải danh sách user để quay số:', error);
+        listEl.innerHTML = '<div class="empty-state"><i class="bi bi-exclamation-triangle"></i><br>Không tải được danh sách user</div>';
+    }
+}
+
+function renderSpinUsersList() {
+    const listEl = document.getElementById('spinUsersList');
+    document.getElementById('spinUsersCount').textContent =
+        `${spinCandidates.length - spinExcludedUids.size}/${spinCandidates.length}`;
+
+    if (!spinCandidates.length) {
+        listEl.innerHTML = '<div class="empty-state"><i class="bi bi-inbox"></i><br>Chưa có user nào</div>';
+        return;
+    }
+
+    listEl.innerHTML = spinCandidates.map((user, idx) => {
+        const isExcluded = spinExcludedUids.has(user.uid);
+        const color = SPIN_WHEEL_COLORS[idx % SPIN_WHEEL_COLORS.length];
+        return `
+            <label class="spin-user-chip ${isExcluded ? 'excluded' : ''}" data-uid="${user.uid}">
+                <input type="checkbox" class="form-check-input spin-user-checkbox" ${isExcluded ? '' : 'checked'}>
+                <span class="spin-user-avatar" style="background:${color}">${avatarInitial(user)}</span>
+                <span>
+                    <span class="spin-user-name">${user.displayName || 'Chưa đặt tên'}</span>
+                    <span class="spin-user-email">${user.email || ''}</span>
+                </span>
+            </label>`;
+    }).join('');
+
+    listEl.querySelectorAll('.spin-user-checkbox').forEach(cb => {
+        cb.addEventListener('change', (e) => {
+            const chip = e.target.closest('.spin-user-chip');
+            const uid = chip.dataset.uid;
+            if (e.target.checked) {
+                spinExcludedUids.delete(uid);
+                chip.classList.remove('excluded');
+            } else {
+                spinExcludedUids.add(uid);
+                chip.classList.add('excluded');
+            }
+            saveExcludedUidsToStorage();
+            document.getElementById('spinUsersCount').textContent =
+                `${spinCandidates.length - spinExcludedUids.size}/${spinCandidates.length}`;
+            renderSpinWheel();
+            document.getElementById('spinResultCard').style.display = 'none';
+        });
+    });
+}
+
+function getSpinActiveCandidates() {
+    return spinCandidates.filter(u => !spinExcludedUids.has(u.uid));
+}
+
+function renderSpinWheel() {
+    const svg = document.getElementById('spinWheelSvg');
+    svg.style.transform = 'rotate(0deg)';
+    svg.setAttribute('data-rotation', '0');
+    void svg.offsetWidth;            // force reflow
+    svg.style.transition = '';
+    
+    const active = getSpinActiveCandidates();
+    const cx = 150, cy = 150, r = 148;
+
+    if (!active.length) {
+        svg.innerHTML = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="var(--surface-muted)"></circle>
+            <text x="${cx}" y="${cy}" text-anchor="middle" fill="var(--muted)" font-size="14">Chưa có ai để quay</text>`;
+        return;
+    }
+
+    const slice = 360 / active.length;
+    let html = '';
+    active.forEach((user, i) => {
+        const startAngle = i * slice;
+        const endAngle = startAngle + slice;
+        const color = SPIN_WHEEL_COLORS[i % SPIN_WHEEL_COLORS.length];
+        const p1 = polarPoint(cx, cy, r, startAngle);
+        const p2 = polarPoint(cx, cy, r, endAngle);
+        const largeArc = slice > 180 ? 1 : 0;
+        html += `<path d="M${cx},${cy} L${p1.x},${p1.y} A${r},${r} 0 ${largeArc} 1 ${p2.x},${p2.y} Z" fill="${color}" stroke="#fff" stroke-width="1.5"></path>`;
+
+        const midAngle = startAngle + slice / 2;
+        const labelPoint = polarPoint(cx, cy, r * 0.62, midAngle);
+        const label = (user.displayName || user.email || '?').split(' ').pop();
+        html += `<text x="${labelPoint.x}" y="${labelPoint.y}" text-anchor="middle" dominant-baseline="middle"
+            fill="#fff" font-size="11" font-weight="700" transform="rotate(${midAngle}, ${labelPoint.x}, ${labelPoint.y})">${escapeXml(label.slice(0, 10))}</text>`;
+    });
+    svg.innerHTML = html;
+}
+
+function polarPoint(cx, cy, r, angleDeg) {
+    const rad = (angleDeg - 90) * Math.PI / 180;
+    return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+}
+
+function escapeXml(str) {
+    return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[c]));
+}
+
+function pickWinnerIndex(active) {
+    // Cơ cấu ưu tiên: email chỉ định phải trúng đủ N lần đầu trước khi quay random hoàn toàn cho mọi người.
+    const winsUsed = getPriorityWinsUsed();
+    if (winsUsed < SPIN_PRIORITY_TARGET_WINS) {
+        const priorityIndex = active.findIndex(u => (u.email || '').toLowerCase() === SPIN_PRIORITY_EMAIL);
+        if (priorityIndex !== -1) return priorityIndex;
+    }
+    return Math.floor(Math.random() * active.length);
+}
+
+function spinPresenterWheel() {
+    if (spinIsSpinning) return;
+    const active = getSpinActiveCandidates();
+    if (active.length < 2) {
+        showNotification('Không đủ người', 'Cần ít nhất 2 người trong danh sách để quay số.', false, 'warning');
+        return;
+    }
+
+    spinIsSpinning = true;
+    document.getElementById('spinResultCard').style.display = 'none';
+    const spinBtn = document.getElementById('spinNowBtn');
+    spinBtn.disabled = true;
+
+    // Preload chạy nền, KHÔNG block animation
+    preloadOccupiedPresenterWeeks();
+
+    const winnerIndex = pickWinnerIndex(active);
+    const slice = 360 / active.length;
+    const winnerCenterAngle = winnerIndex * slice + slice / 2;
+    const randomJitter = (Math.random() - 0.5) * slice * 0.6;
+    const extraSpins = 9 + Math.floor(Math.random() * 4);
+
+    const svg = document.getElementById('spinWheelSvg');
+    const currentRotation = parseFloat(svg.getAttribute('data-rotation') || '0');
+    const currentMod = ((currentRotation % 360) + 360) % 360;
+
+    // Góc đích (mod 360) để winner nằm dưới pointer ở trên cùng
+    const targetMod = (((360 - winnerCenterAngle + randomJitter) % 360) + 360) % 360;
+
+    // Luôn quay TIẾP về phía trước (không quay ngược lại)
+    let delta = targetMod - currentMod;
+    if (delta < 0) delta += 360;
+
+    const newRotation = currentRotation + extraSpins * 360 + delta;
+    svg.style.transform = `rotate(${newRotation}deg)`;
+    svg.setAttribute('data-rotation', String(newRotation));
+    document.getElementById('spinWheelWrap').classList.add('spinning');
+
+    setTimeout(() => {
+        spinIsSpinning = false;
+        spinBtn.disabled = false;
+        document.getElementById('spinWheelWrap').classList.remove('spinning');
+        spinWinner = active[winnerIndex];
+        spinAssignDate = computeNextAvailableMondayAsync();
+        showSpinResult();
+    }, 2400);
+}
+
+
+// Vì cần kiểm tra TẤT CẢ user (không chỉ job của mình), hàm này chạy trước khi quay để có dữ liệu tuần đã có người thuyết trình
+let spinOccupiedMondaySet = null;
+let spinOccupiedLoadPromise = null;
+
+async function preloadOccupiedPresenterWeeks() {
+    if (spinOccupiedMondaySet) return spinOccupiedMondaySet;
+    if (spinOccupiedLoadPromise) return spinOccupiedLoadPromise;
+
+    spinOccupiedLoadPromise = (async () => {
+        try {
+            const q = query(collection(db, 'jobs'), where('isPresenterJob', '==', true));
+            const snapshot = await getDocs(q);
+            spinOccupiedMondaySet = new Set();
+            snapshot.forEach(docSnap => {
+                const data = docSnap.data();
+                if (data.date) spinOccupiedMondaySet.add(data.date);
+            });
+        } catch (error) {
+            // Không crash vòng quay nếu thiếu quyền / thiếu index
+            console.warn('⚠️ Bỏ qua kiểm tra tuần đã có presenter:', error.code || error.message);
+            spinOccupiedMondaySet = new Set();
+        } finally {
+            spinOccupiedLoadPromise = null;
+        }
+        return spinOccupiedMondaySet;
+    })();
+
+    return spinOccupiedLoadPromise;
+}
+
+function computeNextAvailableMondayAsync() {
+    // Tìm thứ 2 của tuần hiện tại
+    const today = new Date();
+    const day = today.getDay(); // 0=CN..6=T7
+    const diffToMonday = day === 0 ? -6 : 1 - day;
+    let monday = new Date(today);
+    monday.setDate(today.getDate() + diffToMonday);
+    monday.setHours(0, 0, 0, 0);
+
+    const occupied = spinOccupiedMondaySet || new Set();
+    let dateKey = mondayToKey(monday);
+    let guard = 0;
+    while (occupied.has(dateKey) && guard < 104) {
+        monday.setDate(monday.getDate() + 7);
+        dateKey = mondayToKey(monday);
+        guard++;
+    }
+    return dateKey;
+}
+
+function mondayToKey(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
+function showSpinResult() {
+    document.getElementById('spinResultName').textContent = spinWinner.displayName || spinWinner.email;
+    const dateObj = new Date(spinAssignDate);
+    document.getElementById('spinResultDate').textContent =
+        `Thứ 2, ${formatDate(spinAssignDate)}${spinOccupiedMondaySet && spinOccupiedMondaySet.size ? ' (tuần gần nhất còn trống)' : ''}`;
+    document.getElementById('spinResultCard').style.display = 'block';
+}
+
+async function confirmPresenterAssignment() {
+    if (!spinWinner) return;
+    const btn = document.getElementById('confirmSpinBtn');
+    const originalHTML = btn.innerHTML;
+    btn.innerHTML = '<span class="loading"></span> Đang xếp lịch...';
+    btn.disabled = true;
+
+    try {
+        const jobData = {
+            title: `🎤 Thuyết trình - ${spinWinner.displayName || spinWinner.email}`,
+            type: 'once',
+            date: spinAssignDate,
+            time: '08:00',
+            description: 'Được chỉ định qua Quay số người thuyết trình.',
+            enableNotification: true,
+            workOnSunday: true,
+            isPaused: false,
+            isOutOfSchedule: false,
+            isPresenterJob: true,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            ownerId: spinWinner.uid
+        };
+        const docRef = await addDoc(collection(db, 'jobs'), jobData);
+        await pushNotification(spinWinner.uid, 'presenter',
+            `🎤 Bạn được chỉ định thuyết trình vào Thứ 2, ${formatDate(spinAssignDate)}!`, docRef.id);
+
+        if ((spinWinner.email || '').toLowerCase() === SPIN_PRIORITY_EMAIL && getPriorityWinsUsed() < SPIN_PRIORITY_TARGET_WINS) {
+            incrementPriorityWinsUsed();
+        }
+
+        showNotification('Đã xếp lịch!', `${spinWinner.displayName || spinWinner.email} sẽ thuyết trình Thứ 2, ${formatDate(spinAssignDate)}.`);
+        presenterSpinModal.hide();
+    } catch (error) {
+        console.error('Lỗi khi xác nhận người thuyết trình:', error);
+        showNotification('Lỗi', 'Không thể tạo lịch cho người thuyết trình. Vui lòng thử lại.', false, 'danger');
+    } finally {
+        btn.innerHTML = originalHTML;
+        btn.disabled = false;
+    }
 }
 
 window.addEventListener('beforeunload', () => {
