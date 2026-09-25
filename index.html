@@ -779,7 +779,7 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
 
     <!-- Guide Modal -->
     <div class="modal fade" id="guideModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-xl">
             <div class="modal-content">
                 <div class="modal-header modern-header modern-header-primary">
                     <div class="modern-header-inner">
@@ -794,66 +794,118 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="guide-grid">
-                        <div class="guide-item">
-                            <i class="bi bi-calendar2-week-fill"></i>
-                            <h6>Lịch làm việc</h6>
-                            <p>Thêm, sửa, xem job theo ngày / tuần / tháng.</p>
+                    <div class="ia-diagram">
+                        <div class="ia-center">
+                            <div class="ia-top-node">
+                                <span class="ia-top-t1"><i class="bi bi-box-arrow-in-right"></i> Đăng nhập / Đăng ký</span>
+                                <span class="ia-top-t2">Email &amp; mật khẩu</span>
+                            </div>
+                            <div class="ia-arrow-down"></div>
+                            <div class="ia-sub-node">
+                                <span class="ia-top-t1">Trang chính</span>
+                                <span class="ia-top-t2">Topbar · Sidebar · Lịch làm việc</span>
+                            </div>
+                            <div class="ia-arrow-down"></div>
                         </div>
-                        <div class="guide-item">
-                            <i class="bi bi-arrow-left-right"></i>
-                            <h6>Chuyển / Copy job</h6>
-                            <p>Chuyển hẳn hoặc sao chép job cho người khác, cần người nhận xác nhận. Áp dụng cho cả job thường và job trong ngày đang làm.</p>
+
+                        <div class="ia-cols">
+                            <div class="ia-col ia-c-biweekly">
+                                <div class="ia-col-head">
+                                    <i class="bi bi-calendar2-week-fill"></i>
+                                    <div><div class="ia-h1">Lịch làm việc</div><div class="ia-h2">Xem &amp; quản lý job định kỳ</div></div>
+                                </div>
+                                <div class="ia-col-body">
+                                    <div class="ia-item">Thêm / Sửa / Xóa Job<span>Daily · Weekly · Biweekly · Monthly · Quarterly · Yearly</span></div>
+                                    <div class="ia-item">Chuyển / Copy Job<span>Cần người nhận xác nhận</span></div>
+                                    <div class="ia-item">Job ngoài lịch<span>Công việc phát sinh không cố định</span></div>
+                                    <div class="ia-item">Check Due<span>So sánh dữ liệu 2 nguồn</span></div>
+                                    <div class="ia-item">Xem dữ liệu / Xuất PDF</div>
+                                    <div class="ia-item">Tìm kiếm job</div>
+                                </div>
+                            </div>
+
+                            <div class="ia-col ia-c-weekly">
+                                <div class="ia-col-head">
+                                    <i class="bi bi-chat-dots-fill"></i>
+                                    <div><div class="ia-h1">Job trong ngày</div><div class="ia-h2">Khung chat real-time</div></div>
+                                </div>
+                                <div class="ia-col-body">
+                                    <div class="ia-item">Báo job phát sinh<span>Kèm hạn chót tùy chọn</span></div>
+                                    <div class="ia-item">Chỉ định người nhận<span>Nhận hoặc từ chối</span></div>
+                                    <div class="ia-item">Cảnh báo quá hạn<span>Tô đỏ khi trễ</span></div>
+                                    <div class="ia-item">Tab "Chung" / "Của tôi"</div>
+                                    <div class="ia-item">Tìm kiếm &amp; lọc<span>Trạng thái · người phụ trách</span></div>
+                                    <div class="ia-item">Reaction &amp; bình luận</div>
+                                    <div class="ia-item">Sửa / Xóa job trong ngày</div>
+                                </div>
+                            </div>
+
+                            <div class="ia-col ia-c-monthly">
+                                <div class="ia-col-head">
+                                    <i class="bi bi-bell-fill"></i>
+                                    <div><div class="ia-h1">Thông báo</div><div class="ia-h2">Hoạt động 30 ngày gần nhất</div></div>
+                                </div>
+                                <div class="ia-col-body">
+                                    <div class="ia-item">Danh sách thông báo<span>Đếm số chưa đọc</span></div>
+                                    <div class="ia-item">Chờ bạn xác nhận<span>Lời mời / chuyển-copy job bị miss</span></div>
+                                </div>
+                            </div>
+
+                            <div class="ia-col ia-c-yearly">
+                                <div class="ia-col-head">
+                                    <i class="bi bi-person-circle"></i>
+                                    <div><div class="ia-h1">Tài khoản</div><div class="ia-h2">Hồ sơ &amp; cài đặt</div></div>
+                                </div>
+                                <div class="ia-col-body">
+                                    <div class="ia-item">Đổi ảnh đại diện</div>
+                                    <div class="ia-item">Đổi tên hiển thị</div>
+                                    <div class="ia-item">Xem Email / UID</div>
+                                    <div class="ia-item">Chế độ tối / sáng</div>
+                                    <div class="ia-item">Đăng xuất</div>
+                                </div>
+                            </div>
+
+                            <div class="ia-col ia-c-quarterly">
+                                <div class="ia-col-head">
+                                    <i class="bi bi-person-plus-fill"></i>
+                                    <div><div class="ia-h1">Xác nhận yêu cầu</div><div class="ia-h2">Modal xử lý nhanh</div></div>
+                                </div>
+                                <div class="ia-col-body">
+                                    <div class="ia-item">Chấp nhận job được giao</div>
+                                    <div class="ia-item">Xác nhận chuyển / copy job</div>
+                                    <div class="ia-item">Gán job cũ (Migrate)</div>
+                                </div>
+                            </div>
+
+                            <div class="ia-col ia-c-daily">
+                                <div class="ia-col-head">
+                                    <i class="bi bi-palette-fill"></i>
+                                    <div><div class="ia-h1">Chú thích &amp; giao diện</div><div class="ia-h2">Nhận diện nhanh</div></div>
+                                </div>
+                                <div class="ia-col-body">
+                                    <div class="ia-item">Màu theo loại job<span>6 màu tương ứng 6 loại lặp</span></div>
+                                    <div class="ia-item">Ẩn / hiện Sidebar</div>
+                                    <div class="ia-item">Hiện / ẩn Chủ Nhật</div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="guide-item">
-                            <i class="bi bi-bell-fill"></i>
-                            <h6>Thông báo</h6>
-                            <p>Chuông góc trên hiện các hoạt động 30 ngày gần nhất, đếm số chưa đọc. Nếu lỡ miss lời mời/yêu cầu chuyển-copy job, mục "Chờ bạn xác nhận" trên cùng cho phép xem lại và xác nhận bất cứ lúc nào.</p>
-                        </div>
-                        <div class="guide-item">
-                            <i class="bi bi-chat-dots-fill"></i>
-                            <h6>Job trong ngày</h6>
-                            <p>Khung chat báo job phát sinh real-time, ai cũng thấy và nhận được.</p>
-                        </div>
-                        <div class="guide-item">
-                            <i class="bi bi-person-plus-fill"></i>
-                            <h6>Chỉ định người nhận</h6>
-                            <p>Giao job trong ngày cho 1 người cụ thể, họ nhận hoặc từ chối.</p>
-                        </div>
-                        <div class="guide-item">
-                            <i class="bi bi-exclamation-triangle-fill"></i>
-                            <h6>Cảnh báo quá hạn</h6>
-                            <p>Job trong ngày chưa ai nhận, qua ngày sẽ tô đỏ để nhắc nhở.</p>
-                        </div>
-                        <div class="guide-item">
-                            <i class="bi bi-list-check"></i>
-                            <h6>Tab "Của tôi"</h6>
-                            <p>Xem riêng job bạn đang làm và đã hoàn thành trong khung chat.</p>
-                        </div>
-                        <div class="guide-item">
-                            <i class="bi bi-funnel-fill"></i>
-                            <h6>Tìm kiếm & lọc</h6>
-                            <p>Lọc job theo trạng thái, người phụ trách hoặc gõ từ khóa trong khung chat.</p>
-                        </div>
-                        <div class="guide-item">
-                            <i class="bi bi-alarm-fill"></i>
-                            <h6>Deadline job</h6>
-                            <p>Đặt hạn chót khi tạo job, quá giờ mà chưa xong sẽ tô đỏ cảnh báo.</p>
-                        </div>
-                        <div class="guide-item">
-                            <i class="bi bi-emoji-smile-fill"></i>
-                            <h6>Reaction & bình luận</h6>
-                            <p>Thả emoji, viết bình luận ngắn ngay trên từng job trong chat.</p>
-                        </div>
-                        <div class="guide-item">
-                            <i class="bi bi-pencil-square"></i>
-                            <h6>Sửa / xóa job</h6>
-                            <p>Người tạo job có thể chỉnh sửa nội dung hoặc xóa job trong ngày.</p>
-                        </div>
-                        <div class="guide-item">
-                            <i class="bi bi-person-circle"></i>
-                            <h6>Tài khoản</h6>
-                            <p>Đổi avatar, tên hiển thị, đăng xuất — tất cả trong 1 nút.</p>
+
+                        <div class="ia-flow-title">Luồng xử lý Job</div>
+                        <div class="ia-flow-box">
+                            <div class="ia-flow-row">
+                                <div class="ia-flow-step"><div class="n">1. Tạo Job</div><div class="d">Định kỳ hoặc phát sinh</div></div>
+                                <div class="ia-flow-arrow"><i class="bi bi-arrow-right"></i></div>
+                                <div class="ia-flow-step"><div class="n">2. Chỉ định / Chuyển</div><div class="d">Giao cho người phụ trách</div></div>
+                                <div class="ia-flow-arrow"><i class="bi bi-arrow-right"></i></div>
+                                <div class="ia-flow-step"><div class="n">3. Xác nhận</div><div class="d">Nhận hoặc từ chối</div></div>
+                            </div>
+                            <div class="ia-flow-row">
+                                <div class="ia-flow-step"><div class="n">4. Thực hiện</div><div class="d">Reaction · bình luận</div></div>
+                                <div class="ia-flow-arrow"><i class="bi bi-arrow-right"></i></div>
+                                <div class="ia-flow-step"><div class="n">5. Cảnh báo quá hạn</div><div class="d">Nếu trễ deadline</div></div>
+                                <div class="ia-flow-arrow"><i class="bi bi-arrow-right"></i></div>
+                                <div class="ia-flow-step"><div class="n">6. Hoàn thành</div><div class="d">Lưu vào thông báo</div></div>
+                            </div>
                         </div>
                     </div>
                 </div>
