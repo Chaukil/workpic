@@ -764,7 +764,7 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
                         <div class="modern-header-icon"><i class="bi bi-calendar-x-fill"></i></div>
                         <div class="modern-header-text">
                             <h5 class="modal-title mb-0">Đăng ký lịch off</h5>
-                            <p class="modern-header-subtitle mb-0">Tháng này &amp; tháng sau · job ngày off sẽ dời sang ngày làm việc kế tiếp</p>
+                            <p class="modern-header-subtitle mb-0">Tháng này &amp; tháng sau · job ngày off sẽ dời lên ngày làm việc liền trước</p>
                         </div>
                     </div>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -851,6 +851,19 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
                                 <i class="bi bi-check-circle"></i> Lưu
                             </button>
                         </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold" for="profileNotifyLead"><i class="bi bi-bell-fill"></i> Nhắc job trước</label>
+                        <select class="form-select" id="profileNotifyLead">
+                            <option value="0">Đúng giờ (không nhắc trước)</option>
+                            <option value="5">5 phút</option>
+                            <option value="10">10 phút</option>
+                            <option value="15">15 phút</option>
+                            <option value="30">30 phút</option>
+                            <option value="60">1 giờ</option>
+                            <option value="120">2 giờ</option>
+                        </select>
+                        <div class="form-text">Tự lưu khi chọn. Nhắc trước và vẫn nhắc lại đúng giờ.</div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold">UID</label>
@@ -972,7 +985,7 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
                                     <div class="ia-item">Job ngoài lịch<span>Công việc phát sinh không cố định</span></div>
                                     <div class="ia-item">Check Due<span>So sánh dữ liệu 2 nguồn</span></div>
                                     <div class="ia-item">Xem dữ liệu / Xuất PDF</div>
-                                    <div class="ia-item">Đăng ký lịch off<span>Job ngày off dời sang ngày kế tiếp (tô xám)</span></div>
+                                    <div class="ia-item">Đăng ký lịch off<span>Job ngày off dời lên ngày làm việc liền trước (tô xám)</span></div>
                                     <div class="ia-item">Quay số thuyết trình<span>Công bằng, có thể thêm ô trùng tên</span></div>
                                     <div class="ia-item">Tìm kiếm job</div>
                                 </div>

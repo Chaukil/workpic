@@ -50,7 +50,8 @@ let dayOffsList = [];            // toàn bộ lịch off (mọi user) từ thá
 let unsubscribeDayOffs = null;
 let dayOffSelected = new Set();  // các ngày (YYYY-MM-DD) MÌNH đang chọn off
 let dayOffFocusUid = null;       // đang xem riêng lịch của user nào
-let dayOffUsers = [];            // danh sách user hiển thị trong form
+let dayOffUsers = [];
+let notifyLeadMinutes = 0;      // nhắc job trước N phút (0 = đúng giờ)            // danh sách user hiển thị trong form
 let checkDueOldRows = null;
 let checkDueNewRows = null;
 let checkDueResultRows = [];
@@ -192,6 +193,11 @@ async function handleAuthenticatedUser(user) {
         currentUser.displayName = user.displayName || user.email?.split('@')[0] || 'User';
     }
     
+    const savedLead = userData && userData.notifyLeadMinutes !== undefined
+        ? userData.notifyLeadMinutes
+        : localStorage.getItem(`notifyLead_${user.uid}`);
+    notifyLeadMinutes = normalizeLeadMinutes(savedLead);
+    
     document.getElementById('authScreen').classList.add('d-none');
     updateUserProfileUI();
     initializeAuthenticatedApp();
@@ -248,6 +254,7 @@ function openUserProfileModal() {
     // Use displayName from Firestore
     const displayName = currentUser.displayName || currentUser.email?.split('@')[0] || '';
     document.getElementById('profileDisplayName').value = displayName;
+    document.getElementById('profileNotifyLead').value = String(notifyLeadMinutes);
     
     // Load avatar
     const savedAvatar = localStorage.getItem(`avatar_${currentUser.uid}`);
@@ -259,6 +266,28 @@ function openUserProfileModal() {
     }
     
     userProfileModal.show();
+}
+
+function normalizeLeadMinutes(value) {
+    const n = parseInt(value, 10);
+    return Number.isFinite(n) ? Math.min(Math.max(n, 0), 1440) : 0;
+}
+
+async function saveNotifyLead() {
+    if (!currentUser) return;
+    const minutes = normalizeLeadMinutes(document.getElementById('profileNotifyLead').value);
+    notifyLeadMinutes = minutes;
+    localStorage.setItem(`notifyLead_${currentUser.uid}`, String(minutes));
+    try {
+        const snapshot = await getDocs(query(collection(db, 'users'), where('uid', '==', currentUser.uid)));
+        if (!snapshot.empty) {
+            await updateDoc(doc(db, 'users', snapshot.docs[0].id), { notifyLeadMinutes: minutes, updatedAt: new Date().toISOString() });
+        }
+        showNotification('Đã lưu', minutes > 0 ? `Bạn sẽ được nhắc job trước ${minutes} phút.` : 'Bạn sẽ được nhắc đúng giờ job.', false, 'success');
+    } catch (error) {
+        console.error('Lỗi lưu thời gian nhắc:', error);
+        showNotification('Đã lưu trên máy này', 'Chưa đồng bộ được lên tài khoản, sẽ dùng cài đặt trên máy này.', false, 'warning');
+    }
 }
 
 async function saveUserProfile() {
@@ -485,6 +514,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     document.getElementById('userProfileBtn').addEventListener('click', openUserProfileModal);
     document.getElementById('saveProfileBtn').addEventListener('click', saveUserProfile);
+    document.getElementById('profileNotifyLead').addEventListener('change', saveNotifyLead);
     document.getElementById('changeAvatarBtn').addEventListener('click', () => {
         document.getElementById('avatarFileInput').click();
     });
@@ -1160,7 +1190,7 @@ function renderSchedule() {
     // Only include active (non-paused) jobs that belong to the fixed schedule
     const activeJobs = jobs.filter(job => job.isPaused !== true && job.isOutOfSchedule !== true);
 
-    // Map ngày -> [{ job, shiftedFrom }]. Job rơi vào ngày off của mình sẽ được dời sang ngày làm việc kế tiếp.
+    // Map ngày -> [{ job, shiftedFrom }]. Job rơi vào ngày off của mình sẽ được dời lên ngày làm việc liền trước.
     const rangeEnd = new Date(startDate);
     rangeEnd.setDate(rangeEnd.getDate() + (totalWeeks * 7) - 1);
     const jobsByDate = buildScheduleEntries(startDate, rangeEnd, activeJobs);
@@ -1269,7 +1299,7 @@ function renderSchedule() {
                             <i class="bi bi-clipboard-check"></i> ${job.title}
                         </h6>
                         <small><i class="bi bi-clock-fill"></i> ${job.time}</small>
-                        ${entry.shiftedFrom ? `<small class="shifted-tag" title="Job của ngày ${formatDateShortDMY(entry.shiftedFrom)} (bạn off) được dời sang"><i class="bi bi-arrow-return-right"></i> dời từ ${formatDateShortDMY(entry.shiftedFrom)}</small>` : ''}
+                        ${entry.shiftedFrom ? `<small class="shifted-tag" title="Job của ngày ${formatDateShortDMY(entry.shiftedFrom)} (bạn off) được dời lên trước"><i class="bi bi-arrow-return-left"></i> dời từ ${formatDateShortDMY(entry.shiftedFrom)}</small>` : ''}
                     `;
                     scheduleItem.addEventListener('click', () => openViewJobModal(job));
                     cell.appendChild(scheduleItem);
@@ -4048,39 +4078,37 @@ function showNotification(title, message, isSystemNotification = false, type = '
 // Check Notifications - WITH DESKTOP NOTIFICATIONS
 function checkNotifications() {
     const now = new Date();
-    const currentDate = localDateKey(now);
-    const currentTime = now.toTimeString().slice(0, 5);
-    
-    jobs.forEach(job => {
-        // Skip paused jobs
-        if (job.isPaused === true) {
-            return;
-        }
+    const lead = notifyLeadMinutes;
 
-        const isOutOfSchedule = job.isOutOfSchedule === true;
-        if (isOutOfSchedule) {
-            return;
-        }
-        
-        if (job.enableNotification !== false) {
-            const isDue = isJobScheduledOnDate(job, now) && job.time === currentTime;
-            
-            if (isDue) {
-                const notificationKey = `notified_${job.id}_${currentDate}_${currentTime}`;
-                if (!localStorage.getItem(notificationKey)) {
-                    // Show in-app notification
-                    showNotification(
-                        '🔔 Nhắc nhở Job',
-                        `Đã đến giờ thực hiện: ${job.title}`,
-                        true
-                    );
-                    
-                    // Show desktop notification
-                    showDesktopNotification(job);
-                    
-                    localStorage.setItem(notificationKey, 'true');
-                }
-            }
+    jobs.forEach(job => {
+        if (job.isPaused === true || job.isOutOfSchedule === true) return;
+        if (job.enableNotification === false || !job.time) return;
+
+        // Xét hôm nay và ngày mai (job 00:10 nhắc trước 30 phút sẽ rơi vào hôm trước)
+        for (let offset = 0; offset <= 1; offset++) {
+            const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
+            const [hh, mm] = String(job.time).split(':').map(Number);
+            if (!Number.isFinite(hh) || !Number.isFinite(mm)) continue;
+            const dueAt = new Date(day.getFullYear(), day.getMonth(), day.getDate(), hh, mm);
+            if (dueAt.getTime() < now.getTime() - 120000) continue;
+            if (!isJobScheduledOnDate(job, day)) continue;
+
+            const dateKey = localDateKey(day);
+            const slots = [{ at: dueAt, kind: 'due' }];
+            if (lead > 0) slots.push({ at: new Date(dueAt.getTime() - lead * 60000), kind: 'lead' });
+
+            slots.forEach(({ at, kind }) => {
+                const elapsed = now.getTime() - at.getTime();
+                if (elapsed < 0 || elapsed >= 120000) return;   // chỉ nhắc trong 2 phút kể từ mốc
+                const key = `notified_${job.id}_${dateKey}_${job.time}_${kind}${kind === 'lead' ? lead : ''}`;
+                if (localStorage.getItem(key)) return;
+                localStorage.setItem(key, 'true');
+                const message = kind === 'lead'
+                    ? `Còn ${lead} phút nữa (${job.time}): ${job.title}`
+                    : `Đã đến giờ thực hiện: ${job.title}`;
+                showNotification('🔔 Nhắc nhở Job', message, true);
+                showDesktopNotification(job);
+            });
         }
     });
 }
@@ -4655,12 +4683,12 @@ function getMyOffMap() {
     return map;
 }
 
-// Ngày làm việc kế tiếp (sau ngày off) — bỏ qua các ngày off liên tiếp và Chủ Nhật nếu job không làm Chủ Nhật
+// Ngày làm việc liền TRƯỚC ngày off — bỏ qua các ngày off liên tiếp và Chủ Nhật nếu job không làm Chủ Nhật
 function resolveShiftedDate(job, originDate, offMap) {
     const d = new Date(originDate);
     let guard = 0;
     do {
-        d.setDate(d.getDate() + 1);
+        d.setDate(d.getDate() - 1);
         guard++;
     } while (guard < 60 && (offMap[localDateKey(d)] || (d.getDay() === 0 && job.workOnSunday === false)));
     return d;
@@ -4672,19 +4700,25 @@ function buildScheduleEntries(rangeStart, rangeEnd, jobList) {
     const offMap = getMyOffMap();
     const startKey = localDateKey(rangeStart);
     const endKey = localDateKey(rangeEnd);
-    // Lùi thêm 14 ngày để bắt các job bị off trước khoảng hiển thị nhưng dời vào trong khoảng
+    // Job chỉ dời về phía trước đó nên phải quét thêm các ngày SAU khoảng hiển thị
+    // (VD: thứ 2 tuần sau off -> job dời về Chủ Nhật/Thứ 7 của tuần đang xem)
     const scanFrom = new Date(rangeStart);
-    scanFrom.setDate(scanFrom.getDate() - 14);
+    const scanTo = new Date(rangeEnd);
+    scanTo.setDate(scanTo.getDate() + 31);
 
     const map = {};
     jobList.forEach(job => {
-        getJobOccurrences(job, scanFrom, rangeEnd).forEach(date => {
+        const occurrences = getJobOccurrences(job, scanFrom, scanTo);
+        const nativeKeys = new Set(occurrences.map(localDateKey));
+        occurrences.forEach(date => {
             const originKey = localDateKey(date);
             let targetKey = originKey;
             let shiftedFrom = null;
             if (offMap[originKey]) {
                 targetKey = localDateKey(resolveShiftedDate(job, date, offMap));
                 shiftedFrom = originKey;
+                // Ngày đích đã có sẵn chính job này (VD job daily) thì không nhân đôi
+                if (nativeKeys.has(targetKey)) return;
             }
             if (targetKey < startKey || targetKey > endKey) return;
             (map[targetKey] = map[targetKey] || []).push({ job, shiftedFrom });
@@ -4925,6 +4959,9 @@ function handleDayOffDetailClick(event) {
             try {
                 await deleteDoc(doc(db, DAYOFF_COLLECTION, id));
                 dayOffSelected.delete(date);
+                dayOffsList = dayOffsList.filter(o => o.id !== id);
+                renderSchedule();
+                renderDayOffModal();
                 showNotification('Đã hủy', `Đã xóa lịch off ngày ${formatDateShortDMY(date)}.`, false, 'success');
             } catch (error) {
                 console.error('Lỗi xóa lịch off:', error);
@@ -4969,11 +5006,20 @@ async function saveDayOffs() {
         });
         await batch.commit();
 
+        // Cập nhật ngay danh sách local + vẽ lại lịch cố định (không chờ snapshot)
+        const removedIds = new Set(removed.map(k => saved[k].id));
+        dayOffsList = dayOffsList.filter(o => !removedIds.has(o.id)).concat(added.map(key => ({
+            id: `${currentUser.uid}_${key}`, userId: currentUser.uid,
+            userName: currentUser.displayName || currentUser.email || 'User', date: key, reason, createdAt: now
+        })));
+        renderSchedule();
+        renderDayOffModal();
+
         reasonInput.value = '';
         const parts = [];
         if (added.length) parts.push(`đăng ký ${added.length} ngày off`);
         if (removed.length) parts.push(`hủy ${removed.length} ngày off`);
-        showNotification('Đã lưu lịch off', `Bạn đã ${parts.join(' và ')}. Job trong ngày off sẽ được dời sang ngày làm việc kế tiếp.`, false, 'success');
+        showNotification('Đã lưu lịch off', `Bạn đã ${parts.join(' và ')}. Job trong ngày off đã được dời lên ngày làm việc liền trước.`, false, 'success');
     } catch (error) {
         console.error('Lỗi lưu lịch off:', error);
         showNotification('Lỗi', 'Không thể lưu lịch off. Vui lòng thử lại.', false, 'danger');
