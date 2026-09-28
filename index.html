@@ -88,14 +88,6 @@
                     <span class="legend-color monthly"></span>
                     <span>Monthly</span>
                 </div>
-                <div class="legend-item">
-                    <span class="legend-color quarterly"></span>
-                    <span>Quarterly</span>
-                </div>
-                <div class="legend-item">
-                    <span class="legend-color yearly"></span>
-                    <span>Yearly</span>
-                </div>
             </div>
             <div class="topbar-badges">
                 <div class="user-menu">
@@ -323,8 +315,6 @@
                                 <option value="weekly">Weekly (Hàng tuần)</option>
                                 <option value="biweekly">Biweekly (2 tuần/lần)</option>
                                 <option value="monthly">Monthly (Hàng tháng)</option>
-                                <option value="quarterly">Quarterly (Hàng quý)</option>
-                                <option value="yearly">Yearly (Hàng năm)</option>
                             </select>
                         </div>
                         <div class="col-md-4 mb-3">
@@ -771,45 +761,47 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
                 </div>
                 <div class="modal-body">
                     <div class="dayoff-layout">
-                        <aside class="dayoff-users-col">
-                            <div class="spin-users-title">
-                                <i class="bi bi-people-fill"></i> Thành viên
-                                <span class="spin-users-count" id="dayOffUsersCount">0</span>
-                            </div>
-                            <div class="spin-users-hint">Bấm tên để xem riêng lịch off của người đó. Lịch của người khác chỉ để xem.</div>
-                            <div class="dayoff-users-list" id="dayOffUsersList"></div>
-                        </aside>
+    <aside class="dayoff-users-col">
+        <div class="spin-users-title">
+            <i class="bi bi-people-fill"></i> Thành viên
+            <span class="spin-users-count" id="dayOffUsersCount">0</span>
+        </div>
+        <div class="spin-users-hint">Bấm tên để xem riêng lịch off của người đó. Lịch của người khác chỉ để xem.</div>
+        <div class="dayoff-users-list" id="dayOffUsersList"></div>
+    </aside>
 
-                        <section class="dayoff-main">
-                            <div class="dayoff-calendars" id="dayOffCalendars"></div>
+    <section class="dayoff-main">
+        <div class="dayoff-calendars" id="dayOffCalendars"></div>
 
-                            <div class="dayoff-form">
-                                <div class="dayoff-form-head"><i class="bi bi-pencil-square"></i> Đăng ký của tôi</div>
-                                <div class="dayoff-summary" id="dayOffSummary"></div>
-                                <div id="dayOffReasonWrap" class="d-none">
-                                    <label class="form-label fw-bold mt-2" for="dayOffReason">Lý do off *</label>
-                                    <input type="text" class="form-control" id="dayOffReason" maxlength="120" placeholder="VD: Nghỉ phép, việc cá nhân...">
-                                    <div class="dayoff-reason-presets" id="dayOffReasonPresets">
-                                        <button type="button" data-reason="Nghỉ phép">Nghỉ phép</button>
-                                        <button type="button" data-reason="Việc cá nhân">Việc cá nhân</button>
-                                        <button type="button" data-reason="Nghỉ ốm">Nghỉ ốm</button>
-                                        <button type="button" data-reason="Đi công tác">Đi công tác</button>
-                                    </div>
-                                </div>
-                                <div class="d-flex justify-content-end mt-3">
-                                    <button type="button" class="btn btn-save" id="saveDayOffBtn" disabled>
-                                        <i class="bi bi-check-circle-fill"></i> Lưu lịch off
-                                        <div class="btn-shine"></div>
-                                    </button>
-                                </div>
-                            </div>
+        <div class="dayoff-form">
+            <div class="dayoff-form-head"><i class="bi bi-pencil-square"></i> Đăng ký của tôi</div>
+            <div class="dayoff-summary" id="dayOffSummary"></div>
+            <div id="dayOffReasonWrap" class="d-none">
+                <label class="form-label fw-bold mt-2" for="dayOffReason">Lý do off *</label>
+                <input type="text" class="form-control" id="dayOffReason" maxlength="120" placeholder="VD: Nghỉ phép, việc cá nhân...">
+                <div class="dayoff-reason-presets" id="dayOffReasonPresets">
+                    <button type="button" data-reason="Nghỉ phép">Nghỉ phép</button>
+                    <button type="button" data-reason="Việc cá nhân">Việc cá nhân</button>
+                    <button type="button" data-reason="Nghỉ ốm">Nghỉ ốm</button>
+                    <button type="button" data-reason="Đi công tác">Đi công tác</button>
+                </div>
+            </div>
+            <div class="d-flex justify-content-end mt-3">
+                <button type="button" class="btn btn-save" id="saveDayOffBtn" disabled>
+                    <i class="bi bi-check-circle-fill"></i> Lưu lịch off
+                    <div class="btn-shine"></div>
+                </button>
+            </div>
+        </div>
+    </section>
 
-                            <div class="dayoff-detail">
-                                <div class="dayoff-form-head"><i class="bi bi-list-ul"></i> <span id="dayOffDetailTitle">Lịch off sắp tới của mọi người</span></div>
-                                <div class="dayoff-detail-list" id="dayOffDetailList"></div>
-                            </div>
-                        </section>
-                    </div>
+    <aside class="dayoff-detail-col">
+        <div class="dayoff-detail">
+            <div class="dayoff-form-head"><i class="bi bi-clock-history"></i> <span id="dayOffDetailTitle">Lịch off sắp tới của mọi người</span></div>
+            <div class="dayoff-detail-list" id="dayOffDetailList"></div>
+        </div>
+    </aside>
+</div>
                 </div>
             </div>
         </div>
@@ -980,7 +972,7 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
                                     <div><div class="ia-h1">Lịch làm việc</div><div class="ia-h2">Xem &amp; quản lý job định kỳ</div></div>
                                 </div>
                                 <div class="ia-col-body">
-                                    <div class="ia-item">Thêm / Sửa / Xóa Job<span>Daily · Weekly · Biweekly · Monthly · Quarterly · Yearly</span></div>
+                                    <div class="ia-item">Thêm / Sửa / Xóa Job<span>Daily · Weekly · Biweekly · Monthly</span></div>
                                     <div class="ia-item">Chuyển / Copy Job<span>Cần người nhận xác nhận</span></div>
                                     <div class="ia-item">Job ngoài lịch<span>Công việc phát sinh không cố định</span></div>
                                     <div class="ia-item">Check Due<span>So sánh dữ liệu 2 nguồn</span></div>

@@ -505,6 +505,9 @@ body.theme-dark #searchJob::placeholder { color: var(--muted); }
 /* ============================================================
    CHECK CHANGE DUE MODAL — Redesigned
    ============================================================ */
+img.dayoff-user-avatar { object-fit: cover; }
+img.dayoff-user-avatar.sm { object-fit: cover; }
+img.quick-chat-avatar { object-fit: cover; }
 
 #checkDueModal .modal-dialog {
     max-width: min(96vw, 1180px);
@@ -1207,8 +1210,6 @@ body.theme-dark .form-text { color: var(--muted) !important; }
 .job-type-label.weekly { background-color: var(--weekly-color); }
 .job-type-label.biweekly { background-color: var(--biweekly-color); }
 .job-type-label.monthly { background-color: var(--monthly-color); color: #422006; }
-.job-type-label.quarterly { background-color: var(--quarterly-color); }
-.job-type-label.yearly { background-color: var(--yearly-color); }
 
 .btn-save {
     background: linear-gradient(135deg, var(--success) 0%, #22c55e 100%);
@@ -1316,8 +1317,6 @@ body.theme-dark .job-item { background: #1f2937; }
 .job-item.weekly::before { background-color: var(--weekly-color); }
 .job-item.biweekly::before { background-color: var(--biweekly-color); }
 .job-item.monthly::before { background-color: var(--monthly-color); }
-.job-item.quarterly::before { background-color: var(--quarterly-color); }
-.job-item.yearly::before { background-color: var(--yearly-color); }
 
 .job-item:hover {
     background: linear-gradient(90deg, rgba(37, 99, 235, 0.08) 0%, rgba(255,255,255,0) 100%);
@@ -1397,8 +1396,6 @@ body.theme-dark .job-item { background: #1f2937; }
 .legend-color.weekly { background-color: var(--weekly-color); }
 .legend-color.biweekly { background-color: var(--biweekly-color); }
 .legend-color.monthly { background-color: var(--monthly-color); }
-.legend-color.quarterly { background-color: var(--quarterly-color); }
-.legend-color.yearly { background-color: var(--yearly-color); }
 
 .schedule-table {
     font-size: var(--fs-xs);
@@ -1461,8 +1458,6 @@ body.theme-dark .schedule-table td:hover { background-color: rgba(255, 255, 255,
 .schedule-item.weekly { background: linear-gradient(135deg, rgba(20, 184, 166, 0.9), rgba(45, 212, 191, 0.96)); }
 .schedule-item.biweekly { background: linear-gradient(135deg, rgba(59, 130, 246, 0.9), rgba(96, 165, 250, 0.96)); }
 .schedule-item.monthly { background: linear-gradient(135deg, rgba(245, 158, 11, 0.9), rgba(250, 204, 21, 0.96)); }
-.schedule-item.quarterly { background: linear-gradient(135deg, rgba(139, 92, 246, 0.9), rgba(168, 85, 247, 0.96)); }
-.schedule-item.yearly { background: linear-gradient(135deg, rgba(236, 72, 153, 0.9), rgba(244, 114, 182, 0.96)); }
 
 .schedule-item:hover {
     transform: translateY(-1px);
@@ -4167,10 +4162,25 @@ body.theme-dark .theme-toggle:hover {
 .layout-item-ic-dayoff { background: linear-gradient(135deg, #f97316, #ef4444); color: #fff; }
 .modal-header.modern-header-dayoff { background: linear-gradient(135deg, #f97316 0%, #ef4444 55%, #be185d 100%); }
 
-.dayoff-layout { display: grid; grid-template-columns: 240px 1fr; gap: 1.25rem; align-items: start; }
-@media (max-width: 992px) { .dayoff-layout { grid-template-columns: 1fr; } }
+.dayoff-layout {
+    display: grid;
+    grid-template-columns: 220px 1fr 320px;
+    gap: 1rem;
+    align-items: start;
+}
 
-.dayoff-users-col { background: var(--surface-muted); border: 1px solid var(--border); border-radius: 14px; padding: 0.85rem; position: sticky; top: 0; }
+.dayoff-users-col {
+    background: var(--surface-muted);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 0.85rem;
+    position: sticky;
+    top: 0;
+    align-self: start;
+    max-height: calc(100vh - 200px);
+    display: flex;
+    flex-direction: column;
+}
 .dayoff-users-list { display: flex; flex-direction: column; gap: 0.4rem; max-height: 60vh; overflow-y: auto; }
 .dayoff-user-row {
     display: flex; align-items: center; gap: 0.55rem; width: 100%; text-align: left; cursor: pointer;
@@ -4243,6 +4253,27 @@ body.theme-dark .theme-toggle:hover {
 .dayoff-detail-del { flex: none; border: none; background: transparent; color: var(--danger); cursor: pointer; padding: 0.1rem 0.3rem; border-radius: 6px; }
 .dayoff-detail-del:hover { background: rgba(239, 68, 68, .12); }
 
+.dayoff-main { min-width: 0; }
+
+.dayoff-detail-col { min-width: 0; }
+
+.dayoff-detail-col .dayoff-detail {
+    margin-top: 0;
+    position: sticky;
+    top: 0;
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+}
+
+@media (max-width: 1200px) {
+    .dayoff-layout { grid-template-columns: 200px 1fr; }
+    .dayoff-detail-col { grid-column: 1 / -1; }
+    .dayoff-detail-col .dayoff-detail { position: static; max-height: none; }
+}
+@media (max-width: 992px) {
+    .dayoff-layout { grid-template-columns: 1fr; }
+}
+
 /* ---- Lịch cố định: ngày off + job dời ---- */
 .schedule-table td.day-off-cell {
     background: repeating-linear-gradient(135deg, rgba(239, 68, 68, .06) 0 8px, rgba(239, 68, 68, .12) 8px 16px);
@@ -4254,12 +4285,208 @@ body.theme-dark .theme-toggle:hover {
 .day-off-note { font-size: .68rem; font-weight: 600; color: #b91c1c; margin-bottom: 0.35rem; }
 body.theme-dark .day-off-note { color: #fca5a5; }
 
-/* Job dời từ ngày off: màu xám, luôn nằm cuối ngày */
+/* Job dời từ ngày off (do off) và job dời ngày thủ công: MÀU HỒNG */
 .schedule-item.shifted,
 .schedule-item.shifted.daily, .schedule-item.shifted.weekly, .schedule-item.shifted.biweekly,
-.schedule-item.shifted.monthly, .schedule-item.shifted.quarterly, .schedule-item.shifted.yearly, .schedule-item.shifted.once {
-    background: linear-gradient(135deg, rgba(100, 116, 139, .95), rgba(148, 163, 184, .95)) !important;
-    border: 1px dashed rgba(255, 255, 255, .55);
+.schedule-item.shifted.monthly, .schedule-item.shifted.once,
+.schedule-item.moved,
+.schedule-item.moved.daily, .schedule-item.moved.weekly, .schedule-item.moved.biweekly,
+.schedule-item.moved.monthly, .schedule-item.moved.once {
+    background: linear-gradient(135deg, rgba(236, 72, 153, .95), rgba(244, 114, 182, .95)) !important;
+    border: 1px dashed rgba(255, 255, 255, .65);
 }
-.schedule-item.shifted h6, .schedule-item.shifted small { color: #fff; }
-.schedule-item.shifted .shifted-tag { display: block; margin-top: 1px; font-size: .6rem; opacity: .95; font-style: italic; }
+.schedule-item.shifted h6, .schedule-item.shifted small,
+.schedule-item.moved h6, .schedule-item.moved small { color: #fff; }
+.schedule-item .shifted-tag { display: block; margin-top: 1px; font-size: .6rem; opacity: .95; font-style: italic; }
+
+/* Job thuyết trình: MÀU TÍM */
+.schedule-item.presenter,
+.schedule-item.presenter.once {
+    background: linear-gradient(135deg, rgba(139, 92, 246, .95), rgba(168, 85, 247, .95)) !important;
+}
+.schedule-item.presenter h6, .schedule-item.presenter small { color: #fff; }
+
+/* Ghi chú nhanh + giờ override trong schedule item */
+.schedule-item .schedule-time-override {
+    display: block;
+    font-weight: 700;
+    color: #fff;
+}
+.schedule-item .schedule-note {
+    display: block;
+    margin-top: 2px;
+    padding: 1px 5px;
+    font-size: .62rem;
+    background: rgba(255, 255, 255, .28);
+    border-radius: 5px;
+    color: #fff;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.schedule-item .schedule-time-override em { font-style: italic; opacity: .85; font-weight: 500; }
+
+/* --- Nút Tùy chỉnh kế giờ thực hiện trong schedule item --- */
+.schedule-item .schedule-time-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    margin-top: 1px;
+}
+.schedule-item .schedule-time-line small {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    color: rgba(255,255,255,0.95);
+    font-size: var(--fs-3xs);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+.schedule-item .schedule-override-btn {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 1px solid rgba(255,255,255,0.55);
+    border-radius: 6px;
+    background: rgba(255,255,255,0.22);
+    color: #fff;
+    font-size: .68rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background .15s ease, transform .15s ease;
+    backdrop-filter: blur(4px);
+}
+.schedule-item .schedule-override-btn:hover {
+    background: rgba(255,255,255,0.42);
+    transform: scale(1.08);
+}
+.schedule-item .schedule-override-btn.has-override {
+    background: #fff;
+    color: #ec4899;
+    border-color: #fff;
+    box-shadow: 0 0 0 2px rgba(236,72,153,.35);
+}
+
+/* Nút tùy chỉnh cũng dùng cho dark theme */
+body.theme-dark .schedule-item .schedule-override-btn {
+    background: rgba(255,255,255,0.28);
+}
+
+/* Popover tùy chỉnh ngày (thay cho modal) */
+.day-override-popover {
+    position: absolute;
+    z-index: 2000;
+    width: 320px;
+    max-width: calc(100vw - 24px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: 0 18px 42px rgba(15,23,42,.22);
+    padding: 1rem;
+    animation: slideDown .18s ease;
+}
+body.theme-dark .day-override-popover {
+    background: #111827;
+    border-color: #2c3a4d;
+}
+.day-override-popover .pop-title {
+    display: flex; align-items: center; gap: .5rem;
+    font-weight: 700; color: var(--text); margin-bottom: .6rem;
+}
+.day-override-popover .pop-job-name {
+    font-size: .78rem; color: var(--muted);
+    background: var(--surface-muted);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: .4rem .55rem;
+    margin-bottom: .75rem;
+    word-break: break-word;
+}
+.day-override-popover .form-label { font-size: .76rem; margin-bottom: .25rem; }
+.day-override-popover .form-control { font-size: .8rem; padding: .35rem .55rem; }
+.day-override-popover .pop-actions {
+    display: flex; gap: .5rem; margin-top: .85rem;
+}
+.day-override-popover .pop-actions .btn { font-size: .76rem; padding: .4rem .8rem; }
+
+/* ============================================================
+   LỊCH OFF — phóng to để dễ nhìn
+   ============================================================ */
+
+/* 1) Modal rộng hơn modal-xl mặc định */
+#dayOffModal .modal-dialog {
+    max-width: min(98vw, 1500px);
+}
+
+/* 2) Layout: cột trái & cột phải hẹp lại, cột giữa (lịch) rộng ra */
+#dayOffModal .dayoff-layout {
+    grid-template-columns: 190px minmax(0, 1fr) 280px;
+    gap: 0.75rem;
+}
+
+/* 3) Ô ngày to hơn, chữ rõ hơn */
+#dayOffModal .dayoff-grid {
+    gap: 6px;
+}
+#dayOffModal .dayoff-day {
+    min-height: 78px;          /* 56px → 78px */
+    padding: 6px 6px 5px;
+    border-radius: 10px;
+}
+#dayOffModal .dayoff-day-num {
+    font-size: 0.95rem;        /* 0.72rem → 0.95rem */
+    line-height: 1.1;
+}
+#dayOffModal .dayoff-dow {
+    font-size: 0.78rem;
+    padding-bottom: 4px;
+}
+#dayOffModal .dayoff-month-title {
+    font-size: 1rem;
+    margin-bottom: 0.65rem;
+}
+
+/* 4) Chip avatar trong ô ngày to hơn chút cho dễ thấy */
+#dayOffModal .dayoff-chip {
+    width: 20px;
+    height: 20px;
+    font-size: 0.68rem;
+}
+#dayOffModal .dayoff-chip.more {
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+}
+
+/* 5) Màn hình nhỏ: về lại 2 cột và 1 cột */
+@media (max-width: 1200px) {
+    #dayOffModal .dayoff-layout {
+        grid-template-columns: 180px minmax(0, 1fr);
+    }
+}
+@media (max-width: 992px) {
+    #dayOffModal .dayoff-layout {
+        grid-template-columns: 1fr;
+    }
+    #dayOffModal .dayoff-day {
+        min-height: 68px;
+    }
+}
+@media (max-width: 576px) {
+    #dayOffModal .dayoff-day {
+        min-height: 60px;
+        padding: 4px;
+    }
+    #dayOffModal .dayoff-day-num {
+        font-size: 0.82rem;
+    }
+    #dayOffModal .dayoff-chip {
+        width: 16px;
+        height: 16px;
+        font-size: 0.6rem;
+    }
+}

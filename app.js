@@ -1,6 +1,6 @@
 // Firebase Configuration - Chỉ sử dụng Firestore
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, getDocs, onSnapshot, enableIndexedDbPersistence, query, where, writeBatch, arrayUnion, arrayRemove } 
+import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, getDocs, onSnapshot, enableIndexedDbPersistence, query, where, writeBatch, arrayUnion, arrayRemove } 
     from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } 
     from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -55,6 +55,19 @@ let notifyLeadMinutes = 0;      // nhắc job trước N phút (0 = đúng giờ
 let checkDueOldRows = null;
 let checkDueNewRows = null;
 let checkDueResultRows = [];
+
+// Job Day Overrides — đổi giờ / dời ngày / note nhanh cho 1 ngày cụ thể
+let jobDayOverridesList = [];
+let unsubscribeJobDayOverrides = null;
+
+// Popover tùy chỉnh ngày (chỉ khai báo 1 lần duy nhất)
+let dayOverridePopoverEl = null;
+let currentOverrideJob = null;    // { job, occurrenceDate }
+
+// Avatar realtime: cache avatar mọi user từ Firestore
+let usersAvatarCache = null;      // { uid: dataUrl }
+let unsubscribeUsersAvatar = null; // listener realtime để thấy avatar mới của người khác
+
 let userProfileModal;
 let transferConfirmModal;
 let pendingTransferJob = null;
@@ -188,9 +201,11 @@ async function handleAuthenticatedUser(user) {
     if (userData && userData.displayName) {
         // Store displayName in currentUser for easy access
         currentUser.displayName = userData.displayName;
+        currentUser.avatar = userData.avatar || null;
     } else {
         // Fallback to email-derived name or auth displayName
         currentUser.displayName = user.displayName || user.email?.split('@')[0] || 'User';
+        currentUser.avatar = null;
     }
     
     const savedLead = userData && userData.notifyLeadMinutes !== undefined
@@ -228,44 +243,54 @@ async function getUserData(uid) {
 
 function updateUserProfileUI() {
     if (!currentUser) return;
-    
-    // Use displayName from Firestore (already fetched in handleAuthenticatedUser)
     const displayName = currentUser.displayName || currentUser.email?.split('@')[0] || 'User';
-    
     document.getElementById('userDisplayName').textContent = displayName;
-    
-    // Load avatar từ localStorage
-    const savedAvatar = localStorage.getItem(`avatar_${currentUser.uid}`);
-    const avatarImg = document.getElementById('userAvatar');
-    if (savedAvatar) {
-        avatarImg.src = savedAvatar;
-    } else {
-        // Avatar mặc định
-        avatarImg.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=3b82f6&color=fff&size=28`;
-    }
+
+    // Ưu tiên avatar từ Firestore (đồng bộ mọi thiết bị), fallback default
+    const avatarSrc = currentUser.avatar
+        || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=3b82f6&color=fff&size=28`;
+    document.getElementById('userAvatar').src = avatarSrc;
 }
 
 function openUserProfileModal() {
     if (!currentUser) return;
-    
     document.getElementById('profileEmail').textContent = currentUser.email || '---';
     document.getElementById('profileUid').textContent = currentUser.uid || '---';
-    
-    // Use displayName from Firestore
+
     const displayName = currentUser.displayName || currentUser.email?.split('@')[0] || '';
     document.getElementById('profileDisplayName').value = displayName;
     document.getElementById('profileNotifyLead').value = String(notifyLeadMinutes);
-    
-    // Load avatar
-    const savedAvatar = localStorage.getItem(`avatar_${currentUser.uid}`);
-    const avatarImg = document.getElementById('profileAvatar');
-    if (savedAvatar) {
-        avatarImg.src = savedAvatar;
-    } else {
-        avatarImg.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=3b82f6&color=fff&size=120`;
-    }
-    
+
+    const avatarSrc = currentUser.avatar
+        || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=3b82f6&color=fff&size=120`;
+    document.getElementById('profileAvatar').src = avatarSrc;
+
     userProfileModal.show();
+}
+
+function resizeImageToDataUrl(file, maxSize = 200, quality = 0.8) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('Không đọc được file ảnh'));
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onerror = () => reject(new Error('Ảnh không hợp lệ'));
+            img.onload = () => {
+                let w = img.width, h = img.height;
+                if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
+                else { w = Math.round(w * maxSize / h); h = maxSize; }
+                const canvas = document.createElement('canvas');
+                canvas.width = w; canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, w, h);
+                try {
+                    resolve(canvas.toDataURL('image/jpeg', quality));
+                } catch (err) { reject(err); }
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
 }
 
 function normalizeLeadMinutes(value) {
@@ -326,22 +351,39 @@ async function saveUserProfile() {
 
 
 // Thêm function đổi avatar
-function changeAvatar(file) {
-    if (!file) return;
-    
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const avatarData = e.target.result;
-        // Lưu vào localStorage
-        localStorage.setItem(`avatar_${currentUser.uid}`, avatarData);
-        
-        // Cập nhật UI
-        document.getElementById('userAvatar').src = avatarData;
-        document.getElementById('profileAvatar').src = avatarData;
-        
-        showNotification('Thành công', 'Đã cập nhật ảnh đại diện!', false, 'success');
-    };
-    reader.readAsDataURL(file);
+async function changeAvatar(file) {
+    if (!file || !currentUser) return;
+    try {
+        // Resize nhỏ (~15-30KB) để không vượt giới hạn 1MB của Firestore document
+        const dataUrl = await resizeImageToDataUrl(file, 200, 0.8);
+
+        // Lưu vào Firestore (mọi thiết bị / người khác đều thấy khi realtime sync)
+        const snapshot = await getDocs(query(collection(db, 'users'), where('uid', '==', currentUser.uid)));
+        if (!snapshot.empty) {
+            await updateDoc(doc(db, 'users', snapshot.docs[0].id), {
+                avatar: dataUrl,
+                updatedAt: new Date().toISOString()
+            });
+        }
+
+        currentUser.avatar = dataUrl;
+        if (usersAvatarCache) usersAvatarCache[currentUser.uid] = dataUrl;
+
+        document.getElementById('userAvatar').src = dataUrl;
+        document.getElementById('profileAvatar').src = dataUrl;
+
+        // Đồng bộ UI phụ thuộc avatar (spin, dayoff, quickchat...) nếu đang mở
+        if (typeof renderSpinUsersList === 'function' && document.getElementById('spinUsersList')) {
+            // chỉ vẽ lại nếu modal đang có dữ liệu
+            if (spinCandidates && spinCandidates.length) renderSpinUsersList();
+        }
+        if (typeof renderDayOffModal === 'function' && dayOffModalOpen) renderDayOffModal();
+
+        showNotification('Thành công', 'Đã cập nhật ảnh đại diện (đồng bộ mọi thiết bị)!', false, 'success');
+    } catch (error) {
+        console.error('Lỗi cập nhật avatar:', error);
+        showNotification('Lỗi', 'Không thể cập nhật ảnh đại diện. Ảnh quá lớn hoặc không hợp lệ.', false, 'danger');
+    }
 }
 
 function handleSignedOut() {
@@ -368,6 +410,19 @@ function handleSignedOut() {
     }
     dayOffsList = [];
     dayOffSelected = new Set();
+    if (unsubscribeJobDayOverrides) {
+        unsubscribeJobDayOverrides();
+        unsubscribeJobDayOverrides = null;
+    }
+    jobDayOverridesList = [];
+    currentOverrideJob = null;
+
+    if (unsubscribeUsersAvatar) {
+        unsubscribeUsersAvatar();
+        unsubscribeUsersAvatar = null;
+    }
+    usersAvatarCache = null;
+
     jobs = [];
     filteredJobs = [];
     notificationsList = [];
@@ -405,6 +460,8 @@ function initializeAuthenticatedApp() {
         listenQuickJobs();
         listenQuickJobTransferRequests();
         listenDayOffs();
+        listenJobDayOverrides();
+        listenUsersAvatars();
     });
 }
 
@@ -433,6 +490,7 @@ document.addEventListener('DOMContentLoaded', function() {
     checkDueModal = new bootstrap.Modal(document.getElementById('checkDueModal'));
     presenterSpinModal = new bootstrap.Modal(document.getElementById('presenterSpinModal'));
     dayOffModal = new bootstrap.Modal(document.getElementById('dayOffModal'));
+
     document.getElementById('dayOffModal').addEventListener('hidden.bs.modal', () => { dayOffModalOpen = false; });
     transferConfirmModal = new bootstrap.Modal(document.getElementById('transferConfirmModal'));
     quickJobInviteModal = new bootstrap.Modal(document.getElementById('quickJobInviteModal'), {
@@ -812,8 +870,6 @@ async function exportToPDF() {
             weekly: [78, 205, 196],
             biweekly: [69, 183, 209],
             monthly: [247, 183, 49],
-            quarterly: [95, 39, 205],
-            yearly: [236, 72, 153]
         };
 
         activeJobs.forEach((job, index) => {
@@ -856,8 +912,6 @@ async function exportToPDF() {
                 weekly: 'Weekly',
                 biweekly: 'Biweekly',
                 monthly: 'Monthly',
-                quarterly: 'Quarterly',
-                yearly: 'Yearly'
             };
             const typeLabel = typeLabels[job.type] || job.type;
             const badgeWidth = pdf.getTextWidth(typeLabel) + 6;
@@ -1058,12 +1112,6 @@ function getJobOccurrences(job, startDate, endDate) {
             case 'monthly':
                 currentDate.setMonth(currentDate.getMonth() + 1);
                 break;
-            case 'quarterly':
-                currentDate.setMonth(currentDate.getMonth() + 3);
-                break;
-            case 'yearly':
-                currentDate.setFullYear(currentDate.getFullYear() + 1);
-                break;
             default:
                 return occurrences;
         }
@@ -1083,6 +1131,7 @@ function renderJobList() {
     }
     
     filteredJobs.forEach(job => {
+        if (job.type === 'once') return;
         const jobItem = document.createElement('div');
         jobItem.className = `job-item ${job.type}${job.isPaused ? ' paused' : ''}`;
         jobItem.innerHTML = `
@@ -1264,46 +1313,82 @@ function renderSchedule() {
                 cell.appendChild(emptyMsg);
             } else {
                 dayJobs.forEach(entry => {
-                    const job = entry.job;
-                    // Determine if job is past, today, or future
-                    let timeClass = 'future'; // Default
-                    
-                    // Compare dates
-                    if (cellDate < todayDate) {
-                        // Ngày đã qua
-                        timeClass = 'past';
-                    } else if (cellDate.getTime() === todayDate.getTime()) {
-                        // Hôm nay - kiểm tra giờ
-                        const [jobHours, jobMinutes] = job.time.split(':').map(Number);
-                        
-                        // So sánh giờ
-                        if (jobHours < currentHours) {
-                            // Giờ đã qua
-                            timeClass = 'past';
-                        } else if (jobHours === currentHours && jobMinutes < currentMinutes) {
-                            // Cùng giờ nhưng phút đã qua
-                            timeClass = 'past';
-                        } else {
-                            // Giờ chưa đến
-                            timeClass = 'today';
-                        }
-                    } else {
-                        // Ngày tương lai
-                        timeClass = 'future';
-                    }
-                    
-                    const scheduleItem = document.createElement('div');
-                    scheduleItem.className = `schedule-item ${job.type} ${timeClass}${entry.shiftedFrom ? ' shifted' : ''}`;
-                    scheduleItem.innerHTML = `
-                        <h6 title="${job.title}">
-                            <i class="bi bi-clipboard-check"></i> ${job.title}
-                        </h6>
-                        <small><i class="bi bi-clock-fill"></i> ${job.time}</small>
-                        ${entry.shiftedFrom ? `<small class="shifted-tag" title="Job của ngày ${formatDateShortDMY(entry.shiftedFrom)} (bạn off) được dời lên trước"><i class="bi bi-arrow-return-left"></i> dời từ ${formatDateShortDMY(entry.shiftedFrom)}</small>` : ''}
-                    `;
-                    scheduleItem.addEventListener('click', () => openViewJobModal(job));
-                    cell.appendChild(scheduleItem);
-                });
+    const job = entry.job;
+    let timeClass = 'future';
+
+    if (cellDate < todayDate) {
+        timeClass = 'past';
+    } else if (cellDate.getTime() === todayDate.getTime()) {
+        const [jobHours, jobMinutes] = String(entry.overrideTime || job.time).split(':').map(Number);
+        if (jobHours < currentHours ||
+            (jobHours === currentHours && jobMinutes < currentMinutes)) {
+            timeClass = 'past';
+        } else {
+            timeClass = 'today';
+        }
+    } else {
+        timeClass = 'future';
+    }
+
+    const displayTime = entry.overrideTime || job.time;
+    const isShifted = !!entry.shiftedFrom;
+    const isMoved = !!entry.movedFrom;
+    const isPresenter = job.isPresenterJob === true;
+    const hasOverride = !!(entry.overrideTime || entry.note || entry.movedFrom);
+
+    const extraClasses = [];
+    if (isShifted || isMoved) extraClasses.push('shifted');
+    if (isPresenter) extraClasses.push('presenter');
+
+    const scheduleItem = document.createElement('div');
+    scheduleItem.className = `schedule-item ${job.type} ${timeClass} ${extraClasses.join(' ')}`.trim();
+
+    const timeHtml = entry.overrideTime
+        ? `<small class="schedule-time-override"><i class="bi bi-clock-fill"></i> ${displayTime} <em>(đổi)</em></small>`
+        : `<small><i class="bi bi-clock-fill"></i> ${displayTime}</small>`;
+
+    let originTagHtml = '';
+    if (isShifted) {
+        originTagHtml = `<small class="shifted-tag" title="Job của ngày ${formatDateShortDMY(entry.shiftedFrom)} (bạn off) được dời lên trước"><i class="bi bi-arrow-return-left"></i> dời từ ${formatDateShortDMY(entry.shiftedFrom)}</small>`;
+    } else if (isMoved) {
+        originTagHtml = `<small class="shifted-tag" title="Job được dời từ ngày ${formatDateShortDMY(entry.movedFrom)}"><i class="bi bi-arrow-right"></i> dời từ ${formatDateShortDMY(entry.movedFrom)}</small>`;
+    }
+
+    const noteHtml = entry.note
+        ? `<span class="schedule-note" title="${escapeHtml(entry.note)}"><i class="bi bi-sticky-fill"></i> ${escapeHtml(entry.note.length > 40 ? entry.note.substring(0, 40) + '…' : entry.note)}</span>`
+        : '';
+
+    scheduleItem.innerHTML = `
+        <h6 title="${job.title}">
+            <i class="bi bi-clipboard-check"></i> ${job.title}
+        </h6>
+        <div class="schedule-time-line">
+            ${timeHtml}
+            <button type="button" class="schedule-override-btn ${hasOverride ? 'has-override' : ''}"
+                title="Tùy chỉnh ngày này (đổi giờ / dời ngày / ghi chú)"
+                data-job-id="${job.id}"
+                data-origin-date="${entry.originDate}">
+                <i class="bi bi-sliders"></i>
+            </button>
+        </div>
+        ${originTagHtml}
+        ${noteHtml}
+    `;
+
+    // Click vào nội dung item → mở xem job đầy đủ (không mở override nữa)
+    scheduleItem.addEventListener('click', (e) => {
+        if (e.target.closest('.schedule-override-btn')) return;
+        openViewJobModal(job);
+    });
+
+    // Nút tùy chỉnh kế giờ → mở popover
+    scheduleItem.querySelector('.schedule-override-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        openDayOverridePopover(job, entry.originDate, e.currentTarget);
+    });
+
+    cell.appendChild(scheduleItem);
+});
             }
             
             row.appendChild(cell);
@@ -1312,6 +1397,143 @@ function renderSchedule() {
         scheduleBody.appendChild(row);
     }
 }
+
+// ============================================================
+// DAY OVERRIDE POPOVER — đổi giờ / dời ngày / note nhanh cho 1 ngày
+// ============================================================
+
+function closeDayOverridePopover() {
+    if (dayOverridePopoverEl) {
+        dayOverridePopoverEl.remove();
+        dayOverridePopoverEl = null;
+    }
+    currentOverrideJob = null;
+}
+
+function openDayOverridePopover(job, occurrenceDate, anchorEl) {
+    closeDayOverridePopover();
+    currentOverrideJob = { job, occurrenceDate };
+
+    const existing = getOverrideFor(job.id, occurrenceDate);
+    const pop = document.createElement('div');
+    pop.className = 'day-override-popover';
+    pop.innerHTML = `
+        <div class="pop-title">
+            <i class="bi bi-sliders text-primary"></i> Tùy chỉnh ngày này
+        </div>
+        <div class="pop-job-name">
+            <strong>${escapeHtml(job.title)}</strong><br>
+            <span class="text-muted">Ngày ${formatDateShortDMY(occurrenceDate)} · Giờ gốc ${escapeHtml(job.time || '—')}</span>
+        </div>
+
+        <label class="form-label fw-bold" for="dopTime"><i class="bi bi-clock-fill"></i> Đổi giờ (chỉ ngày này)</label>
+        <input type="time" class="form-control mb-2" id="dopTime" value="${existing?.overrideTime || ''}">
+
+        <label class="form-label fw-bold" for="dopDate"><i class="bi bi-calendar-event-fill"></i> Dời sang ngày khác (chỉ lần này)</label>
+        <input type="date" class="form-control mb-2" id="dopDate" value="${existing?.overrideDate || ''}">
+
+        <label class="form-label fw-bold" for="dopNote"><i class="bi bi-sticky-fill text-warning"></i> Ghi chú nhanh</label>
+        <textarea class="form-control" id="dopNote" rows="2" maxlength="300" placeholder="VD: Chuyển ca chiều...">${escapeHtml(existing?.note || '')}</textarea>
+
+        <div class="pop-actions">
+            ${existing ? `<button type="button" class="btn btn-delete" id="dopDelete"><i class="bi bi-trash-fill"></i> Xóa</button>` : ''}
+            <button type="button" class="btn btn-cancel ms-auto" id="dopCancel">Hủy</button>
+            <button type="button" class="btn btn-save" id="dopSave"><i class="bi bi-check-circle-fill"></i> Lưu</button>
+        </div>
+    `;
+
+    // Đặt popover cạnh nút, tính toán để không tràn màn hình
+    document.body.appendChild(pop);
+    const rect = anchorEl.getBoundingClientRect();
+    const popRect = pop.getBoundingClientRect();
+    let left = rect.right + 8;
+    let top = rect.top;
+    if (left + popRect.width > window.innerWidth - 8) left = rect.left - popRect.width - 8;
+    if (left < 8) left = 8;
+    if (top + popRect.height > window.innerHeight - 8) top = window.innerHeight - popRect.height - 8;
+    if (top < 8) top = 8;
+    pop.style.left = left + 'px';
+    pop.style.top = top + 'px';
+    pop.style.position = 'fixed';
+
+    dayOverridePopoverEl = pop;
+
+    pop.querySelector('#dopCancel').addEventListener('click', closeDayOverridePopover);
+    pop.querySelector('#dopSave').addEventListener('click', saveDayOverrideFromPopover);
+    const delBtn = pop.querySelector('#dopDelete');
+    if (delBtn) delBtn.addEventListener('click', deleteDayOverrideFromPopover);
+
+    // Click ngoài popover → đóng
+    setTimeout(() => {
+        document.addEventListener('click', _outsideClickClosePopover, { capture: true });
+    }, 0);
+}
+
+function _outsideClickClosePopover(e) {
+    if (!dayOverridePopoverEl) return;
+    if (dayOverridePopoverEl.contains(e.target)) return;
+    if (e.target.closest('.schedule-override-btn')) return;
+    closeDayOverridePopover();
+    document.removeEventListener('click', _outsideClickClosePopover, { capture: true });
+}
+
+async function saveDayOverrideFromPopover() {
+    if (!currentOverrideJob || !currentUser) return;
+    const { job, occurrenceDate } = currentOverrideJob;
+    const overrideTime = document.getElementById('dopTime').value.trim() || null;
+    const overrideDate = document.getElementById('dopDate').value.trim() || null;
+    const note = document.getElementById('dopNote').value.trim() || null;
+
+    const btn = document.getElementById('dopSave');
+    const originalHTML = btn.innerHTML;
+    btn.innerHTML = '<span class="loading"></span>';
+    btn.disabled = true;
+
+    try {
+        const docId = `${currentUser.uid}_${job.id}_${occurrenceDate}`;
+
+        if (!overrideTime && !overrideDate && !note) {
+            await deleteDoc(doc(db, 'jobDayOverrides', docId));
+        } else {
+            await setDoc(doc(db, 'jobDayOverrides', docId), {
+                userId: currentUser.uid,
+                jobId: job.id,
+                occurrenceDate,
+                overrideTime,
+                overrideDate,
+                note,
+                updatedAt: new Date().toISOString()
+            });
+        }
+
+        closeDayOverridePopover();
+        showNotification('Đã lưu', 'Tùy chỉnh chỉ áp dụng cho ngày này.', false, 'success');
+    } catch (error) {
+        console.error('Lỗi lưu tùy chỉnh ngày:', error);
+        showNotification('Lỗi', 'Không thể lưu tùy chỉnh. Vui lòng thử lại.', false, 'danger');
+    } finally {
+        btn.innerHTML = originalHTML;
+        btn.disabled = false;
+    }
+}
+
+async function deleteDayOverrideFromPopover() {
+    if (!currentOverrideJob || !currentUser) return;
+    const { job, occurrenceDate } = currentOverrideJob;
+    const docId = `${currentUser.uid}_${job.id}_${occurrenceDate}`;
+    try {
+        await deleteDoc(doc(db, 'jobDayOverrides', docId));
+        closeDayOverridePopover();
+        showNotification('Đã xóa tùy chỉnh', 'Job đã trở về lịch cố định của ngày đó.', false, 'success');
+    } catch (error) {
+        console.error('Lỗi xóa tùy chỉnh:', error);
+        showNotification('Lỗi', 'Không thể xóa tùy chỉnh.', false, 'danger');
+    }
+}
+
+// Đóng popover khi resize / scroll (tránh lệch vị trí)
+window.addEventListener('resize', closeDayOverridePopover);
+window.addEventListener('scroll', closeDayOverridePopover, true);
 
 function updateTransferMode() {
     const modeTransfer = document.getElementById('transferModeTransfer');
@@ -2621,8 +2843,6 @@ function getTypeBadgeColor(type) {
         weekly: 'info',
         biweekly: 'primary',
         monthly: 'warning',
-        quarterly: 'secondary',
-        yearly: 'pink',
         custom: 'warning'
     };
     return colors[type] || 'secondary';
@@ -2634,8 +2854,6 @@ function getTypeLabel(type) {
         weekly: 'Weekly',
         biweekly: 'Biweekly',
         monthly: 'Monthly',
-        quarterly: 'Quarterly',
-        yearly: 'Yearly',
         custom: 'Ngoài lịch'
     };
     return labels[type] || type;
@@ -3280,7 +3498,9 @@ function renderQuickJobBubble(job) {
     return `
         <div class="quick-chat-bubble ${isOwn ? 'own' : ''} status-${status} ${isOverdue ? 'overdue' : ''} ${deadlinePassed ? 'deadline-passed' : ''}" data-job-id="${job.id}">
             <div class="quick-chat-bubble-head">
-                <div class="quick-chat-avatar">${getInitials(job.createdByName)}</div>
+                 ${getUserAvatarUrl(job.createdBy)
+                    ? `<img class="quick-chat-avatar" src="${getUserAvatarUrl(job.createdBy)}" alt="">`
+                    : `<div class="quick-chat-avatar">${getInitials(job.createdByName)}</div>`}
                 <span class="quick-chat-author">${escapeHtml(job.createdByName || 'Ẩn danh')}</span>
                 <span class="quick-chat-time">${timeAgoVN(job.createdAt)}${editedTagHtml}</span>
                 ${ownerToolsHtml}
@@ -3567,6 +3787,40 @@ async function quickChatConfirmAssign(jobId) {
         console.error('Lỗi chỉ định người nhận:', error);
         showNotification('Lỗi', 'Không thể chỉ định người nhận.', false, 'danger');
     }
+}
+
+// ============================================================
+// USERS AVATAR — realtime để mọi người thấy avatar mới của nhau
+// ============================================================
+function listenUsersAvatars() {
+    if (unsubscribeUsersAvatar) unsubscribeUsersAvatar();
+    unsubscribeUsersAvatar = onSnapshot(collection(db, 'users'), (snapshot) => {
+        usersAvatarCache = {};
+        snapshot.forEach(d => {
+            const u = d.data();
+            if (u.uid && u.avatar) usersAvatarCache[u.uid] = u.avatar;
+        });
+
+        // Nếu avatar của chính mình vừa được sync từ thiết bị khác → cập nhật
+        if (currentUser && usersAvatarCache[currentUser.uid] && usersAvatarCache[currentUser.uid] !== currentUser.avatar) {
+            currentUser.avatar = usersAvatarCache[currentUser.uid];
+            updateUserProfileUI();
+        }
+
+        // Refresh các UI đang dùng avatar
+        if (dayOffModalOpen) renderDayOffModal();
+        if (typeof renderQuickChat === 'function' && quickChatPanelOpen) renderQuickChat();
+        if (typeof renderSpinUsersList === 'function' && spinCandidates && spinCandidates.length
+            && document.getElementById('presenterSpinModal')?.classList.contains('show')) {
+            renderSpinUsersList();
+        }
+    }, (error) => {
+        console.error('Lỗi lắng nghe avatar users:', error);
+    });
+}
+
+function getUserAvatarUrl(uid) {
+    return (usersAvatarCache && usersAvatarCache[uid]) || null;
 }
 
 async function quickChatAcceptInvite(jobId) {
@@ -4075,6 +4329,33 @@ function showNotification(title, message, isSystemNotification = false, type = '
     
 }
 
+// ============================================================
+// JOB DAY OVERRIDES — đổi giờ / dời ngày / note nhanh cho 1 ngày
+// ============================================================
+
+function listenJobDayOverrides() {
+    if (!currentUser) return;
+    if (unsubscribeJobDayOverrides) unsubscribeJobDayOverrides();
+
+    const q = query(
+        collection(db, 'jobDayOverrides'),
+        where('userId', '==', currentUser.uid)
+    );
+
+    unsubscribeJobDayOverrides = onSnapshot(q, (snapshot) => {
+        jobDayOverridesList = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderSchedule();
+    }, (error) => {
+        console.error('❌ Lỗi lắng nghe jobDayOverrides:', error);
+    });
+}
+
+function getOverrideFor(jobId, occurrenceDateKey) {
+    return jobDayOverridesList.find(o =>
+        o.jobId === jobId && o.occurrenceDate === occurrenceDateKey
+    ) || null;
+}
+
 // Check Notifications - WITH DESKTOP NOTIFICATIONS
 function checkNotifications() {
     const now = new Date();
@@ -4141,7 +4422,6 @@ function createNotification(job) {
         weekly: 'Weekly',
         biweekly: 'Biweekly',
         monthly: 'Monthly',
-        quarterly: 'Quarterly',
         custom: 'Ngoài lịch'
     };
     
@@ -4374,14 +4654,18 @@ function renderSpinUsersList() {
         return;
     }
 
-    listEl.innerHTML = spinCandidates.map((user, idx) => {
+        listEl.innerHTML = spinCandidates.map((user, idx) => {
         const isExcluded = spinExcludedUids.has(user.uid);
         const color = SPIN_WHEEL_COLORS[idx % SPIN_WHEEL_COLORS.length];
         const tickets = getSpinTicketCount(user.uid);
+        const avatarUrl = getUserAvatarUrl(user.uid);
+        const avatarHtml = avatarUrl
+            ? `<img class="spin-user-avatar" src="${avatarUrl}" alt="">`
+            : `<span class="spin-user-avatar" style="background:${color}">${escapeHtml(avatarInitial(user))}</span>`;
         return `
             <label class="spin-user-chip ${isExcluded ? 'excluded' : ''}" data-uid="${escapeHtml(user.uid)}">
                 <input type="checkbox" class="form-check-input spin-user-checkbox" ${isExcluded ? '' : 'checked'}>
-                <span class="spin-user-avatar" style="background:${color}">${escapeHtml(avatarInitial(user))}</span>
+                ${avatarHtml}
                 <span class="spin-user-info">
                     <span class="spin-user-name">${escapeHtml(user.displayName || 'Chưa đặt tên')}</span>
                     <span class="spin-user-email">${escapeHtml(user.email || '')}</span>
@@ -4694,14 +4978,10 @@ function resolveShiftedDate(job, originDate, offMap) {
     return d;
 }
 
-// Trả về map { 'YYYY-MM-DD': [{ job, shiftedFrom }] } cho khoảng [rangeStart, rangeEnd].
-// shiftedFrom = ngày gốc (đã off) nếu job này được dời sang.
 function buildScheduleEntries(rangeStart, rangeEnd, jobList) {
     const offMap = getMyOffMap();
     const startKey = localDateKey(rangeStart);
     const endKey = localDateKey(rangeEnd);
-    // Job chỉ dời về phía trước đó nên phải quét thêm các ngày SAU khoảng hiển thị
-    // (VD: thứ 2 tuần sau off -> job dời về Chủ Nhật/Thứ 7 của tuần đang xem)
     const scanFrom = new Date(rangeStart);
     const scanTo = new Date(rangeEnd);
     scanTo.setDate(scanTo.getDate() + 31);
@@ -4713,15 +4993,41 @@ function buildScheduleEntries(rangeStart, rangeEnd, jobList) {
         occurrences.forEach(date => {
             const originKey = localDateKey(date);
             let targetKey = originKey;
-            let shiftedFrom = null;
+            let shiftedFrom = null;   // dời do off
+            let movedFrom = null;     // dời do override
+
+            // 1) Nếu ngày gốc là ngày off → dời lên ngày làm việc liền trước
             if (offMap[originKey]) {
                 targetKey = localDateKey(resolveShiftedDate(job, date, offMap));
                 shiftedFrom = originKey;
-                // Ngày đích đã có sẵn chính job này (VD job daily) thì không nhân đôi
                 if (nativeKeys.has(targetKey)) return;
             }
+
+            // 2) Áp dụng override (đổi giờ / dời ngày / note)
+            const override = getOverrideFor(job.id, originKey);
+            let overrideTime = null;
+            let note = null;
+
+            if (override) {
+                if (override.overrideDate && override.overrideDate !== originKey) {
+                    // Dời sang ngày khác → bỏ ở ngày cũ, thêm vào ngày mới
+                    movedFrom = originKey;
+                    targetKey = override.overrideDate;
+                }
+                overrideTime = override.overrideTime || null;
+                note = override.note || null;
+            }
+
             if (targetKey < startKey || targetKey > endKey) return;
-            (map[targetKey] = map[targetKey] || []).push({ job, shiftedFrom });
+
+            (map[targetKey] = map[targetKey] || []).push({
+                job,
+                shiftedFrom,     // nếu dời do off (màu hồng)
+                movedFrom,       // nếu dời do override (màu hồng)
+                overrideTime,    // giờ đổi riêng cho ngày này
+                note,            // ghi chú riêng cho ngày này
+                originDate: originKey
+            });
         });
     });
     return map;
@@ -4802,9 +5108,13 @@ function renderDayOffUsers() {
         const isMe = user.uid === currentUser.uid;
         const name = user.displayName || user.email || 'Chưa đặt tên';
         const count = countUpcomingOffs(user.uid, todayKey);
+        const avatarUrl = getUserAvatarUrl(user.uid);
+        const avatarHtml = avatarUrl
+            ? `<img class="dayoff-user-avatar" src="${avatarUrl}" alt="">`
+            : `<span class="dayoff-user-avatar" style="background:${getDayOffUserColor(user.uid)}">${escapeHtml(avatarInitial(user))}</span>`;
         return `
             <button type="button" class="dayoff-user-row ${dayOffFocusUid === user.uid ? 'active' : ''}" data-uid="${escapeHtml(user.uid)}">
-                <span class="dayoff-user-avatar" style="background:${getDayOffUserColor(user.uid)}">${escapeHtml(avatarInitial(user))}</span>
+                ${avatarHtml}
                 <span class="dayoff-user-name">${escapeHtml(name)}${isMe ? ' <em>(Tôi)</em>' : ''}</span>
                 <span class="dayoff-user-count ${count ? '' : 'zero'}" title="Số ngày off sắp tới">${count}</span>
             </button>`;
@@ -4902,7 +5212,14 @@ function renderDayOffDetails() {
     const todayKey = localDateKey(new Date());
     const rows = dayOffsList
         .filter(o => o.date >= todayKey && (!dayOffFocusUid || o.userId === dayOffFocusUid))
-        .sort((a, b) => a.date.localeCompare(b.date) || String(a.userName).localeCompare(String(b.userName)));
+                .sort((a, b) => {
+            // Ưu tiên mới đăng ký (createdAt) lên đầu
+            const ca = a.createdAt || '';
+            const cb = b.createdAt || '';
+            if (ca !== cb) return cb.localeCompare(ca);
+            // Cùng thời điểm → ngày mới hơn lên trước
+            return b.date.localeCompare(a.date);
+        });
     const weekdayShort = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
 
     document.getElementById('dayOffDetailTitle').textContent = dayOffFocusUid
@@ -4913,13 +5230,17 @@ function renderDayOffDetails() {
         document.getElementById('dayOffDetailList').innerHTML = '<div class="empty-state empty-state-sm"><i class="bi bi-calendar-check"></i><br>Chưa có lịch off nào</div>';
         return;
     }
-    document.getElementById('dayOffDetailList').innerHTML = rows.map(o => {
+        document.getElementById('dayOffDetailList').innerHTML = rows.map(o => {
         const isMine = o.userId === currentUser.uid;
         const name = dayOffUserName(o.userId, o.userName);
+        const avatarUrl = getUserAvatarUrl(o.userId);
+        const avatarHtml = avatarUrl
+            ? `<img class="dayoff-user-avatar sm" src="${avatarUrl}" alt="">`
+            : `<span class="dayoff-user-avatar sm" style="background:${getDayOffUserColor(o.userId)}">${escapeHtml(avatarInitial({ displayName: name }))}</span>`;
         return `
             <div class="dayoff-detail-row">
                 <span class="dayoff-detail-date">${weekdayShort[parseJobDate(o.date).getDay()]} · ${formatDateShortDMY(o.date)}</span>
-                <span class="dayoff-user-avatar sm" style="background:${getDayOffUserColor(o.userId)}">${escapeHtml(avatarInitial({ displayName: name }))}</span>
+                ${avatarHtml}
                 <span class="dayoff-detail-name">${escapeHtml(isMine ? `${name} (Tôi)` : name)}</span>
                 <span class="dayoff-detail-reason">${escapeHtml(o.reason || '')}</span>
                 ${isMine ? `<button type="button" class="dayoff-detail-del" data-off-id="${escapeHtml(o.id)}" data-off-date="${o.date}" title="Xóa ngày off này"><i class="bi bi-trash3-fill"></i></button>` : ''}
