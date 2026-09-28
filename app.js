@@ -108,6 +108,14 @@ let pendingTransferRequestsList = [];
 let transferRequestsInitialLoadDone = false;
 let quickJobTransferInitialLoadDone = false;
 
+// Voice command
+let voiceRecognition = null;
+let voiceListening = false;
+
+// Morning digest email
+const MORNING_DIGEST_STORAGE_KEY = 'workpic_morning_digest_sent';
+const MORNING_DIGEST_HOURS = { from: 6, to: 10 };  // Chỉ gửi mail trong khung 6h–10h
+
 function applyTheme(theme) {
     currentTheme = theme;
     document.body.classList.toggle('theme-dark', theme === 'dark');
@@ -377,7 +385,7 @@ async function changeAvatar(file) {
             // chỉ vẽ lại nếu modal đang có dữ liệu
             if (spinCandidates && spinCandidates.length) renderSpinUsersList();
         }
-        if (typeof renderDayOffModal === 'function' && dayOffModalOpen) renderDayOffModal();
+        if (dayOffModalOpen) renderDayOffModal();
 
         showNotification('Thành công', 'Đã cập nhật ảnh đại diện (đồng bộ mọi thiết bị)!', false, 'success');
     } catch (error) {
@@ -501,7 +509,8 @@ document.addEventListener('DOMContentLoaded', function() {
     guideModal = new bootstrap.Modal(document.getElementById('guideModal'));
 
     initQuickChatUi();
-    
+    initVoiceCommand();
+
     // Event Listeners
     document.getElementById('addJobBtn').addEventListener('click', () => openAddJobModal(false));
     document.getElementById('addOutOfScheduleBtn').addEventListener('click', () => openAddJobModal(true));
@@ -1281,6 +1290,29 @@ function renderSchedule() {
             dateHeader.innerHTML = `<i class="bi bi-calendar-day"></i> ${formatDateShort(currentDate)}${offDoc ? '<span class="day-off-badge">OFF</span>' : ''}`;
             cell.appendChild(dateHeader);
 
+                        // ===== KÉO-THẢ: ô ngày nhận drop =====
+            cell.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                cell.classList.add('drag-over');
+            });
+            cell.addEventListener('dragleave', (e) => {
+                if (!cell.contains(e.relatedTarget)) cell.classList.remove('drag-over');
+            });
+            cell.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                cell.classList.remove('drag-over');
+                try {
+                    const raw = e.dataTransfer.getData('text/plain') || '{}';
+                    const data = JSON.parse(raw);
+                    if (!data.jobId || !data.originDate) return;
+                    await moveJobToDate(data.jobId, data.originDate, dateStr);
+                } catch (err) {
+                    console.error('Lỗi drop job:', err);
+                }
+            });
+            // ===== HẾT KÉO-THẢ =====
+
             if (offDoc) {
                 const offNote = document.createElement('div');
                 offNote.className = 'day-off-note';
@@ -1375,6 +1407,24 @@ function renderSchedule() {
         ${noteHtml}
     `;
 
+        // ===== KÉO-THẢ: cho phép kéo item =====
+    scheduleItem.setAttribute('draggable', 'true');
+    scheduleItem.addEventListener('dragstart', (e) => {
+        e.stopPropagation();
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', JSON.stringify({
+            jobId: job.id,
+            originDate: entry.originDate,
+            jobTitle: job.title
+        }));
+        scheduleItem.classList.add('dragging');
+    });
+    scheduleItem.addEventListener('dragend', () => {
+        scheduleItem.classList.remove('dragging');
+        document.querySelectorAll('.schedule-table td.drag-over').forEach(td => td.classList.remove('drag-over'));
+    });
+    // ===== HẾT KÉO-THẢ =====
+
     // Click vào nội dung item → mở xem job đầy đủ (không mở override nữa)
     scheduleItem.addEventListener('click', (e) => {
         if (e.target.closest('.schedule-override-btn')) return;
@@ -1395,6 +1445,72 @@ function renderSchedule() {
         }
         
         scheduleBody.appendChild(row);
+    }
+}
+
+// ============================================================
+// KÉO-THẢ JOB — lưu override ngày cho lần xuất hiện của job
+// ============================================================
+async function moveJobToDate(jobId, originDate, targetDate) {
+    if (!currentUser) return;
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return;
+
+    const docId = `${currentUser.uid}_${jobId}_${originDate}`;
+    const existing = getOverrideFor(jobId, originDate);
+
+        // ----- Trường hợp 1: kéo về CHÍNH ngày gốc -----
+    // → chỉ xóa overrideDate (giữ nguyên overrideTime/note nếu có)
+    if (originDate === targetDate) {
+        if (!existing) return;   // chưa có override → không làm gì
+        const keepTime = existing.overrideTime || null;
+        const keepNote = existing.note || null;
+        try {
+            if (!keepTime && !keepNote) {
+                await deleteDoc(doc(db, 'jobDayOverrides', docId));
+            } else {
+                await setDoc(doc(db, 'jobDayOverrides', docId), {
+                    userId: currentUser.uid,
+                    jobId,
+                    occurrenceDate: originDate,
+                    overrideTime: keepTime,
+                    overrideDate: null,
+                    note: keepNote,
+                    updatedAt: new Date().toISOString()
+                });
+            }
+            showNotification(
+                'Đã trả về',
+                `"${job.title}" trở về ngày ${formatDateShortDMY(originDate)}`,
+                false, 'success'
+            );
+        } catch (error) {
+            console.error('Lỗi trả job về ngày gốc:', error);
+            showNotification('Lỗi', 'Không thể trả job về ngày gốc.', false, 'danger');
+        }
+        return;
+    }
+
+    // ----- Trường hợp 2: kéo sang ngày khác -----
+    // → tạo / cập nhật override, giữ nguyên giờ gốc (chỉ ngày thay đổi)
+    try {
+        await setDoc(doc(db, 'jobDayOverrides', docId), {
+            userId: currentUser.uid,
+            jobId,
+            occurrenceDate: originDate,
+            overrideTime: existing?.overrideTime || null,
+            overrideDate: targetDate,
+            note: existing?.note || null,
+            updatedAt: new Date().toISOString()
+        });
+        showNotification(
+            'Đã dời job',
+            `"${job.title}" → ${formatDateShortDMY(targetDate)} (chỉ lần này)`,
+            false, 'success'
+        );
+    } catch (error) {
+        console.error('Lỗi dời job:', error);
+        showNotification('Lỗi', 'Không thể dời job. Vui lòng thử lại.', false, 'danger');
     }
 }
 
@@ -3798,7 +3914,9 @@ function listenUsersAvatars() {
         usersAvatarCache = {};
         snapshot.forEach(d => {
             const u = d.data();
-            if (u.uid && u.avatar) usersAvatarCache[u.uid] = u.avatar;
+            if (u.uid && u.avatar && !usersAvatarCache[u.uid]) {
+                usersAvatarCache[u.uid] = u.avatar;
+            }
         });
 
         // Nếu avatar của chính mình vừa được sync từ thiết bị khác → cập nhật
@@ -5059,9 +5177,15 @@ async function openDayOffModal() {
     try {
         const snapshot = await getDocs(collection(db, 'users'));
         const users = [];
+        // Đồng thời nạp cache avatar từ kết quả fetch này (đề phòng listener
+        // listenUsersAvatars chưa fire xong hoặc chưa có user nào có avatar)
+        if (!usersAvatarCache) usersAvatarCache = {};
         snapshot.forEach(userDoc => {
             const user = userDoc.data();
-            if (user.uid) users.push(user);
+            if (user.uid) {
+                users.push(user);
+                if (user.avatar) usersAvatarCache[user.uid] = user.avatar;
+            }
         });
         buildDayOffUsers(users);
         if (dayOffModalOpen) renderDayOffModal();
@@ -5348,6 +5472,201 @@ async function saveDayOffs() {
         btn.innerHTML = originalHTML;
         renderDayOffSummary();
     }
+}
+
+// ============================================================
+// VOICE COMMAND — điều khiển bằng giọng nói (Chrome/Edge)
+// ============================================================
+function initVoiceCommand() {
+    const btn = document.getElementById('voiceBtn');
+    if (!btn) return;
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        btn.style.display = 'none';
+        return;
+    }
+
+    voiceRecognition = new SpeechRecognition();
+    voiceRecognition.lang = 'vi-VN';
+    voiceRecognition.continuous = false;
+    voiceRecognition.interimResults = false;
+    voiceRecognition.maxAlternatives = 3;
+
+    voiceRecognition.onstart = () => {
+        voiceListening = true;
+        updateVoiceButton();
+        showNotification('🎤 Đang nghe', 'Hãy nói lệnh của bạn…', false, 'info');
+    };
+    voiceRecognition.onend = () => {
+        voiceListening = false;
+        updateVoiceButton();
+    };
+    voiceRecognition.onerror = (e) => {
+        voiceListening = false;
+        updateVoiceButton();
+        if (e.error === 'not-allowed') {
+            showNotification('Lỗi micro', 'Vui lòng cấp quyền micro cho trang web.', false, 'danger');
+        } else if (e.error === 'no-speech') {
+            showNotification('Không nghe thấy', 'Không nhận diện được giọng nói.', false, 'warning');
+        }
+    };
+    voiceRecognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript.toLowerCase().trim();
+        console.log('🎤 Voice:', transcript);
+        handleVoiceCommand(transcript);
+    };
+
+    btn.addEventListener('click', toggleVoice);
+    updateVoiceButton();
+}
+
+function toggleVoice() {
+    if (!voiceRecognition) {
+        showNotification('Không hỗ trợ', 'Trình duyệt không hỗ trợ nhận diện giọng nói. Dùng Chrome/Edge.', false, 'warning');
+        return;
+    }
+    if (voiceListening) {
+        voiceRecognition.stop();
+    } else {
+        try { voiceRecognition.start(); } catch (e) { console.error(e); }
+    }
+}
+
+function updateVoiceButton() {
+    const btn = document.getElementById('voiceBtn');
+    if (!btn) return;
+    btn.classList.toggle('voice-active', voiceListening);
+    btn.title = voiceListening ? 'Đang nghe… (bấm để dừng)' : 'Lệnh thoại';
+}
+
+function handleVoiceCommand(text) {
+    // 1. Đóng modal
+    if (/^(đóng|tắt|close|thoát)/.test(text)) {
+        document.querySelectorAll('.modal.show').forEach(m => {
+            const inst = bootstrap.Modal.getInstance(m);
+            if (inst) inst.hide();
+        });
+        showNotification('Đã đóng', 'Đã đóng tất cả cửa sổ.', false, 'success');
+        return;
+    }
+
+    // 2. Tìm kiếm job
+    const searchMatch = text.match(/^(tìm|tìm kiếm|search)\s+(.+)/);
+    if (searchMatch) {
+        const q = searchMatch[2].replace(/^(job|việc|công việc)\s+/, '').trim();
+        document.getElementById('searchJob').value = q;
+        handleSearch({ target: { value: q } });
+        showNotification('Đang tìm', `"${q}"`, false, 'success');
+        return;
+    }
+
+    // 3. Thêm job: "thêm job ABC lúc 8 giờ 30 ngày 5 tháng 10"
+    const addMatch = text.match(/^(thêm|tạo|add)\s+(job|việc|công việc)\s+(.+)/);
+    if (addMatch) {
+        let title = addMatch[3].trim();
+        let time = null;
+        let date = null;
+
+        const timeMatch = title.match(/lúc\s+(\d{1,2})\s*(?:giờ|h|:)?\s*(\d{1,2})?/);
+        if (timeMatch) {
+            const h = String(timeMatch[1]).padStart(2, '0');
+            const m = timeMatch[2] ? String(timeMatch[2]).padStart(2, '0') : '00';
+            time = `${h}:${m}`;
+            title = title.replace(timeMatch[0], '').trim();
+        }
+        const dateMatch = title.match(/ngày\s+(\d{1,2})\s*tháng\s*(\d{1,2})/);
+        if (dateMatch) {
+            const y = new Date().getFullYear();
+            const d = String(dateMatch[1]).padStart(2, '0');
+            const mo = String(dateMatch[2]).padStart(2, '0');
+            date = `${y}-${mo}-${d}`;
+            title = title.replace(dateMatch[0], '').trim();
+        }
+        if (!title) { showNotification('Thiếu tên', 'Chưa nghe rõ tên job.', false, 'warning'); return; }
+
+        openAddJobModal(false);
+        document.getElementById('jobTitle').value = title;
+        if (time) document.getElementById('jobTime').value = time;
+        if (date) document.getElementById('jobDate').value = date;
+        showNotification('Đã điền sẵn', `Job "${title}" — kiểm tra và bấm Lưu`, false, 'success');
+        return;
+    }
+
+    // 4. Mở các chức năng
+    if (/(lịch off|nghỉ|off)/.test(text))           { openDayOffModal(); return; }
+    if (/(chat|job trong ngày|khung chat)/.test(text)) { openQuickChatPanel(); return; }
+    if (/(check due|so sánh|đối chiếu|kiểm tra due)/.test(text)) { openCheckDueModal(); return; }
+    if (/(quay số|thuyết trình|random|dice)/.test(text))         { openPresenterSpinModal(); return; }
+    if (/(hướng dẫn|guide|trợ giúp)/.test(text))    { guideModal.show(); return; }
+    if (/(thông tin|profile|tài khoản|avatar)/.test(text)) { openUserProfileModal(); return; }
+    if (/(xem dữ liệu|xem job|view data)/.test(text)) { openViewDataModal(); return; }
+    if (/(xuất pdf|in pdf|export pdf)/.test(text))   { exportToPDF(); return; }
+    if (/(sidebar|ẩn menu|hiện menu|menu)/.test(text)) { toggleSidebar(); return; }
+
+    // 5. Theme
+    if (/(chế độ tối|dark mode|ban đêm|tối)/.test(text)) {
+        applyTheme('dark');
+        showNotification('Đã bật', 'Chế độ tối', false, 'success'); return;
+    }
+    if (/(chế độ sáng|light mode|ban ngày|sáng)/.test(text)) {
+        applyTheme('light');
+        showNotification('Đã bật', 'Chế độ sáng', false, 'success'); return;
+    }
+
+    // 6. Đăng xuất
+    if (/(đăng xuất|logout|thoát tài khoản)/.test(text)) {
+        showConfirmDialog({
+            title: 'Đăng xuất?',
+            message: 'Bạn có chắc muốn đăng xuất khỏi tài khoản?',
+            confirmText: 'Đăng xuất',
+            confirmClass: 'btn-delete',
+            onConfirm: () => signOut(auth)
+        });
+        return;
+    }
+
+    // 7. Đọc lịch hôm nay
+    if (/(hôm nay|việc hôm nay|hôm nay có gì|lịch hôm nay)/.test(text)) {
+        speakTodayJobs(); return;
+    }
+
+    showNotification('Không hiểu lệnh', `"${text}"\nThử: "mở lịch off", "hôm nay có gì", "tìm frame mill"`, false, 'warning');
+}
+
+function speakTodayJobs() {
+    if (!('speechSynthesis' in window)) {
+        showNotification('Không hỗ trợ', 'Trình duyệt không hỗ trợ đọc văn bản.', false, 'warning');
+        return;
+    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayKey = localDateKey(today);
+    const activeJobs = jobs.filter(j => j.isPaused !== true && j.isOutOfSchedule !== true);
+    const entries = buildScheduleEntries(today, today, activeJobs);
+    const todayItems = (entries[todayKey] || []).slice().sort((a, b) =>
+        String(a.overrideTime || a.job.time || '').localeCompare(String(b.overrideTime || b.job.time || ''))
+    );
+
+    if (todayItems.length === 0) {
+        speakText('Hôm nay bạn không có công việc nào.');
+        return;
+    }
+    const parts = [`Hôm nay bạn có ${todayItems.length} công việc.`];
+    todayItems.forEach(e => {
+        const t = e.overrideTime || e.job.time || '';
+        parts.push(`${t}, ${e.job.title}.`);
+    });
+    speakText(parts.join(' '));
+}
+
+function speakText(text) {
+    if (!('speechSynthesis' in window)) return;
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'vi-VN';
+    u.rate = 1.05;
+    speechSynthesis.speak(u);
 }
 
 window.addEventListener('beforeunload', () => {
