@@ -187,6 +187,15 @@
                                                 </span>
                                             </button>
                                         </li>
+                                        <li>
+                                            <button class="layout-dropdown-item" id="dayOffBtn" type="button">
+                                                <span class="layout-item-ic layout-item-ic-dayoff"><i class="bi bi-calendar-x-fill"></i></span>
+                                                <span class="layout-item-text">
+                                                    <span class="layout-item-title">Đăng ký lịch off</span>
+                                                    <span class="layout-item-sub">Chọn ngày nghỉ, xem lịch off của mọi người</span>
+                                                </span>
+                                            </button>
+                                        </li>
                                         <li><hr class="dropdown-divider"></li>
                                         <li><span class="layout-item-note"><i class="bi bi-stars"></i> Sẽ có thêm lựa chọn khác tại đây</span></li>
                                     </ul>
@@ -735,11 +744,71 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
                                 <i class="bi bi-people-fill"></i> Danh sách quay số
                                 <span class="spin-users-count" id="spinUsersCount">0</span>
                             </div>
-                            <div class="spin-users-hint">Bỏ chọn để loại người đó khỏi lượt quay này.</div>
+                            <div class="spin-users-hint">Bỏ chọn để loại người đó khỏi lượt quay. Bấm <strong>+</strong>/<strong>−</strong> để thêm/bớt ô (trùng tên); mỗi ô trên vòng quay có xác suất trúng như nhau.</div>
                             <div class="spin-users-list" id="spinUsersList">
                                 <div class="empty-state"><i class="bi bi-hourglass-split"></i><br>Đang tải danh sách user...</div>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Day Off Modal -->
+    <div class="modal fade" id="dayOffModal" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header modern-header modern-header-dayoff">
+                    <div class="modern-header-inner">
+                        <div class="modern-header-icon"><i class="bi bi-calendar-x-fill"></i></div>
+                        <div class="modern-header-text">
+                            <h5 class="modal-title mb-0">Đăng ký lịch off</h5>
+                            <p class="modern-header-subtitle mb-0">Tháng này &amp; tháng sau · job ngày off sẽ dời sang ngày làm việc kế tiếp</p>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="dayoff-layout">
+                        <aside class="dayoff-users-col">
+                            <div class="spin-users-title">
+                                <i class="bi bi-people-fill"></i> Thành viên
+                                <span class="spin-users-count" id="dayOffUsersCount">0</span>
+                            </div>
+                            <div class="spin-users-hint">Bấm tên để xem riêng lịch off của người đó. Lịch của người khác chỉ để xem.</div>
+                            <div class="dayoff-users-list" id="dayOffUsersList"></div>
+                        </aside>
+
+                        <section class="dayoff-main">
+                            <div class="dayoff-calendars" id="dayOffCalendars"></div>
+
+                            <div class="dayoff-form">
+                                <div class="dayoff-form-head"><i class="bi bi-pencil-square"></i> Đăng ký của tôi</div>
+                                <div class="dayoff-summary" id="dayOffSummary"></div>
+                                <div id="dayOffReasonWrap" class="d-none">
+                                    <label class="form-label fw-bold mt-2" for="dayOffReason">Lý do off *</label>
+                                    <input type="text" class="form-control" id="dayOffReason" maxlength="120" placeholder="VD: Nghỉ phép, việc cá nhân...">
+                                    <div class="dayoff-reason-presets" id="dayOffReasonPresets">
+                                        <button type="button" data-reason="Nghỉ phép">Nghỉ phép</button>
+                                        <button type="button" data-reason="Việc cá nhân">Việc cá nhân</button>
+                                        <button type="button" data-reason="Nghỉ ốm">Nghỉ ốm</button>
+                                        <button type="button" data-reason="Đi công tác">Đi công tác</button>
+                                    </div>
+                                </div>
+                                <div class="d-flex justify-content-end mt-3">
+                                    <button type="button" class="btn btn-save" id="saveDayOffBtn" disabled>
+                                        <i class="bi bi-check-circle-fill"></i> Lưu lịch off
+                                        <div class="btn-shine"></div>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="dayoff-detail">
+                                <div class="dayoff-form-head"><i class="bi bi-list-ul"></i> <span id="dayOffDetailTitle">Lịch off sắp tới của mọi người</span></div>
+                                <div class="dayoff-detail-list" id="dayOffDetailList"></div>
+                            </div>
+                        </section>
                     </div>
                 </div>
             </div>
@@ -903,6 +972,8 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
                                     <div class="ia-item">Job ngoài lịch<span>Công việc phát sinh không cố định</span></div>
                                     <div class="ia-item">Check Due<span>So sánh dữ liệu 2 nguồn</span></div>
                                     <div class="ia-item">Xem dữ liệu / Xuất PDF</div>
+                                    <div class="ia-item">Đăng ký lịch off<span>Job ngày off dời sang ngày kế tiếp (tô xám)</span></div>
+                                    <div class="ia-item">Quay số thuyết trình<span>Công bằng, có thể thêm ô trùng tên</span></div>
                                     <div class="ia-item">Tìm kiếm job</div>
                                 </div>
                             </div>

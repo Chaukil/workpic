@@ -43,6 +43,14 @@ let legacyJobs = [];
 let viewDataModal;
 let checkDueModal;
 let presenterSpinModal;
+// Lịch off
+let dayOffModal;
+let dayOffModalOpen = false;
+let dayOffsList = [];            // toàn bộ lịch off (mọi user) từ tháng trước trở đi
+let unsubscribeDayOffs = null;
+let dayOffSelected = new Set();  // các ngày (YYYY-MM-DD) MÌNH đang chọn off
+let dayOffFocusUid = null;       // đang xem riêng lịch của user nào
+let dayOffUsers = [];            // danh sách user hiển thị trong form
 let checkDueOldRows = null;
 let checkDueNewRows = null;
 let checkDueResultRows = [];
@@ -325,6 +333,12 @@ function handleSignedOut() {
         unsubscribeQuickJobTransferRequests();
         unsubscribeQuickJobTransferRequests = null;
     }
+    if (unsubscribeDayOffs) {
+        unsubscribeDayOffs();
+        unsubscribeDayOffs = null;
+    }
+    dayOffsList = [];
+    dayOffSelected = new Set();
     jobs = [];
     filteredJobs = [];
     notificationsList = [];
@@ -361,6 +375,7 @@ function initializeAuthenticatedApp() {
         listenUserNotifications();
         listenQuickJobs();
         listenQuickJobTransferRequests();
+        listenDayOffs();
     });
 }
 
@@ -388,6 +403,8 @@ document.addEventListener('DOMContentLoaded', function() {
     viewDataModal = new bootstrap.Modal(document.getElementById('viewDataModal'));
     checkDueModal = new bootstrap.Modal(document.getElementById('checkDueModal'));
     presenterSpinModal = new bootstrap.Modal(document.getElementById('presenterSpinModal'));
+    dayOffModal = new bootstrap.Modal(document.getElementById('dayOffModal'));
+    document.getElementById('dayOffModal').addEventListener('hidden.bs.modal', () => { dayOffModalOpen = false; });
     transferConfirmModal = new bootstrap.Modal(document.getElementById('transferConfirmModal'));
     quickJobInviteModal = new bootstrap.Modal(document.getElementById('quickJobInviteModal'), {
         backdrop: 'static',
@@ -430,6 +447,15 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('checkDueBtn').addEventListener('click', openCheckDueModal);
     document.getElementById('presenterSpinBtn').addEventListener('click', openPresenterSpinModal);
     document.getElementById('spinNowBtn').addEventListener('click', spinPresenterWheel);
+    document.getElementById('dayOffBtn').addEventListener('click', openDayOffModal);
+    document.getElementById('saveDayOffBtn').addEventListener('click', saveDayOffs);
+    document.getElementById('dayOffCalendars').addEventListener('click', handleDayOffCalendarClick);
+    document.getElementById('dayOffUsersList').addEventListener('click', handleDayOffUserClick);
+    document.getElementById('dayOffDetailList').addEventListener('click', handleDayOffDetailClick);
+    document.getElementById('dayOffReasonPresets').addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-reason]');
+        if (btn) document.getElementById('dayOffReason').value = btn.dataset.reason;
+    });
     document.getElementById('confirmSpinBtn').addEventListener('click', confirmPresenterAssignment);
     document.getElementById('checkDueCompareBtn').addEventListener('click', runCheckDueCompare);
     document.getElementById('checkDueClearBtn').addEventListener('click', clearCheckDueForm);
@@ -1131,26 +1157,14 @@ function renderSchedule() {
         scheduleHeader.appendChild(th);
     });
     
-    // Tạo map các jobs theo ngày (FILTER OUT PAUSED JOBS + OUT-OF-SCHEDULE JOBS)
-    const jobsByDate = {};
-    
     // Only include active (non-paused) jobs that belong to the fixed schedule
     const activeJobs = jobs.filter(job => job.isPaused !== true && job.isOutOfSchedule !== true);
-    
-    activeJobs.forEach(job => {
-        const endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + (totalWeeks * 7) - 1);
-        
-        const occurrences = getJobOccurrences(job, startDate, endDate);
-        
-        occurrences.forEach(date => {
-            const dateStr = localDateKey(date);
-            if (!jobsByDate[dateStr]) {
-                jobsByDate[dateStr] = [];
-            }
-            jobsByDate[dateStr].push(job);
-        });
-    });
+
+    // Map ngày -> [{ job, shiftedFrom }]. Job rơi vào ngày off của mình sẽ được dời sang ngày làm việc kế tiếp.
+    const rangeEnd = new Date(startDate);
+    rangeEnd.setDate(rangeEnd.getDate() + (totalWeeks * 7) - 1);
+    const jobsByDate = buildScheduleEntries(startDate, rangeEnd, activeJobs);
+    const myOffMap = getMyOffMap();
     
     // Render các tuần
     const daysToShow = showSunday ? 7 : 6;
@@ -1172,8 +1186,12 @@ function renderSchedule() {
             const todayDate = new Date(today);
             todayDate.setHours(0, 0, 0, 0);
             
-            // Highlight hôm nay
-            if (cellDate.getTime() === todayDate.getTime()) {
+            const offDoc = myOffMap[dateStr] || null;
+            
+            // Ngày off: tô sọc đỏ; ngày thường: highlight hôm nay
+            if (offDoc) {
+                cell.classList.add('day-off-cell');
+            } else if (cellDate.getTime() === todayDate.getTime()) {
                 cell.style.backgroundColor = '#fffbea';
                 cell.style.fontWeight = 'bold';
             }
@@ -1181,20 +1199,33 @@ function renderSchedule() {
             // Date header
             const dateHeader = document.createElement('div');
             dateHeader.className = 'date-header text-muted small';
-            dateHeader.innerHTML = `<i class="bi bi-calendar-day"></i> ${formatDateShort(currentDate)}`;
+            dateHeader.innerHTML = `<i class="bi bi-calendar-day"></i> ${formatDateShort(currentDate)}${offDoc ? '<span class="day-off-badge">OFF</span>' : ''}`;
             cell.appendChild(dateHeader);
+
+            if (offDoc) {
+                const offNote = document.createElement('div');
+                offNote.className = 'day-off-note';
+                offNote.title = offDoc.reason || '';
+                offNote.innerHTML = `<i class="bi bi-calendar-x-fill"></i> ${escapeHtml(offDoc.reason || 'Nghỉ')}`;
+                cell.appendChild(offNote);
+            }
             
             // Add jobs for this date - SORTED BY TIME
             let dayJobs = jobsByDate[dateStr] || [];
             
             // Sort jobs by time (HH:MM)
             dayJobs.sort((a, b) => {
-                const timeA = a.time || '00:00';
-                const timeB = b.time || '00:00';
+                // Job dời từ ngày off sang luôn nằm cuối ngày
+                const shiftDiff = (a.shiftedFrom ? 1 : 0) - (b.shiftedFrom ? 1 : 0);
+                if (shiftDiff !== 0) return shiftDiff;
+                const timeA = a.job.time || '00:00';
+                const timeB = b.job.time || '00:00';
                 return timeA.localeCompare(timeB);
             });
             
-            if (dayJobs.length === 0) {
+            if (dayJobs.length === 0 && offDoc) {
+                // Ngày off và không có job dời sang: không cần hiện dấu '-'
+            } else if (dayJobs.length === 0) {
                 const emptyMsg = document.createElement('div');
                 emptyMsg.className = 'text-muted small text-center';
                 emptyMsg.style.opacity = '0.4';
@@ -1202,7 +1233,8 @@ function renderSchedule() {
                 emptyMsg.textContent = '-';
                 cell.appendChild(emptyMsg);
             } else {
-                dayJobs.forEach(job => {
+                dayJobs.forEach(entry => {
+                    const job = entry.job;
                     // Determine if job is past, today, or future
                     let timeClass = 'future'; // Default
                     
@@ -1231,12 +1263,13 @@ function renderSchedule() {
                     }
                     
                     const scheduleItem = document.createElement('div');
-                    scheduleItem.className = `schedule-item ${job.type} ${timeClass}`;
+                    scheduleItem.className = `schedule-item ${job.type} ${timeClass}${entry.shiftedFrom ? ' shifted' : ''}`;
                     scheduleItem.innerHTML = `
                         <h6 title="${job.title}">
                             <i class="bi bi-clipboard-check"></i> ${job.title}
                         </h6>
                         <small><i class="bi bi-clock-fill"></i> ${job.time}</small>
+                        ${entry.shiftedFrom ? `<small class="shifted-tag" title="Job của ngày ${formatDateShortDMY(entry.shiftedFrom)} (bạn off) được dời sang"><i class="bi bi-arrow-return-right"></i> dời từ ${formatDateShortDMY(entry.shiftedFrom)}</small>` : ''}
                     `;
                     scheduleItem.addEventListener('click', () => openViewJobModal(job));
                     cell.appendChild(scheduleItem);
@@ -4030,7 +4063,7 @@ function checkNotifications() {
         }
         
         if (job.enableNotification !== false) {
-            const isDue = getJobOccurrences(job, now, now).length > 0 && job.time === currentTime;
+            const isDue = isJobScheduledOnDate(job, now) && job.time === currentTime;
             
             if (isDue) {
                 const notificationKey = `notified_${job.id}_${currentDate}_${currentTime}`;
@@ -4209,13 +4242,12 @@ function formatDateShort(date) {
 // ============================================================
 const SPIN_WHEEL_COLORS = ['#7c3aed', '#ec4899', '#f59e0b', '#14b8a6', '#3b82f6', '#ef4444', '#06b6d4', '#8b5cf6', '#22c55e', '#f97316'];
 const SPIN_EXCLUDED_STORAGE_KEY = 'workpic_spin_excluded_uids';
-// Email được "ưu tiên" trúng số N lần đầu trước khi vòng quay trở lại random hoàn toàn cho mọi người.
-const SPIN_PRIORITY_EMAIL = 'duyenguyen@wanekfurniture.com';
-const SPIN_PRIORITY_TARGET_WINS = 3;
-const SPIN_PRIORITY_STORAGE_KEY = 'workpic_spin_priority_wins';
+const SPIN_TICKETS_STORAGE_KEY = 'workpic_spin_tickets';
+const SPIN_MAX_TICKETS = 5;
 
 let spinCandidates = [];      // {uid, displayName, email}
 let spinExcludedUids = new Set();
+let spinTickets = {};         // { uid: số phiếu (số ô trên vòng quay) }
 let spinIsSpinning = false;
 let spinWinner = null;
 let spinAssignDate = null;    // 'YYYY-MM-DD'
@@ -4238,14 +4270,38 @@ function saveExcludedUidsToStorage() {
     } catch (e) { /* ignore quota/private mode errors */ }
 }
 
-function getPriorityWinsUsed() {
-    try { return parseInt(localStorage.getItem(SPIN_PRIORITY_STORAGE_KEY) || '0', 10) || 0; }
-    catch (e) { return 0; }
+function loadSpinTicketsFromStorage() {
+    try {
+        const raw = localStorage.getItem(SPIN_TICKETS_STORAGE_KEY);
+        const parsed = raw ? JSON.parse(raw) : {};
+        return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (e) { return {}; }
 }
 
-function incrementPriorityWinsUsed() {
-    try { localStorage.setItem(SPIN_PRIORITY_STORAGE_KEY, String(getPriorityWinsUsed() + 1)); }
+function saveSpinTicketsToStorage() {
+    try { localStorage.setItem(SPIN_TICKETS_STORAGE_KEY, JSON.stringify(spinTickets)); }
     catch (e) { /* ignore */ }
+}
+
+function getSpinTicketCount(uid) {
+    const n = parseInt(spinTickets[uid], 10);
+    return Number.isFinite(n) ? Math.min(Math.max(n, 1), SPIN_MAX_TICKETS) : 1;
+}
+
+// Số ngẫu nhiên không thiên lệch (rejection sampling) từ bộ sinh số mật mã của trình duyệt
+function secureRandomInt(max) {
+    const cryptoObj = window.crypto;
+    if (!cryptoObj || !cryptoObj.getRandomValues || max <= 1) return Math.floor(Math.random() * max);
+    const limit = Math.floor(0x100000000 / max) * max;
+    const buf = new Uint32Array(1);
+    do { cryptoObj.getRandomValues(buf); } while (buf[0] >= limit);
+    return buf[0] % max;
+}
+
+function updateSpinCounts() {
+    const people = spinCandidates.length - spinExcludedUids.size;
+    const slots = getSpinActiveCandidates().length;
+    document.getElementById('spinUsersCount').textContent = `${people}/${spinCandidates.length} người · ${slots} ô`;
 }
 
 async function openPresenterSpinModal() {
@@ -4253,6 +4309,7 @@ async function openPresenterSpinModal() {
     document.getElementById('spinResultCard').style.display = 'none';
     spinWinner = null;
     spinAssignDate = null;
+    spinOccupiedMondaySet = null;   // nạp lại các tuần đã có người thuyết trình mỗi lần mở
     const listEl = document.getElementById('spinUsersList');
     listEl.innerHTML = '<div class="empty-state"><i class="bi bi-hourglass-split"></i><br>Đang tải danh sách user...</div>';
 
@@ -4265,10 +4322,12 @@ async function openPresenterSpinModal() {
         });
         spinCandidates.sort((a, b) => (a.displayName || a.email || '').localeCompare(b.displayName || b.email || ''));
 
-        // Khôi phục danh sách đã bỏ chọn từ lần quay trước, chỉ giữ uid còn tồn tại
-        const savedExcluded = loadExcludedUidsFromStorage();
+        // Khôi phục danh sách đã bỏ chọn + số phiếu từ lần trước, chỉ giữ uid còn tồn tại
         const validUids = new Set(spinCandidates.map(u => u.uid));
-        spinExcludedUids = new Set(Array.from(savedExcluded).filter(uid => validUids.has(uid)));
+        spinExcludedUids = new Set(Array.from(loadExcludedUidsFromStorage()).filter(uid => validUids.has(uid)));
+        const savedTickets = loadSpinTicketsFromStorage();
+        spinTickets = {};
+        Object.keys(savedTickets).forEach(uid => { if (validUids.has(uid)) spinTickets[uid] = savedTickets[uid]; });
 
         renderSpinUsersList();
         renderSpinWheel();
@@ -4280,8 +4339,7 @@ async function openPresenterSpinModal() {
 
 function renderSpinUsersList() {
     const listEl = document.getElementById('spinUsersList');
-    document.getElementById('spinUsersCount').textContent =
-        `${spinCandidates.length - spinExcludedUids.size}/${spinCandidates.length}`;
+    updateSpinCounts();
 
     if (!spinCandidates.length) {
         listEl.innerHTML = '<div class="empty-state"><i class="bi bi-inbox"></i><br>Chưa có user nào</div>';
@@ -4291,13 +4349,19 @@ function renderSpinUsersList() {
     listEl.innerHTML = spinCandidates.map((user, idx) => {
         const isExcluded = spinExcludedUids.has(user.uid);
         const color = SPIN_WHEEL_COLORS[idx % SPIN_WHEEL_COLORS.length];
+        const tickets = getSpinTicketCount(user.uid);
         return `
-            <label class="spin-user-chip ${isExcluded ? 'excluded' : ''}" data-uid="${user.uid}">
+            <label class="spin-user-chip ${isExcluded ? 'excluded' : ''}" data-uid="${escapeHtml(user.uid)}">
                 <input type="checkbox" class="form-check-input spin-user-checkbox" ${isExcluded ? '' : 'checked'}>
-                <span class="spin-user-avatar" style="background:${color}">${avatarInitial(user)}</span>
-                <span>
-                    <span class="spin-user-name">${user.displayName || 'Chưa đặt tên'}</span>
-                    <span class="spin-user-email">${user.email || ''}</span>
+                <span class="spin-user-avatar" style="background:${color}">${escapeHtml(avatarInitial(user))}</span>
+                <span class="spin-user-info">
+                    <span class="spin-user-name">${escapeHtml(user.displayName || 'Chưa đặt tên')}</span>
+                    <span class="spin-user-email">${escapeHtml(user.email || '')}</span>
+                </span>
+                <span class="spin-ticket" title="Số ô của người này trên vòng quay (trùng tên)">
+                    <button type="button" class="spin-ticket-btn" data-ticket="-1" ${tickets <= 1 ? 'disabled' : ''} aria-label="Bớt 1 ô">−</button>
+                    <span class="spin-ticket-count">${tickets}</span>
+                    <button type="button" class="spin-ticket-btn" data-ticket="1" ${tickets >= SPIN_MAX_TICKETS ? 'disabled' : ''} aria-label="Thêm 1 ô">+</button>
                 </span>
             </label>`;
     }).join('');
@@ -4314,16 +4378,38 @@ function renderSpinUsersList() {
                 chip.classList.add('excluded');
             }
             saveExcludedUidsToStorage();
-            document.getElementById('spinUsersCount').textContent =
-                `${spinCandidates.length - spinExcludedUids.size}/${spinCandidates.length}`;
+            updateSpinCounts();
+            renderSpinWheel();
+            document.getElementById('spinResultCard').style.display = 'none';
+        });
+    });
+
+    listEl.querySelectorAll('.spin-ticket-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (spinIsSpinning) return;
+            const uid = btn.closest('.spin-user-chip').dataset.uid;
+            const next = Math.min(Math.max(getSpinTicketCount(uid) + parseInt(btn.dataset.ticket, 10), 1), SPIN_MAX_TICKETS);
+            spinTickets[uid] = next;
+            saveSpinTicketsToStorage();
+            renderSpinUsersList();
             renderSpinWheel();
             document.getElementById('spinResultCard').style.display = 'none';
         });
     });
 }
 
+// Mỗi "phiếu" = 1 ô trên vòng quay. Các phiếu của cùng 1 người được rải xen kẽ (không dính liền nhau)
+// để nhìn công bằng; xác suất trúng của mỗi ô luôn bằng nhau.
 function getSpinActiveCandidates() {
-    return spinCandidates.filter(u => !spinExcludedUids.has(u.uid));
+    const active = spinCandidates.filter(u => !spinExcludedUids.has(u.uid));
+    const maxTickets = active.reduce((max, u) => Math.max(max, getSpinTicketCount(u.uid)), 0);
+    const entries = [];
+    for (let round = 1; round <= maxTickets; round++) {
+        active.forEach(u => { if (getSpinTicketCount(u.uid) >= round) entries.push(u); });
+    }
+    return entries;
 }
 
 function renderSpinWheel() {
@@ -4343,21 +4429,26 @@ function renderSpinWheel() {
     }
 
     const slice = 360 / active.length;
+    const fontSize = active.length > 16 ? 8 : (active.length > 10 ? 9.5 : 11);
     let html = '';
     active.forEach((user, i) => {
         const startAngle = i * slice;
         const endAngle = startAngle + slice;
-        const color = SPIN_WHEEL_COLORS[i % SPIN_WHEEL_COLORS.length];
-        const p1 = polarPoint(cx, cy, r, startAngle);
-        const p2 = polarPoint(cx, cy, r, endAngle);
-        const largeArc = slice > 180 ? 1 : 0;
-        html += `<path d="M${cx},${cy} L${p1.x},${p1.y} A${r},${r} 0 ${largeArc} 1 ${p2.x},${p2.y} Z" fill="${color}" stroke="#fff" stroke-width="1.5"></path>`;
+        const color = SPIN_WHEEL_COLORS[spinCandidates.findIndex(u => u.uid === user.uid) % SPIN_WHEEL_COLORS.length];
+        if (active.length === 1) {
+            html += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}" stroke="#fff" stroke-width="1.5"></circle>`;
+        } else {
+            const p1 = polarPoint(cx, cy, r, startAngle);
+            const p2 = polarPoint(cx, cy, r, endAngle);
+            const largeArc = slice > 180 ? 1 : 0;
+            html += `<path d="M${cx},${cy} L${p1.x},${p1.y} A${r},${r} 0 ${largeArc} 1 ${p2.x},${p2.y} Z" fill="${color}" stroke="#fff" stroke-width="1.5"></path>`;
+        }
 
         const midAngle = startAngle + slice / 2;
         const labelPoint = polarPoint(cx, cy, r * 0.62, midAngle);
         const label = (user.displayName || user.email || '?').split(' ').pop();
         html += `<text x="${labelPoint.x}" y="${labelPoint.y}" text-anchor="middle" dominant-baseline="middle"
-            fill="#fff" font-size="11" font-weight="700" transform="rotate(${midAngle}, ${labelPoint.x}, ${labelPoint.y})">${escapeXml(label.slice(0, 10))}</text>`;
+            fill="#fff" font-size="${fontSize}" font-weight="700" transform="rotate(${midAngle}, ${labelPoint.x}, ${labelPoint.y})">${escapeXml(label.slice(0, 10))}</text>`;
     });
     svg.innerHTML = html;
 }
@@ -4371,21 +4462,16 @@ function escapeXml(str) {
     return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[c]));
 }
 
+// Công bằng: mọi ô trên vòng quay có xác suất trúng như nhau (không còn ưu tiên riêng ai).
 function pickWinnerIndex(active) {
-    // Cơ cấu ưu tiên: email chỉ định phải trúng đủ N lần đầu trước khi quay random hoàn toàn cho mọi người.
-    const winsUsed = getPriorityWinsUsed();
-    if (winsUsed < SPIN_PRIORITY_TARGET_WINS) {
-        const priorityIndex = active.findIndex(u => (u.email || '').toLowerCase() === SPIN_PRIORITY_EMAIL);
-        if (priorityIndex !== -1) return priorityIndex;
-    }
-    return Math.floor(Math.random() * active.length);
+    return secureRandomInt(active.length);
 }
 
 function spinPresenterWheel() {
     if (spinIsSpinning) return;
     const active = getSpinActiveCandidates();
-    if (active.length < 2) {
-        showNotification('Không đủ người', 'Cần ít nhất 2 người trong danh sách để quay số.', false, 'warning');
+    if (new Set(active.map(u => u.uid)).size < 2) {
+        showNotification('Không đủ người', 'Cần ít nhất 2 người khác nhau trong danh sách để quay số.', false, 'warning');
         return;
     }
 
@@ -4489,9 +4575,9 @@ function mondayToKey(date) {
 
 function showSpinResult() {
     document.getElementById('spinResultName').textContent = spinWinner.displayName || spinWinner.email;
-    const dateObj = new Date(spinAssignDate);
+    const winnerIsOff = dayOffsList.some(o => o.userId === spinWinner.uid && o.date === spinAssignDate);
     document.getElementById('spinResultDate').textContent =
-        `Thứ 2, ${formatDate(spinAssignDate)}${spinOccupiedMondaySet && spinOccupiedMondaySet.size ? ' (tuần gần nhất còn trống)' : ''}`;
+        `Thứ 2, ${formatDate(spinAssignDate)}${spinOccupiedMondaySet && spinOccupiedMondaySet.size ? ' (tuần gần nhất còn trống)' : ''}${winnerIsOff ? ' — ⚠️ người này đã đăng ký OFF ngày này' : ''}`;
     document.getElementById('spinResultCard').style.display = 'block';
 }
 
@@ -4522,9 +4608,7 @@ async function confirmPresenterAssignment() {
         await pushNotification(spinWinner.uid, 'presenter',
             `🎤 Bạn được chỉ định thuyết trình vào Thứ 2, ${formatDate(spinAssignDate)}!`, docRef.id);
 
-        if ((spinWinner.email || '').toLowerCase() === SPIN_PRIORITY_EMAIL && getPriorityWinsUsed() < SPIN_PRIORITY_TARGET_WINS) {
-            incrementPriorityWinsUsed();
-        }
+        if (spinOccupiedMondaySet) spinOccupiedMondaySet.add(spinAssignDate);
 
         showNotification('Đã xếp lịch!', `${spinWinner.displayName || spinWinner.email} sẽ thuyết trình Thứ 2, ${formatDate(spinAssignDate)}.`);
         presenterSpinModal.hide();
@@ -4534,6 +4618,368 @@ async function confirmPresenterAssignment() {
     } finally {
         btn.innerHTML = originalHTML;
         btn.disabled = false;
+    }
+}
+
+// ============================================================
+// LỊCH OFF — đăng ký ngày nghỉ & dời job trong lịch cố định
+// Firestore: collection "dayOffs", mỗi ngày off = 1 document, id = `${uid}_${YYYY-MM-DD}`
+//   { userId, userName, date, reason, createdAt }
+// ============================================================
+const DAYOFF_COLLECTION = 'dayOffs';
+const DAYOFF_MONTHS_SHOWN = 2;   // tháng hiện tại + tháng sau
+
+function listenDayOffs() {
+    if (unsubscribeDayOffs) unsubscribeDayOffs();
+    // Lấy từ đầu tháng trước để tuần hiện tại (có thể nằm ở tháng trước) vẫn tính đúng
+    const lower = new Date();
+    lower.setDate(1);
+    lower.setMonth(lower.getMonth() - 1);
+    const q = query(collection(db, DAYOFF_COLLECTION), where('date', '>=', localDateKey(lower)));
+    unsubscribeDayOffs = onSnapshot(q, (snapshot) => {
+        dayOffsList = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderSchedule();
+        if (dayOffModalOpen) renderDayOffModal();
+    }, (error) => {
+        console.error('❌ Lỗi khi lắng nghe lịch off:', error);
+        showNotification('Lỗi', 'Không tải được lịch off. Kiểm tra Firestore rules cho collection "dayOffs".', false, 'danger');
+    });
+}
+
+function getMyOffMap() {
+    const map = {};
+    if (!currentUser) return map;
+    dayOffsList.forEach(o => {
+        if (o.userId === currentUser.uid && o.date) map[o.date] = o;
+    });
+    return map;
+}
+
+// Ngày làm việc kế tiếp (sau ngày off) — bỏ qua các ngày off liên tiếp và Chủ Nhật nếu job không làm Chủ Nhật
+function resolveShiftedDate(job, originDate, offMap) {
+    const d = new Date(originDate);
+    let guard = 0;
+    do {
+        d.setDate(d.getDate() + 1);
+        guard++;
+    } while (guard < 60 && (offMap[localDateKey(d)] || (d.getDay() === 0 && job.workOnSunday === false)));
+    return d;
+}
+
+// Trả về map { 'YYYY-MM-DD': [{ job, shiftedFrom }] } cho khoảng [rangeStart, rangeEnd].
+// shiftedFrom = ngày gốc (đã off) nếu job này được dời sang.
+function buildScheduleEntries(rangeStart, rangeEnd, jobList) {
+    const offMap = getMyOffMap();
+    const startKey = localDateKey(rangeStart);
+    const endKey = localDateKey(rangeEnd);
+    // Lùi thêm 14 ngày để bắt các job bị off trước khoảng hiển thị nhưng dời vào trong khoảng
+    const scanFrom = new Date(rangeStart);
+    scanFrom.setDate(scanFrom.getDate() - 14);
+
+    const map = {};
+    jobList.forEach(job => {
+        getJobOccurrences(job, scanFrom, rangeEnd).forEach(date => {
+            const originKey = localDateKey(date);
+            let targetKey = originKey;
+            let shiftedFrom = null;
+            if (offMap[originKey]) {
+                targetKey = localDateKey(resolveShiftedDate(job, date, offMap));
+                shiftedFrom = originKey;
+            }
+            if (targetKey < startKey || targetKey > endKey) return;
+            (map[targetKey] = map[targetKey] || []).push({ job, shiftedFrom });
+        });
+    });
+    return map;
+}
+
+function isJobScheduledOnDate(job, date) {
+    const day = new Date(date);
+    day.setHours(0, 0, 0, 0);
+    const map = buildScheduleEntries(day, day, [job]);
+    return (map[localDateKey(day)] || []).length > 0;
+}
+
+// ---------------- Form đăng ký lịch off ----------------
+function getDayOffUserColor(uid) {
+    const idx = dayOffUsers.findIndex(u => u.uid === uid);
+    return idx >= 0 ? SPIN_WHEEL_COLORS[idx % SPIN_WHEEL_COLORS.length] : '#94a3b8';
+}
+
+async function openDayOffModal() {
+    if (!currentUser) return;
+    dayOffModalOpen = true;
+    dayOffFocusUid = null;
+    dayOffSelected = new Set(Object.keys(getMyOffMap()));
+    document.getElementById('dayOffReason').value = '';
+    buildDayOffUsers([]);
+    dayOffModal.show();
+    renderDayOffModal();
+
+    try {
+        const snapshot = await getDocs(collection(db, 'users'));
+        const users = [];
+        snapshot.forEach(userDoc => {
+            const user = userDoc.data();
+            if (user.uid) users.push(user);
+        });
+        buildDayOffUsers(users);
+        if (dayOffModalOpen) renderDayOffModal();
+    } catch (error) {
+        console.error('Lỗi tải danh sách user cho lịch off:', error);
+    }
+}
+
+// Gộp user từ collection users + user chỉ xuất hiện trong lịch off; mình luôn đứng đầu
+function buildDayOffUsers(fetchedUsers) {
+    const byUid = {};
+    fetchedUsers.forEach(u => { byUid[u.uid] = { uid: u.uid, displayName: u.displayName, email: u.email }; });
+    if (currentUser && !byUid[currentUser.uid]) {
+        byUid[currentUser.uid] = { uid: currentUser.uid, displayName: currentUser.displayName, email: currentUser.email };
+    }
+    dayOffsList.forEach(o => {
+        if (o.userId && !byUid[o.userId]) byUid[o.userId] = { uid: o.userId, displayName: o.userName, email: '' };
+    });
+    const label = u => u.displayName || u.email || '';
+    dayOffUsers = Object.values(byUid).sort((a, b) => label(a).localeCompare(label(b)));
+    dayOffUsers.sort((a, b) => (b.uid === currentUser.uid) - (a.uid === currentUser.uid));
+}
+
+function dayOffUserName(uid, fallback) {
+    const u = dayOffUsers.find(x => x.uid === uid);
+    return (u && (u.displayName || u.email)) || fallback || 'User';
+}
+
+function renderDayOffModal() {
+    renderDayOffUsers();
+    renderDayOffCalendars();
+    renderDayOffSummary();
+    renderDayOffDetails();
+}
+
+function countUpcomingOffs(uid, todayKey) {
+    return dayOffsList.filter(o => o.userId === uid && o.date >= todayKey).length;
+}
+
+function renderDayOffUsers() {
+    const todayKey = localDateKey(new Date());
+    document.getElementById('dayOffUsersCount').textContent = dayOffUsers.length;
+    document.getElementById('dayOffUsersList').innerHTML = dayOffUsers.map(user => {
+        const isMe = user.uid === currentUser.uid;
+        const name = user.displayName || user.email || 'Chưa đặt tên';
+        const count = countUpcomingOffs(user.uid, todayKey);
+        return `
+            <button type="button" class="dayoff-user-row ${dayOffFocusUid === user.uid ? 'active' : ''}" data-uid="${escapeHtml(user.uid)}">
+                <span class="dayoff-user-avatar" style="background:${getDayOffUserColor(user.uid)}">${escapeHtml(avatarInitial(user))}</span>
+                <span class="dayoff-user-name">${escapeHtml(name)}${isMe ? ' <em>(Tôi)</em>' : ''}</span>
+                <span class="dayoff-user-count ${count ? '' : 'zero'}" title="Số ngày off sắp tới">${count}</span>
+            </button>`;
+    }).join('');
+}
+
+function renderDayOffCalendars() {
+    const host = document.getElementById('dayOffCalendars');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayKey = localDateKey(today);
+    const savedMine = getMyOffMap();
+    const dows = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+
+    // Lịch off của NGƯỜI KHÁC theo ngày (chỉ xem)
+    const othersByDate = {};
+    dayOffsList.forEach(o => {
+        if (o.userId === currentUser.uid) return;
+        if (dayOffFocusUid && o.userId !== dayOffFocusUid) return;
+        (othersByDate[o.date] = othersByDate[o.date] || []).push(o);
+    });
+    const showMine = !dayOffFocusUid || dayOffFocusUid === currentUser.uid;
+
+    let html = '';
+    for (let m = 0; m < DAYOFF_MONTHS_SHOWN; m++) {
+        const first = new Date(today.getFullYear(), today.getMonth() + m, 1);
+        const daysInMonth = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+        const lead = (first.getDay() + 6) % 7;   // tuần bắt đầu từ T2
+
+        html += `<div class="dayoff-month"><div class="dayoff-month-title"><i class="bi bi-calendar3"></i> Tháng ${first.getMonth() + 1}/${first.getFullYear()}</div><div class="dayoff-grid">`;
+        dows.forEach(w => { html += `<div class="dayoff-dow">${w}</div>`; });
+        for (let i = 0; i < lead; i++) html += '<div class="dayoff-day empty"></div>';
+
+        for (let d = 1; d <= daysInMonth; d++) {
+            const key = localDateKey(new Date(first.getFullYear(), first.getMonth(), d));
+            const isPast = key < todayKey;
+            const isSunday = (lead + d - 1) % 7 === 6;
+            const isSelected = dayOffSelected.has(key);
+            const isPending = isSelected && !savedMine[key];
+
+            const entries = (othersByDate[key] || []).map(o => ({
+                uid: o.userId, name: dayOffUserName(o.userId, o.userName), reason: o.reason
+            }));
+            if (showMine && isSelected) {
+                const reason = savedMine[key] ? savedMine[key].reason : '(chưa lưu)';
+                entries.unshift({ uid: currentUser.uid, name: 'Tôi', reason });
+            }
+
+            const chips = entries.slice(0, 3).map(e =>
+                `<span class="dayoff-chip" style="background:${getDayOffUserColor(e.uid)}">${escapeHtml(avatarInitial({ displayName: e.name }))}</span>`
+            ).join('') + (entries.length > 3 ? `<span class="dayoff-chip more">+${entries.length - 3}</span>` : '');
+            const title = entries.map(e => `${e.name}: ${e.reason || 'Off'}`).join('\n');
+
+            const classes = ['dayoff-day'];
+            if (isPast) classes.push('past');
+            if (key === todayKey) classes.push('today');
+            if (isSunday) classes.push('sunday');
+            if (isSelected) classes.push('selected');
+            if (isPending) classes.push('pending');
+            if (entries.length) classes.push('has-off');
+
+            html += `<div class="${classes.join(' ')}" data-date="${key}" title="${escapeHtml(title)}">
+                <span class="dayoff-day-num">${d}</span>
+                <span class="dayoff-chips">${chips}</span>
+            </div>`;
+        }
+        html += '</div></div>';
+    }
+    host.innerHTML = html;
+}
+
+function getDayOffDiff() {
+    const todayKey = localDateKey(new Date());
+    const saved = getMyOffMap();
+    const added = Array.from(dayOffSelected).filter(k => !saved[k] && k >= todayKey).sort();
+    const removed = Object.keys(saved).filter(k => !dayOffSelected.has(k) && k >= todayKey).sort();
+    return { added, removed, saved };
+}
+
+function renderDayOffSummary() {
+    const { added, removed } = getDayOffDiff();
+    const summary = document.getElementById('dayOffSummary');
+    if (!added.length && !removed.length) {
+        summary.innerHTML = '<span class="text-muted">Bấm vào ngày trên lịch để chọn ngày off. Bấm lại ngày đã off của bạn để hủy.</span>';
+    } else {
+        summary.innerHTML =
+            added.map(k => `<span class="dayoff-diff-chip add">+ ${formatDateShortDMY(k)}</span>`).join('') +
+            removed.map(k => `<span class="dayoff-diff-chip remove">− ${formatDateShortDMY(k)}</span>`).join('');
+    }
+    document.getElementById('saveDayOffBtn').disabled = !added.length && !removed.length;
+    document.getElementById('dayOffReasonWrap').classList.toggle('d-none', !added.length);
+}
+
+function renderDayOffDetails() {
+    const todayKey = localDateKey(new Date());
+    const rows = dayOffsList
+        .filter(o => o.date >= todayKey && (!dayOffFocusUid || o.userId === dayOffFocusUid))
+        .sort((a, b) => a.date.localeCompare(b.date) || String(a.userName).localeCompare(String(b.userName)));
+    const weekdayShort = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+
+    document.getElementById('dayOffDetailTitle').textContent = dayOffFocusUid
+        ? `Lịch off của ${dayOffUserName(dayOffFocusUid)}`
+        : 'Lịch off sắp tới của mọi người';
+
+    if (!rows.length) {
+        document.getElementById('dayOffDetailList').innerHTML = '<div class="empty-state empty-state-sm"><i class="bi bi-calendar-check"></i><br>Chưa có lịch off nào</div>';
+        return;
+    }
+    document.getElementById('dayOffDetailList').innerHTML = rows.map(o => {
+        const isMine = o.userId === currentUser.uid;
+        const name = dayOffUserName(o.userId, o.userName);
+        return `
+            <div class="dayoff-detail-row">
+                <span class="dayoff-detail-date">${weekdayShort[parseJobDate(o.date).getDay()]} · ${formatDateShortDMY(o.date)}</span>
+                <span class="dayoff-user-avatar sm" style="background:${getDayOffUserColor(o.userId)}">${escapeHtml(avatarInitial({ displayName: name }))}</span>
+                <span class="dayoff-detail-name">${escapeHtml(isMine ? `${name} (Tôi)` : name)}</span>
+                <span class="dayoff-detail-reason">${escapeHtml(o.reason || '')}</span>
+                ${isMine ? `<button type="button" class="dayoff-detail-del" data-off-id="${escapeHtml(o.id)}" data-off-date="${o.date}" title="Xóa ngày off này"><i class="bi bi-trash3-fill"></i></button>` : ''}
+            </div>`;
+    }).join('');
+}
+
+function handleDayOffCalendarClick(event) {
+    const cell = event.target.closest('.dayoff-day[data-date]');
+    // Chỉ chọn được ngày từ hôm nay trở đi; lịch của người khác chỉ để xem
+    if (!cell || cell.classList.contains('past')) return;
+    const key = cell.dataset.date;
+    if (dayOffSelected.has(key)) dayOffSelected.delete(key);
+    else dayOffSelected.add(key);
+    if (dayOffFocusUid && dayOffFocusUid !== currentUser.uid) dayOffFocusUid = null;
+    renderDayOffModal();
+}
+
+function handleDayOffUserClick(event) {
+    const row = event.target.closest('.dayoff-user-row[data-uid]');
+    if (!row) return;
+    dayOffFocusUid = dayOffFocusUid === row.dataset.uid ? null : row.dataset.uid;
+    renderDayOffModal();
+}
+
+function handleDayOffDetailClick(event) {
+    const btn = event.target.closest('[data-off-id]');
+    if (!btn) return;
+    const id = btn.dataset.offId;
+    const date = btn.dataset.offDate;
+    showConfirmDialog({
+        title: 'Xóa ngày off',
+        message: `Hủy lịch off ngày ${formatDateShortDMY(date)}? Job của ngày này sẽ trở lại lịch bình thường.`,
+        confirmText: 'Xóa',
+        confirmClass: 'btn-delete',
+        onConfirm: async () => {
+            try {
+                await deleteDoc(doc(db, DAYOFF_COLLECTION, id));
+                dayOffSelected.delete(date);
+                showNotification('Đã hủy', `Đã xóa lịch off ngày ${formatDateShortDMY(date)}.`, false, 'success');
+            } catch (error) {
+                console.error('Lỗi xóa lịch off:', error);
+                showNotification('Lỗi', 'Không thể xóa lịch off.', false, 'danger');
+            }
+        }
+    });
+}
+
+async function saveDayOffs() {
+    if (!currentUser) return;
+    const { added, removed, saved } = getDayOffDiff();
+    if (!added.length && !removed.length) return;
+
+    const reasonInput = document.getElementById('dayOffReason');
+    const reason = reasonInput.value.trim();
+    if (added.length && !reason) {
+        showNotification('Thiếu lý do', 'Vui lòng nhập lý do off cho các ngày mới chọn.', false, 'warning');
+        reasonInput.focus();
+        return;
+    }
+
+    const btn = document.getElementById('saveDayOffBtn');
+    const originalHTML = btn.innerHTML;
+    btn.innerHTML = '<span class="loading"></span> Đang lưu...';
+    btn.disabled = true;
+
+    try {
+        const batch = writeBatch(db);
+        const now = new Date().toISOString();
+        added.forEach(key => {
+            batch.set(doc(db, DAYOFF_COLLECTION, `${currentUser.uid}_${key}`), {
+                userId: currentUser.uid,
+                userName: currentUser.displayName || currentUser.email || 'User',
+                date: key,
+                reason,
+                createdAt: now
+            });
+        });
+        removed.forEach(key => {
+            batch.delete(doc(db, DAYOFF_COLLECTION, saved[key].id));
+        });
+        await batch.commit();
+
+        reasonInput.value = '';
+        const parts = [];
+        if (added.length) parts.push(`đăng ký ${added.length} ngày off`);
+        if (removed.length) parts.push(`hủy ${removed.length} ngày off`);
+        showNotification('Đã lưu lịch off', `Bạn đã ${parts.join(' và ')}. Job trong ngày off sẽ được dời sang ngày làm việc kế tiếp.`, false, 'success');
+    } catch (error) {
+        console.error('Lỗi lưu lịch off:', error);
+        showNotification('Lỗi', 'Không thể lưu lịch off. Vui lòng thử lại.', false, 'danger');
+    } finally {
+        btn.innerHTML = originalHTML;
+        renderDayOffSummary();
     }
 }
 

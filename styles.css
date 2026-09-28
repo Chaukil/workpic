@@ -4144,3 +4144,122 @@ body.theme-dark .theme-toggle:hover {
     .card-header.modern-card-header h6 { font-size: 0.86rem; }
     .card-header.modern-card-header small { font-size: 0.66rem; }
 }
+
+/* ============================================================
+   SPIN — số ô (trùng tên) cho từng người
+   ============================================================ */
+.spin-user-info { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.spin-user-info .spin-user-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spin-ticket { margin-left: auto; display: inline-flex; align-items: center; gap: 0.2rem; flex: none; }
+.spin-ticket-btn {
+    width: 22px; height: 22px; padding: 0; border-radius: 50%; line-height: 1; font-weight: 700;
+    display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+    border: 1px solid var(--border); background: var(--surface-muted); color: var(--text);
+}
+.spin-ticket-btn:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+.spin-ticket-btn:disabled { opacity: .35; cursor: not-allowed; }
+.spin-ticket-count { min-width: 1.2rem; text-align: center; font-weight: 700; font-size: var(--fs-2xs); color: var(--text); }
+.spin-user-chip.excluded .spin-ticket { pointer-events: none; }
+
+/* ============================================================
+   LỊCH OFF
+   ============================================================ */
+.layout-item-ic-dayoff { background: linear-gradient(135deg, #f97316, #ef4444); color: #fff; }
+.modal-header.modern-header-dayoff { background: linear-gradient(135deg, #f97316 0%, #ef4444 55%, #be185d 100%); }
+
+.dayoff-layout { display: grid; grid-template-columns: 240px 1fr; gap: 1.25rem; align-items: start; }
+@media (max-width: 992px) { .dayoff-layout { grid-template-columns: 1fr; } }
+
+.dayoff-users-col { background: var(--surface-muted); border: 1px solid var(--border); border-radius: 14px; padding: 0.85rem; position: sticky; top: 0; }
+.dayoff-users-list { display: flex; flex-direction: column; gap: 0.4rem; max-height: 60vh; overflow-y: auto; }
+.dayoff-user-row {
+    display: flex; align-items: center; gap: 0.55rem; width: 100%; text-align: left; cursor: pointer;
+    padding: 0.45rem 0.6rem; border-radius: 10px; font-size: var(--fs-2xs);
+    background: var(--surface); border: 1px solid var(--border); color: var(--text);
+    transition: border-color .15s ease, background .15s ease;
+}
+.dayoff-user-row:hover { border-color: var(--primary); }
+.dayoff-user-row.active { border-color: var(--primary); background: var(--primary-soft); }
+.dayoff-user-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.dayoff-user-name em { font-style: normal; font-weight: 500; color: var(--muted); }
+.dayoff-user-count { flex: none; min-width: 1.4rem; text-align: center; padding: 0.05rem 0.4rem; border-radius: 999px; font-size: var(--fs-3xs); font-weight: 700; background: #ef4444; color: #fff; }
+.dayoff-user-count.zero { background: var(--surface-strong); color: var(--muted); }
+.dayoff-user-avatar {
+    width: 26px; height: 26px; border-radius: 50%; flex: none; color: #fff; font-weight: 700; font-size: var(--fs-3xs);
+    display: flex; align-items: center; justify-content: center;
+}
+.dayoff-user-avatar.sm { width: 20px; height: 20px; font-size: .6rem; }
+
+.dayoff-calendars { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media (max-width: 768px) { .dayoff-calendars { grid-template-columns: 1fr; } }
+.dayoff-month { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 0.75rem; }
+.dayoff-month-title { font-weight: 700; font-size: var(--fs-sm); color: var(--text); margin-bottom: 0.5rem; }
+.dayoff-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.dayoff-dow { text-align: center; font-size: var(--fs-3xs); font-weight: 700; color: var(--muted); padding-bottom: 2px; }
+.dayoff-day {
+    position: relative; min-height: 56px; padding: 3px 4px; border-radius: 8px; cursor: pointer; user-select: none;
+    display: flex; flex-direction: column; gap: 2px; overflow: hidden;
+    background: var(--surface-muted); border: 1px solid var(--border);
+    transition: border-color .12s ease, transform .12s ease, background .12s ease;
+}
+.dayoff-day.empty { visibility: hidden; pointer-events: none; }
+.dayoff-day:hover:not(.past) { border-color: var(--primary); transform: translateY(-1px); }
+.dayoff-day.past { opacity: .4; cursor: not-allowed; }
+.dayoff-day.sunday .dayoff-day-num { color: var(--danger); }
+.dayoff-day.today { box-shadow: inset 0 0 0 2px #ffc107; }
+.dayoff-day.has-off { background: rgba(239, 68, 68, 0.07); }
+.dayoff-day.selected { background: var(--primary-soft); border-color: var(--primary); box-shadow: inset 0 0 0 2px var(--primary); }
+.dayoff-day.selected.today { box-shadow: inset 0 0 0 2px var(--primary), 0 0 0 2px #ffc107; }
+.dayoff-day.pending { border-style: dashed; }
+.dayoff-day-num { font-size: var(--fs-2xs); font-weight: 700; color: var(--text); }
+.dayoff-chips { display: flex; flex-wrap: wrap; gap: 2px; }
+.dayoff-chip {
+    width: 17px; height: 17px; border-radius: 50%; color: #fff; font-size: .58rem; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+}
+.dayoff-chip.more { background: var(--muted); width: auto; min-width: 17px; padding: 0 3px; border-radius: 999px; }
+
+.dayoff-form, .dayoff-detail { margin-top: 1rem; padding: 0.9rem; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-muted); }
+.dayoff-form-head { font-weight: 700; font-size: var(--fs-sm); color: var(--text); margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.4rem; }
+.dayoff-summary { display: flex; flex-wrap: wrap; gap: 0.35rem; font-size: var(--fs-xs); }
+.dayoff-diff-chip { padding: 0.15rem 0.55rem; border-radius: 999px; font-weight: 700; font-size: var(--fs-2xs); }
+.dayoff-diff-chip.add { background: rgba(22, 163, 74, .14); color: var(--success); }
+.dayoff-diff-chip.remove { background: rgba(239, 68, 68, .14); color: var(--danger); }
+.dayoff-reason-presets { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.5rem; }
+.dayoff-reason-presets button {
+    border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer;
+    padding: 0.15rem 0.6rem; border-radius: 999px; font-size: var(--fs-2xs);
+}
+.dayoff-reason-presets button:hover { border-color: var(--primary); color: var(--primary); }
+
+.dayoff-detail-list { display: flex; flex-direction: column; gap: 0.35rem; max-height: 260px; overflow-y: auto; }
+.dayoff-detail-row {
+    display: flex; align-items: center; gap: 0.55rem; padding: 0.4rem 0.6rem; border-radius: 10px;
+    background: var(--surface); border: 1px solid var(--border); font-size: var(--fs-2xs); color: var(--text);
+}
+.dayoff-detail-date { flex: none; font-weight: 700; min-width: 74px; }
+.dayoff-detail-name { flex: none; font-weight: 600; max-width: 34%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dayoff-detail-reason { flex: 1; min-width: 0; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dayoff-detail-del { flex: none; border: none; background: transparent; color: var(--danger); cursor: pointer; padding: 0.1rem 0.3rem; border-radius: 6px; }
+.dayoff-detail-del:hover { background: rgba(239, 68, 68, .12); }
+
+/* ---- Lịch cố định: ngày off + job dời ---- */
+.schedule-table td.day-off-cell {
+    background: repeating-linear-gradient(135deg, rgba(239, 68, 68, .06) 0 8px, rgba(239, 68, 68, .12) 8px 16px);
+}
+.day-off-badge {
+    display: inline-block; margin-left: 0.35rem; padding: 0 0.4rem; border-radius: 999px;
+    background: #ef4444; color: #fff; font-size: .6rem; font-weight: 800; vertical-align: middle;
+}
+.day-off-note { font-size: .68rem; font-weight: 600; color: #b91c1c; margin-bottom: 0.35rem; }
+body.theme-dark .day-off-note { color: #fca5a5; }
+
+/* Job dời từ ngày off: màu xám, luôn nằm cuối ngày */
+.schedule-item.shifted,
+.schedule-item.shifted.daily, .schedule-item.shifted.weekly, .schedule-item.shifted.biweekly,
+.schedule-item.shifted.monthly, .schedule-item.shifted.quarterly, .schedule-item.shifted.yearly, .schedule-item.shifted.once {
+    background: linear-gradient(135deg, rgba(100, 116, 139, .95), rgba(148, 163, 184, .95)) !important;
+    border: 1px dashed rgba(255, 255, 255, .55);
+}
+.schedule-item.shifted h6, .schedule-item.shifted small { color: #fff; }
+.schedule-item.shifted .shifted-tag { display: block; margin-top: 1px; font-size: .6rem; opacity: .95; font-style: italic; }
