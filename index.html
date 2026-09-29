@@ -91,9 +91,6 @@
             </div>
             <div class="topbar-badges">
                 <div class="user-menu">
-                    <button type="button" class="voice-btn" id="voiceBtn" title="Lệnh thoại (Chrome/Edge)">
-                        <i class="bi bi-mic-fill"></i>
-                    </button>
                     <button type="button" class="notif-bell-btn" id="guideBtn" title="Hướng dẫn sử dụng">
                         <i class="bi bi-info-circle-fill"></i>
                     </button>
@@ -188,6 +185,24 @@
                                                 <span class="layout-item-text">
                                                     <span class="layout-item-title">Đăng ký lịch off</span>
                                                     <span class="layout-item-sub">Chọn ngày nghỉ, xem lịch off của mọi người</span>
+                                                </span>
+                                            </button>
+                                        </li>
+                                        <li>
+                                            <button class="layout-dropdown-item" id="statisticsBtn" type="button">
+                                                <span class="layout-item-ic layout-item-ic-stats"><i class="bi bi-bar-chart-fill"></i></span>
+                                                    <span class="layout-item-text">
+                                                        <span class="layout-item-title">Thống kê job</span>
+                                                        <span class="layout-item-sub">Xem user nào đang chiếm nhiều thời gian</span>
+                                                    </span>
+                                                </button>
+                                            </li>
+                                        <li>
+                                            <button class="layout-dropdown-item" id="salaryCalcBtn" type="button">
+                                                <span class="layout-item-ic layout-item-ic-salary"><i class="bi bi-cash-coin"></i></span>
+                                                <span class="layout-item-text">
+                                                    <span class="layout-item-title">Tính lương</span>
+                                                    <span class="layout-item-sub">Ước tính thu nhập &amp; thực lãnh trong tháng</span>
                                                 </span>
                                             </button>
                                         </li>
@@ -310,34 +325,39 @@
                     </div>
 
                     <div id="scheduleFields" class="row">
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label fw-bold">Loại Job *</label>
-                            <select class="form-select" id="jobType" required>
-                                <option value="once">Once (Một lần)</option>
-                                <option value="daily">Daily (Hàng ngày)</option>
-                                <option value="weekly">Weekly (Hàng tuần)</option>
-                                <option value="biweekly">Biweekly (2 tuần/lần)</option>
-                                <option value="monthly">Monthly (Hàng tháng)</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label fw-bold">Ngày Bắt Đầu *</label>
-                            <input type="date" class="form-control" id="jobDate" required>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label fw-bold">Giờ Thực Hiện *</label>
-                            <input type="time" class="form-control" id="jobTime" required>
-                        </div>
-                        <div class="col-md-12 mb-3">
-                            <label class="form-label fw-bold">Làm Chủ Nhật?</label>
-                            <div class="form-check form-switch mt-2">
-                                <input class="form-check-input" type="checkbox" id="workOnSunday">
-                                <label class="form-check-label" for="workOnSunday">
-                                    Có làm vào Chủ Nhật
-                                </label>
-                            </div>
-                        </div>
-                    </div>
+    <div class="col-md-3 mb-3">
+        <label class="form-label fw-bold">Loại Job *</label>
+        <select class="form-select" id="jobType" required>
+            <option value="once">Once (Một lần)</option>
+            <option value="daily">Daily (Hàng ngày)</option>
+            <option value="weekly">Weekly (Hàng tuần)</option>
+            <option value="biweekly">Biweekly (2 tuần/lần)</option>
+            <option value="monthly">Monthly (Hàng tháng)</option>
+        </select>
+    </div>
+    <div class="col-md-3 mb-3">
+        <label class="form-label fw-bold">Ngày Bắt Đầu *</label>
+        <input type="date" class="form-control" id="jobDate" required>
+    </div>
+    <div class="col-md-3 mb-3">
+        <label class="form-label fw-bold">Giờ Thực Hiện *</label>
+        <input type="time" class="form-control" id="jobTime" required>
+    </div>
+    <div class="col-md-3 mb-3">
+        <label class="form-label fw-bold">Thời Gian (phút)</label>
+        <input type="number" class="form-control" id="jobDuration" min="1" max="1440" placeholder="30">
+        <div class="form-text">Trống = 30 phút</div>
+    </div>
+    <div class="col-md-12 mb-3">
+        <label class="form-label fw-bold">Làm Chủ Nhật?</label>
+        <div class="form-check form-switch mt-2">
+            <input class="form-check-input" type="checkbox" id="workOnSunday">
+            <label class="form-check-label" for="workOnSunday">
+                Có làm vào Chủ Nhật
+            </label>
+        </div>
+    </div>
+</div>
 
                     <div class="mb-3">
                         <label class="form-label fw-bold">Nội Dung Chi Tiết</label>
@@ -810,6 +830,122 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
         </div>
     </div>
 
+    <!-- Salary Calculator Modal -->
+    <div class="modal fade" id="salaryCalcModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content salary-modal-content">
+                <div class="modal-header modern-header modern-header-salary">
+                    <div class="modern-header-inner">
+                        <div class="modern-header-icon"><i class="bi bi-cash-coin"></i></div>
+                        <div class="modern-header-text">
+                            <h5 class="modal-title mb-0">Tính lương</h5>
+                            <p class="modern-header-subtitle mb-0">Nhập số liệu để ước tính lương thực lãnh</p>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="salary-lcb-card">
+                        <div class="salary-lcb-row">
+                            <label for="salLCB"><i class="bi bi-cash-stack"></i> Lương cơ bản (LCB)</label>
+                            <input type="text" inputmode="numeric" class="salary-input salary-input-lcb" id="salLCB" placeholder="0">
+                        </div>
+                        <div class="salary-lcb-row salary-lcb-row-sm">
+                            <label for="salStandardDays"><i class="bi bi-calendar-range"></i> Ngày công chuẩn/tháng</label>
+                            <input type="text" inputmode="numeric" class="salary-input salary-input-sm" id="salStandardDays" placeholder="26">
+                        </div>
+                        <div class="salary-lcb-hint"><i class="bi bi-info-circle"></i> Đơn giá ngày = LCB ÷ Ngày công chuẩn. Các mục bên dưới chỉ cần nhập số ngày/giờ, tiền sẽ tự tính.</div>
+                    </div>
+
+                    <div class="salary-grid">
+                        <div class="salary-card salary-card-income">
+                            <div class="salary-card-head salary-head-income">
+                                <i class="bi bi-plus-circle-fill"></i> Mục A: Thu nhập
+                            </div>
+                            <div class="salary-card-body" id="salaryIncomeRows">
+                                <div class="salary-row salary-row-auto">
+                                    <label for="salWorkDay"><i class="bi bi-briefcase-fill"></i> Ngày làm việc<span class="salary-formula">× 1 LCB/ngày</span></label>
+                                    <input type="text" inputmode="numeric" class="salary-count-input" id="salWorkDay" data-unit="ngày" placeholder="0"><span class="salary-unit">ngày</span>
+                                    <span class="salary-line-value" id="salWorkDayValue">0 VNĐ</span>
+                                </div>
+                                <div class="salary-row salary-row-auto">
+                                    <label for="salHoliday"><i class="bi bi-flag-fill"></i> Ngày lễ<span class="salary-formula">× 3 LCB/ngày</span></label>
+                                    <input type="text" inputmode="numeric" class="salary-count-input" id="salHoliday" data-unit="ngày" placeholder="0"><span class="salary-unit">ngày</span>
+                                    <span class="salary-line-value" id="salHolidayValue">0 VNĐ</span>
+                                </div>
+                                <div class="salary-row salary-row-auto">
+                                    <label for="salAnnualLeave"><i class="bi bi-umbrella-fill"></i> Phép năm<span class="salary-formula">× 1 LCB/ngày</span></label>
+                                    <input type="text" inputmode="numeric" class="salary-count-input" id="salAnnualLeave" data-unit="ngày" placeholder="0"><span class="salary-unit">ngày</span>
+                                    <span class="salary-line-value" id="salAnnualLeaveValue">0 VNĐ</span>
+                                </div>
+                                <div class="salary-row salary-row-auto">
+                                    <label for="salPaidLeave"><i class="bi bi-house-heart-fill"></i> Nghỉ hưởng lương<span class="salary-formula">× 1 LCB/ngày</span></label>
+                                    <input type="text" inputmode="numeric" class="salary-count-input" id="salPaidLeave" data-unit="ngày" placeholder="0"><span class="salary-unit">ngày</span>
+                                    <span class="salary-line-value" id="salPaidLeaveValue">0 VNĐ</span>
+                                </div>
+                                <div class="salary-row salary-row-auto">
+                                    <label for="salOtNormal"><i class="bi bi-clock-fill"></i> Tăng ca thường<span class="salary-formula">× 1.5 LCB/8</span></label>
+                                    <input type="text" inputmode="numeric" class="salary-count-input" id="salOtNormal" data-unit="giờ" placeholder="0"><span class="salary-unit">giờ</span>
+                                    <span class="salary-line-value" id="salOtNormalValue">0 VNĐ</span>
+                                </div>
+                                <div class="salary-row salary-row-auto">
+                                    <label for="salOtSunday"><i class="bi bi-gear-fill"></i> Tăng ca CN<span class="salary-formula">× 2 LCB/8</span></label>
+                                    <input type="text" inputmode="numeric" class="salary-count-input" id="salOtSunday" data-unit="giờ" placeholder="0"><span class="salary-unit">giờ</span>
+                                    <span class="salary-line-value" id="salOtSundayValue">0 VNĐ</span>
+                                </div>
+                                <div class="salary-row">
+                                    <label for="salNightShift"><i class="bi bi-moon-stars-fill"></i> Ca đêm<span class="salary-formula">nhập tay</span></label>
+                                    <input type="text" inputmode="numeric" class="salary-input" id="salNightShift" data-group="income" placeholder="0">
+                                </div>
+                                <div class="salary-row salary-total-row">
+                                    <label>Tổng Thu Nhập:</label>
+                                    <span class="salary-total-value" id="salaryIncomeTotal">0 VNĐ</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="salary-card salary-card-deduct">
+                            <div class="salary-card-head salary-head-deduct">
+                                <i class="bi bi-dash-circle-fill"></i> Mục B: Khấu trừ
+                            </div>
+                            <div class="salary-card-body" id="salaryDeductRows">
+                                <div class="salary-row salary-row-readonly">
+                                    <label for="salInsurance"><i class="bi bi-shield-fill-check"></i> BHXH/BHYT/BHTN<span class="salary-formula">10.5% LCB</span></label>
+                                    <span class="salary-line-value salary-line-value-deduct" id="salInsuranceValue">0 VNĐ</span>
+                                </div>
+                                <div class="salary-row salary-row-readonly">
+                                    <label for="salUnionFee"><i class="bi bi-people-fill"></i> Phí công đoàn<span class="salary-formula">cố định</span></label>
+                                    <span class="salary-line-value salary-line-value-deduct" id="salUnionFeeValue">0 VNĐ</span>
+                                </div>
+                                <div class="salary-row salary-total-row salary-total-row-deduct">
+                                    <label>Tổng Khấu Trừ:</label>
+                                    <span class="salary-total-value" id="salaryDeductTotal">0 VNĐ</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="salary-result">
+                        <div class="salary-result-icon"><i class="bi bi-wallet2"></i></div>
+                        <div class="salary-result-text">
+                            <div class="salary-result-label">Thực Lãnh</div>
+                            <div class="salary-result-value" id="salaryNetTotal">0 VNĐ</div>
+                            <div class="salary-result-sub">Lương thực tế sau khấu trừ</div>
+                        </div>
+                    </div>
+
+                    <div class="salary-note">
+                        <i class="bi bi-info-circle"></i> Chỉ dùng để ước tính, số liệu không được lưu lại. Form sẽ tự xóa khi đóng.
+                    </div>
+
+                    <div class="d-flex justify-content-end mt-3">
+                        <button type="button" class="btn btn-cancel" id="salaryResetBtn"><i class="bi bi-arrow-counterclockwise"></i> Xóa hết</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- User Profile Modal -->
     <div class="modal fade" id="userProfileModal" tabindex="-1">
         <div class="modal-dialog modal-md">
@@ -1156,6 +1292,49 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
         </div>
     </div>
 
+    <!-- Statistics Modal -->
+<div class="modal fade" id="statisticsModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header modern-header modern-header-info">
+                <div class="modern-header-inner">
+                    <div class="modern-header-icon"><i class="bi bi-bar-chart-fill"></i></div>
+                    <div class="modern-header-text">
+                        <h5 class="modal-title mb-0">Thống kê thời gian làm việc</h5>
+                        <p class="modern-header-subtitle mb-0">Xem user nào đang có nhiều job và chiếm nhiều thời gian</p>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="stats-mode-tabs" role="tablist">
+                    <button class="stats-mode-tab active" data-mode="today" type="button">
+                        <i class="bi bi-sun-fill"></i> Hôm nay
+                    </button>
+                    <button class="stats-mode-tab" data-mode="week" type="button">
+                        <i class="bi bi-calendar-week-fill"></i> Tuần này
+                    </button>
+                </div>
+
+                <div class="stats-summary" id="statsSummary"></div>
+
+                <div class="stats-chart-section">
+                    <div class="stats-chart-header">
+                        <h6><i class="bi bi-bar-chart-line-fill"></i> Thời gian theo user</h6>
+                        <small class="text-muted">Bấm vào tên để ẩn/hiện user — trạng thái được lưu lại</small>
+                    </div>
+                    <div id="statsChart" class="stats-chart"></div>
+                </div>
+
+                <div class="stats-table-section">
+                    <h6><i class="bi bi-list-ul"></i> Chi tiết job theo user</h6>
+                    <div id="statsTable" class="table-responsive"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
     <button type="button" class="quick-chat-toggle" id="quickChatToggleBtn" title="Job trong ngày">
         <i class="bi bi-chat-dots-fill"></i>
         <span class="quick-chat-badge d-none" id="quickChatBadge">0</span>
@@ -1212,6 +1391,7 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
             </button>
         </div>
     </aside>
+    
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script type="module" src="app.js"></script>

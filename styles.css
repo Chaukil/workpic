@@ -4579,37 +4579,252 @@ body.theme-dark .day-override-popover {
 }
 
 /* ============================================================
-   NÚT LỆNH THOẠI (VOICE COMMAND)
+   MODAL TÍNH LƯƠNG
    ============================================================ */
-.voice-btn {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 38px; height: 38px;
+.layout-item-ic-salary { background: linear-gradient(135deg, #16a34a, #22c55e); }
+.modal-header.modern-header-salary { background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 60%, #16a34a 120%); }
+
+.salary-modal-content { overflow: hidden; }
+
+.salary-lcb-card {
+    border-radius: 14px;
+    padding: 0.9rem 1rem;
+    margin-bottom: 1rem;
+    background: linear-gradient(135deg, rgba(37, 99, 235, .08), rgba(22, 163, 74, .07));
     border: 1px solid var(--border);
-    border-radius: 999px;
-    background: var(--surface-muted);
-    color: var(--text);
-    cursor: pointer;
-    font-size: var(--fs-md);
-    transition: all 0.2s ease;
 }
-.voice-btn:hover {
+.salary-lcb-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.salary-lcb-row + .salary-lcb-row { margin-top: 0.5rem; }
+.salary-lcb-row label { font-weight: 800; font-size: var(--fs-sm); color: var(--text); display: flex; align-items: center; gap: 0.4rem; }
+.salary-lcb-row-sm label { font-weight: 600; font-size: var(--fs-2xs); color: var(--muted); }
+.salary-input-lcb { width: 220px; max-width: 55%; font-size: var(--fs-md); font-weight: 800; color: var(--primary); }
+.salary-input-sm { width: 90px; max-width: 30%; font-size: var(--fs-2xs); }
+.salary-lcb-hint { margin-top: 0.55rem; font-size: var(--fs-3xs); color: var(--muted); display: flex; gap: 0.35rem; align-items: flex-start; }
+
+.salary-row-auto, .salary-row-readonly { flex-wrap: wrap; }
+.salary-formula {
+    display: inline-block; margin-left: 0.4rem; font-size: var(--fs-3xs); font-weight: 600;
+    color: var(--muted); background: var(--surface-muted); border-radius: 999px; padding: 0 0.4rem;
+}
+.salary-count-input {
+    width: 56px; text-align: right; font-weight: 700; font-size: var(--fs-2xs);
+    border: 1px solid var(--border); border-radius: 8px; padding: 0.28rem 0.4rem;
+    background: var(--surface); color: var(--text); margin-left: auto;
+}
+.salary-count-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-soft); }
+.salary-unit { font-size: var(--fs-3xs); color: var(--muted); margin: 0 0.5rem 0 0.25rem; }
+.salary-line-value { font-weight: 700; font-size: var(--fs-2xs); color: var(--success); min-width: 92px; text-align: right; }
+.salary-line-value-deduct { color: var(--danger); margin-left: auto; }
+.salary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: start; }
+@media (max-width: 768px) { .salary-grid { grid-template-columns: 1fr; } }
+
+.salary-card {
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid var(--border);
     background: var(--surface);
-    border-color: var(--primary);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(139, 92, 246, 0.18);
+    box-shadow: 0 6px 18px rgba(15, 23, 42, .06);
 }
-.voice-btn.voice-active {
-    background: linear-gradient(135deg, #ef4444, #f43f5e);
+.salary-card-head {
+    padding: 0.7rem 1rem;
+    font-weight: 700;
+    font-size: var(--fs-sm);
     color: #fff;
-    border-color: transparent;
-    animation: voicePulse 1.4s ease-in-out infinite;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
 }
-@keyframes voicePulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.55); }
-    50%      { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+.salary-head-income { background: linear-gradient(135deg, #2563eb, #38bdf8); }
+.salary-head-deduct { background: linear-gradient(135deg, #dc2626, #f97316); }
+.salary-card-body { padding: 0.85rem 1rem; }
+.salary-card-income .salary-card-body { background: rgba(34, 197, 94, .05); }
+.salary-card-deduct .salary-card-body { background: rgba(239, 68, 68, .05); }
+
+.salary-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.42rem 0;
+    border-bottom: 1px dashed var(--border);
 }
-body.theme-dark .voice-btn { background: rgba(30, 41, 59, 0.6); border-color: rgba(71, 85, 105, 0.5); }
-body.theme-dark .voice-btn:hover { background: rgba(30, 41, 59, 0.9); }
+.salary-row:last-of-type { border-bottom: none; }
+.salary-row label { display: flex; align-items: center; gap: 0.4rem; font-size: var(--fs-2xs); color: var(--text); font-weight: 600; flex: 1; }
+.salary-row label i { color: var(--muted); }
+.salary-input {
+    width: 130px; max-width: 44%; text-align: right; font-weight: 700; font-size: var(--fs-2xs);
+    border: 1px solid var(--border); border-radius: 8px; padding: 0.3rem 0.5rem;
+    background: var(--surface); color: var(--text);
+}
+.salary-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-soft); }
+
+.salary-total-row { border-top: 1px solid var(--border); border-bottom: none !important; margin-top: 0.3rem; padding-top: 0.6rem; }
+.salary-total-row label { font-weight: 800; color: var(--text); font-size: var(--fs-xs); }
+.salary-total-value { font-weight: 800; font-size: var(--fs-sm); color: var(--success); }
+.salary-total-row-deduct .salary-total-value { color: var(--danger); }
+
+.salary-result {
+    margin-top: 1rem;
+    border-radius: 16px;
+    padding: 1.1rem 1.3rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: linear-gradient(135deg, #16a34a, #22c55e 60%, #4ade80);
+    color: #fff;
+    box-shadow: 0 10px 26px rgba(22, 163, 74, .28);
+}
+.salary-result-icon { font-size: 1.9rem; opacity: .9; }
+.salary-result-label { font-size: var(--fs-xs); font-weight: 700; opacity: .92; text-transform: uppercase; letter-spacing: .03em; }
+.salary-result-value { font-size: 1.7rem; font-weight: 800; line-height: 1.25; }
+.salary-result-sub { font-size: var(--fs-2xs); opacity: .85; }
+
+.salary-note { margin-top: 0.75rem; font-size: var(--fs-3xs); color: var(--muted); display: flex; align-items: center; gap: 0.35rem; }
+
+/* ============================================================
+   STATISTICS MODAL
+   ============================================================ */
+.layout-item-ic-stats { background: linear-gradient(135deg, #0ea5e9, #3b82f6); }
+
+.stats-mode-tabs {
+    display: inline-flex; gap: 0.25rem;
+    padding: 0.3rem; margin-bottom: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+}
+.stats-mode-tab {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    padding: 0.5rem 1.05rem;
+    border: none; background: transparent;
+    color: var(--muted); border-radius: 9px;
+    font-size: 0.82rem; font-weight: 600;
+    cursor: pointer; transition: all 0.2s ease;
+}
+.stats-mode-tab:hover:not(.active) { color: var(--text); background: var(--surface-muted); }
+.stats-mode-tab.active {
+    color: #fff;
+    background: var(--grad-info);
+    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.32);
+}
+
+.stats-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+.stats-summary-card {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.85rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+}
+.stats-summary-icon {
+    width: 40px; height: 40px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 11px; color: #fff; font-size: 1.1rem;
+    box-shadow: 0 4px 10px rgba(15,23,42,0.15);
+}
+.stats-summary-icon.busy   { background: linear-gradient(135deg, #f59e0b, #f97316); }
+.stats-summary-icon.free   { background: linear-gradient(135deg, #10b981, #22c55e); }
+.stats-summary-icon.people { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
+.stats-summary-icon.jobs   { background: linear-gradient(135deg, #ec4899, #f43f5e); }
+.stats-summary-value {
+    font-size: 1.35rem; font-weight: 800; color: var(--text);
+    line-height: 1; letter-spacing: -0.02em;
+}
+.stats-summary-label {
+    margin-top: 0.25rem; font-size: 0.68rem; color: var(--muted);
+    font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+}
+
+.stats-chart-section {
+    margin-bottom: 1.25rem; padding: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+}
+.stats-chart-header {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;
+}
+.stats-chart-header h6 { margin: 0; font-size: 0.9rem; font-weight: 700; color: var(--text); }
+.stats-chart { display: flex; flex-direction: column; gap: 0.55rem; }
+
+.stats-user-row {
+    display: grid;
+    grid-template-columns: 220px 1fr 160px;
+    align-items: center; gap: 0.75rem;
+    padding: 0.5rem 0.6rem;
+    border-radius: 10px;
+    transition: background 0.15s ease;
+}
+.stats-user-row:hover { background: var(--surface-muted); }
+.stats-user-row.hidden-user { opacity: 0.35; }
+
+.stats-user-info { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.stats-user-avatar {
+    width: 26px; height: 26px; border-radius: 50%; flex: none;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 700; font-size: 0.65rem;
+    object-fit: cover;
+}
+.stats-user-name {
+    font-weight: 600; font-size: 0.82rem; color: var(--text);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.stats-bar-wrap {
+    position: relative; height: 22px;
+    background: var(--surface-muted);
+    border-radius: 999px; overflow: hidden;
+    border: 1px solid var(--border);
+}
+.stats-bar-fill {
+    position: absolute; top: 0; left: 0; height: 100%;
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    border-radius: 999px;
+    transition: width 0.5s cubic-bezier(.2,.9,.25,1);
+    min-width: 4px;
+}
+.stats-bar-fill.over { background: linear-gradient(135deg, #ef4444, #f43f5e); }
+
+.stats-user-stats {
+    font-size: 0.78rem; color: var(--muted);
+    text-align: right; white-space: nowrap;
+}
+.stats-user-stats strong { color: var(--text); font-weight: 700; }
+
+.stats-toggle {
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    width: 100%; min-width: 0;
+}
+.stats-toggle input { margin: 0; cursor: pointer; flex: none; }
+.stats-toggle:hover .stats-user-name { color: var(--primary); }
+
+.stats-table-section {
+    padding: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+}
+.stats-table-section h6 { margin: 0 0 0.75rem 0; font-weight: 700; font-size: 0.9rem; color: var(--text); }
+
+.stats-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.stats-table th {
+    padding: 0.6rem 0.75rem;
+    background: var(--surface-muted);
+    color: var(--text); font-weight: 700;
+    font-size: 0.7rem; text-transform: uppercase;
+    letter-spacing: 0.04em; text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+.stats-table td { padding: 0.55rem 0.75rem; border-bottom: 1px solid var(--border); color: var(--text); }
+.stats-table tr:last-child td { border-bottom: none; }
+.stats-table tr:hover td { background: var(--surface-muted); }
+
+body.theme-dark .stats-user-row:hover { background: rgba(255,255,255,0.04); }
+body.theme-dark .stats-bar-wrap { background: rgba(15,23,42,0.6); }

@@ -45,6 +45,7 @@ let checkDueModal;
 let presenterSpinModal;
 // Lịch off
 let dayOffModal;
+let salaryCalcModal;
 let dayOffModalOpen = false;
 let dayOffsList = [];            // toàn bộ lịch off (mọi user) từ tháng trước trở đi
 let unsubscribeDayOffs = null;
@@ -108,9 +109,16 @@ let pendingTransferRequestsList = [];
 let transferRequestsInitialLoadDone = false;
 let quickJobTransferInitialLoadDone = false;
 
-// Voice command
-let voiceRecognition = null;
-let voiceListening = false;
+
+// Statistics
+let statisticsModal = null;
+let statsMode = 'today';          // 'today' | 'week'
+let statsAllJobs = [];            // cache toàn bộ job active (không pause, không out-of-schedule)
+let usersInfoCache = {};          // { uid: { displayName, email, avatar } }
+const STATS_HIDDEN_USERS_KEY = 'workpic_stats_hidden_users';
+let statsHiddenUsers = new Set();
+const DEFAULT_JOB_DURATION = 30;  // phút
+const WORK_HOURS_PER_DAY = 8;
 
 // Morning digest email
 const MORNING_DIGEST_STORAGE_KEY = 'workpic_morning_digest_sent';
@@ -498,6 +506,7 @@ document.addEventListener('DOMContentLoaded', function() {
     checkDueModal = new bootstrap.Modal(document.getElementById('checkDueModal'));
     presenterSpinModal = new bootstrap.Modal(document.getElementById('presenterSpinModal'));
     dayOffModal = new bootstrap.Modal(document.getElementById('dayOffModal'));
+    salaryCalcModal = new bootstrap.Modal(document.getElementById('salaryCalcModal'));
 
     document.getElementById('dayOffModal').addEventListener('hidden.bs.modal', () => { dayOffModalOpen = false; });
     transferConfirmModal = new bootstrap.Modal(document.getElementById('transferConfirmModal'));
@@ -508,8 +517,24 @@ document.addEventListener('DOMContentLoaded', function() {
     quickJobTransferConfirmModal = new bootstrap.Modal(document.getElementById('quickJobTransferConfirmModal'));
     guideModal = new bootstrap.Modal(document.getElementById('guideModal'));
 
+        statisticsModal = new bootstrap.Modal(document.getElementById('statisticsModal'));
+    document.getElementById('statisticsBtn').addEventListener('click', openStatisticsModal);
+    document.getElementById('salaryCalcBtn').addEventListener('click', openSalaryCalcModal);
+    document.getElementById('salaryResetBtn').addEventListener('click', resetSalaryCalc);
+    document.getElementById('salaryCalcModal').addEventListener('input', (e) => {
+        if (e.target.classList.contains('salary-input') || e.target.classList.contains('salary-count-input')) updateSalaryTotals();
+    });
+    document.getElementById('salaryCalcModal').addEventListener('hidden.bs.modal', resetSalaryCalc);
+    document.querySelectorAll('.stats-mode-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.stats-mode-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            statsMode = tab.dataset.mode;
+            renderStatistics();
+        });
+    });
+
     initQuickChatUi();
-    initVoiceCommand();
 
     // Event Listeners
     document.getElementById('addJobBtn').addEventListener('click', () => openAddJobModal(false));
@@ -1710,6 +1735,10 @@ function openViewJobModal(job) {
         <div class="mb-3">
             <strong><i class="bi bi-clock"></i> Giờ:</strong> 
             <span class="ms-2">${job.time}</span>
+        </div>
+                <div class="mb-3">
+            <strong><i class="bi bi-hourglass-split"></i> Thời gian thực hiện:</strong> 
+            <span class="ms-2">${getJobDuration(job)} phút</span>
         </div>
         ${job.isPaused ? `
         <div class="mb-3">
@@ -2984,6 +3013,10 @@ function openAddJobModal(isOutOfSchedule = false) {
         : '<i class="bi bi-plus-circle-fill"></i> Thêm Job Mới';
     document.getElementById('jobForm').reset();
     document.getElementById('jobDescription').innerHTML = '';
+
+        const durInput = document.getElementById('jobDuration');
+    if (durInput) durInput.value = '';
+
     document.getElementById('deleteJobBtn').style.display = 'none';
     document.getElementById('pauseJobBtn').style.display = 'none'; // NEW
     
@@ -3008,6 +3041,9 @@ function openEditJobModal(job) {
     document.getElementById('jobDate').value = job.date;
     document.getElementById('jobTime').value = job.time;
     document.getElementById('jobDescription').innerHTML = job.description || '';
+
+        const durInput = document.getElementById('jobDuration');
+    if (durInput) durInput.value = job.duration || '';
     
     const notificationToggle = document.getElementById('enableNotification');
     if (notificationToggle) {
@@ -3066,6 +3102,10 @@ async function saveJob() {
     const workOnSunday = document.getElementById('workOnSunday').checked;
     const isPaused = currentJobIsPaused; // Lấy từ state thay vì checkbox
     const isOutOfSchedule = document.getElementById('isOutOfSchedule').checked;
+
+        const durationInput = document.getElementById('jobDuration');
+    const durationRaw = durationInput ? parseInt(durationInput.value, 10) : NaN;
+    const duration = Number.isFinite(durationRaw) && durationRaw > 0 ? durationRaw : DEFAULT_JOB_DURATION;
     
     if (!title) {
         showNotification('Thiếu thông tin', 'Vui lòng nhập tiêu đề job.', false, 'warning');
@@ -3097,6 +3137,7 @@ async function saveJob() {
         workOnSunday,
         isPaused,
         isOutOfSchedule,
+        duration,
         updatedAt: new Date().toISOString(),
         ownerId: currentUser.uid
     };
@@ -3912,25 +3953,33 @@ function listenUsersAvatars() {
     if (unsubscribeUsersAvatar) unsubscribeUsersAvatar();
     unsubscribeUsersAvatar = onSnapshot(collection(db, 'users'), (snapshot) => {
         usersAvatarCache = {};
+        usersInfoCache = {};
         snapshot.forEach(d => {
             const u = d.data();
-            if (u.uid && u.avatar && !usersAvatarCache[u.uid]) {
-                usersAvatarCache[u.uid] = u.avatar;
+            if (u.uid) {
+                if (u.avatar) usersAvatarCache[u.uid] = u.avatar;
+                usersInfoCache[u.uid] = {
+                    displayName: u.displayName || '',
+                    email: u.email || '',
+                    avatar: u.avatar || null
+                };
             }
         });
 
-        // Nếu avatar của chính mình vừa được sync từ thiết bị khác → cập nhật
         if (currentUser && usersAvatarCache[currentUser.uid] && usersAvatarCache[currentUser.uid] !== currentUser.avatar) {
             currentUser.avatar = usersAvatarCache[currentUser.uid];
             updateUserProfileUI();
         }
 
-        // Refresh các UI đang dùng avatar
         if (dayOffModalOpen) renderDayOffModal();
         if (typeof renderQuickChat === 'function' && quickChatPanelOpen) renderQuickChat();
         if (typeof renderSpinUsersList === 'function' && spinCandidates && spinCandidates.length
             && document.getElementById('presenterSpinModal')?.classList.contains('show')) {
             renderSpinUsersList();
+        }
+        // Statistics modal đang mở → refresh để cập nhật tên/avatar
+        if (statisticsModal && document.getElementById('statisticsModal')?.classList.contains('show')) {
+            renderStatistics();
         }
     }, (error) => {
         console.error('Lỗi lắng nghe avatar users:', error);
@@ -5475,198 +5524,336 @@ async function saveDayOffs() {
 }
 
 // ============================================================
-// VOICE COMMAND — điều khiển bằng giọng nói (Chrome/Edge)
+// STATISTICS — Thống kê thời gian làm việc theo user
 // ============================================================
-function initVoiceCommand() {
-    const btn = document.getElementById('voiceBtn');
-    if (!btn) return;
+// ============================================================
+// TÍNH LƯƠNG — ước tính, không lưu dữ liệu, tự reset khi đóng
+// Chỉ nhập LCB + số ngày/giờ; các khoản tiền suy ra tự động:
+//   Đơn giá ngày = LCB / Ngày công chuẩn
+//   Ngày làm việc   = đơn giá ngày × 1  × số ngày
+//   Ngày lễ         = đơn giá ngày × 3  × số ngày
+//   Phép năm/Nghỉ hưởng lương = đơn giá ngày × 1 × số ngày
+//   Tăng ca thường  = (đơn giá ngày / 8) × 1.5 × số giờ
+//   Tăng ca CN      = (đơn giá ngày / 8) × 2   × số giờ
+//   BHXH/BHYT/BHTN  = LCB × 10.5%
+//   Phí công đoàn   = 30.000đ cố định
+// ============================================================
+const SALARY_UNION_FEE = 30000;
+const SALARY_INSURANCE_RATE = 0.105;
+const SALARY_DEFAULT_STANDARD_DAYS = 26;
+const SALARY_MONEY_FIELDS = ['salLCB', 'salNightShift'];
+const SALARY_COUNT_FIELDS = ['salWorkDay', 'salHoliday', 'salAnnualLeave', 'salPaidLeave', 'salOtNormal', 'salOtSunday'];
+const SALARY_ALL_INPUT_FIELDS = [...SALARY_MONEY_FIELDS, ...SALARY_COUNT_FIELDS, 'salStandardDays'];
 
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-        btn.style.display = 'none';
-        return;
-    }
-
-    voiceRecognition = new SpeechRecognition();
-    voiceRecognition.lang = 'vi-VN';
-    voiceRecognition.continuous = false;
-    voiceRecognition.interimResults = false;
-    voiceRecognition.maxAlternatives = 3;
-
-    voiceRecognition.onstart = () => {
-        voiceListening = true;
-        updateVoiceButton();
-        showNotification('🎤 Đang nghe', 'Hãy nói lệnh của bạn…', false, 'info');
-    };
-    voiceRecognition.onend = () => {
-        voiceListening = false;
-        updateVoiceButton();
-    };
-    voiceRecognition.onerror = (e) => {
-        voiceListening = false;
-        updateVoiceButton();
-        if (e.error === 'not-allowed') {
-            showNotification('Lỗi micro', 'Vui lòng cấp quyền micro cho trang web.', false, 'danger');
-        } else if (e.error === 'no-speech') {
-            showNotification('Không nghe thấy', 'Không nhận diện được giọng nói.', false, 'warning');
-        }
-    };
-    voiceRecognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript.toLowerCase().trim();
-        console.log('🎤 Voice:', transcript);
-        handleVoiceCommand(transcript);
-    };
-
-    btn.addEventListener('click', toggleVoice);
-    updateVoiceButton();
+function formatSalaryVND(n) {
+    return `${Math.round(n || 0).toLocaleString('vi-VN')} VNĐ`;
 }
 
-function toggleVoice() {
-    if (!voiceRecognition) {
-        showNotification('Không hỗ trợ', 'Trình duyệt không hỗ trợ nhận diện giọng nói. Dùng Chrome/Edge.', false, 'warning');
-        return;
-    }
-    if (voiceListening) {
-        voiceRecognition.stop();
-    } else {
-        try { voiceRecognition.start(); } catch (e) { console.error(e); }
-    }
+function parseSalaryNumber(id) {
+    const el = document.getElementById(id);
+    if (!el) return 0;
+    const raw = (el.value || '').replace(/[^\d]/g, '');
+    return raw ? parseInt(raw, 10) : 0;
 }
 
-function updateVoiceButton() {
-    const btn = document.getElementById('voiceBtn');
-    if (!btn) return;
-    btn.classList.toggle('voice-active', voiceListening);
-    btn.title = voiceListening ? 'Đang nghe… (bấm để dừng)' : 'Lệnh thoại';
+function openSalaryCalcModal() {
+    resetSalaryCalc();
+    salaryCalcModal.show();
 }
 
-function handleVoiceCommand(text) {
-    // 1. Đóng modal
-    if (/^(đóng|tắt|close|thoát)/.test(text)) {
-        document.querySelectorAll('.modal.show').forEach(m => {
-            const inst = bootstrap.Modal.getInstance(m);
-            if (inst) inst.hide();
-        });
-        showNotification('Đã đóng', 'Đã đóng tất cả cửa sổ.', false, 'success');
-        return;
-    }
-
-    // 2. Tìm kiếm job
-    const searchMatch = text.match(/^(tìm|tìm kiếm|search)\s+(.+)/);
-    if (searchMatch) {
-        const q = searchMatch[2].replace(/^(job|việc|công việc)\s+/, '').trim();
-        document.getElementById('searchJob').value = q;
-        handleSearch({ target: { value: q } });
-        showNotification('Đang tìm', `"${q}"`, false, 'success');
-        return;
-    }
-
-    // 3. Thêm job: "thêm job ABC lúc 8 giờ 30 ngày 5 tháng 10"
-    const addMatch = text.match(/^(thêm|tạo|add)\s+(job|việc|công việc)\s+(.+)/);
-    if (addMatch) {
-        let title = addMatch[3].trim();
-        let time = null;
-        let date = null;
-
-        const timeMatch = title.match(/lúc\s+(\d{1,2})\s*(?:giờ|h|:)?\s*(\d{1,2})?/);
-        if (timeMatch) {
-            const h = String(timeMatch[1]).padStart(2, '0');
-            const m = timeMatch[2] ? String(timeMatch[2]).padStart(2, '0') : '00';
-            time = `${h}:${m}`;
-            title = title.replace(timeMatch[0], '').trim();
-        }
-        const dateMatch = title.match(/ngày\s+(\d{1,2})\s*tháng\s*(\d{1,2})/);
-        if (dateMatch) {
-            const y = new Date().getFullYear();
-            const d = String(dateMatch[1]).padStart(2, '0');
-            const mo = String(dateMatch[2]).padStart(2, '0');
-            date = `${y}-${mo}-${d}`;
-            title = title.replace(dateMatch[0], '').trim();
-        }
-        if (!title) { showNotification('Thiếu tên', 'Chưa nghe rõ tên job.', false, 'warning'); return; }
-
-        openAddJobModal(false);
-        document.getElementById('jobTitle').value = title;
-        if (time) document.getElementById('jobTime').value = time;
-        if (date) document.getElementById('jobDate').value = date;
-        showNotification('Đã điền sẵn', `Job "${title}" — kiểm tra và bấm Lưu`, false, 'success');
-        return;
-    }
-
-    // 4. Mở các chức năng
-    if (/(lịch off|nghỉ|off)/.test(text))           { openDayOffModal(); return; }
-    if (/(chat|job trong ngày|khung chat)/.test(text)) { openQuickChatPanel(); return; }
-    if (/(check due|so sánh|đối chiếu|kiểm tra due)/.test(text)) { openCheckDueModal(); return; }
-    if (/(quay số|thuyết trình|random|dice)/.test(text))         { openPresenterSpinModal(); return; }
-    if (/(hướng dẫn|guide|trợ giúp)/.test(text))    { guideModal.show(); return; }
-    if (/(thông tin|profile|tài khoản|avatar)/.test(text)) { openUserProfileModal(); return; }
-    if (/(xem dữ liệu|xem job|view data)/.test(text)) { openViewDataModal(); return; }
-    if (/(xuất pdf|in pdf|export pdf)/.test(text))   { exportToPDF(); return; }
-    if (/(sidebar|ẩn menu|hiện menu|menu)/.test(text)) { toggleSidebar(); return; }
-
-    // 5. Theme
-    if (/(chế độ tối|dark mode|ban đêm|tối)/.test(text)) {
-        applyTheme('dark');
-        showNotification('Đã bật', 'Chế độ tối', false, 'success'); return;
-    }
-    if (/(chế độ sáng|light mode|ban ngày|sáng)/.test(text)) {
-        applyTheme('light');
-        showNotification('Đã bật', 'Chế độ sáng', false, 'success'); return;
-    }
-
-    // 6. Đăng xuất
-    if (/(đăng xuất|logout|thoát tài khoản)/.test(text)) {
-        showConfirmDialog({
-            title: 'Đăng xuất?',
-            message: 'Bạn có chắc muốn đăng xuất khỏi tài khoản?',
-            confirmText: 'Đăng xuất',
-            confirmClass: 'btn-delete',
-            onConfirm: () => signOut(auth)
-        });
-        return;
-    }
-
-    // 7. Đọc lịch hôm nay
-    if (/(hôm nay|việc hôm nay|hôm nay có gì|lịch hôm nay)/.test(text)) {
-        speakTodayJobs(); return;
-    }
-
-    showNotification('Không hiểu lệnh', `"${text}"\nThử: "mở lịch off", "hôm nay có gì", "tìm frame mill"`, false, 'warning');
-}
-
-function speakTodayJobs() {
-    if (!('speechSynthesis' in window)) {
-        showNotification('Không hỗ trợ', 'Trình duyệt không hỗ trợ đọc văn bản.', false, 'warning');
-        return;
-    }
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayKey = localDateKey(today);
-    const activeJobs = jobs.filter(j => j.isPaused !== true && j.isOutOfSchedule !== true);
-    const entries = buildScheduleEntries(today, today, activeJobs);
-    const todayItems = (entries[todayKey] || []).slice().sort((a, b) =>
-        String(a.overrideTime || a.job.time || '').localeCompare(String(b.overrideTime || b.job.time || ''))
-    );
-
-    if (todayItems.length === 0) {
-        speakText('Hôm nay bạn không có công việc nào.');
-        return;
-    }
-    const parts = [`Hôm nay bạn có ${todayItems.length} công việc.`];
-    todayItems.forEach(e => {
-        const t = e.overrideTime || e.job.time || '';
-        parts.push(`${t}, ${e.job.title}.`);
+function resetSalaryCalc() {
+    SALARY_ALL_INPUT_FIELDS.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
     });
-    speakText(parts.join(' '));
+    updateSalaryTotals();
 }
 
-function speakText(text) {
-    if (!('speechSynthesis' in window)) return;
-    speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'vi-VN';
-    u.rate = 1.05;
-    speechSynthesis.speak(u);
+function updateSalaryTotals() {
+    // Format lại các ô tiền/số khi gõ (dấu chấm ngăn cách nghìn)
+    SALARY_ALL_INPUT_FIELDS.forEach(id => {
+        const el = document.getElementById(id);
+        const n = parseSalaryNumber(id);
+        el.value = n ? n.toLocaleString('vi-VN') : '';
+    });
+
+    const lcb = parseSalaryNumber('salLCB');
+    const standardDays = parseSalaryNumber('salStandardDays') || SALARY_DEFAULT_STANDARD_DAYS;
+    const dailyRate = standardDays > 0 ? lcb / standardDays : 0;
+    const hourlyRate = dailyRate / 8;
+
+    const lineValues = {
+        salWorkDayValue: parseSalaryNumber('salWorkDay') * dailyRate,
+        salHolidayValue: parseSalaryNumber('salHoliday') * dailyRate * 3,
+        salAnnualLeaveValue: parseSalaryNumber('salAnnualLeave') * dailyRate,
+        salPaidLeaveValue: parseSalaryNumber('salPaidLeave') * dailyRate,
+        salOtNormalValue: parseSalaryNumber('salOtNormal') * hourlyRate * 1.5,
+        salOtSundayValue: parseSalaryNumber('salOtSunday') * hourlyRate * 2
+    };
+    Object.entries(lineValues).forEach(([id, val]) => {
+        document.getElementById(id).textContent = formatSalaryVND(val);
+    });
+
+    const nightShift = parseSalaryNumber('salNightShift');
+    const income = Object.values(lineValues).reduce((a, b) => a + b, 0) + nightShift;
+
+    const insurance = lcb * SALARY_INSURANCE_RATE;
+    const unionFee = lcb > 0 ? SALARY_UNION_FEE : 0;
+    document.getElementById('salInsuranceValue').textContent = formatSalaryVND(insurance);
+    document.getElementById('salUnionFeeValue').textContent = formatSalaryVND(unionFee);
+    const deduct = insurance + unionFee;
+
+    document.getElementById('salaryIncomeTotal').textContent = formatSalaryVND(income);
+    document.getElementById('salaryDeductTotal').textContent = formatSalaryVND(deduct);
+    document.getElementById('salaryNetTotal').textContent = formatSalaryVND(income - deduct);
+}
+
+function getJobDuration(job) {
+    const n = parseInt(job?.duration, 10);
+    return Number.isFinite(n) && n > 0 ? n : DEFAULT_JOB_DURATION;
+}
+
+function loadStatsHiddenUsers() {
+    try {
+        const raw = localStorage.getItem(STATS_HIDDEN_USERS_KEY);
+        statsHiddenUsers = raw ? new Set(JSON.parse(raw)) : new Set();
+    } catch (e) { statsHiddenUsers = new Set(); }
+}
+function saveStatsHiddenUsers() {
+    try { localStorage.setItem(STATS_HIDDEN_USERS_KEY, JSON.stringify(Array.from(statsHiddenUsers))); }
+    catch (e) { /* ignore */ }
+}
+
+function getStatsUserColor(uid) {
+    let hash = 0;
+    for (let i = 0; i < uid.length; i++) hash = (hash * 31 + uid.charCodeAt(i)) | 0;
+    return SPIN_WHEEL_COLORS[Math.abs(hash) % SPIN_WHEEL_COLORS.length];
+}
+
+async function ensureUsersInfoCache() {
+    if (Object.keys(usersInfoCache).length > 0) return;
+    try {
+        const snap = await getDocs(collection(db, 'users'));
+        snap.forEach(d => {
+            const u = d.data();
+            if (u.uid) {
+                usersInfoCache[u.uid] = {
+                    displayName: u.displayName || '',
+                    email: u.email || '',
+                    avatar: u.avatar || null
+                };
+                if (u.avatar) {
+                    if (!usersAvatarCache) usersAvatarCache = {};
+                    usersAvatarCache[u.uid] = u.avatar;
+                }
+            }
+        });
+    } catch (e) { console.error('Không tải được users info:', e); }
+}
+
+async function fetchAllJobsForStats() {
+    const snap = await getDocs(collection(db, 'jobs'));
+    const list = [];
+    snap.forEach(d => {
+        const data = d.data();
+        if (data.isPaused !== true && data.isOutOfSchedule !== true) {
+            list.push({ id: d.id, ...data });
+        }
+    });
+    return list;
+}
+
+async function openStatisticsModal() {
+    statisticsModal.show();
+    document.getElementById('statsSummary').innerHTML = '';
+    document.getElementById('statsChart').innerHTML = '<div class="empty-state"><i class="bi bi-hourglass-split"></i><br>Đang tải dữ liệu...</div>';
+    document.getElementById('statsTable').innerHTML = '';
+
+    loadStatsHiddenUsers();
+    await ensureUsersInfoCache();
+    statsAllJobs = await fetchAllJobsForStats();
+    renderStatistics();
+}
+
+function computeStatistics(mode) {
+    const now = new Date();
+    let rangeStart, rangeEnd, totalDays, label;
+
+    if (mode === 'today') {
+        rangeStart = new Date(now); rangeStart.setHours(0, 0, 0, 0);
+        rangeEnd = new Date(rangeStart); rangeEnd.setDate(rangeEnd.getDate() + 1); rangeEnd.setMilliseconds(-1);
+        totalDays = 1; label = 'Hôm nay';
+    } else {
+        rangeStart = new Date(now); rangeStart.setHours(0, 0, 0, 0);
+        const day = rangeStart.getDay();
+        const diff = day === 0 ? -6 : 1 - day;
+        rangeStart.setDate(rangeStart.getDate() + diff);
+        rangeEnd = new Date(rangeStart); rangeEnd.setDate(rangeEnd.getDate() + 7); rangeEnd.setMilliseconds(-1);
+        totalDays = 7; label = 'Tuần này';
+    }
+
+    const byUser = {};
+    statsAllJobs.forEach(job => {
+        const occurrences = getJobOccurrences(job, rangeStart, rangeEnd);
+        if (occurrences.length === 0) return;
+
+        const duration = getJobDuration(job);
+        const totalForJob = duration * occurrences.length;
+        const uid = job.ownerId;
+        if (!uid) return;
+
+        const info = usersInfoCache[uid] || {};
+        const name = info.displayName || info.email || `User ${uid.slice(0, 6)}`;
+
+        if (!byUser[uid]) {
+            byUser[uid] = { uid, name, totalMinutes: 0, jobs: [] };
+        }
+        byUser[uid].totalMinutes += totalForJob;
+        byUser[uid].jobs.push({ job, occurrences: occurrences.length, minutes: totalForJob });
+    });
+
+    const totalAvailable = WORK_HOURS_PER_DAY * 60 * totalDays;
+    const users = Object.values(byUser).sort((a, b) => b.totalMinutes - a.totalMinutes);
+    const totalBusy = users.reduce((s, u) => s + u.totalMinutes, 0);
+    const totalFree = Math.max(0, totalAvailable - totalBusy);
+
+    return {
+        mode, label, totalDays, totalAvailable, totalBusy, totalFree,
+        users, peopleCount: users.length
+    };
+}
+
+function renderStatistics() {
+    if (!currentUser || !statsAllJobs) return;
+    const stats = computeStatistics(statsMode);
+
+    // ----- Summary -----
+    const busyH = (stats.totalBusy / 60).toFixed(1);
+    const freeH = (stats.totalFree / 60).toFixed(1);
+    const availH = (stats.totalAvailable / 60).toFixed(1);
+    const utilization = stats.totalAvailable > 0
+        ? ((stats.totalBusy / stats.totalAvailable) * 100).toFixed(0) : 0;
+
+    document.getElementById('statsSummary').innerHTML = `
+        <div class="stats-summary-card">
+            <div class="stats-summary-icon people"><i class="bi bi-people-fill"></i></div>
+            <div>
+                <div class="stats-summary-value">${stats.peopleCount}</div>
+                <div class="stats-summary-label">User có job (${stats.label.toLowerCase()})</div>
+            </div>
+        </div>
+        <div class="stats-summary-card">
+            <div class="stats-summary-icon busy"><i class="bi bi-hourglass-split"></i></div>
+            <div>
+                <div class="stats-summary-value">${busyH}h</div>
+                <div class="stats-summary-label">Đã chiếm · ${utilization}%</div>
+            </div>
+        </div>
+        <div class="stats-summary-card">
+            <div class="stats-summary-icon free"><i class="bi bi-cup-hot-fill"></i></div>
+            <div>
+                <div class="stats-summary-value">${freeH}h</div>
+                <div class="stats-summary-label">Thời gian trống</div>
+            </div>
+        </div>
+        <div class="stats-summary-card">
+            <div class="stats-summary-icon jobs"><i class="bi bi-calendar-check-fill"></i></div>
+            <div>
+                <div class="stats-summary-value">${availH}h</div>
+                <div class="stats-summary-label">Quỹ thời gian (${stats.totalDays}×8h)</div>
+            </div>
+        </div>
+    `;
+
+    // ----- Chart (bar ngang) -----
+    const chartEl = document.getElementById('statsChart');
+    if (stats.users.length === 0) {
+        chartEl.innerHTML = '<div class="empty-state"><i class="bi bi-inbox"></i><br>Không có job nào trong khoảng thời gian này</div>';
+    } else {
+        const maxMinutes = Math.max(...stats.users.map(u => u.totalMinutes), 1);
+        chartEl.innerHTML = stats.users.map(u => {
+            const isHidden = statsHiddenUsers.has(u.uid);
+            const percent = Math.min(100, (u.totalMinutes / maxMinutes) * 100);
+            const busyPct = ((u.totalMinutes / stats.totalAvailable) * 100).toFixed(1);
+            const hours = (u.totalMinutes / 60).toFixed(1);
+            const jobCount = u.jobs.reduce((s, j) => s + j.occurrences, 0);
+            const avatarUrl = (usersInfoCache[u.uid] && usersInfoCache[u.uid].avatar) || getUserAvatarUrl(u.uid);
+            const avatarHtml = avatarUrl
+                ? `<img class="stats-user-avatar" src="${avatarUrl}" alt="">`
+                : `<span class="stats-user-avatar" style="background:${getStatsUserColor(u.uid)}">${escapeHtml(avatarInitial({ displayName: u.name }))}</span>`;
+
+            return `
+                <div class="stats-user-row ${isHidden ? 'hidden-user' : ''}" data-uid="${escapeHtml(u.uid)}">
+                    <label class="stats-toggle">
+                        <input type="checkbox" class="stats-user-checkbox" ${isHidden ? '' : 'checked'}>
+                        ${avatarHtml}
+                        <span class="stats-user-name" title="${escapeHtml(u.name)}">${escapeHtml(u.name)}</span>
+                    </label>
+                    <div class="stats-bar-wrap">
+                        <div class="stats-bar-fill ${Number(busyPct) > 100 ? 'over' : ''}" style="width:${percent}%"></div>
+                    </div>
+                    <div class="stats-user-stats">
+                        <strong>${hours}h</strong> · ${jobCount} job · ${busyPct}%
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        chartEl.querySelectorAll('.stats-user-checkbox').forEach(cb => {
+            cb.addEventListener('change', (e) => {
+                const row = e.target.closest('.stats-user-row');
+                const uid = row.dataset.uid;
+                if (e.target.checked) {
+                    statsHiddenUsers.delete(uid);
+                    row.classList.remove('hidden-user');
+                } else {
+                    statsHiddenUsers.add(uid);
+                    row.classList.add('hidden-user');
+                }
+                saveStatsHiddenUsers();
+            });
+        });
+    }
+
+    // ----- Table chi tiết -----
+    const tableEl = document.getElementById('statsTable');
+    if (stats.users.length === 0) {
+        tableEl.innerHTML = '<div class="empty-state"><i class="bi bi-inbox"></i><br>Chưa có dữ liệu</div>';
+        return;
+    }
+
+    let html = `<table class="stats-table">
+        <thead>
+            <tr>
+                <th>User</th>
+                <th>Job</th>
+                <th>Loại</th>
+                <th>Số lần</th>
+                <th>Thời gian/lần</th>
+                <th>Tổng (giờ)</th>
+            </tr>
+        </thead><tbody>`;
+
+    stats.users.forEach(u => {
+        u.jobs.sort((a, b) => b.minutes - a.minutes);
+        u.jobs.forEach((j, idx) => {
+            const isHiddenUser = statsHiddenUsers.has(u.uid);
+            const userCell = idx === 0
+                ? `<td rowspan="${u.jobs.length}" style="vertical-align: top; font-weight: 700; ${isHiddenUser ? 'opacity:.4;' : ''}">${escapeHtml(u.name)}</td>`
+                : '';
+            html += `
+                <tr>
+                    ${userCell}
+                    <td>${escapeHtml(j.job.title)}</td>
+                    <td><span class="job-type-label ${escapeHtml(j.job.type)}">${escapeHtml(getTypeLabel(j.job.type))}</span></td>
+                    <td>${j.occurrences}</td>
+                    <td>${getJobDuration(j.job)} phút</td>
+                    <td><strong>${(j.minutes / 60).toFixed(1)}h</strong></td>
+                </tr>`;
+        });
+    });
+    html += '</tbody></table>';
+    tableEl.innerHTML = html;
 }
 
 window.addEventListener('beforeunload', () => {
