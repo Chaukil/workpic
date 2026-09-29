@@ -552,6 +552,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     document.getElementById('searchJob').addEventListener('input', handleSearch);
     document.getElementById('isOutOfSchedule').addEventListener('change', toggleOutOfScheduleFields);
+    document.getElementById('jobType').addEventListener('change', toggleDailyExcludeWrap);
+    document.getElementById('dailyExcludeDays').addEventListener('click', (e) => {
+        const chip = e.target.closest('.daily-exclude-chip');
+        if (chip) chip.classList.toggle('active');
+    });
     document.getElementById('exportPdfBtn').addEventListener('click', exportToPDF);
     document.getElementById('showSunday').addEventListener('change', toggleSunday);
     document.getElementById('toggleSidebarBtn').addEventListener('click', toggleSidebar);
@@ -679,6 +684,25 @@ function requestNotificationPermission() {
     } else {
         console.warn('❌ Browser không hỗ trợ Notifications API');
     }
+}
+
+function toggleDailyExcludeWrap() {
+    const type = document.getElementById('jobType').value;
+    const wrap = document.getElementById('dailyExcludeWrap');
+    if (wrap) wrap.classList.toggle('d-none', type !== 'daily');
+}
+
+function getExcludedWeekdaysFromForm() {
+    return Array.from(document.querySelectorAll('#dailyExcludeDays .daily-exclude-chip:not(.active)'))
+        .map(chip => parseInt(chip.dataset.dow, 10));
+}
+
+function setExcludedWeekdaysInForm(excludedWeekdays) {
+    const excluded = new Set(Array.isArray(excludedWeekdays) ? excludedWeekdays : []);
+    document.querySelectorAll('#dailyExcludeDays .daily-exclude-chip').forEach(chip => {
+        const dow = parseInt(chip.dataset.dow, 10);
+        chip.classList.toggle('active', !excluded.has(dow));
+    });
 }
 
 function toggleOutOfScheduleFields() {
@@ -1126,8 +1150,11 @@ function getJobOccurrences(job, startDate, endDate) {
             // Check if workOnSunday is false and current day is Sunday (0)
             const isSunday = currentDate.getDay() === 0;
             const workOnSunday = job.workOnSunday !== false; // Default true if not specified
-            
-            if (!isSunday || workOnSunday) {
+            // Daily job có thể bỏ bớt một vài thứ trong tuần (mặc định chạy tất cả)
+            const isExcludedWeekday = job.type === 'daily' && Array.isArray(job.excludedWeekdays) &&
+                job.excludedWeekdays.includes(currentDate.getDay());
+
+            if (!isExcludedWeekday && (!isSunday || workOnSunday)) {
                 occurrences.push(new Date(currentDate));
             }
         }
@@ -3025,7 +3052,9 @@ function openAddJobModal(isOutOfSchedule = false) {
     document.getElementById('jobTime').value = now.toTimeString().slice(0, 5);
     document.getElementById('workOnSunday').checked = false;
     document.getElementById('isOutOfSchedule').checked = isOutOfSchedule;
+    setExcludedWeekdaysInForm([]);
     toggleOutOfScheduleFields();
+    toggleDailyExcludeWrap();
 
     jobModal.show();
 }
@@ -3052,6 +3081,7 @@ function openEditJobModal(job) {
     
     document.getElementById('workOnSunday').checked = job.workOnSunday !== false;
     document.getElementById('isOutOfSchedule').checked = job.isOutOfSchedule === true;
+    setExcludedWeekdaysInForm(job.excludedWeekdays);
     document.getElementById('deleteJobBtn').style.display = 'block';
     
     // Update pause button
@@ -3070,6 +3100,7 @@ function openEditJobModal(job) {
     }
     
     toggleOutOfScheduleFields();
+    toggleDailyExcludeWrap();
     jobModal.show();
 }
 
@@ -3138,6 +3169,7 @@ async function saveJob() {
         isPaused,
         isOutOfSchedule,
         duration,
+        excludedWeekdays: effectiveType === 'daily' ? getExcludedWeekdaysFromForm() : [],
         updatedAt: new Date().toISOString(),
         ownerId: currentUser.uid
     };
@@ -5538,12 +5570,30 @@ async function saveDayOffs() {
 //   BHXH/BHYT/BHTN  = LCB × 10.5%
 //   Phí công đoàn   = 30.000đ cố định
 // ============================================================
+// Biểu thuế lũy tiến từng phần 2026 (5 bậc, rút gọn theo Thu nhập tính thuế/tháng)
+const SALARY_TAX_BRACKETS_2026 = [
+    { upTo: 10000000, rate: 0.05, sub: 0 },
+    { upTo: 30000000, rate: 0.10, sub: 500000 },
+    { upTo: 60000000, rate: 0.20, sub: 3500000 },
+    { upTo: 100000000, rate: 0.30, sub: 9500000 },
+    { upTo: Infinity, rate: 0.35, sub: 14500000 }
+];
+const SALARY_SELF_DEDUCTION_2026 = 15500000;
+const SALARY_DEPENDENT_DEDUCTION_2026 = 6200000;
+
+function calcPersonalIncomeTax2026(taxableIncome) {
+    if (taxableIncome <= 0) return { tax: 0, rate: 0 };
+    const bracket = SALARY_TAX_BRACKETS_2026.find(b => taxableIncome <= b.upTo);
+    const tax = taxableIncome * bracket.rate - bracket.sub;
+    return { tax: Math.max(tax, 0), rate: bracket.rate };
+}
+
 const SALARY_UNION_FEE = 30000;
 const SALARY_INSURANCE_RATE = 0.105;
 const SALARY_DEFAULT_STANDARD_DAYS = 26;
 const SALARY_MONEY_FIELDS = ['salLCB', 'salNightShift'];
 const SALARY_COUNT_FIELDS = ['salWorkDay', 'salHoliday', 'salAnnualLeave', 'salPaidLeave', 'salOtNormal', 'salOtSunday'];
-const SALARY_ALL_INPUT_FIELDS = [...SALARY_MONEY_FIELDS, ...SALARY_COUNT_FIELDS, 'salStandardDays'];
+const SALARY_ALL_INPUT_FIELDS = [...SALARY_MONEY_FIELDS, ...SALARY_COUNT_FIELDS, 'salStandardDays', 'salDependents'];
 
 function formatSalaryVND(n) {
     return `${Math.round(n || 0).toLocaleString('vi-VN')} VNĐ`;
@@ -5552,8 +5602,20 @@ function formatSalaryVND(n) {
 function parseSalaryNumber(id) {
     const el = document.getElementById(id);
     if (!el) return 0;
-    const raw = (el.value || '').replace(/[^\d]/g, '');
-    return raw ? parseInt(raw, 10) : 0;
+    // Cho phép số thập phân: giữ lại chữ số và MỘT dấu , hoặc . cuối cùng làm dấu thập phân
+    let raw = (el.value || '').replace(/[^\d.,]/g, '');
+    const lastComma = raw.lastIndexOf(',');
+    const lastDot = raw.lastIndexOf('.');
+    const decimalPos = Math.max(lastComma, lastDot);
+    if (decimalPos === -1) {
+        raw = raw.replace(/[.,]/g, '');
+    } else {
+        const intPart = raw.slice(0, decimalPos).replace(/[.,]/g, '');
+        const decPart = raw.slice(decimalPos + 1).replace(/[.,]/g, '');
+        raw = decPart ? `${intPart}.${decPart}` : intPart;
+    }
+    const n = parseFloat(raw);
+    return Number.isFinite(n) ? n : 0;
 }
 
 function openSalaryCalcModal() {
@@ -5570,13 +5632,6 @@ function resetSalaryCalc() {
 }
 
 function updateSalaryTotals() {
-    // Format lại các ô tiền/số khi gõ (dấu chấm ngăn cách nghìn)
-    SALARY_ALL_INPUT_FIELDS.forEach(id => {
-        const el = document.getElementById(id);
-        const n = parseSalaryNumber(id);
-        el.value = n ? n.toLocaleString('vi-VN') : '';
-    });
-
     const lcb = parseSalaryNumber('salLCB');
     const standardDays = parseSalaryNumber('salStandardDays') || SALARY_DEFAULT_STANDARD_DAYS;
     const dailyRate = standardDays > 0 ? lcb / standardDays : 0;
@@ -5605,7 +5660,21 @@ function updateSalaryTotals() {
 
     document.getElementById('salaryIncomeTotal').textContent = formatSalaryVND(income);
     document.getElementById('salaryDeductTotal').textContent = formatSalaryVND(deduct);
-    document.getElementById('salaryNetTotal').textContent = formatSalaryVND(income - deduct);
+
+    // Thuế TNCN 2026: Thu nhập tính thuế = Tổng thu nhập chịu thuế - BH bắt buộc - giảm trừ bản thân - giảm trừ người phụ thuộc
+    const dependents = Math.max(0, Math.floor(parseSalaryNumber('salDependents')));
+    const dependentDeduct = dependents * SALARY_DEPENDENT_DEDUCTION_2026;
+    const taxableIncome = income - insurance - SALARY_SELF_DEDUCTION_2026 - dependentDeduct;
+    const { tax, rate } = calcPersonalIncomeTax2026(taxableIncome);
+
+    document.getElementById('salSelfDeductValue').textContent = formatSalaryVND(SALARY_SELF_DEDUCTION_2026);
+    document.getElementById('salDependentDeductValue').textContent = formatSalaryVND(dependentDeduct);
+    document.getElementById('salInsuranceRefValue').textContent = formatSalaryVND(insurance);
+    document.getElementById('salTaxableIncomeValue').textContent = formatSalaryVND(Math.max(taxableIncome, 0));
+    document.getElementById('salTaxRateLabel').textContent = `${(rate * 100).toFixed(0)}%`;
+    document.getElementById('salTaxValue').textContent = formatSalaryVND(tax);
+
+    document.getElementById('salaryNetTotal').textContent = formatSalaryVND(income - deduct - tax);
 }
 
 function getJobDuration(job) {

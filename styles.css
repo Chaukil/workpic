@@ -402,6 +402,11 @@ body.theme-dark #searchJob::placeholder { color: var(--muted); }
     border: 1px solid var(--border); border-radius: 14px; padding: 0.5rem;
     box-shadow: var(--shadow-float, 0 18px 42px rgba(15,23,42,.12));
     background: var(--surface); min-width: 260px;
+    max-width: calc(100vw - 1.5rem);
+    max-height: min(70vh, 520px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
 }
 .layout-dropdown-item {
     display: flex; align-items: center; gap: 0.6rem; width: 100%;
@@ -3267,6 +3272,7 @@ body.theme-dark .legend-item {
 .card-header.modern-card-header .btn-outline-light {
     position: relative;
     z-index: 1;
+    color: var(--text);
     border: 1px solid rgba(255,255,255,0.5);
     background: rgba(255,255,255,0.12);
     backdrop-filter: blur(8px);
@@ -3276,8 +3282,19 @@ body.theme-dark .legend-item {
 
 .card-header.modern-card-header .btn-outline-light:hover {
     background: rgba(255,255,255,0.25);
-    border-color: #fff;
+    border-color: var(--text);
+    color: var(--text);
     transform: translateY(-1px);
+}
+
+body.theme-dark .card-header.modern-card-header .btn-outline-light {
+    color: var(--text);
+    background: rgba(15, 23, 42, 0.22);
+    border-color: rgba(255,255,255,0.45);
+}
+body.theme-dark .card-header.modern-card-header .btn-outline-light:hover {
+    background: rgba(15, 23, 42, 0.4);
+    border-color: #fff;
 }
 
 .card-header.modern-card-header .switch-label {
@@ -3848,9 +3865,16 @@ body.theme-dark .guide-item {
     width: 180px; height: 180px;
     border-radius: 50%;
     background: radial-gradient(circle, rgba(255,255,255,0.18), transparent 70%);
+    pointer-events: none;   /* Lớp trang trí không được chặn click nút đóng bên dưới */
+    z-index: 0;
 }
 
 .quick-chat-header-title { position: relative; z-index: 1; }
+
+.quick-chat-close {
+    position: relative;
+    z-index: 2;
+}
 
 .quick-chat-header-title i {
     width: 38px; height: 38px;
@@ -4636,6 +4660,10 @@ body.theme-dark .day-override-popover {
 }
 .salary-head-income { background: linear-gradient(135deg, #2563eb, #38bdf8); }
 .salary-head-deduct { background: linear-gradient(135deg, #dc2626, #f97316); }
+.salary-head-tax { background: linear-gradient(135deg, #7c3aed, #a855f7); }
+.salary-card-tax .salary-card-body { background: rgba(124, 58, 237, .05); }
+.salary-card-tax .salary-card-body { background: rgba(124, 58, 237, .05); }
+
 .salary-card-body { padding: 0.85rem 1rem; }
 .salary-card-income .salary-card-body { background: rgba(34, 197, 94, .05); }
 .salary-card-deduct .salary-card-body { background: rgba(239, 68, 68, .05); }
@@ -4828,3 +4856,13 @@ body.theme-dark .day-override-popover {
 
 body.theme-dark .stats-user-row:hover { background: rgba(255,255,255,0.04); }
 body.theme-dark .stats-bar-wrap { background: rgba(15,23,42,0.6); }
+.daily-exclude-wrap { margin-top: 0.5rem; }
+.daily-exclude-label { font-size: var(--fs-3xs); color: var(--muted); margin-bottom: 0.3rem; display: flex; align-items: center; gap: 0.3rem; }
+.daily-exclude-days { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.daily-exclude-chip {
+    border: 1px solid var(--border); background: var(--surface-muted); color: var(--muted);
+    border-radius: 999px; padding: 0.15rem 0.55rem; font-size: var(--fs-3xs); font-weight: 700; cursor: pointer;
+    transition: all .12s ease;
+}
+.daily-exclude-chip.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.daily-exclude-chip:not(.active) { text-decoration: line-through; opacity: .6; }
