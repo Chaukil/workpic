@@ -66,29 +66,6 @@
                     <p class="topbar-subtitle">Quản lý lịch công việc rõ ràng, gọn gàng và nhất quán</p>
                 </div>
             </div>
-            <div class="topbar-legend" aria-label="Chú thích loại job">
-                <span class="legend-inline-title">Chú Thích</span>
-                <div class="legend-item">
-                    <span class="legend-color once"></span>
-                    <span>Once</span>
-                </div>
-                <div class="legend-item">
-                    <span class="legend-color daily"></span>
-                    <span>Daily</span>
-                </div>
-                <div class="legend-item">
-                    <span class="legend-color weekly"></span>
-                    <span>Weekly</span>
-                </div>
-                <div class="legend-item">
-                    <span class="legend-color biweekly"></span>
-                    <span>Biweekly</span>
-                </div>
-                <div class="legend-item">
-                    <span class="legend-color monthly"></span>
-                    <span>Monthly</span>
-                </div>
-            </div>
             <div class="topbar-badges">
                 <div class="user-menu">
                     <button type="button" class="notif-bell-btn" id="guideBtn" title="Hướng dẫn sử dụng">
@@ -155,11 +132,11 @@
                             </div>
                             <div class="col-6">
                                 <div class="dropdown w-100">
-                                    <button class="btn btn-layout-menu w-100" id="layoutMenuBtn" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                        <i class="bi bi-grid-3x3-gap-fill"></i>
-                                        <span>Layout</span>
-                                        <div class="btn-shine"></div>
-                                    </button>
+                                    <button class="btn btn-layout-menu w-100" id="layoutMenuBtn" type="button" aria-expanded="false" aria-haspopup="true">
+    <i class="bi bi-grid-3x3-gap-fill"></i>
+    <span>Layout</span>
+    <div class="btn-shine"></div>
+</button>
                                     <ul class="dropdown-menu layout-dropdown-menu" aria-labelledby="layoutMenuBtn">
                                         <li>
                                             <button class="layout-dropdown-item" id="checkDueBtn" type="button">
@@ -289,8 +266,8 @@
 
     <!-- Job Modal -->
     <div class="modal fade" id="jobModal" tabindex="-1">
-    <div class="modal-dialog modal-centered">
-        <div class="modal-content">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content job-modal-content">
             <div class="modal-header modern-header modern-header-primary">
                 <div class="modern-header-inner">
                     <div class="modern-header-icon">
@@ -306,15 +283,16 @@
             <div class="modal-body">
                 <form id="jobForm">
                     <input type="hidden" id="jobId">
-                    
-                    <div class="row align-items-end">
-                        <div class="col-md-7 mb-3">
+
+                    <div class="job-form-section">
+                    <div class="row align-items-end g-3">
+                        <div class="col-md-7">
                             <label class="form-label fw-bold">Tiêu Đề Job *</label>
                             <input type="text" class="form-control" id="jobTitle" required>
                         </div>
 
-                        <div class="col-md-5 mb-3">
-                            <div class="form-check form-switch mt-2">
+                        <div class="col-md-5">
+                            <div class="form-check form-switch job-switch-card">
                                 <input class="form-check-input" type="checkbox" id="isOutOfSchedule">
                                 <label class="form-check-label fw-bold" for="isOutOfSchedule">
                                     <i class="bi bi-lightning-charge-fill"></i> Job ngoài lịch
@@ -323,8 +301,11 @@
                             <div class="form-text">Dùng cho công việc phát sinh, không cố định theo lịch lặp.</div>
                         </div>
                     </div>
+                    </div>
 
-                    <div id="scheduleFields" class="row">
+                    <div class="job-form-section">
+                    <div class="job-form-section-title"><i class="bi bi-calendar-week"></i> Lịch lặp</div>
+                    <div id="scheduleFields" class="row g-3">
     <div class="col-md-3 mb-3">
         <label class="form-label fw-bold">Loại Job *</label>
         <select class="form-select" id="jobType" required>
@@ -360,19 +341,19 @@
         <input type="number" class="form-control" id="jobDuration" min="1" max="1440" placeholder="30">
         <div class="form-text">Trống = 30 phút</div>
     </div>
-    <div class="col-md-12 mb-3">
-        <label class="form-label fw-bold">Làm Chủ Nhật?</label>
-        <div class="form-check form-switch mt-2">
+    <div class="col-md-12">
+        <div class="form-check form-switch job-switch-card">
             <input class="form-check-input" type="checkbox" id="workOnSunday">
-            <label class="form-check-label" for="workOnSunday">
-                Có làm vào Chủ Nhật
+            <label class="form-check-label fw-bold" for="workOnSunday">
+                <i class="bi bi-sun-fill"></i> Có làm vào Chủ Nhật
             </label>
         </div>
     </div>
 </div>
+                    </div>
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Nội Dung Chi Tiết</label>
+                    <div class="job-form-section">
+                    <div class="job-form-section-title"><i class="bi bi-card-text"></i> Nội dung chi tiết</div>
                         <div class="editor-toolbar mb-2">
                             <button type="button" class="btn btn-sm btn-outline-secondary" onclick="formatText('bold')">
                                 <i class="bi bi-type-bold"></i> Bold
@@ -391,6 +372,9 @@
                                 <i class="bi bi-brush-fill"></i> Màu nền
                                 <input type="color" id="highlightColor" value="#fff176" style="display:none;">
                             </label>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="removeHighlightColor()">
+                                <i class="bi bi-eraser-fill"></i> Xóa màu nền
+                            </button>
                             <button type="button" class="btn btn-sm btn-outline-secondary" onclick="insertTable()">
                                 <i class="bi bi-table"></i> Bảng
                             </button>
@@ -422,7 +406,7 @@
 
     <!-- View Job Modal -->
     <div class="modal fade" id="viewJobModal" tabindex="-1">
-    <div class="modal-dialog modal-centered">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header modern-header modern-header-info">
                 <div class="modern-header-inner">
@@ -844,7 +828,7 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
 
     <!-- Salary Calculator Modal -->
     <div class="modal fade" id="salaryCalcModal" tabindex="-1">
-        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
             <div class="modal-content salary-modal-content">
                 <div class="modal-header modern-header modern-header-salary">
                     <div class="modern-header-inner">
@@ -905,9 +889,10 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
                                     <input type="text" inputmode="decimal" class="salary-count-input" id="salOtSunday" data-unit="giờ" placeholder="0"><span class="salary-unit">giờ</span>
                                     <span class="salary-line-value" id="salOtSundayValue">0 VNĐ</span>
                                 </div>
-                                <div class="salary-row">
-                                    <label for="salNightShift"><i class="bi bi-moon-stars-fill"></i> Ca đêm<span class="salary-formula">nhập tay</span></label>
-                                    <input type="text" inputmode="decimal" class="salary-input" id="salNightShift" data-group="income" placeholder="0">
+                                <div class="salary-row salary-row-auto">
+                                    <label for="salNightShift"><i class="bi bi-moon-stars-fill"></i> Ca đêm<span class="salary-formula">× 0.3 LCB/8 + 10K/8h</span></label>
+                                        <input type="text" inputmode="decimal" class="salary-count-input" id="salNightShift" data-unit="giờ" placeholder="0"><span class="salary-unit">giờ</span>
+                                    <span class="salary-line-value" id="salNightShiftValue">0 VNĐ</span>
                                 </div>
                                 <div class="salary-row salary-total-row">
                                     <label>Tổng Thu Nhập:</label>
@@ -935,10 +920,9 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    <div class="salary-card salary-card-tax mt-3">
-                        <div class="salary-card-head salary-head-tax">
+                        <div class="salary-card salary-card-tax">
+                            <div class="salary-card-head salary-head-tax">
                             <i class="bi bi-receipt"></i> Thuế TNCN (theo biểu thuế lũy tiến 2026)
                         </div>
                         <div class="salary-card-body">
@@ -967,6 +951,7 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
                                 <span class="salary-total-value" id="salTaxValue">0 VNĐ</span>
                             </div>
                         </div>
+                    </div>
                     </div>
 
                     <div class="salary-result">
@@ -1281,20 +1266,65 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
         </div>
     </div>
 
-    <!-- ===== LỆNH THOẠI GỢI Ý ===== -->
-    <div class="ia-flow-title">Lệnh thoại gợi ý 🎤</div>
-    <div class="ia-flow-box">
-        <div class="ia-flow-row" style="grid-template-columns: 1fr 1fr;">
-            <div class="ia-flow-step"><div class="n">"Mở lịch off"</div><div class="d">Mở modal đăng ký ngày nghỉ</div></div>
-            <div class="ia-flow-step"><div class="n">"Hôm nay có gì"</div><div class="d">Đọc danh sách job hôm nay</div></div>
+        <!-- ===== CHÚ THÍCH MÀU ===== -->
+<div class="ia-flow-title">Chú thích màu loại job</div>
+<div class="ia-flow-box">
+    <div class="ia-legend-grid">
+        <div class="ia-legend-item">
+            <span class="ia-legend-color once"></span>
+            <div>
+                <div class="ia-legend-name">Once</div>
+                <div class="ia-legend-desc">Job một lần</div>
+            </div>
         </div>
-        <div class="ia-flow-row" style="grid-template-columns: 1fr 1fr;">
-            <div class="ia-flow-step"><div class="n">"Tìm frame mill"</div><div class="d">Lọc nhanh danh sách job</div></div>
-            <div class="ia-flow-step"><div class="n">"Thêm job ABC lúc 8 giờ 30"</div><div class="d">Mở form tạo job và điền sẵn</div></div>
+        <div class="ia-legend-item">
+            <span class="ia-legend-color daily"></span>
+            <div>
+                <div class="ia-legend-name">Daily</div>
+                <div class="ia-legend-desc">Hàng ngày</div>
+            </div>
         </div>
-        <div class="ia-flow-row" style="grid-template-columns: 1fr 1fr;">
-            <div class="ia-flow-step"><div class="n">"Chế độ tối" / "Chế độ sáng"</div><div class="d">Đổi giao diện</div></div>
-            <div class="ia-flow-step"><div class="n">"Mở chat" / "Quay số" / "Check due"</div><div class="d">Mở nhanh công cụ tương ứng</div></div>
+        <div class="ia-legend-item">
+            <span class="ia-legend-color weekly"></span>
+            <div>
+                <div class="ia-legend-name">Weekly</div>
+                <div class="ia-legend-desc">Hàng tuần</div>
+            </div>
+        </div>
+        <div class="ia-legend-item">
+            <span class="ia-legend-color biweekly"></span>
+            <div>
+                <div class="ia-legend-name">Biweekly</div>
+                <div class="ia-legend-desc">2 tuần/lần</div>
+            </div>
+        </div>
+        <div class="ia-legend-item">
+            <span class="ia-legend-color monthly"></span>
+            <div>
+                <div class="ia-legend-name">Monthly</div>
+                <div class="ia-legend-desc">Hàng tháng</div>
+            </div>
+        </div>
+        <div class="ia-legend-item">
+            <span class="ia-legend-color shifted"></span>
+            <div>
+                <div class="ia-legend-name">Dời / Off</div>
+                <div class="ia-legend-desc">Job dời do off hoặc kéo-thả</div>
+            </div>
+        </div>
+        <div class="ia-legend-item">
+            <span class="ia-legend-color presenter"></span>
+            <div>
+                <div class="ia-legend-name">Thuyết trình</div>
+                <div class="ia-legend-desc">Job chỉ định qua quay số</div>
+            </div>
+        </div>
+        <div class="ia-legend-item">
+            <span class="ia-legend-color day-off"></span>
+            <div>
+                <div class="ia-legend-name">Ngày off</div>
+                <div class="ia-legend-desc">Ngày bạn đã đăng ký nghỉ</div>
+            </div>
         </div>
     </div>
 </div>

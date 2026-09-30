@@ -125,6 +125,10 @@ const MORNING_DIGEST_STORAGE_KEY = 'workpic_morning_digest_sent';
 const MORNING_DIGEST_HOURS = { from: 6, to: 10 };  // Chỉ gửi mail trong khung 6h–10h
 
 function applyTheme(theme) {
+    // Bật "chế độ tắt transition" để hàng trăm element cùng lúc
+    // không animate bg/color/border khi đổi theme
+    document.body.classList.add('no-theme-transition');
+
     currentTheme = theme;
     document.body.classList.toggle('theme-dark', theme === 'dark');
     document.body.classList.toggle('theme-light', theme === 'light');
@@ -146,9 +150,16 @@ function applyTheme(theme) {
     }
 
     localStorage.setItem('workpic-theme', theme);
+
+    // Sau 2 frame (browser đã paint xong theme mới) → trả lại transition bình thường
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        document.body.classList.remove('no-theme-transition');
+    }));
 }
 
 function initTheme() {
+    // Cũng tắt transition trong lúc load theme lần đầu (tránh FOUC nhấp nháy)
+    document.body.classList.add('no-theme-transition');
     const savedTheme = localStorage.getItem('workpic-theme');
     const preferredTheme = savedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     applyTheme(preferredTheme);
@@ -521,9 +532,44 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('statisticsBtn').addEventListener('click', openStatisticsModal);
     document.getElementById('salaryCalcBtn').addEventListener('click', openSalaryCalcModal);
     document.getElementById('salaryResetBtn').addEventListener('click', resetSalaryCalc);
+        // Ô nhập tiền → tự chèn dấu "." ngăn cách nghìn, giữ vị trí con trỏ
+        const MONEY_INPUT_IDS = ['salLCB'];
+    function handleMoneyInput(e) {
+        const el = e.target;
+        const cursorPos = el.selectionStart;
+        const beforeCursor = el.value.slice(0, cursorPos);
+        const digitsBefore = beforeCursor.replace(/\D/g, '').length;
+
+        el.value = formatMoneyInputValue(el.value);
+
+        // Đặt lại con trỏ đúng ngay sau chữ số thứ `digitsBefore`
+        let pos = 0, count = 0;
+        while (pos < el.value.length && count < digitsBefore) {
+            if (/\d/.test(el.value[pos])) count++;
+            pos++;
+        }
+        try { el.setSelectionRange(pos, pos); } catch (err) { /* một số input type không hỗ trợ */ }
+    }
+
     document.getElementById('salaryCalcModal').addEventListener('input', (e) => {
-        if (e.target.classList.contains('salary-input') || e.target.classList.contains('salary-count-input')) updateSalaryTotals();
+        if (MONEY_INPUT_IDS.includes(e.target.id)) {
+            handleMoneyInput(e);
+            updateSalaryTotals();
+            return;
+        }
+        if (e.target.classList.contains('salary-input') || e.target.classList.contains('salary-count-input')) {
+            updateSalaryTotals();
+        }
     });
+
+    // Khi rời ô tiền → format lại lần cuối (đề phòng user paste chuỗi lộn xộn)
+    document.getElementById('salaryCalcModal').addEventListener('blur', (e) => {
+        if (MONEY_INPUT_IDS.includes(e.target.id)) {
+            e.target.value = formatMoneyInputValue(e.target.value);
+            updateSalaryTotals();
+        }
+    }, true);
+
     document.getElementById('salaryCalcModal').addEventListener('hidden.bs.modal', resetSalaryCalc);
     document.querySelectorAll('.stats-mode-tab').forEach(tab => {
         tab.addEventListener('click', () => {
@@ -535,6 +581,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     initQuickChatUi();
+    initLayoutDropdown();
 
     // Event Listeners
     document.getElementById('addJobBtn').addEventListener('click', () => openAddJobModal(false));
@@ -751,6 +798,22 @@ window.applyHighlightColor = function() {
     document.getElementById('jobDescription').focus();
 };
 
+// Xóa màu nền đã tô cho phần văn bản đang bôi đen (hoặc toàn bộ nếu không chọn gì)
+window.removeHighlightColor = function() {
+    const editor = document.getElementById('jobDescription');
+    editor.focus();
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0 || selection.toString().trim() === '') {
+        // Không bôi đen gì: chọn hết nội dung để xóa màu nền toàn bộ
+        const range = document.createRange();
+        range.selectNodeContents(editor);
+        selection.removeAllRanges();
+        selection.addRange(range);
+    }
+    document.execCommand('hiliteColor', false, 'transparent');
+    editor.focus();
+};
+
 window.insertTable = function() {
     const editor = document.getElementById('jobDescription');
     const selection = window.getSelection();
@@ -784,7 +847,7 @@ window.insertTable = function() {
     };
 
     const tableHtml = `
-        <table style="border-collapse: collapse; width: auto; max-width: 100%; margin: 0.5rem 0; table-layout: auto;">
+        <table style="border-collapse: collapse; width: auto; margin: 0.5rem 0; table-layout: auto;">
             ${rows.map(row => {
                 const safeCells = parseCells(row);
                 return `<tr>${safeCells.map(cell => `<td style="border: 1px solid #dee2e6; padding: 0.25rem 0.5rem; white-space: nowrap; font-size: 0.95em;">${cell}</td>`).join('')}</tr>`;
@@ -4365,6 +4428,108 @@ function initQuickChatUi() {
     });
 }
 
+/// ============================================================
+// LAYOUT DROPDOWN — tự quản lý, không dùng Bootstrap
+// để không bị cắt bởi overflow của .card và #sidebar
+// ============================================================
+function initLayoutDropdown() {
+    const btn = document.getElementById('layoutMenuBtn');
+    if (!btn) return;
+    const menu = btn.parentElement.querySelector('.layout-dropdown-menu');
+    if (!menu) return;
+
+    // Chuyển menu ra body để không tổ tiên nào cắt được
+    if (menu.parentElement !== document.body) {
+        document.body.appendChild(menu);
+    }
+
+    let isOpen = false;
+
+    function position() {
+        const r = btn.getBoundingClientRect();
+        menu.style.maxWidth = Math.min(420, window.innerWidth - 16) + 'px';
+
+        const mw = menu.offsetWidth;
+        const mh = menu.offsetHeight;
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+
+        let top = r.bottom + 8;
+        let left = r.left;
+
+        if (left + mw > vw - 8) left = Math.max(8, r.right - mw);
+        if (left < 8) left = 8;
+
+        if (top + mh > vh - 8) {
+            const aboveTop = r.top - mh - 8;
+            if (aboveTop >= 8) {
+                top = aboveTop;
+                menu.style.maxHeight = '';
+            } else {
+                top = 8;
+                menu.style.maxHeight = (vh - 16) + 'px';
+            }
+        } else {
+            menu.style.maxHeight = '';
+        }
+
+        menu.style.top = top + 'px';
+        menu.style.left = left + 'px';
+    }
+
+    function openMenu() {
+        if (isOpen) return;
+        isOpen = true;
+        menu.style.top = '-9999px';
+        menu.style.left = '-9999px';
+        menu.classList.add('show');
+        btn.setAttribute('aria-expanded', 'true');
+        requestAnimationFrame(() => requestAnimationFrame(position));
+        setTimeout(() => {
+            document.addEventListener('click', onDocClick, true);
+            window.addEventListener('resize', position);
+            window.addEventListener('scroll', position, true);
+        }, 0);
+    }
+
+    function closeMenu() {
+        if (!isOpen) return;
+        isOpen = false;
+        menu.classList.remove('show');
+        btn.setAttribute('aria-expanded', 'false');
+        // Đẩy ra ngoài viewport để chắc chắn không chặn click khi đã đóng
+        setTimeout(() => {
+            if (!isOpen) {
+                menu.style.top = '-9999px';
+                menu.style.left = '-9999px';
+            }
+        }, 200);
+        document.removeEventListener('click', onDocClick, true);
+        window.removeEventListener('resize', position);
+        window.removeEventListener('scroll', position, true);
+    }
+
+    function onDocClick(e) {
+        if (menu.contains(e.target) || btn.contains(e.target)) return;
+        closeMenu();
+    }
+
+    btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (isOpen) closeMenu(); else openMenu();
+    });
+
+    // Đóng menu sau khi chọn item, sau khi handler của item chạy xong
+    menu.querySelectorAll('.layout-dropdown-item').forEach(item => {
+        item.addEventListener('click', () => setTimeout(closeMenu, 100));
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && isOpen) closeMenu();
+    });
+}
+
 // Delete Job
 async function deleteJob() {
     if (!currentEditingJobId) return;
@@ -5591,12 +5756,27 @@ function calcPersonalIncomeTax2026(taxableIncome) {
 const SALARY_UNION_FEE = 30000;
 const SALARY_INSURANCE_RATE = 0.105;
 const SALARY_DEFAULT_STANDARD_DAYS = 26;
-const SALARY_MONEY_FIELDS = ['salLCB', 'salNightShift'];
-const SALARY_COUNT_FIELDS = ['salWorkDay', 'salHoliday', 'salAnnualLeave', 'salPaidLeave', 'salOtNormal', 'salOtSunday'];
+const SALARY_MONEY_FIELDS = ['salLCB'];
+const SALARY_COUNT_FIELDS = ['salWorkDay', 'salHoliday', 'salAnnualLeave', 'salPaidLeave', 'salOtNormal', 'salOtSunday', 'salNightShift'];
 const SALARY_ALL_INPUT_FIELDS = [...SALARY_MONEY_FIELDS, ...SALARY_COUNT_FIELDS, 'salStandardDays', 'salDependents'];
 
 function formatSalaryVND(n) {
     return `${Math.round(n || 0).toLocaleString('vi-VN')} VNĐ`;
+}
+
+// Format số nguyên với dấu "." ngăn cách nghìn (vi-VN)
+function formatMoneyInputValue(raw) {
+    const digits = String(raw).replace(/\D/g, '');
+    if (!digits) return '';
+    return Number(digits).toLocaleString('vi-VN');
+}
+
+// Parse chuỗi tiền có dấu ngăn cách: "26.000.000" -> 26000000
+function parseMoney(id) {
+    const el = document.getElementById(id);
+    if (!el) return 0;
+    const digits = (el.value || '').replace(/\D/g, '');
+    return parseInt(digits, 10) || 0;
 }
 
 function parseSalaryNumber(id) {
@@ -5632,10 +5812,14 @@ function resetSalaryCalc() {
 }
 
 function updateSalaryTotals() {
-    const lcb = parseSalaryNumber('salLCB');
+        const lcb = parseMoney('salLCB');
     const standardDays = parseSalaryNumber('salStandardDays') || SALARY_DEFAULT_STANDARD_DAYS;
     const dailyRate = standardDays > 0 ? lcb / standardDays : 0;
     const hourlyRate = dailyRate / 8;
+
+        // Ca đêm = (LCB / Ngày công chuẩn / 8) × 0.3 × số giờ + (số giờ / 8) × 10.000
+    const nightShiftHours = parseSalaryNumber('salNightShift');
+    const nightShiftPay = hourlyRate * 0.3 * nightShiftHours + (nightShiftHours / 8) * 10000;
 
     const lineValues = {
         salWorkDayValue: parseSalaryNumber('salWorkDay') * dailyRate,
@@ -5643,14 +5827,14 @@ function updateSalaryTotals() {
         salAnnualLeaveValue: parseSalaryNumber('salAnnualLeave') * dailyRate,
         salPaidLeaveValue: parseSalaryNumber('salPaidLeave') * dailyRate,
         salOtNormalValue: parseSalaryNumber('salOtNormal') * hourlyRate * 1.5,
-        salOtSundayValue: parseSalaryNumber('salOtSunday') * hourlyRate * 2
+        salOtSundayValue: parseSalaryNumber('salOtSunday') * hourlyRate * 2,
+        salNightShiftValue: nightShiftPay
     };
     Object.entries(lineValues).forEach(([id, val]) => {
         document.getElementById(id).textContent = formatSalaryVND(val);
     });
 
-    const nightShift = parseSalaryNumber('salNightShift');
-    const income = Object.values(lineValues).reduce((a, b) => a + b, 0) + nightShift;
+    const income = Object.values(lineValues).reduce((a, b) => a + b, 0);
 
     const insurance = lcb * SALARY_INSURANCE_RATE;
     const unionFee = lcb > 0 ? SALARY_UNION_FEE : 0;
@@ -5733,15 +5917,25 @@ async function fetchAllJobsForStats() {
 }
 
 async function openStatisticsModal() {
-    statisticsModal.show();
-    document.getElementById('statsSummary').innerHTML = '';
-    document.getElementById('statsChart').innerHTML = '<div class="empty-state"><i class="bi bi-hourglass-split"></i><br>Đang tải dữ liệu...</div>';
-    document.getElementById('statsTable').innerHTML = '';
+    if (!statisticsModal) {
+        console.error('statisticsModal chưa được khởi tạo');
+        showNotification('Lỗi', 'Không mở được thống kê. Vui lòng tải lại trang.', false, 'danger');
+        return;
+    }
+    try {
+        statisticsModal.show();
+        document.getElementById('statsSummary').innerHTML = '';
+        document.getElementById('statsChart').innerHTML = '<div class="empty-state"><i class="bi bi-hourglass-split"></i><br>Đang tải dữ liệu...</div>';
+        document.getElementById('statsTable').innerHTML = '';
 
-    loadStatsHiddenUsers();
-    await ensureUsersInfoCache();
-    statsAllJobs = await fetchAllJobsForStats();
-    renderStatistics();
+        loadStatsHiddenUsers();
+        await ensureUsersInfoCache();
+        statsAllJobs = await fetchAllJobsForStats();
+        renderStatistics();
+    } catch (error) {
+        console.error('Lỗi mở thống kê:', error);
+        showNotification('Lỗi', 'Không tải được dữ liệu thống kê.', false, 'danger');
+    }
 }
 
 function computeStatistics(mode) {

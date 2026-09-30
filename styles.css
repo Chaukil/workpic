@@ -54,16 +54,6 @@ body.theme-dark {
     letter-spacing: 0.005em;
 }
 
-a, button, .btn, .form-control, .form-select, .form-check-input,
-.card, .job-list-card, .nav-link, .notif-bell-btn, .user-profile-btn,
-.legend-item, .quick-chat-tab, .quick-chat-send-btn, .theme-toggle,
-input, select, textarea {
-    transition: background-color 0.15s ease,
-                color 0.15s ease,
-                border-color 0.15s ease,
-                transform 0.12s ease;
-}
-
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
         animation-duration: 0.001ms !important;
@@ -399,14 +389,16 @@ body.theme-dark #searchJob::placeholder { color: var(--muted); }
    LAYOUT DROPDOWN MENU (Check Due + Quay số thuyết trình...)
    ============================================================ */
 .layout-dropdown-menu {
-    border: 1px solid var(--border); border-radius: 14px; padding: 0.5rem;
-    box-shadow: var(--shadow-float, 0 18px 42px rgba(15,23,42,.12));
-    background: var(--surface); min-width: 260px;
-    max-width: calc(100vw - 1.5rem);
-    max-height: min(70vh, 520px);
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
+    position: fixed !important;
+    top: -9999px;
+    left: -9999px;
+    z-index: 1055 !important;
+    margin: 0;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-6px);
+    transition: opacity .15s ease, transform .15s ease;
+    will-change: opacity, transform;
 }
 .layout-dropdown-item {
     display: flex; align-items: center; gap: 0.6rem; width: 100%;
@@ -1507,7 +1499,10 @@ body.theme-dark .schedule-table td:hover { background-color: rgba(255, 255, 255,
     padding: 0.75rem;
     border: 1px solid var(--border);
     background: var(--surface); color: var(--text);
+    overflow-x: auto;              /* Bảng/nội dung dài hơn form sẽ kéo ngang được thay vì bị cắt */
+    max-width: 100%;
 }
+.editor-content table { max-width: none; }   /* Bảng giữ đúng độ rộng nội dung, không bị ép co lại */
 
 body.theme-dark .editor-content { background: #1f2937; color: #f8fafc; }
 body.theme-dark .editor-content * { color: inherit; }
@@ -3272,7 +3267,7 @@ body.theme-dark .legend-item {
 .card-header.modern-card-header .btn-outline-light {
     position: relative;
     z-index: 1;
-    color: var(--text);
+    color: #fff;
     border: 1px solid rgba(255,255,255,0.5);
     background: rgba(255,255,255,0.12);
     backdrop-filter: blur(8px);
@@ -3282,13 +3277,13 @@ body.theme-dark .legend-item {
 
 .card-header.modern-card-header .btn-outline-light:hover {
     background: rgba(255,255,255,0.25);
-    border-color: var(--text);
-    color: var(--text);
+    border-color: #fff;
+    color: #fff;
     transform: translateY(-1px);
 }
 
 body.theme-dark .card-header.modern-card-header .btn-outline-light {
-    color: var(--text);
+    color: #fff;
     background: rgba(15, 23, 42, 0.22);
     border-color: rgba(255,255,255,0.45);
 }
@@ -3683,6 +3678,7 @@ body.theme-dark .editor-toolbar {
     border-radius: 0 0 12px 12px;
     border: 1px solid rgba(148, 163, 184, 0.22);
     background: #fff;
+    overflow-x: auto;
 }
 
 body.theme-dark .editor-content {
@@ -4639,8 +4635,11 @@ body.theme-dark .day-override-popover {
 .salary-unit { font-size: var(--fs-3xs); color: var(--muted); margin: 0 0.5rem 0 0.25rem; }
 .salary-line-value { font-weight: 700; font-size: var(--fs-2xs); color: var(--success); min-width: 92px; text-align: right; }
 .salary-line-value-deduct { color: var(--danger); margin-left: auto; }
-.salary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: start; }
+.salary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; align-items: start; }
+@media (max-width: 1100px) { .salary-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 768px) { .salary-grid { grid-template-columns: 1fr; } }
+.salary-card-tax { grid-column: span 1; }
+@media (max-width: 1100px) { .salary-card-tax { grid-column: 1 / -1; } }
 
 .salary-card {
     border-radius: 16px;
@@ -4661,7 +4660,6 @@ body.theme-dark .day-override-popover {
 .salary-head-income { background: linear-gradient(135deg, #2563eb, #38bdf8); }
 .salary-head-deduct { background: linear-gradient(135deg, #dc2626, #f97316); }
 .salary-head-tax { background: linear-gradient(135deg, #7c3aed, #a855f7); }
-.salary-card-tax .salary-card-body { background: rgba(124, 58, 237, .05); }
 .salary-card-tax .salary-card-body { background: rgba(124, 58, 237, .05); }
 
 .salary-card-body { padding: 0.85rem 1rem; }
@@ -4866,3 +4864,414 @@ body.theme-dark .stats-bar-wrap { background: rgba(15,23,42,0.6); }
 }
 .daily-exclude-chip.active { background: var(--primary); border-color: var(--primary); color: #fff; }
 .daily-exclude-chip:not(.active) { text-decoration: line-through; opacity: .6; }
+
+/* ============================================================
+   CHUẨN HÓA FORM THÊM/SỬA JOB
+   ============================================================ */
+.job-modal-content { overflow: visible; }
+.job-form-section {
+    background: var(--surface-muted);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1rem 1.1rem;
+    margin-bottom: 1rem;
+}
+.job-form-section:last-of-type { margin-bottom: 0; }
+.job-form-section-title {
+    font-weight: 700;
+    font-size: var(--fs-sm);
+    color: var(--text);
+    margin-bottom: 0.75rem;
+    display: flex; align-items: center; gap: 0.4rem;
+}
+.job-switch-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.55rem 0.7rem 0.55rem 2.6rem;
+    margin: 0;
+}
+.job-switch-card .form-check-input { margin-left: -2.1rem; }
+
+/* ============================================================
+   FORM THÊM/SỬA JOB — phóng to 90-95% màn hình (mọi kích cỡ)
+   ============================================================ */
+#jobModal .modal-dialog {
+    width: 93vw;
+    max-width: 93vw;
+    max-height: 93vh;
+    margin-top: 3.5vh;
+    margin-bottom: 3.5vh;
+}
+
+#jobModal .modal-content {
+    max-height: 93vh;
+    display: flex;
+    flex-direction: column;
+}
+
+#jobModal .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+#jobModal .modal-header,
+#jobModal .modal-footer {
+    flex-shrink: 0;
+}
+
+/* Màn hình nhỏ: rộng hơn chút cho dễ thao tác */
+@media (max-width: 768px) {
+    #jobModal .modal-dialog {
+        width: 96vw;
+        max-width: 96vw;
+        max-height: 96vh;
+        margin-top: 2vh;
+        margin-bottom: 2vh;
+    }
+    #jobModal .modal-content { max-height: 96vh; }
+}
+
+/* Màn hình cực nhỏ (điện thoại) */
+@media (max-width: 480px) {
+    #jobModal .modal-dialog {
+        width: 98vw;
+        max-width: 98vw;
+        max-height: 98vh;
+        margin-top: 1vh;
+        margin-bottom: 1vh;
+    }
+    #jobModal .modal-content { max-height: 98vh; }
+}
+#viewJobModal .modal-dialog {
+    width: 90vw;
+    max-width: 90vw;
+    max-height: 90vh;
+    margin-top: 5vh;
+    margin-bottom: 5vh;
+}
+#viewJobModal .modal-content {
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+}
+#viewJobModal .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+/* ============================================================
+   TÍNH LƯƠNG — sửa layout các dòng có ô nhập số
+   ============================================================ */
+.salary-row-auto {
+    display: grid !important;
+    grid-template-columns: 1fr auto auto auto;
+    align-items: center;
+    gap: 0.5rem;
+    justify-content: unset !important;
+}
+.salary-row-auto > label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.salary-row-auto .salary-count-input {
+    margin-left: 0 !important;
+    justify-self: end;
+}
+.salary-row-auto .salary-unit {
+    justify-self: start;
+    margin: 0;
+}
+.salary-row-auto .salary-line-value {
+    justify-self: end;
+    min-width: 100px;
+}
+
+/* Dòng chỉ đọc (readonly) cũng dùng grid cho thẳng cột với dòng auto */
+.salary-row-readonly {
+    display: grid !important;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 0.5rem;
+    justify-content: unset !important;
+}
+.salary-row-readonly .salary-line-value-deduct {
+    margin-left: 0 !important;
+    justify-self: end;
+}
+
+/* Dòng nhập tiền lớn (Ca đêm) — giữ flex nhưng canh đúng */
+.salary-row:not(.salary-row-auto):not(.salary-row-readonly):not(.salary-total-row) {
+    display: grid !important;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 0.75rem;
+    justify-content: unset !important;
+}
+
+/* Trên mobile, các cột có thể hơi chật → thu gọn */
+@media (max-width: 576px) {
+    .salary-row-auto {
+        grid-template-columns: 1fr auto;
+        row-gap: 0.25rem;
+    }
+    .salary-row-auto .salary-count-input { grid-column: 2; grid-row: 1; }
+    .salary-row-auto .salary-unit { grid-column: 1; grid-row: 2; }
+    .salary-row-auto .salary-line-value { grid-column: 2; grid-row: 2; }
+}
+
+/* ============================================================
+   TÍNH LƯƠNG — mở rộng modal và các ô nhập
+   ============================================================ */
+
+/* 1) Modal rộng hơn nữa (đè lên modal-xl mặc định) */
+#salaryCalcModal .modal-dialog {
+    width: min(97vw, 1500px);
+    max-width: min(97vw, 1500px);
+    margin-top: 2.5vh;
+    margin-bottom: 2.5vh;
+}
+#salaryCalcModal .salary-modal-content {
+    max-height: 95vh;
+    display: flex;
+    flex-direction: column;
+}
+#salaryCalcModal .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+/* 2) Ô LCB — dài hơn và nổi bật */
+.salary-lcb-row .salary-input-lcb {
+    width: 320px !important;
+    max-width: 60% !important;
+    text-align: right;
+    font-size: 1.05rem;
+    padding: 0.45rem 0.75rem;
+}
+
+/* 3) Ô tiền khác (nếu có) — dài vừa phải, chữ số căn phải */
+.salary-input {
+    width: 200px !important;
+    max-width: 55% !important;
+    text-align: right;
+    padding: 0.35rem 0.6rem;
+}
+
+/* 4) Ô nhập số ngày / giờ — đồng nhất 90px */
+.salary-count-input {
+    width: 90px !important;
+    text-align: right;
+    margin-left: 0 !important;
+    padding: 0.35rem 0.6rem;
+}
+
+/* 5) Ô nhập ngày công chuẩn ở header LCB */
+.salary-lcb-row .salary-input-sm {
+    width: 110px !important;
+    max-width: 25% !important;
+    text-align: right;
+    padding: 0.35rem 0.6rem;
+}
+
+/* 6) Căn lại grid dòng auto để số & đơn vị & giá trị thẳng cột */
+.salary-row-auto {
+    grid-template-columns: 1fr 90px auto 110px !important;
+    column-gap: 0.6rem;
+}
+.salary-row-auto .salary-unit {
+    margin: 0 !important;
+    min-width: 28px;
+}
+
+/* 7) Mục Thu nhập / Khấu trừ / Thuế — cân bằng chiều rộng cột */
+.salary-grid {
+    grid-template-columns: 1fr 1fr 1.1fr;
+}
+
+/* 8) Responsive: xuống 2 cột hoặc 1 cột */
+@media (max-width: 1200px) {
+    .salary-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 900px) {
+    .salary-grid { grid-template-columns: 1fr; }
+    .salary-lcb-row .salary-input-lcb { width: 240px !important; max-width: 55% !important; }
+    .salary-input { width: 160px !important; max-width: 50% !important; }
+}
+
+/* 9) Mobile nhỏ — các ô co lại vừa đủ */
+@media (max-width: 576px) {
+    .salary-count-input { width: 70px !important; }
+    .salary-row-auto { grid-template-columns: 1fr 70px auto 90px !important; }
+    .salary-lcb-row .salary-input-lcb { width: 170px !important; max-width: 55% !important; font-size: 0.95rem; }
+    .salary-lcb-row .salary-input-sm { width: 80px !important; }
+    .salary-input { width: 130px !important; max-width: 45% !important; }
+}
+
+/* ============================================================
+   FIX LAG KHI ĐỔI THEME & GIẢM TẢI TRANSITION
+   ============================================================ */
+
+/* Tạm tắt MỌI transition/animation trong lúc đổi theme để tránh
+   hàng trăm element cùng animate → repaint toàn page → giật. */
+body.no-theme-transition,
+body.no-theme-transition *,
+body.no-theme-transition *::before,
+body.no-theme-transition *::after {
+    transition: none !important;
+    animation: none !important;
+}
+
+/* Xoá transition trên body — tránh repaint toàn cục khi đổi màu nền */
+body {
+    transition: none;
+}
+
+/* ============================================================
+   LAYOUT DROPDOWN — tách khỏi card/sidebar, không bị cắt
+   ============================================================ */
+.layout-dropdown-menu {
+    position: fixed !important;
+    top: -9999px;
+    left: -9999px;
+    z-index: 3000 !important;   /* trên cả sidebar, topbar */
+    margin: 0;
+    opacity: 0;
+    transform: translateY(-6px);
+    transition: opacity .15s ease, transform .15s ease;
+    will-change: opacity, transform;
+}
+.layout-dropdown-menu.show {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+}
+.layout-dropdown-menu:not(.show) {
+    transition: none;
+}
+
+/* ============================================================
+   GUIDE — Chú thích màu loại job
+   ============================================================ */
+.ia-legend-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+}
+.ia-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    transition: transform 0.2s var(--ease-out-expo, ease-out), box-shadow 0.2s ease;
+}
+.ia-legend-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
+}
+.ia-legend-color {
+    width: 18px;
+    height: 18px;
+    border-radius: 5px;
+    flex: none;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+.ia-legend-color.once      { background: var(--once-color); }
+.ia-legend-color.daily     { background: var(--daily-color); }
+.ia-legend-color.weekly    { background: var(--weekly-color); }
+.ia-legend-color.biweekly  { background: var(--biweekly-color); }
+.ia-legend-color.monthly   { background: var(--monthly-color); }
+.ia-legend-color.shifted   { background: linear-gradient(135deg, #ec4899, #f472b6); }
+.ia-legend-color.presenter { background: linear-gradient(135deg, #8b5cf6, #a855f7); }
+.ia-legend-color.day-off   {
+    background: repeating-linear-gradient(135deg, #ef4444 0 4px, rgba(239,68,68,.35) 4px 8px);
+}
+.ia-legend-name {
+    font-weight: 700;
+    font-size: var(--fs-xs);
+    color: var(--text);
+    line-height: 1.2;
+}
+.ia-legend-desc {
+    font-size: var(--fs-3xs);
+    color: var(--muted);
+    margin-top: 2px;
+    line-height: 1.3;
+}
+
+/* Topbar giờ chỉ còn 2 phần (logo + badges) do đã bỏ legend */
+.topbar {
+    grid-template-columns: 1fr auto;
+    gap: 1rem;
+}
+
+/* Đảm bảo trên mobile topbar vẫn đúng */
+@media (max-width: 992px) {
+    .topbar {
+        grid-template-columns: 1fr auto;
+    }
+}
+
+/* ============================================================
+   QUAY SỐ THUYẾT TRÌNH — kích thước responsive theo màn hình
+   ============================================================ */
+#presenterSpinModal .modal-dialog {
+    width: min(92vw, 1100px);
+    max-width: min(92vw, 1100px);
+    max-height: 92vh;
+    margin-top: 4vh;
+    margin-bottom: 4vh;
+}
+#presenterSpinModal .modal-content {
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+}
+#presenterSpinModal .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Màn hình nhỏ: mở rộng tối đa để dễ thao tác */
+@media (max-width: 768px) {
+    #presenterSpinModal .modal-dialog {
+        width: 96vw;
+        max-width: 96vw;
+        max-height: 96vh;
+        margin-top: 2vh;
+        margin-bottom: 2vh;
+    }
+    #presenterSpinModal .modal-content { max-height: 96vh; }
+    #presenterSpinModal .spin-layout { grid-template-columns: 1fr; }
+    #presenterSpinModal .spin-wheel-wrap {
+        width: min(240px, 70vw);
+        height: min(240px, 70vw);
+    }
+}
+
+/* Màn hình cực nhỏ (điện thoại): gần full màn */
+@media (max-width: 480px) {
+    #presenterSpinModal .modal-dialog {
+        width: 98vw;
+        max-width: 98vw;
+        max-height: 98vh;
+        margin-top: 1vh;
+        margin-bottom: 1vh;
+    }
+    #presenterSpinModal .modal-content { max-height: 98vh; }
+    #presenterSpinModal .spin-wheel-wrap {
+        width: min(200px, 60vw);
+        height: min(200px, 60vw);
+    }
+}
