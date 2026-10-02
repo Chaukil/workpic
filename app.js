@@ -164,12 +164,21 @@ function applyTheme(theme) {
     }));
 }
 
+function enableSkyAnimation() {
+    // Bật transition cho nền topbar sau lần vẽ đầu tiên (tránh chạy animation lúc mới tải trang)
+    setTimeout(() => {
+        const sky = document.querySelector('.topbar-sky');
+        if (sky) sky.classList.add('sky-animate');
+    }, 400);
+}
+
 function initTheme() {
     // Cũng tắt transition trong lúc load theme lần đầu (tránh FOUC nhấp nháy)
     document.body.classList.add('no-theme-transition');
     const savedTheme = localStorage.getItem('workpic-theme');
     const preferredTheme = savedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     applyTheme(preferredTheme);
+    enableSkyAnimation();
 }
 
 function setAuthMode(mode) {
@@ -1408,9 +1417,9 @@ function renderSchedule() {
             // Ngày off: tô sọc đỏ; ngày thường: highlight hôm nay
             if (offDoc) {
                 cell.classList.add('day-off-cell');
-            } else if (cellDate.getTime() === todayDate.getTime()) {
-                cell.style.backgroundColor = '#fffbea';
-                cell.style.fontWeight = 'bold';
+            }
+            if (cellDate.getTime() === todayDate.getTime()) {
+                cell.classList.add('today-cell');
             }
             
             // Date header
@@ -1418,7 +1427,7 @@ function renderSchedule() {
             dateHeader.className = 'date-header text-muted small';
             const whDoc = workHoursMap[dateStr] || null;
             const whBadge = whDoc
-                ? `<span class="wh-badge" title="Giờ làm việc — Motion: ${formatWorkHours(whDoc.motion)}h, Station: ${formatWorkHours(whDoc.station)}h">M: ${formatWorkHours(whDoc.motion)}h - S: ${formatWorkHours(whDoc.station)}h</span>`
+                ? `<span class="wh-badges"><span class="wh-badge wh-m" title="Giờ Motion">M-${formatWorkHours(whDoc.motion)}h</span><span class="wh-badge wh-s" title="Giờ Station">S-${formatWorkHours(whDoc.station)}h</span></span>`
                 : '';
             dateHeader.innerHTML = `<span class="date-header-left"><i class="bi bi-calendar-day"></i> ${formatDateShort(currentDate)}${offDoc ? '<span class="day-off-badge">OFF</span>' : ''}</span>${whBadge}`;
             cell.appendChild(dateHeader);
