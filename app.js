@@ -50,6 +50,13 @@ let dayOffModalOpen = false;
 let dayOffsList = [];            // toàn bộ lịch off (mọi user) từ tháng trước trở đi
 let unsubscribeDayOffs = null;
 let dayOffSelected = new Set();  // các ngày (YYYY-MM-DD) MÌNH đang chọn off
+// Giờ làm việc (Motion / Station) theo ngày — dùng chung mọi user
+let workHoursModal;
+let workHoursModalOpen = false;
+let workHoursMap = {};           // { 'YYYY-MM-DD': { date, motion, station, ... } }
+let unsubscribeWorkHours = null;
+let workHoursParsed = [];        // kết quả phân tích ô dán
+const WORKHOURS_COLLECTION = 'workHours';
 let dayOffFocusUid = null;       // đang xem riêng lịch của user nào
 let dayOffUsers = [];
 let notifyLeadMinutes = 0;      // nhắc job trước N phút (0 = đúng giờ)            // danh sách user hiển thị trong form
@@ -437,6 +444,11 @@ function handleSignedOut() {
     }
     dayOffsList = [];
     dayOffSelected = new Set();
+    if (unsubscribeWorkHours) {
+        unsubscribeWorkHours();
+        unsubscribeWorkHours = null;
+    }
+    workHoursMap = {};
     if (unsubscribeJobDayOverrides) {
         unsubscribeJobDayOverrides();
         unsubscribeJobDayOverrides = null;
@@ -487,6 +499,7 @@ function initializeAuthenticatedApp() {
         listenQuickJobs();
         listenQuickJobTransferRequests();
         listenDayOffs();
+        listenWorkHours();
         listenJobDayOverrides();
         listenUsersAvatars();
     });
@@ -528,8 +541,9 @@ document.addEventListener('DOMContentLoaded', function() {
     quickJobTransferConfirmModal = new bootstrap.Modal(document.getElementById('quickJobTransferConfirmModal'));
     guideModal = new bootstrap.Modal(document.getElementById('guideModal'));
 
-        statisticsModal = new bootstrap.Modal(document.getElementById('statisticsModal'));
+    statisticsModal = new bootstrap.Modal(document.getElementById('statisticsModal'));
     document.getElementById('statisticsBtn').addEventListener('click', openStatisticsModal);
+    initWorkHoursUi();
     document.getElementById('salaryCalcBtn').addEventListener('click', openSalaryCalcModal);
     document.getElementById('salaryResetBtn').addEventListener('click', resetSalaryCalc);
         // Ô nhập tiền → tự chèn dấu "." ngăn cách nghìn, giữ vị trí con trỏ
@@ -1402,7 +1416,11 @@ function renderSchedule() {
             // Date header
             const dateHeader = document.createElement('div');
             dateHeader.className = 'date-header text-muted small';
-            dateHeader.innerHTML = `<i class="bi bi-calendar-day"></i> ${formatDateShort(currentDate)}${offDoc ? '<span class="day-off-badge">OFF</span>' : ''}`;
+            const whDoc = workHoursMap[dateStr] || null;
+            const whBadge = whDoc
+                ? `<span class="wh-badge" title="Giờ làm việc — Motion: ${formatWorkHours(whDoc.motion)}h, Station: ${formatWorkHours(whDoc.station)}h">M: ${formatWorkHours(whDoc.motion)}h - S: ${formatWorkHours(whDoc.station)}h</span>`
+                : '';
+            dateHeader.innerHTML = `<span class="date-header-left"><i class="bi bi-calendar-day"></i> ${formatDateShort(currentDate)}${offDoc ? '<span class="day-off-badge">OFF</span>' : ''}</span>${whBadge}`;
             cell.appendChild(dateHeader);
 
                         // ===== KÉO-THẢ: ô ngày nhận drop =====
@@ -5298,6 +5316,273 @@ async function confirmPresenterAssignment() {
 }
 
 // ============================================================
+// GIỜ LÀM VIỆC — Motion / Station theo ngày
+// Firestore: collection "workHours", mỗi ngày = 1 document, id = YYYY-MM-DD (dùng chung mọi user)
+//   { date, motion, station, updatedBy, updatedByName, updatedAt }
+// ============================================================
+function formatWorkHours(n) {
+    const v = Number(n);
+    if (!Number.isFinite(v)) return '0';
+    return String(Math.round(v * 100) / 100);
+}
+
+function listenWorkHours() {
+    if (unsubscribeWorkHours) unsubscribeWorkHours();
+    const lower = new Date();
+    lower.setMonth(lower.getMonth() - 2);
+    const q = query(collection(db, WORKHOURS_COLLECTION), where('date', '>=', localDateKey(lower)));
+    unsubscribeWorkHours = onSnapshot(q, (snapshot) => {
+        const map = {};
+        snapshot.forEach(d => {
+            const data = d.data();
+            if (data.date) map[data.date] = { id: d.id, ...data };
+        });
+        workHoursMap = map;
+        renderSchedule();
+        if (workHoursModalOpen) {
+            renderWorkHoursSaved();
+            renderWorkHoursPreview();
+        }
+    }, (error) => {
+        console.error('❌ Lỗi khi lắng nghe giờ làm việc:', error);
+        showNotification('Lỗi', 'Không tải được giờ làm việc. Kiểm tra Firestore rules cho collection "workHours".', false, 'danger');
+    });
+}
+
+// "9.75" | "9,75" | "9.75h" -> 9.75 ; sai định dạng -> NaN
+function parseWorkHoursNumber(raw) {
+    let t = String(raw == null ? '' : raw).trim().replace(/h$/i, '').replace(/\s/g, '');
+    if (!t) return NaN;
+    if (t.includes(',') && !t.includes('.')) t = t.replace(',', '.');
+    else t = t.replace(/,/g, '');
+    if (!/^\d+(\.\d+)?$/.test(t)) return NaN;
+    return parseFloat(t);
+}
+
+// d/m | d/m/yyyy | d-m-yy | yyyy-mm-dd -> 'YYYY-MM-DD' (hoặc null)
+function parseWorkHoursDate(raw) {
+    const t = String(raw == null ? '' : raw).trim();
+    let m, y, mo, d;
+    if ((m = t.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/))) {
+        y = +m[1]; mo = +m[2]; d = +m[3];
+    } else if ((m = t.match(/^(\d{1,2})[-\/.](\d{1,2})(?:[-\/.](\d{2,4}))?$/))) {
+        d = +m[1]; mo = +m[2];
+        if (m[3]) {
+            y = +m[3];
+            if (y < 100) y += 2000;
+        } else {
+            // Không ghi năm: chọn năm gần "hôm nay" nhất (xử lý qua giao thừa)
+            const now = new Date();
+            y = now.getFullYear();
+            const cand = new Date(y, mo - 1, d);
+            const diffDays = (cand - now) / 86400000;
+            if (diffDays < -180) y += 1;
+            else if (diffDays > 180) y -= 1;
+        }
+    } else {
+        return null;
+    }
+    const dt = new Date(y, mo - 1, d);
+    if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
+    return localDateKey(dt);
+}
+
+function formatWorkHoursDateLabel(key) {
+    const [y, m, d] = key.split('-');
+    return `${d}/${m}/${y}`;
+}
+
+// Phân tích text dán: mỗi dòng "ngày | Motion | Station"
+function parseWorkHoursText(text) {
+    const lines = String(text || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const rows = [];
+    lines.forEach((line, idx) => {
+        const cols = (line.includes('\t') ? line.split('\t') : line.split(/[;\s|]+/))
+            .map(c => c.trim()).filter((c, i, arr) => c !== '' || arr.length <= 3);
+        const date = parseWorkHoursDate(cols[0]);
+        // Dòng tiêu đề (đầu tiên, không có ngày hợp lệ và không có số ở cột 2-3) → bỏ qua
+        if (!date && idx === 0 && Number.isNaN(parseWorkHoursNumber(cols[1])) && Number.isNaN(parseWorkHoursNumber(cols[2]))) {
+            return;
+        }
+        const row = { line, date, motion: parseWorkHoursNumber(cols[1]), station: parseWorkHoursNumber(cols[2]), error: '', skipped: false };
+        if (!date) row.error = 'Ngày không hợp lệ';
+        else if (cols.length < 3) row.error = 'Thiếu cột (cần Ngày, Motion, Station)';
+        else if (Number.isNaN(row.motion)) row.error = 'Giờ Motion không hợp lệ';
+        else if (Number.isNaN(row.station)) row.error = 'Giờ Station không hợp lệ';
+        rows.push(row);
+    });
+    // Trùng ngày ngay trong dữ liệu dán → lấy dòng cuối cùng
+    const lastIdx = {};
+    rows.forEach((r, i) => { if (!r.error) lastIdx[r.date] = i; });
+    rows.forEach((r, i) => { if (!r.error && lastIdx[r.date] !== i) r.skipped = true; });
+    return rows;
+}
+
+function renderWorkHoursPreview() {
+    const area = document.getElementById('whPasteArea');
+    const host = document.getElementById('whPreview');
+    const saveBtn = document.getElementById('whSaveBtn');
+    const saveText = document.getElementById('whSaveBtnText');
+    workHoursParsed = parseWorkHoursText(area.value);
+
+    const usable = workHoursParsed.filter(r => !r.error && !r.skipped);
+    const dupCount = usable.filter(r => workHoursMap[r.date]).length;
+    document.getElementById('whPreviewCount').textContent = workHoursParsed.length;
+
+    if (workHoursParsed.length === 0) {
+        host.innerHTML = '<div class="wh-empty">Chưa có dữ liệu</div>';
+    } else {
+        host.innerHTML = `<table class="wh-table">
+            <thead><tr><th>Ngày</th><th>Motion</th><th>Station</th><th>Trạng thái</th></tr></thead>
+            <tbody>${workHoursParsed.map(r => {
+                if (r.error) {
+                    return `<tr><td colspan="3" class="wh-note">${escapeHtml(r.line)}</td><td><span class="wh-tag err">${escapeHtml(r.error)}</span></td></tr>`;
+                }
+                const old = workHoursMap[r.date];
+                let tag;
+                if (r.skipped) tag = '<span class="wh-tag skip">Trùng trong dữ liệu dán · bỏ qua</span>';
+                else if (old) tag = `<span class="wh-tag dup">Đã có · M ${formatWorkHours(old.motion)}h / S ${formatWorkHours(old.station)}h</span>`;
+                else tag = '<span class="wh-tag new">Mới</span>';
+                return `<tr class="${r.skipped ? 'is-skip' : ''}">
+                    <td>${formatWorkHoursDateLabel(r.date)}</td>
+                    <td>${formatWorkHours(r.motion)}h</td>
+                    <td>${formatWorkHours(r.station)}h</td>
+                    <td class="wh-note">${tag}</td></tr>`;
+            }).join('')}</tbody></table>`;
+    }
+
+    saveBtn.disabled = usable.length === 0;
+    saveText.textContent = usable.length === 0
+        ? 'Lưu giờ làm việc'
+        : `Lưu ${usable.length} ngày${dupCount ? ` (${dupCount} trùng)` : ''}`;
+}
+
+function renderWorkHoursSaved() {
+    const host = document.getElementById('whSavedList');
+    const todayKey = localDateKey(new Date());
+    const items = Object.values(workHoursMap)
+        .sort((a, b) => b.date.localeCompare(a.date))
+        .slice(0, 40);
+    if (items.length === 0) {
+        host.innerHTML = '<div class="wh-empty">Chưa có ngày nào</div>';
+        return;
+    }
+    host.innerHTML = items.map(it => `
+        <div class="wh-saved-item" data-date="${escapeHtml(it.date)}">
+            <div>
+                <strong>${formatDateShortDMY(it.date)}${it.date === todayKey ? ' · hôm nay' : ''}</strong>
+                <div class="wh-saved-vals">M: ${formatWorkHours(it.motion)}h - S: ${formatWorkHours(it.station)}h</div>
+            </div>
+            <button type="button" class="wh-saved-del" data-act="del" title="Xóa ngày này"><i class="bi bi-trash-fill"></i></button>
+        </div>`).join('');
+}
+
+async function commitWorkHours(rows) {
+    const btn = document.getElementById('whSaveBtn');
+    btn.disabled = true;
+    try {
+        const nowIso = new Date().toISOString();
+        const payload = rows.map(r => ({
+            date: r.date, motion: r.motion, station: r.station,
+            updatedBy: currentUser.uid,
+            updatedByName: currentUser.displayName || currentUser.email || '',
+            updatedAt: nowIso
+        }));
+        for (let i = 0; i < payload.length; i += 400) {
+            const batch = writeBatch(db);
+            payload.slice(i, i + 400).forEach(p => batch.set(doc(db, WORKHOURS_COLLECTION, p.date), p));
+            await batch.commit();
+        }
+        showNotification('Thành công', `Đã lưu giờ làm việc cho ${payload.length} ngày.`, false, 'success');
+        document.getElementById('whPasteArea').value = '';
+        renderWorkHoursPreview();
+    } catch (error) {
+        console.error('Lỗi lưu giờ làm việc:', error);
+        showNotification('Lỗi', 'Không lưu được giờ làm việc. Kiểm tra Firestore rules cho collection "workHours".', false, 'danger');
+        renderWorkHoursPreview();
+    }
+}
+
+async function saveWorkHours() {
+    if (!currentUser) return;
+    renderWorkHoursPreview();
+    const errors = workHoursParsed.filter(r => r.error);
+    const usable = workHoursParsed.filter(r => !r.error && !r.skipped);
+    if (usable.length === 0) return;
+    const dups = usable.filter(r => workHoursMap[r.date]);
+
+    const proceed = () => commitWorkHours(usable);
+    if (dups.length === 0 && errors.length === 0) { proceed(); return; }
+
+    const parts = [];
+    if (dups.length) {
+        const list = dups.slice(0, 6).map(r => formatDateShortDMY(r.date)).join(', ') + (dups.length > 6 ? ` … (+${dups.length - 6})` : '');
+        parts.push(`${dups.length} ngày đã có dữ liệu (${list}) — bạn có muốn cập nhật không?`);
+    }
+    if (errors.length) parts.push(`${errors.length} dòng lỗi sẽ bị bỏ qua.`);
+    showConfirmDialog({
+        title: dups.length ? 'Có ngày bị trùng' : 'Có dòng bị lỗi',
+        message: parts.join(' '),
+        confirmText: dups.length ? 'Cập nhật' : 'Vẫn lưu',
+        onConfirm: proceed
+    });
+}
+
+function addQuickWorkHoursRow() {
+    const dateVal = document.getElementById('whQuickDate').value;       // YYYY-MM-DD
+    const motion = document.getElementById('whQuickMotion').value.trim();
+    const station = document.getElementById('whQuickStation').value.trim();
+    if (!dateVal || Number.isNaN(parseWorkHoursNumber(motion)) || Number.isNaN(parseWorkHoursNumber(station))) {
+        showNotification('Thiếu dữ liệu', 'Chọn ngày và nhập giờ Motion, Station hợp lệ.', false, 'warning');
+        return;
+    }
+    const area = document.getElementById('whPasteArea');
+    area.value = (area.value.trim() ? area.value.replace(/\s+$/, '') + '\n' : '') + `${dateVal}\t${motion}\t${station}`;
+    document.getElementById('whQuickMotion').value = '';
+    document.getElementById('whQuickStation').value = '';
+    renderWorkHoursPreview();
+}
+
+function openWorkHoursModal() {
+    workHoursModalOpen = true;
+    document.getElementById('whQuickDate').value = localDateKey(new Date());
+    renderWorkHoursSaved();
+    renderWorkHoursPreview();
+    workHoursModal.show();
+}
+
+function initWorkHoursUi() {
+    workHoursModal = new bootstrap.Modal(document.getElementById('workHoursModal'));
+    document.getElementById('workHoursModal').addEventListener('hidden.bs.modal', () => { workHoursModalOpen = false; });
+    document.getElementById('workHoursBtn').addEventListener('click', openWorkHoursModal);
+    document.getElementById('whPasteArea').addEventListener('input', renderWorkHoursPreview);
+    document.getElementById('whSaveBtn').addEventListener('click', saveWorkHours);
+    document.getElementById('whQuickAddBtn').addEventListener('click', addQuickWorkHoursRow);
+    document.getElementById('whClearBtn').addEventListener('click', () => {
+        document.getElementById('whPasteArea').value = '';
+        renderWorkHoursPreview();
+    });
+    document.getElementById('whSavedList').addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-act="del"]');
+        if (!btn) return;
+        const date = btn.closest('.wh-saved-item').dataset.date;
+        showConfirmDialog({
+            title: 'Xóa giờ làm việc',
+            message: `Xóa giờ làm việc ngày ${formatWorkHoursDateLabel(date)}?`,
+            confirmText: 'Xóa',
+            confirmClass: 'btn-delete',
+            onConfirm: async () => {
+                try { await deleteDoc(doc(db, WORKHOURS_COLLECTION, date)); }
+                catch (err) {
+                    console.error('Lỗi xóa giờ làm việc:', err);
+                    showNotification('Lỗi', 'Không xóa được.', false, 'danger');
+                }
+            }
+        });
+    });
+}
+
+// ============================================================
 // LỊCH OFF — đăng ký ngày nghỉ & dời job trong lịch cố định
 // Firestore: collection "dayOffs", mỗi ngày off = 1 document, id = `${uid}_${YYYY-MM-DD}`
 //   { userId, userName, date, reason, createdAt }
@@ -5530,12 +5815,20 @@ function renderDayOffCalendars() {
             }));
             if (showMine && isSelected) {
                 const reason = savedMine[key] ? savedMine[key].reason : '(chưa lưu)';
-                entries.unshift({ uid: currentUser.uid, name: 'Tôi', reason });
+                entries.unshift({
+                    uid: currentUser.uid, name: 'Tôi', reason,
+                    initialName: currentUser.displayName || currentUser.email || 'Tôi'
+                });
             }
 
-            const chips = entries.slice(0, 3).map(e =>
-                `<span class="dayoff-chip" style="background:${getDayOffUserColor(e.uid)}">${escapeHtml(avatarInitial({ displayName: e.name }))}</span>`
-            ).join('') + (entries.length > 3 ? `<span class="dayoff-chip more">+${entries.length - 3}</span>` : '');
+            const chips = entries.slice(0, 3).map(e => {
+                const avatarUrl = getUserAvatarUrl(e.uid) || (e.uid === currentUser.uid ? currentUser.avatar : null);
+                const tip = escapeHtml(e.name);
+                if (avatarUrl) {
+                    return `<img class="dayoff-chip" src="${escapeHtml(avatarUrl)}" alt="${tip}" title="${tip}">`;
+                }
+                return `<span class="dayoff-chip" style="background:${getDayOffUserColor(e.uid)}">${escapeHtml(avatarInitial({ displayName: e.initialName || e.name }))}</span>`;
+            }).join('') + (entries.length > 3 ? `<span class="dayoff-chip more">+${entries.length - 3}</span>` : '');
             const title = entries.map(e => `${e.name}: ${e.reason || 'Off'}`).join('\n');
 
             const classes = ['dayoff-day'];

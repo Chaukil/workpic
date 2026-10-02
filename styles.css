@@ -5275,3 +5275,68 @@ body {
         height: min(200px, 60vw);
     }
 }
+
+/* ============================================================
+   UPDATE GIỜ LÀM VIỆC (Motion / Station)
+   ============================================================ */
+.layout-item-ic-workhours { background: linear-gradient(135deg, #0d9488, #14b8a6); }
+
+/* Ô ngày trong lịch: ngày bên trái, M/S bên phải */
+.schedule-table .date-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.15rem 0.4rem;
+}
+.schedule-table .date-header-left { display: inline-flex; align-items: center; gap: 0.25rem; }
+.wh-badge {
+    margin-left: auto;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: rgba(13, 148, 136, 0.12);
+    color: #0f766e;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+}
+body.theme-dark .wh-badge { background: rgba(45, 212, 191, 0.16); color: #5eead4; }
+
+.wh-layout { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 1rem; }
+@media (max-width: 991px) { .wh-layout { grid-template-columns: 1fr; } }
+.wh-block {
+    border: 1px solid var(--border);
+    background: var(--surface-muted);
+    border-radius: 14px;
+    padding: 0.8rem 0.9rem;
+    margin-bottom: 0.8rem;
+}
+.wh-block-title { font-size: 0.85rem; font-weight: 700; color: var(--text); margin-bottom: 0.55rem; display: flex; align-items: center; gap: 0.4rem; }
+.wh-count { background: var(--primary-soft); color: var(--primary); border-radius: 999px; padding: 0 8px; font-size: 0.7rem; }
+.wh-quick-row { display: grid; grid-template-columns: 1.3fr 1fr 1fr auto; gap: 0.4rem; }
+.wh-textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.82rem; white-space: pre; }
+.wh-hint { font-size: 0.72rem; color: var(--muted); margin-top: 0.4rem; }
+.wh-preview { max-height: 260px; overflow: auto; }
+.wh-empty { text-align: center; padding: 0.8rem; color: var(--muted); font-size: 0.8rem; }
+.wh-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+.wh-table th, .wh-table td { padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
+.wh-table th { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; position: sticky; top: 0; background: var(--surface-muted); }
+.wh-table td.wh-note { white-space: normal; }
+.wh-tag { display: inline-block; padding: 0 8px; border-radius: 999px; font-size: 0.68rem; font-weight: 700; }
+.wh-tag.new { background: rgba(34, 197, 94, 0.15); color: #15803d; }
+.wh-tag.dup { background: rgba(245, 158, 11, 0.18); color: #b45309; }
+.wh-tag.skip { background: rgba(148, 163, 184, 0.2); color: #64748b; }
+.wh-tag.err { background: rgba(239, 68, 68, 0.15); color: #b91c1c; }
+.wh-table tr.is-skip td:not(.wh-note) { opacity: 0.5; text-decoration: line-through; }
+.wh-saved-list { display: flex; flex-direction: column; gap: 0.35rem; max-height: 480px; overflow: auto; }
+.wh-saved-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;
+    padding: 0.35rem 0.5rem; border-radius: 10px; background: var(--surface, #fff); border: 1px solid var(--border); font-size: 0.78rem;
+}
+.wh-saved-item strong { font-weight: 700; }
+.wh-saved-item .wh-saved-vals { color: var(--muted); font-size: 0.74rem; }
+.wh-saved-del { border: 0; background: transparent; color: #ef4444; padding: 0 4px; cursor: pointer; }
+
+/* Avatar trong ô ngày của lịch off */
+img.dayoff-chip { object-fit: cover; background: #fff; border: 1px solid rgba(255, 255, 255, 0.9); box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.12); }

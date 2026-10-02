@@ -175,6 +175,15 @@
                                                 </button>
                                             </li>
                                         <li>
+                                            <button class="layout-dropdown-item" id="workHoursBtn" type="button">
+                                                <span class="layout-item-ic layout-item-ic-workhours"><i class="bi bi-clock-history"></i></span>
+                                                <span class="layout-item-text">
+                                                    <span class="layout-item-title">Update giờ làm việc</span>
+                                                    <span class="layout-item-sub">Nhập giờ Motion / Station theo ngày</span>
+                                                </span>
+                                            </button>
+                                        </li>
+                                        <li>
                                             <button class="layout-dropdown-item" id="salaryCalcBtn" type="button">
                                                 <span class="layout-item-ic layout-item-ic-salary"><i class="bi bi-cash-coin"></i></span>
                                                 <span class="layout-item-text">
@@ -826,6 +835,69 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
         </div>
     </div>
 
+    <!-- Work Hours Modal -->
+    <div class="modal fade" id="workHoursModal" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header modern-header modern-header-teal">
+                    <div class="modern-header-inner">
+                        <div class="modern-header-icon"><i class="bi bi-clock-history"></i></div>
+                        <div class="modern-header-text">
+                            <h5 class="modal-title mb-0">Update giờ làm việc</h5>
+                            <p class="modern-header-subtitle mb-0">Nhập giờ Motion &amp; Station theo ngày — hiển thị ở góc phải ô ngày trên lịch</p>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="wh-layout">
+                        <div class="wh-input-col">
+                            <div class="wh-block">
+                                <div class="wh-block-title"><i class="bi bi-plus-circle-fill"></i> Thêm nhanh 1 ngày</div>
+                                <div class="wh-quick-row">
+                                    <input type="date" class="form-control form-control-sm" id="whQuickDate">
+                                    <input type="text" inputmode="decimal" class="form-control form-control-sm" id="whQuickMotion" placeholder="Motion (h)">
+                                    <input type="text" inputmode="decimal" class="form-control form-control-sm" id="whQuickStation" placeholder="Station (h)">
+                                    <button type="button" class="btn btn-sm btn-save" id="whQuickAddBtn"><i class="bi bi-plus-lg"></i></button>
+                                </div>
+                            </div>
+                            <div class="wh-block">
+                                <div class="wh-block-title"><i class="bi bi-clipboard-data-fill"></i> Dán nhiều ngày</div>
+                                <textarea class="form-control wh-textarea" id="whPasteArea" rows="8" placeholder="Dán từ Excel, mỗi dòng 1 ngày, 3 cột theo thứ tự:
+Ngày  |  Giờ Motion  |  Giờ Station
+
+VD:
+28/9	9.75	9.75
+29/9	8	7.5
+30/9/2026	10	9,25
+
+Ngày nhận: d/m, d/m/yyyy, yyyy-mm-dd. Số thập phân dùng . hoặc ,"></textarea>
+                                <div class="wh-hint"><i class="bi bi-info-circle"></i> Dòng tiêu đề (nếu có) sẽ tự bỏ qua. Ngày đã có dữ liệu sẽ được hỏi trước khi cập nhật.</div>
+                            </div>
+                            <div class="wh-block">
+                                <div class="wh-block-title"><i class="bi bi-eye-fill"></i> Xem trước <span class="wh-count" id="whPreviewCount">0</span></div>
+                                <div class="wh-preview" id="whPreview"><div class="wh-empty">Chưa có dữ liệu</div></div>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mt-3 gap-2 flex-wrap">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="whClearBtn"><i class="bi bi-eraser-fill"></i> Xóa ô dán</button>
+                                <button type="button" class="btn btn-save" id="whSaveBtn" disabled>
+                                    <i class="bi bi-check-circle-fill"></i> <span id="whSaveBtnText">Lưu giờ làm việc</span>
+                                    <div class="btn-shine"></div>
+                                </button>
+                            </div>
+                        </div>
+                        <aside class="wh-saved-col">
+                            <div class="wh-block">
+                                <div class="wh-block-title"><i class="bi bi-calendar-check-fill"></i> Đã nhập gần đây</div>
+                                <div class="wh-saved-list" id="whSavedList"></div>
+                            </div>
+                        </aside>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Salary Calculator Modal -->
     <div class="modal fade" id="salaryCalcModal" tabindex="-1">
         <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
@@ -1207,6 +1279,7 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
                 <div class="ia-item">Check Due<span>So sánh FG_MO / FG_JOBNO / FG_DUE giữa 2 nguồn dữ liệu — hỗ trợ dán hoặc tải file Excel/CSV</span></div>
                 <div class="ia-item">Quay số thuyết trình<span>Ngẫu nhiên công bằng · thêm/bớt ô trùng tên · tự xếp lịch Thứ 2</span></div>
                 <div class="ia-item">Đăng ký lịch off<span>Xem &amp; quản lý ngày nghỉ</span></div>
+                <div class="ia-item">Update giờ làm việc<span>Dán nhiều ngày (Ngày · Motion · Station), hiện M/S ở góc ô ngày, hỏi khi trùng ngày</span></div>
             </div>
         </div>
 
@@ -1328,6 +1401,7 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
         </div>
     </div>
 </div>
+                    </div><!-- /.ia-diagram -->
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-cancel" data-bs-dismiss="modal">Đã hiểu</button>
