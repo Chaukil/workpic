@@ -57,6 +57,18 @@ let workHoursMap = {};           // { 'YYYY-MM-DD': { date, motion, station, ...
 let unsubscribeWorkHours = null;
 let workHoursParsed = [];        // kết quả phân tích ô dán
 const WORKHOURS_COLLECTION = 'workHours';
+let workHoursAll = [];           // toàn bộ document giờ làm việc (mọi bộ phận)
+
+// Bộ phận làm việc
+const DEPT_COLLECTION = 'departments';
+const DEPT_ALL = '__all__';      // chỉ dùng cho bộ lọc (Quay số / Thống kê)
+let departmentDocs = [];         // [{id, name}] từ collection "departments"
+let departmentsList = [];        // departmentDocs + bộ phận chỉ xuất hiện ở user
+let unsubscribeDepartments = null;
+let spinDeptFilter = DEPT_ALL;
+let statsDeptFilter = DEPT_ALL;
+let workHoursViewDept = '';      // '' = chưa phân bộ phận
+let spinAllUsers = [];
 let dayOffFocusUid = null;       // đang xem riêng lịch của user nào
 let dayOffUsers = [];
 let notifyLeadMinutes = 0;      // nhắc job trước N phút (0 = đúng giờ)            // danh sách user hiển thị trong form
@@ -251,6 +263,10 @@ async function handleAuthenticatedUser(user) {
         currentUser.avatar = null;
     }
     
+    // Bộ phận: user cũ chưa có field này => '' (chưa phân bộ phận), không gây lỗi
+    currentUser.department = (userData && userData.department) || '';
+    initDeptState();
+
     const savedLead = userData && userData.notifyLeadMinutes !== undefined
         ? userData.notifyLeadMinutes
         : localStorage.getItem(`notifyLead_${user.uid}`);
@@ -303,6 +319,8 @@ function openUserProfileModal() {
     const displayName = currentUser.displayName || currentUser.email?.split('@')[0] || '';
     document.getElementById('profileDisplayName').value = displayName;
     document.getElementById('profileNotifyLead').value = String(notifyLeadMinutes);
+    fillDeptSelect(document.getElementById('profileDepartment'), currentUser.department || '', { none: true, noneLabel: '— Chưa chọn —' });
+    document.getElementById('profileNewDeptRow').classList.add('d-none');
 
     const avatarSrc = currentUser.avatar
         || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=3b82f6&color=fff&size=120`;
@@ -457,6 +475,13 @@ function handleSignedOut() {
         unsubscribeWorkHours();
         unsubscribeWorkHours = null;
     }
+    if (unsubscribeDepartments) {
+        unsubscribeDepartments();
+        unsubscribeDepartments = null;
+    }
+    departmentDocs = [];
+    departmentsList = [];
+    workHoursAll = [];
     workHoursMap = {};
     if (unsubscribeJobDayOverrides) {
         unsubscribeJobDayOverrides();
@@ -508,6 +533,7 @@ function initializeAuthenticatedApp() {
         listenQuickJobs();
         listenQuickJobTransferRequests();
         listenDayOffs();
+        listenDepartments();
         listenWorkHours();
         listenJobDayOverrides();
         listenUsersAvatars();
@@ -553,6 +579,7 @@ document.addEventListener('DOMContentLoaded', function() {
     statisticsModal = new bootstrap.Modal(document.getElementById('statisticsModal'));
     document.getElementById('statisticsBtn').addEventListener('click', openStatisticsModal);
     initWorkHoursUi();
+    initDepartmentUi();
     document.getElementById('salaryCalcBtn').addEventListener('click', openSalaryCalcModal);
     document.getElementById('salaryResetBtn').addEventListener('click', resetSalaryCalc);
         // Ô nhập tiền → tự chèn dấu "." ngăn cách nghìn, giữ vị trí con trỏ
@@ -1427,7 +1454,7 @@ function renderSchedule() {
             dateHeader.className = 'date-header text-muted small';
             const whDoc = workHoursMap[dateStr] || null;
             const whBadge = whDoc
-                ? `<span class="wh-badges"><span class="wh-badge wh-m" title="Giờ Motion">M-${formatWorkHours(whDoc.motion)}h</span><span class="wh-badge wh-s" title="Giờ Station">S-${formatWorkHours(whDoc.station)}h</span></span>`
+                ? `<span class="wh-badges"><span class="wh-badge wh-m" title="Giờ Motion${workHoursViewDept ? ' · ' + escapeHtml(getDeptName(workHoursViewDept)) : ''}">M-${formatWorkHours(whDoc.motion)}h</span><span class="wh-badge wh-s" title="Giờ Station">S-${formatWorkHours(whDoc.station)}h</span></span>`
                 : '';
             dateHeader.innerHTML = `<span class="date-header-left"><i class="bi bi-calendar-day"></i> ${formatDateShort(currentDate)}${offDoc ? '<span class="day-off-badge">OFF</span>' : ''}</span>${whBadge}`;
             cell.appendChild(dateHeader);
@@ -4083,10 +4110,18 @@ function listenUsersAvatars() {
                 usersInfoCache[u.uid] = {
                     displayName: u.displayName || '',
                     email: u.email || '',
-                    avatar: u.avatar || null
+                    avatar: u.avatar || null,
+                    department: u.department || ''
                 };
             }
         });
+
+        if (currentUser && usersInfoCache[currentUser.uid]
+            && (usersInfoCache[currentUser.uid].department || '') !== (currentUser.department || '')) {
+            currentUser.department = usersInfoCache[currentUser.uid].department || '';   // đổi từ thiết bị khác
+        }
+        rebuildDepartmentsList();
+        if (document.getElementById('presenterSpinModal')?.classList.contains('show') && spinAllUsers.length) applySpinDeptFilter(false);
 
         if (currentUser && usersAvatarCache[currentUser.uid] && usersAvatarCache[currentUser.uid] !== currentUser.avatar) {
             currentUser.avatar = usersAvatarCache[currentUser.uid];
@@ -5014,26 +5049,47 @@ async function openPresenterSpinModal() {
 
     try {
         const snapshot = await getDocs(collection(db, 'users'));
-        spinCandidates = [];
+        spinAllUsers = [];
         snapshot.forEach(userDoc => {
             const user = userDoc.data();
-            if (user.uid) spinCandidates.push(user);
+            if (!user.uid) return;
+            spinAllUsers.push(user);
+            // đồng bộ bộ phận vào cache (user cũ chưa có field => '')
+            usersInfoCache[user.uid] = Object.assign(
+                { displayName: user.displayName || '', email: user.email || '', avatar: user.avatar || null },
+                usersInfoCache[user.uid] || {},
+                { department: user.department || '' }
+            );
         });
-        spinCandidates.sort((a, b) => (a.displayName || a.email || '').localeCompare(b.displayName || b.email || ''));
+        rebuildDepartmentsList();
+        fillDeptSelect(document.getElementById('spinDeptSelect'), spinDeptFilter, { all: true, none: true, noneLabel: 'Chưa phân bộ phận' });
 
-        // Khôi phục danh sách đã bỏ chọn + số phiếu từ lần trước, chỉ giữ uid còn tồn tại
-        const validUids = new Set(spinCandidates.map(u => u.uid));
+        // Khôi phục danh sách đã bỏ chọn + số phiếu từ lần trước, chỉ giữ uid còn tồn tại (mọi bộ phận)
+        const validUids = new Set(spinAllUsers.map(u => u.uid));
         spinExcludedUids = new Set(Array.from(loadExcludedUidsFromStorage()).filter(uid => validUids.has(uid)));
         const savedTickets = loadSpinTicketsFromStorage();
         spinTickets = {};
         Object.keys(savedTickets).forEach(uid => { if (validUids.has(uid)) spinTickets[uid] = savedTickets[uid]; });
 
-        renderSpinUsersList();
-        renderSpinWheel();
+        applySpinDeptFilter(false);
     } catch (error) {
         console.error('Lỗi tải danh sách user để quay số:', error);
         listEl.innerHTML = '<div class="empty-state"><i class="bi bi-exclamation-triangle"></i><br>Không tải được danh sách user</div>';
     }
+}
+
+// Lọc danh sách quay số theo bộ phận đang chọn
+function applySpinDeptFilter(resetResult = true) {
+    spinCandidates = spinAllUsers
+        .filter(u => deptMatches(u.uid, spinDeptFilter))
+        .sort((a, b) => (a.displayName || a.email || '').localeCompare(b.displayName || b.email || ''));
+    if (resetResult) {
+        spinWinner = null;
+        const card = document.getElementById('spinResultCard');
+        if (card) card.style.display = 'none';
+    }
+    renderSpinUsersList();
+    renderSpinWheel();
 }
 
 function renderSpinUsersList() {
@@ -5041,7 +5097,9 @@ function renderSpinUsersList() {
     updateSpinCounts();
 
     if (!spinCandidates.length) {
-        listEl.innerHTML = '<div class="empty-state"><i class="bi bi-inbox"></i><br>Chưa có user nào</div>';
+        listEl.innerHTML = spinDeptFilter === DEPT_ALL
+            ? '<div class="empty-state"><i class="bi bi-inbox"></i><br>Chưa có user nào</div>'
+            : '<div class="empty-state"><i class="bi bi-inbox"></i><br>Bộ phận này chưa có thành viên.<br><small>Mỗi người chọn bộ phận trong Thông tin tài khoản.</small></div>';
         return;
     }
 
@@ -5325,6 +5383,193 @@ async function confirmPresenterAssignment() {
 }
 
 // ============================================================
+// BỘ PHẬN LÀM VIỆC
+// Firestore: collection "departments" (docId = slug) { name, createdBy, createdAt }
+//            users/{...}.department = id bộ phận
+// Không cần migrate dữ liệu: user cũ chưa có field "department" => coi như '' (chưa phân
+// bộ phận) và hiển thị "Chưa phân bộ phận" để mọi người tự cập nhật sau.
+// ============================================================
+function deptSlug(name) {
+    const slug = String(name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    return slug || `bp-${Date.now()}`;
+}
+
+function getDeptName(id) {
+    if (!id) return 'Chưa phân bộ phận';
+    const d = departmentsList.find(x => x.id === id);
+    return d ? d.name : id;
+}
+
+function getUserDept(uid) {
+    const info = usersInfoCache[uid];
+    if (info && info.department !== undefined) return info.department || '';
+    if (currentUser && currentUser.uid === uid) return currentUser.department || '';
+    return '';
+}
+
+function deptMatches(uid, filter) {
+    return filter === DEPT_ALL || getUserDept(uid) === (filter || '');
+}
+
+function loadDeptPref(key) {
+    try { return localStorage.getItem(`deptPref_${key}_${currentUser ? currentUser.uid : ''}`); }
+    catch (e) { return null; }
+}
+function saveDeptPref(key, value) {
+    try { localStorage.setItem(`deptPref_${key}_${currentUser ? currentUser.uid : ''}`, value); }
+    catch (e) { /* ignore */ }
+}
+
+// Mặc định: bộ phận của chính mình (nếu có), lần sau nhớ lựa chọn gần nhất
+function initDeptState() {
+    const own = currentUser.department || '';
+    const spin = loadDeptPref('spin');
+    const stats = loadDeptPref('stats');
+    const hours = loadDeptPref('hours');
+    spinDeptFilter = spin !== null ? spin : (own || DEPT_ALL);
+    statsDeptFilter = stats !== null ? stats : (own || DEPT_ALL);
+    workHoursViewDept = hours !== null ? hours : own;
+}
+
+function deptOptionsHtml(opts = {}) {
+    let html = '';
+    if (opts.all) html += `<option value="${DEPT_ALL}">Tất cả bộ phận</option>`;
+    if (opts.none) html += `<option value="">${escapeHtml(opts.noneLabel || '— Chưa chọn —')}</option>`;
+    departmentsList.forEach(d => { html += `<option value="${escapeHtml(d.id)}">${escapeHtml(d.name)}</option>`; });
+    return html;
+}
+
+function fillDeptSelect(sel, value, opts) {
+    if (!sel) return;
+    let html = deptOptionsHtml(opts);
+    if (value && value !== DEPT_ALL && !departmentsList.some(d => d.id === value)) {
+        html += `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`;
+    }
+    sel.innerHTML = html;
+    sel.value = value;
+}
+
+function refreshDeptSelects() {
+    fillDeptSelect(document.getElementById('profileDepartment'), currentUser ? (currentUser.department || '') : '', { none: true, noneLabel: '— Chưa chọn —' });
+    fillDeptSelect(document.getElementById('spinDeptSelect'), spinDeptFilter, { all: true, none: true, noneLabel: 'Chưa phân bộ phận' });
+    fillDeptSelect(document.getElementById('statsDeptSelect'), statsDeptFilter, { all: true, none: true, noneLabel: 'Chưa phân bộ phận' });
+    fillDeptSelect(document.getElementById('whDeptSelect'), workHoursViewDept, { none: true, noneLabel: 'Chưa phân bộ phận' });
+}
+
+function rebuildDepartmentsList() {
+    const map = new Map();
+    departmentDocs.forEach(d => map.set(d.id, d.name || d.id));
+    Object.values(usersInfoCache).forEach(u => {
+        if (u.department && !map.has(u.department)) map.set(u.department, u.department);
+    });
+    if (currentUser && currentUser.department && !map.has(currentUser.department)) {
+        map.set(currentUser.department, currentUser.department);
+    }
+    departmentsList = Array.from(map, ([id, name]) => ({ id, name }))
+        .sort((x, y) => x.name.localeCompare(y.name, 'vi'));
+    refreshDeptSelects();
+}
+
+function listenDepartments() {
+    if (unsubscribeDepartments) unsubscribeDepartments();
+    unsubscribeDepartments = onSnapshot(collection(db, DEPT_COLLECTION), (snapshot) => {
+        departmentDocs = snapshot.docs.map(d => ({ id: d.id, name: (d.data().name || d.id) }));
+        rebuildDepartmentsList();
+    }, (error) => {
+        // Chưa có quyền/collection => vẫn chạy được, chỉ dùng bộ phận lấy từ user
+        console.error('❌ Lỗi lắng nghe bộ phận:', error);
+        rebuildDepartmentsList();
+    });
+}
+
+async function saveUserDepartment(deptId) {
+    if (!currentUser) return;
+    const value = deptId || '';
+    try {
+        const snap = await getDocs(query(collection(db, 'users'), where('uid', '==', currentUser.uid)));
+        if (!snap.empty) {
+            await updateDoc(doc(db, 'users', snap.docs[0].id), { department: value, updatedAt: new Date().toISOString() });
+        }
+        currentUser.department = value;
+        if (usersInfoCache[currentUser.uid]) usersInfoCache[currentUser.uid].department = value;
+        // Bộ lọc chưa từng chọn tay thì đi theo bộ phận mới của mình
+        if (loadDeptPref('spin') === null) spinDeptFilter = value || DEPT_ALL;
+        if (loadDeptPref('stats') === null) statsDeptFilter = value || DEPT_ALL;
+        if (loadDeptPref('hours') === null) { workHoursViewDept = value; rebuildWorkHoursMap(); renderSchedule(); }
+        rebuildDepartmentsList();
+        showNotification('Đã lưu', value ? `Bộ phận của bạn: ${getDeptName(value)}.` : 'Đã bỏ chọn bộ phận.', false, 'success');
+    } catch (error) {
+        console.error('Lỗi lưu bộ phận:', error);
+        showNotification('Lỗi', 'Không lưu được bộ phận. Thử lại sau.', false, 'danger');
+        fillDeptSelect(document.getElementById('profileDepartment'), currentUser.department || '', { none: true, noneLabel: '— Chưa chọn —' });
+    }
+}
+
+async function addDepartmentFromProfile() {
+    const input = document.getElementById('profileNewDeptName');
+    const name = input.value.trim().replace(/\s+/g, ' ');
+    if (name.length < 2) {
+        showNotification('Thiếu thông tin', 'Nhập tên bộ phận (ít nhất 2 ký tự).', false, 'warning');
+        return;
+    }
+    const id = deptSlug(name);
+    const existing = departmentsList.find(d => d.id === id || d.name.toLowerCase() === name.toLowerCase());
+    try {
+        let useId = id;
+        if (existing) {
+            useId = existing.id;
+        } else {
+            await setDoc(doc(db, DEPT_COLLECTION, id), {
+                name, createdBy: currentUser.uid, createdAt: new Date().toISOString()
+            });
+            departmentDocs.push({ id, name });
+            rebuildDepartmentsList();
+        }
+        input.value = '';
+        document.getElementById('profileNewDeptRow').classList.add('d-none');
+        document.getElementById('profileDepartment').value = useId;
+        await saveUserDepartment(useId);
+    } catch (error) {
+        console.error('Lỗi thêm bộ phận:', error);
+        showNotification('Lỗi', 'Không thêm được bộ phận. Kiểm tra Firestore rules cho collection "departments".', false, 'danger');
+    }
+}
+
+function initDepartmentUi() {
+    document.getElementById('profileDepartment').addEventListener('change', (e) => saveUserDepartment(e.target.value));
+    document.getElementById('profileAddDeptBtn').addEventListener('click', () => {
+        const row = document.getElementById('profileNewDeptRow');
+        row.classList.toggle('d-none');
+        if (!row.classList.contains('d-none')) document.getElementById('profileNewDeptName').focus();
+    });
+    document.getElementById('profileNewDeptSaveBtn').addEventListener('click', addDepartmentFromProfile);
+    document.getElementById('profileNewDeptName').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); addDepartmentFromProfile(); }
+    });
+
+    document.getElementById('spinDeptSelect').addEventListener('change', (e) => {
+        spinDeptFilter = e.target.value;
+        saveDeptPref('spin', spinDeptFilter);
+        applySpinDeptFilter(true);
+    });
+    document.getElementById('statsDeptSelect').addEventListener('change', (e) => {
+        statsDeptFilter = e.target.value;
+        saveDeptPref('stats', statsDeptFilter);
+        renderStatistics();
+    });
+    document.getElementById('whDeptSelect').addEventListener('change', (e) => {
+        workHoursViewDept = e.target.value;
+        saveDeptPref('hours', workHoursViewDept);
+        rebuildWorkHoursMap();
+        renderSchedule();
+        renderWorkHoursSaved();
+        renderWorkHoursPreview();
+    });
+}
+
+// ============================================================
 // GIỜ LÀM VIỆC — Motion / Station theo ngày
 // Firestore: collection "workHours", mỗi ngày = 1 document, id = YYYY-MM-DD (dùng chung mọi user)
 //   { date, motion, station, updatedBy, updatedByName, updatedAt }
@@ -5341,12 +5586,13 @@ function listenWorkHours() {
     lower.setMonth(lower.getMonth() - 2);
     const q = query(collection(db, WORKHOURS_COLLECTION), where('date', '>=', localDateKey(lower)));
     unsubscribeWorkHours = onSnapshot(q, (snapshot) => {
-        const map = {};
+        const all = [];
         snapshot.forEach(d => {
             const data = d.data();
-            if (data.date) map[data.date] = { id: d.id, ...data };
+            if (data.date) all.push({ ...data, id: d.id, department: data.department || '' });   // doc cũ không có department => ''
         });
-        workHoursMap = map;
+        workHoursAll = all;
+        rebuildWorkHoursMap();
         renderSchedule();
         if (workHoursModalOpen) {
             renderWorkHoursSaved();
@@ -5356,6 +5602,20 @@ function listenWorkHours() {
         console.error('❌ Lỗi khi lắng nghe giờ làm việc:', error);
         showNotification('Lỗi', 'Không tải được giờ làm việc. Kiểm tra Firestore rules cho collection "workHours".', false, 'danger');
     });
+}
+
+// Lấy giờ của bộ phận đang xem: { 'YYYY-MM-DD': doc }
+function rebuildWorkHoursMap() {
+    const map = {};
+    workHoursAll.forEach(w => {
+        if ((w.department || '') === workHoursViewDept) map[w.date] = w;
+    });
+    workHoursMap = map;
+}
+
+// Doc id: bộ phận trống giữ id = ngày (tương thích dữ liệu cũ); có bộ phận => "<bộ phận>__<ngày>"
+function workHoursDocId(dept, date) {
+    return dept ? `${dept}__${date}` : date;
 }
 
 // "9.75" | "9,75" | "9.75h" -> 9.75 ; sai định dạng -> NaN
@@ -5491,18 +5751,19 @@ async function commitWorkHours(rows) {
     btn.disabled = true;
     try {
         const nowIso = new Date().toISOString();
+        const dept = workHoursViewDept;
         const payload = rows.map(r => ({
-            date: r.date, motion: r.motion, station: r.station,
+            date: r.date, motion: r.motion, station: r.station, department: dept,
             updatedBy: currentUser.uid,
             updatedByName: currentUser.displayName || currentUser.email || '',
             updatedAt: nowIso
         }));
         for (let i = 0; i < payload.length; i += 400) {
             const batch = writeBatch(db);
-            payload.slice(i, i + 400).forEach(p => batch.set(doc(db, WORKHOURS_COLLECTION, p.date), p));
+            payload.slice(i, i + 400).forEach(p => batch.set(doc(db, WORKHOURS_COLLECTION, workHoursDocId(dept, p.date)), p));
             await batch.commit();
         }
-        showNotification('Thành công', `Đã lưu giờ làm việc cho ${payload.length} ngày.`, false, 'success');
+        showNotification('Thành công', `Đã lưu giờ làm việc cho ${payload.length} ngày${dept ? ' · ' + getDeptName(dept) : ''}.`, false, 'success');
         document.getElementById('whPasteArea').value = '';
         renderWorkHoursPreview();
     } catch (error) {
@@ -5555,6 +5816,7 @@ function addQuickWorkHoursRow() {
 function openWorkHoursModal() {
     workHoursModalOpen = true;
     document.getElementById('whQuickDate').value = localDateKey(new Date());
+    fillDeptSelect(document.getElementById('whDeptSelect'), workHoursViewDept, { none: true, noneLabel: 'Chưa phân bộ phận' });
     renderWorkHoursSaved();
     renderWorkHoursPreview();
     workHoursModal.show();
@@ -5581,7 +5843,7 @@ function initWorkHoursUi() {
             confirmText: 'Xóa',
             confirmClass: 'btn-delete',
             onConfirm: async () => {
-                try { await deleteDoc(doc(db, WORKHOURS_COLLECTION, date)); }
+                try { await deleteDoc(doc(db, WORKHOURS_COLLECTION, workHoursDocId(workHoursViewDept, date))); }
                 catch (err) {
                     console.error('Lỗi xóa giờ làm việc:', err);
                     showNotification('Lỗi', 'Không xóa được.', false, 'danger');
@@ -6195,7 +6457,8 @@ async function ensureUsersInfoCache() {
                 usersInfoCache[u.uid] = {
                     displayName: u.displayName || '',
                     email: u.email || '',
-                    avatar: u.avatar || null
+                    avatar: u.avatar || null,
+                    department: u.department || ''
                 };
                 if (u.avatar) {
                     if (!usersAvatarCache) usersAvatarCache = {};
@@ -6203,6 +6466,7 @@ async function ensureUsersInfoCache() {
                 }
             }
         });
+        rebuildDepartmentsList();
     } catch (e) { console.error('Không tải được users info:', e); }
 }
 
@@ -6232,6 +6496,7 @@ async function openStatisticsModal() {
 
         loadStatsHiddenUsers();
         await ensureUsersInfoCache();
+        fillDeptSelect(document.getElementById('statsDeptSelect'), statsDeptFilter, { all: true, none: true, noneLabel: 'Chưa phân bộ phận' });
         statsAllJobs = await fetchAllJobsForStats();
         renderStatistics();
     } catch (error) {
@@ -6266,6 +6531,7 @@ function computeStatistics(mode) {
         const totalForJob = duration * occurrences.length;
         const uid = job.ownerId;
         if (!uid) return;
+        if (!deptMatches(uid, statsDeptFilter)) return;   // lọc theo bộ phận
 
         const info = usersInfoCache[uid] || {};
         const name = info.displayName || info.email || `User ${uid.slice(0, 6)}`;

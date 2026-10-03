@@ -190,18 +190,14 @@ body.theme-dark .notification {
     display: flex; flex-direction: column; overflow: hidden;
 }
 
+/* .topbar: layout/vị trí ở đây; nền, bo góc, bóng, lưới cột nằm ở khối "TOPBAR" phía dưới.
+   (đã bỏ backdrop-filter: nền trời của topbar đặc nên blur không có tác dụng mà còn tốn GPU) */
 .topbar {
     display: flex; justify-content: space-between; align-items: center;
     gap: 1rem; padding: 0.9rem 1rem; margin-bottom: 0.5rem;
     border: 1px solid rgba(148, 163, 184, 0.22);
-    border-radius: 18px;
-    background: rgba(255, 255, 255, 0.86);
-    box-shadow: 0 12px 26px rgba(15, 23, 42, 0.04);
-    backdrop-filter: blur(14px);
     position: sticky; top: 0; z-index: 1000; flex-shrink: 0;
 }
-
-body.theme-dark .topbar { background: rgba(17, 24, 39, 0.95); }
 
 .topbar-eyebrow {
     margin: 0 0 0.2rem; font-size: var(--fs-2xs); font-weight: 700;
@@ -388,18 +384,6 @@ body.theme-dark #searchJob::placeholder { color: var(--muted); }
 /* ============================================================
    LAYOUT DROPDOWN MENU (Check Due + Quay số thuyết trình...)
    ============================================================ */
-.layout-dropdown-menu {
-    position: fixed !important;
-    top: -9999px;
-    left: -9999px;
-    z-index: 1055 !important;
-    margin: 0;
-    opacity: 0;
-    pointer-events: none;
-    transform: translateY(-6px);
-    transition: opacity .15s ease, transform .15s ease;
-    will-change: opacity, transform;
-}
 .layout-dropdown-item {
     display: flex; align-items: center; gap: 0.6rem; width: 100%;
     border: none; background: transparent; text-align: left;
@@ -2832,11 +2816,7 @@ body::after {
     background: #2dd4bf;
 }
 
-.topbar {
-    border-radius: var(--radius-lg);
-    box-shadow: 0 14px 36px rgba(15, 23, 42, .055);
-    animation: enterDown .7s var(--ease-out-expo) both;
-}
+body.app-intro .topbar { animation: enterDown .7s var(--ease-out-expo) both; }
 
 .topbar h1 {
     background: linear-gradient(110deg, var(--text) 15%, #2563eb 105%);
@@ -2845,12 +2825,11 @@ body::after {
     color: transparent;
 }
 
-.container-fluid > .row > [class*="col-"] {
+body.app-intro .container-fluid > .row > [class*="col-"] {
     animation: enterUp .65s var(--ease-out-expo) both;
 }
-
-.container-fluid > .row > [class*="col-"]:first-child { animation-delay: .08s; }
-.container-fluid > .row > [class*="col-"]:last-child { animation-delay: .16s; }
+body.app-intro .container-fluid > .row > [class*="col-"]:first-child { animation-delay: .08s; }
+body.app-intro .container-fluid > .row > [class*="col-"]:last-child { animation-delay: .16s; }
 
 @keyframes enterDown {
     from { opacity: 0; transform: translateY(-14px); }
@@ -5125,7 +5104,8 @@ body.no-theme-transition *:not(.topbar-sky, .topbar-sky *),
 body.no-theme-transition *:not(.topbar-sky, .topbar-sky *)::before,
 body.no-theme-transition *:not(.topbar-sky, .topbar-sky *)::after {
     transition: none !important;
-    animation: none !important;
+    /* KHÔNG đặt animation:none ở đây: bỏ rồi bật lại sẽ làm các animation vào trang
+       (enterDown / enterUp) chạy lại từ đầu → khung bị "nhảy lên" khi đổi theme */
 }
 
 /* Xoá transition trên body — tránh repaint toàn cục khi đổi màu nền */
@@ -5143,6 +5123,7 @@ body {
     z-index: 3000 !important;   /* trên cả sidebar, topbar */
     margin: 0;
     opacity: 0;
+    pointer-events: none;
     transform: translateY(-6px);
     transition: opacity .15s ease, transform .15s ease;
     will-change: opacity, transform;
@@ -5333,7 +5314,7 @@ img.dayoff-chip { object-fit: cover; background: #fff; border: 1px solid rgba(25
 /* ============================================================
    BADGE GIỜ M / S TRONG Ô NGÀY
    ============================================================ */
-.wh-badges { margin-left: auto; display: inline-flex; gap: 4px; align-items: center; }
+.wh-badges { flex: 0 0 100%; width: 100%; display: flex; justify-content: center; align-items: center; gap: 6px; margin-top: 2px; }
 .wh-badge {
     padding: 1px 8px;
     border-radius: 999px;
@@ -5377,7 +5358,6 @@ body.theme-dark .schedule-table td.today-cell .date-header { color: #e0e7ff; }
 /* ============================================================
    TOPBAR SKY — mặt trời (sáng) ⇄ mặt trăng (tối)
    ============================================================ */
-.topbar { position: relative; }
 .topbar > :not(.topbar-sky) { position: relative; }   /* nội dung nằm trên nền trời */
 
 .topbar-sky {
@@ -5401,7 +5381,7 @@ body.theme-dark .sky-night { opacity: 1; }
 /* Mặt trời & mặt trăng — cùng một vị trí, luân phiên lên/xuống */
 .sky-body {
     position: absolute;
-    top: 50%; right: 21%;
+    top: 50%; left: 46%;
     width: 64px; height: 64px;
     margin-top: -32px;
 }
@@ -5422,12 +5402,41 @@ body.theme-dark .sky-moon { transform: translate(0, 0) scale(1) rotate(0); opaci
             mask: radial-gradient(circle, transparent 0 38%, #000 40% 62%, transparent 64%);
     animation: sunSpin 40s linear infinite;
 }
+/* Mặt trăng tròn: đĩa sáng có vài "biển" mờ + vầng sáng (không còn vòng tròn bao quanh) */
+.sky-moon { filter: drop-shadow(0 0 8px rgba(254, 243, 199, .5)) drop-shadow(0 0 22px rgba(254, 243, 199, .22)); }
 .moon-core {
-    position: absolute; inset: 15px; border-radius: 50%;
-    background: transparent;
-    box-shadow: inset -11px 4px 0 0 #fef9c3, 0 0 22px 4px rgba(254, 249, 195, .35);
-    transform: rotate(-20deg);
-    animation: moonGlow 5s ease-in-out infinite;
+    position: absolute; inset: 9px; border-radius: 50%;
+    background:
+        radial-gradient(circle at 29px 19px, rgba(176, 134, 58, .30) 0 5.5px, transparent 6.5px),
+        radial-gradient(circle at 18px 33px, rgba(176, 134, 58, .26) 0 4.5px, transparent 5.5px),
+        radial-gradient(circle at 34px 32px, rgba(176, 134, 58, .22) 0 3px, transparent 4px),
+        radial-gradient(circle at 15px 17px, rgba(176, 134, 58, .20) 0 3px, transparent 4px),
+        radial-gradient(circle at 34% 30%, #fffef5 0%, #fdf3c0 55%, #ecd08a 100%);
+    box-shadow: inset -5px -5px 11px rgba(176, 134, 58, .30);
+    animation: moonGlow 6s ease-in-out infinite;
+}
+
+/* Sao băng: rơi xéo từ trên-trái xuống dưới-phải */
+.shoot {
+    position: absolute; display: block;
+    width: 96px; height: 2px; border-radius: 2px;
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, .15) 45%, #fff 100%);
+    opacity: 0; rotate: 27deg;
+    filter: drop-shadow(0 0 4px rgba(199, 210, 254, .9));
+}
+.shoot::after {
+    content: ""; position: absolute; right: -1px; top: -1.5px;
+    width: 5px; height: 5px; border-radius: 50%; background: #fff;
+    box-shadow: 0 0 8px 2px rgba(224, 231, 255, .9);
+}
+.shoot.s1 { top: 10%; left: 34%; animation: shootFall 7s ease-in infinite 1.2s; }
+.shoot.s2 { top: 6%;  left: 66%; animation: shootFall 11s ease-in infinite 5s; width: 72px; }
+.shoot.s3 { top: 30%; left: 82%; animation: shootFall 14s ease-in infinite 9s; width: 60px; }
+@keyframes shootFall {
+    0%   { opacity: 0; translate: 0 0; }
+    1.5% { opacity: 1; }
+    9%   { opacity: 0; translate: 230px 117px; }
+    100% { opacity: 0; translate: 230px 117px; }
 }
 
 /* Mây (sáng) */
@@ -5473,7 +5482,7 @@ body.theme-dark .sky-stars { opacity: 1; }
 .topbar-sky.sky-animate .sky-stars { transition: opacity .9s ease, transform 1.1s ease; }
 
 @keyframes sunSpin    { to { transform: rotate(360deg); } }
-@keyframes moonGlow   { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.18); } }
+@keyframes moonGlow   { 0%, 100% { opacity: 1; } 50% { opacity: .86; } }
 @keyframes cloudDrift { from { translate: -40px 0; } to { translate: 160px 0; } }
 @keyframes starTwinkle{ 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
 
@@ -5481,10 +5490,91 @@ body.theme-dark .sky-stars { opacity: 1; }
 body.theme-light .topbar-subtitle { color: #334155; }
 
 @media (max-width: 768px) {
-    .sky-body { right: 30%; transform-origin: center; }
+    .sky-body { left: 14%; }
     .sky-sun, .sky-moon { scale: .8; }
 }
 @media (prefers-reduced-motion: reduce) {
-    .sun-rays, .moon-core, .cloud, .sky-stars::before, .sky-stars::after { animation: none; }
+    .sun-rays, .moon-core, .cloud, .shoot, .owl, .owl-wing, .owl-flap, .owl-lid, .sky-stars::before, .sky-stars::after { animation: none; }
+    .shoot { display: none; }
     .topbar-sky.sky-animate .sky-body { transition-duration: .01s; }
 }
+
+
+/* ============================================================
+   MENU CON LAYOUT — theo chế độ sáng / tối (dùng biến màu theme)
+   ============================================================ */
+.layout-dropdown-menu {
+    --bs-dropdown-bg: var(--surface);
+    --bs-dropdown-color: var(--text);
+    --bs-dropdown-border-color: var(--border);
+    --bs-dropdown-link-hover-bg: var(--surface-muted);
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 0.4rem;
+    min-width: 270px;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, .18);
+}
+body.theme-dark .layout-dropdown-menu { box-shadow: 0 18px 40px rgba(0, 0, 0, .55); }
+.layout-dropdown-item { color: var(--text); }
+.layout-item-title { color: var(--text); }
+.layout-item-sub, .layout-item-note { color: var(--muted); }
+.layout-dropdown-item:hover,
+.layout-dropdown-item:focus-visible { background: var(--surface-muted); outline: none; }
+
+
+/* ============================================================
+   CÚ ĐÊM — chỉ xuất hiện ở chế độ tối, bay tới đậu trên chữ "Lịch Làm Việc"
+   ============================================================ */
+.modern-card-header-text { position: relative; }
+.owl {
+    position: absolute; left: 22%; bottom: calc(100% - 5px);
+    width: 32px; height: 32px;
+    z-index: 3; pointer-events: none;
+    opacity: 0; visibility: hidden;
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .45));
+}
+.owl svg { overflow: visible; display: block; }
+body.theme-dark .owl {
+    visibility: visible;
+    animation: owlFly 3.7s cubic-bezier(.45, .05, .35, 1) .6s both;
+}
+.owl-wing, .owl-flap { transform-box: view-box; }
+.owl-wing-l, .owl-wing-l .owl-flap { transform-origin: 13px 17px; }
+.owl-wing-r, .owl-wing-r .owl-flap { transform-origin: 27px 17px; }
+body.theme-dark .owl-wing-l { animation: owlSpreadL 3.3s ease-in-out .6s both; }
+body.theme-dark .owl-wing-r { animation: owlSpreadR 3.3s ease-in-out .6s both; }
+body.theme-dark .owl-wing-l .owl-flap { animation: owlFlapL .16s ease-in-out .6s 19 alternate; }
+body.theme-dark .owl-wing-r .owl-flap { animation: owlFlapR .16s ease-in-out .6s 19 alternate; }
+.owl-lid { transform-box: fill-box; transform-origin: 50% 0%; transform: scaleY(0); }
+body.theme-dark .owl-lid { animation: owlBlink 5.5s ease-in-out 5s infinite; }
+
+@keyframes owlFly {
+    0%   { opacity: 0; transform: translate(280px, -70px) scale(.6) rotate(8deg); }
+    8%   { opacity: 1; }
+    30%  { transform: translate(180px, -100px) scale(.8) rotate(-7deg); }
+    55%  { transform: translate(90px, -64px) scale(.95) rotate(6deg); }
+    78%  { transform: translate(26px, -28px) scale(1) rotate(-5deg); }
+    90%  { transform: translate(4px, -7px) scale(1) rotate(0deg); }
+    100% { opacity: 1; transform: translate(0, 0) scale(1) rotate(0deg); }
+}
+@keyframes owlSpreadL { 0%, 84% { transform: rotate(85deg); } 100% { transform: rotate(0deg); } }
+@keyframes owlSpreadR { 0%, 84% { transform: rotate(-85deg); } 100% { transform: rotate(0deg); } }
+@keyframes owlFlapL { from { transform: rotate(0deg); } to { transform: rotate(48deg); } }
+@keyframes owlFlapR { from { transform: rotate(0deg); } to { transform: rotate(-48deg); } }
+@keyframes owlBlink { 0%, 92%, 100% { transform: scaleY(0); } 95%, 97% { transform: scaleY(1); } }
+
+@media (max-width: 576px) { .owl { display: none; } }
+
+/* ============================================================
+   BỘ LỌC BỘ PHẬN (Quay số / Thống kê / Giờ làm việc)
+   ============================================================ */
+.dept-filter { display: flex; align-items: center; gap: 0.5rem; margin: 0.4rem 0 0.6rem; }
+.dept-filter label { margin: 0; font-size: var(--fs-2xs); font-weight: 700; color: var(--muted); white-space: nowrap; }
+.dept-filter .form-select { flex: 1 1 auto; min-width: 0; max-width: 260px; }
+.stats-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1rem; margin-bottom: 1rem; }
+.stats-toolbar .stats-mode-tabs { margin-bottom: 0; }
+.stats-toolbar .dept-filter { margin: 0; }
+.wh-dept-row { margin: 0 0 0.9rem; flex-wrap: wrap; }
+.wh-dept-hint { font-size: var(--fs-3xs); color: var(--muted); }
