@@ -2,7 +2,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, getDocs, onSnapshot, enableIndexedDbPersistence, query, where, writeBatch, arrayUnion, arrayRemove } 
     from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } 
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail } 
     from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -69,6 +69,10 @@ let spinDeptFilter = DEPT_ALL;
 let statsDeptFilter = DEPT_ALL;
 let workHoursViewDept = '';      // '' = chưa phân bộ phận
 let spinAllUsers = [];
+let owlSyncHook = null;          // do OwlFx gán; applyTheme gọi để cú xuất hiện/biến mất
+let authMouse = null;            // vị trí chuột trên màn hình đăng nhập (đèn pin)
+let resetCooldownTimer = null;
+let dayOffDeptFilter = DEPT_ALL;
 let dayOffFocusUid = null;       // đang xem riêng lịch của user nào
 let dayOffUsers = [];
 let notifyLeadMinutes = 0;      // nhắc job trước N phút (0 = đúng giờ)            // danh sách user hiển thị trong form
@@ -168,6 +172,11 @@ function applyTheme(theme) {
         }
     }
 
+    const authBtn = document.getElementById('authThemeBtn');
+    if (authBtn) authBtn.querySelector('i').className = theme === 'dark' ? 'bi bi-sun-fill' : 'bi bi-moon-fill';
+    if (owlSyncHook) owlSyncHook();
+    if (typeof updateTorch === 'function') updateTorch();
+
     localStorage.setItem('workpic-theme', theme);
 
     // Sau 2 frame (browser đã paint xong theme mới) → trả lại transition bình thường
@@ -179,8 +188,7 @@ function applyTheme(theme) {
 function enableSkyAnimation() {
     // Bật transition cho nền topbar sau lần vẽ đầu tiên (tránh chạy animation lúc mới tải trang)
     setTimeout(() => {
-        const sky = document.querySelector('.topbar-sky');
-        if (sky) sky.classList.add('sky-animate');
+        document.querySelectorAll('.topbar-sky').forEach(sky => sky.classList.add('sky-animate'));
     }, 400);
 }
 
@@ -196,13 +204,27 @@ function initTheme() {
 function setAuthMode(mode) {
     authMode = mode;
     const isRegister = mode === 'register';
-    document.getElementById('loginTab').classList.toggle('active', !isRegister);
+    const isReset = mode === 'reset';
+    document.getElementById('loginTab').classList.toggle('active', mode === 'login');
     document.getElementById('registerTab').classList.toggle('active', isRegister);
+    document.getElementById('authTabs').classList.toggle('d-none', isReset);
     document.getElementById('authNameLabel').classList.toggle('d-none', !isRegister);
     document.getElementById('authName').classList.toggle('d-none', !isRegister);
     document.getElementById('authName').required = isRegister;
-    document.getElementById('authSubmitBtn').textContent = isRegister ? 'Tạo tài khoản' : 'Đăng nhập';
+    document.getElementById('authPasswordBlock').classList.toggle('d-none', isReset);
+    document.getElementById('authPassword').required = !isReset;
+    document.getElementById('authForgotBtn').classList.toggle('d-none', mode !== 'login');
+    document.getElementById('authBackBtn').classList.toggle('d-none', !isReset);
+    document.getElementById('authSubmitBtn').textContent =
+        isReset ? 'Gửi link đặt lại mật khẩu' : (isRegister ? 'Tạo tài khoản' : 'Đăng nhập');
+    document.getElementById('authSubtitle').textContent = isReset
+        ? 'Nhập email đã đăng ký, hệ thống sẽ gửi link đặt lại mật khẩu về hộp thư của bạn.'
+        : 'Đăng nhập để quản lý lịch công việc của bạn.';
     document.getElementById('authError').textContent = '';
+    document.getElementById('authInfo').textContent = '';
+    if (resetCooldownTimer) { clearInterval(resetCooldownTimer); resetCooldownTimer = null; }
+    document.getElementById('authSubmitBtn').disabled = false;
+    resetAuthPwUi();
 }
 
 function showAuthError(error) {
@@ -211,9 +233,38 @@ function showAuthError(error) {
         'auth/invalid-credential': 'Email hoặc mật khẩu không đúng.',
         'auth/email-already-in-use': 'Email này đã được đăng ký.',
         'auth/invalid-email': 'Email không hợp lệ.',
-        'auth/weak-password': 'Mật khẩu cần có ít nhất 6 ký tự.'
+        'auth/weak-password': 'Mật khẩu cần có ít nhất 6 ký tự.',
+        'auth/user-not-found': 'Không tìm thấy tài khoản với email này.',
+        'auth/missing-email': 'Vui lòng nhập email.',
+        'auth/too-many-requests': 'Bạn thao tác quá nhiều lần. Vui lòng thử lại sau ít phút.',
+        'auth/network-request-failed': 'Lỗi kết nối mạng. Kiểm tra internet rồi thử lại.'
     };
     document.getElementById('authError').textContent = messages[error.code] || 'Không thể xác thực. Vui lòng thử lại.';
+}
+
+// Gửi email đặt lại mật khẩu (Firebase Authentication tự gửi mail)
+async function handlePasswordReset(email, submitButton) {
+    await sendPasswordResetEmail(auth, email);
+    document.getElementById('authInfo').textContent =
+        `Đã gửi link đặt lại mật khẩu tới ${email}. Hãy mở hộp thư (kiểm tra cả mục Spam), bấm link rồi đặt mật khẩu mới.`;
+    // chống bấm liên tục: khóa nút 30 giây
+    let left = 30;
+    submitButton.disabled = true;
+    submitButton.textContent = `Gửi lại sau ${left}s`;
+    if (resetCooldownTimer) clearInterval(resetCooldownTimer);
+    resetCooldownTimer = setInterval(() => {
+        left -= 1;
+        if (left <= 0) {
+            clearInterval(resetCooldownTimer);
+            resetCooldownTimer = null;
+            if (authMode === 'reset') {
+                submitButton.disabled = false;
+                submitButton.textContent = 'Gửi link đặt lại mật khẩu';
+            }
+        } else {
+            submitButton.textContent = `Gửi lại sau ${left}s`;
+        }
+    }, 1000);
 }
 
 async function handleAuthSubmit(event) {
@@ -224,8 +275,15 @@ async function handleAuthSubmit(event) {
     const submitButton = document.getElementById('authSubmitBtn');
     submitButton.disabled = true;
     document.getElementById('authError').textContent = '';
+    document.getElementById('authInfo').textContent = '';
+    let keepDisabled = false;
 
     try {
+        if (authMode === 'reset') {
+            await handlePasswordReset(email, submitButton);
+            keepDisabled = true;
+            return;
+        }
         if (authMode === 'register') {
             const credential = await createUserWithEmailAndPassword(auth, email, password);
             await addDoc(collection(db, 'users'), {
@@ -238,14 +296,126 @@ async function handleAuthSubmit(event) {
             await signInWithEmailAndPassword(auth, email, password);
         }
         document.getElementById('authForm').reset();
+        resetAuthPwUi();
     } catch (error) {
         console.error('Authentication error:', error);
         showAuthError(error);
     } finally {
-        submitButton.disabled = false;
+        if (!keepDisabled) submitButton.disabled = false;
     }
 }
 
+// ---- Nút hiện mật khẩu: chế độ sáng = con mắt, chế độ tối = đèn pin chiếu chùm sáng chữ V theo chuột ----
+function resetAuthPwUi() {
+    const pw = document.getElementById('authPassword');
+    const btn = document.getElementById('authPwToggle');
+    const reveal = document.getElementById('authPwReveal');
+    if (!pw || !btn) return;
+
+    pw.type = 'password';
+    if (reveal) {
+        reveal.textContent = '';
+        reveal.style.setProperty('--mx', '-2000px');
+        reveal.style.setProperty('--my', '-2000px');
+    }
+    btn.setAttribute('aria-pressed', 'false');
+    btn.setAttribute('aria-label', 'Hiện mật khẩu');
+    document.getElementById('authScreen').classList.remove('torch-on');
+}
+
+function updateTorch() {
+    const btn = document.getElementById('authPwToggle');
+    const beam = document.getElementById('flashBeam');
+    const reveal = document.getElementById('authPwReveal');
+    const input = document.getElementById('authPassword');
+    if (!btn || !beam) return;
+
+    const screenOn = document.getElementById('authScreen').classList.contains('torch-on');
+    if (!screenOn) return;
+
+    const r = btn.getBoundingClientRect();
+    const ox = r.left + r.width / 2;
+    const oy = r.top + r.height / 2;
+    const m = authMouse || { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+
+    const ang = Math.atan2(m.x - ox, -(m.y - oy)) * 180 / Math.PI;
+    beam.style.setProperty('--bx', ox + 'px');
+    beam.style.setProperty('--by', oy + 'px');
+    beam.style.setProperty('--ang', ang + 'deg');
+
+    const torch = btn.querySelector('.pw-torch');
+    if (torch) torch.style.transform = `rotate(${ang}deg)`;
+
+    // ── Mask cho lớp reveal: vị trí chuột tính theo toạ độ của input ──
+    if (reveal && input) {
+        const ir = input.getBoundingClientRect();
+        // Chỉ đặt mask khi chuột ở gần input (tránh mask nhảy lung tung khi chuột xa)
+        const inside = m.x >= ir.left - 60 && m.x <= ir.right + 60
+                    && m.y >= ir.top - 60 && m.y <= ir.bottom + 60;
+        if (inside) {
+            reveal.style.setProperty('--mx', (m.x - ir.left) + 'px');
+            reveal.style.setProperty('--my', (m.y - ir.top) + 'px');
+        } else {
+            // Chuột ở xa → đẩy mask ra ngoài, password tối thui
+            reveal.style.setProperty('--mx', '-2000px');
+            reveal.style.setProperty('--my', '-2000px');
+        }
+    }
+}
+
+function initAuthExtras() {
+    const screen = document.getElementById('authScreen');
+    document.getElementById('authThemeBtn').addEventListener('click', () => {
+        applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
+    });
+
+    const pwInput = document.getElementById('authPassword');
+    const pwToggle = document.getElementById('authPwToggle');
+
+    // Đồng bộ text sang lớp reveal mỗi khi user gõ
+    pwInput.addEventListener('input', updatePwReveal);
+    pwInput.addEventListener('change', updatePwReveal);
+    // Đồng bộ sau khi browser autofill (thường trễ vài chục ms)
+    setTimeout(updatePwReveal, 300);
+
+    pwToggle.addEventListener('click', () => {
+    if (currentTheme === 'dark') {
+        // ── Chế độ tối: dùng chính class torch-on làm nguồn sự thật ──
+        const isOn = screen.classList.contains('torch-on');
+        const next = !isOn;
+
+        screen.classList.toggle('torch-on', next);
+        pwToggle.setAttribute('aria-pressed', String(next));
+        pwToggle.setAttribute('aria-label', next ? 'Tắt đèn pin' : 'Bật đèn pin');
+
+        if (next) updatePwReveal();   // đồng bộ text vào lớp reveal
+        updateTorch();                // cập nhật chùm sáng + mask
+    } else {
+        // ── Chế độ sáng: toggle hiện/ẩn mật khẩu bình thường ──
+        const show = pwInput.type === 'password';
+        pwInput.type = show ? 'text' : 'password';
+        pwToggle.setAttribute('aria-pressed', String(show));
+        pwToggle.setAttribute('aria-label', show ? 'Ẩn mật khẩu' : 'Hiện mật khẩu');
+    }
+});
+
+    screen.addEventListener('pointermove', (e) => {
+        authMouse = { x: e.clientX, y: e.clientY };
+        updateTorch();
+    });
+    window.addEventListener('resize', updateTorch);
+
+    document.getElementById('authForgotBtn').addEventListener('click', () => setAuthMode('reset'));
+    document.getElementById('authBackBtn').addEventListener('click', () => setAuthMode('login'));
+}
+
+// Đồng bộ value của input sang lớp reveal
+function updatePwReveal() {
+    const input = document.getElementById('authPassword');
+    const reveal = document.getElementById('authPwReveal');
+    if (!input || !reveal) return;
+    reveal.textContent = input.value;
+}
 
 async function handleAuthenticatedUser(user) {
     currentUser = user;
@@ -449,6 +619,24 @@ async function changeAvatar(file) {
 
 function handleSignedOut() {
     currentUser = null;
+    try {
+        [userProfileModal, jobModal, viewJobModal, dayOffModal,
+         workHoursModal, salaryCalcModal, statisticsModal,
+         presenterSpinModal, guideModal, viewDataModal, checkDueModal,
+         transferConfirmModal, quickJobInviteModal, quickJobTransferConfirmModal,
+         migrateLegacyJobsModal
+        ].forEach(m => { try { m && m.hide(); } catch (_) {} });
+    } catch (_) {}
+    document.body.classList.remove('modal-open');
+    document.body.style.removeProperty('overflow');
+    document.body.style.removeProperty('padding-right');
+    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+
+    // ── Reset đèn pin + chuột để tránh state cũ dính lại ──
+    authMouse = null;
+    resetAuthPwUi();
+    try { updateTorch(); } catch (_) {}
+
     if (unsubscribeJobs) {
         unsubscribeJobs();
         unsubscribeJobs = null;
@@ -580,6 +768,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('statisticsBtn').addEventListener('click', openStatisticsModal);
     initWorkHoursUi();
     initDepartmentUi();
+    OwlFx.init();
     document.getElementById('salaryCalcBtn').addEventListener('click', openSalaryCalcModal);
     document.getElementById('salaryResetBtn').addEventListener('click', resetSalaryCalc);
         // Ô nhập tiền → tự chèn dấu "." ngăn cách nghìn, giữ vị trí con trỏ
@@ -661,10 +850,19 @@ document.addEventListener('DOMContentLoaded', function() {
         applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
     });
     
+    initAuthExtras();
     document.getElementById('loginTab').addEventListener('click', () => setAuthMode('login'));
     document.getElementById('registerTab').addEventListener('click', () => setAuthMode('register'));
     document.getElementById('authForm').addEventListener('submit', handleAuthSubmit);
-    document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth));
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+    try {
+        // Ẩn modal trước để Bootstrap dọn backdrop + body.modal-open
+        userProfileModal.hide();
+        // Chờ Bootstrap chạy xong hiệu ứng đóng
+        await new Promise(r => setTimeout(r, 200));
+    } catch (e) { /* modal chưa init thì bỏ qua */ }
+    try { await signOut(auth); } catch (e) { console.error(e); }
+});
     document.getElementById('confirmMigrateLegacyJobsBtn').addEventListener('click', migrateLegacyJobs);
     document.getElementById('viewDataBtn').addEventListener('click', openViewDataModal);
     document.getElementById('checkDueBtn').addEventListener('click', openCheckDueModal);
@@ -1171,9 +1369,9 @@ async function testFirestoreConnection() {
         const snapshot = await getDocs(testCollection);
         
         firestoreConnected = true;
-        console.log(`📊 Số lượng jobs hiện tại: ${snapshot.size}`);
+        //console.log(`📊 Số lượng jobs hiện tại: ${snapshot.size}`);
         
-        showNotification('Kết nối thành công', `Đã kết nối với Firestore. Tìm thấy ${snapshot.size} jobs.`);
+        //showNotification('Kết nối thành công', `Đã kết nối với Firestore. Tìm thấy ${snapshot.size} jobs.`);
         return true;
     } catch (error) {
         firestoreConnected = false;
@@ -5383,6 +5581,364 @@ async function confirmPresenterAssignment() {
 }
 
 // ============================================================
+// CÚ ĐÊM 3D (chỉ chế độ tối)
+// - Nằm trong lớp riêng #owlLayer (fixed, toàn màn hình) nên không bị cắt bởi card header.
+// - 3D thật bằng CSS: mỗi bộ phận (đuôi, thân, 2 cánh, đầu) là 1 lớp SVG ở độ sâu Z khác nhau,
+//   cả con cú dùng perspective() + preserve-3d nên khi xoay/nghiêng sẽ có thị sai & chiều sâu.
+// - Bay từ xa (z âm, nhỏ) tới gần, nghiêng người theo hướng bay, vỗ cánh, ngửa người hãm đà rồi đáp.
+// - Bấm vào cú đang đậu: đạn bay tới, lông bay tung, cú rơi xoay xuống; ít giây sau con khác bay về.
+// ============================================================
+const OwlFx = (() => {
+    const W = 56, H = 56, PERSP = 700;
+    const HUES = [0, -8, 8, -14, 14];
+    let layer = null, owl = null, parts = {};
+    let mode = 'none';                 // none | fly | settle | perch | shot | fall
+    let A = {};                        // dữ liệu animation hiện tại
+    let raf = 0, last = 0, phase = 0, spawnTimer = 0, spawnCount = 0, perchRange = null;
+
+    const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+    const lerp = (x, y, t) => x + (y - x) * t;
+    const bez = (p0, p1, p2, p3, u) => { const k = 1 - u; return k*k*k*p0 + 3*k*k*u*p1 + 3*k*u*u*p2 + u*u*u*p3; };
+    const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const DEFS = `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+        <radialGradient id="owlBodyG" cx="42%" cy="30%" r="80%"><stop offset="0" stop-color="#b79470"/><stop offset=".55" stop-color="#8a6a4d"/><stop offset="1" stop-color="#5a4230"/></radialGradient>
+        <radialGradient id="owlBellyG" cx="50%" cy="25%" r="75%"><stop offset="0" stop-color="#f7ead0"/><stop offset="1" stop-color="#d0b68a"/></radialGradient>
+        <radialGradient id="owlHeadG" cx="45%" cy="30%" r="80%"><stop offset="0" stop-color="#c0a07a"/><stop offset=".6" stop-color="#8f6f51"/><stop offset="1" stop-color="#5d4532"/></radialGradient>
+        <radialGradient id="owlDiscG" cx="50%" cy="40%" r="65%"><stop offset="0" stop-color="#fff6de"/><stop offset="1" stop-color="#e3c995"/></radialGradient>
+        <radialGradient id="owlIrisG" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#ffe680"/><stop offset=".65" stop-color="#f5a623"/><stop offset="1" stop-color="#b8650c"/></radialGradient>
+        <linearGradient id="owlWingG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a28060"/><stop offset="1" stop-color="#4f3a29"/></linearGradient>
+        <linearGradient id="owlBeakG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f9cf63"/><stop offset="1" stop-color="#d4851a"/></linearGradient>
+    </defs></svg>`;
+
+    const WING = `<path d="M31 48 C20 50 11 62 10 78 L9 90 Q10 97 15 92 L17 98 Q21 99 23 92 L26 99 Q31 98 31 90 L35 96 Q39 94 38 84 C40 72 39 58 36 49 Z" fill="url(#owlWingG)" stroke="#3f2d1f" stroke-width=".8"/>
+        <path d="M33 52 L16 88 M34 57 L24 93 M35 60 L31 91" stroke="#3f2d1f" stroke-width=".9" fill="none" opacity=".6" stroke-linecap="round"/>
+        <path d="M15 62 q4 4 8 0 M14 70 q4 4 8 0 M24 62 q4 4 8 0 M23 70 q4 4 8 0" stroke="#c9ad85" stroke-width="1.1" fill="none" opacity=".75" stroke-linecap="round"/>`;
+
+    function owlMarkup(hue) {
+        return `<div class="owl3d" style="--owl-hue:${hue}deg">
+            <svg class="o-part o-tail" viewBox="0 0 100 100"><path d="M36 78 L32 101 L50 96 L68 101 L64 78 Z" fill="#5b4330" stroke="#3f2d1f" stroke-width=".8"/><path d="M42 82 L41 97 M50 82 L50 96 M58 82 L59 97" stroke="#7d6044" stroke-width="1" fill="none"/></svg>
+            <svg class="o-part o-body" viewBox="0 0 100 100">
+                <ellipse cx="50" cy="66" rx="25" ry="30" fill="url(#owlBodyG)"/>
+                <ellipse cx="50" cy="72" rx="16.5" ry="22" fill="url(#owlBellyG)"/>
+                <path d="M40 58 q10 6 20 0 M38 66 q12 7 24 0 M39 74 q11 7 22 0 M41 82 q9 6 18 0" stroke="#9c7f55" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".8"/>
+                <path d="M42 94 l-3 5 M42 94 l0 5.5 M42 94 l3 5 M58 94 l-3 5 M58 94 l0 5.5 M58 94 l3 5" stroke="#e5a52c" stroke-width="2.2" stroke-linecap="round"/>
+            </svg>
+            <svg class="o-part o-wl" viewBox="0 0 100 100"><g>${WING}</g></svg>
+            <svg class="o-part o-wr" viewBox="0 0 100 100"><g transform="translate(100,0) scale(-1,1)">${WING}</g></svg>
+            <svg class="o-part o-head" viewBox="0 0 100 100">
+                <path d="M26 22 L22 3 L40 15 Z" fill="#6c5139"/><path d="M74 22 L78 3 L60 15 Z" fill="#6c5139"/>
+                <path d="M27 18 L25 8 L35 15 Z" fill="#a7865f"/><path d="M73 18 L75 8 L65 15 Z" fill="#a7865f"/>
+                <ellipse cx="50" cy="34" rx="29" ry="24" fill="url(#owlHeadG)"/>
+                <circle cx="37" cy="36" r="15" fill="url(#owlDiscG)" stroke="#7a5d40" stroke-width="1.2"/>
+                <circle cx="63" cy="36" r="15" fill="url(#owlDiscG)" stroke="#7a5d40" stroke-width="1.2"/>
+                <path d="M50 21 L45 34 M50 21 L55 34" stroke="#7a5d40" stroke-width="1.4" stroke-linecap="round"/>
+                <circle cx="37" cy="36" r="9" fill="url(#owlIrisG)"/><circle cx="63" cy="36" r="9" fill="url(#owlIrisG)"/>
+                <circle cx="37" cy="36" r="5" fill="#120d18"/><circle cx="63" cy="36" r="5" fill="#120d18"/>
+                <ellipse cx="34.5" cy="33.3" rx="2.1" ry="1.7" fill="#fff"/><ellipse cx="60.5" cy="33.3" rx="2.1" ry="1.7" fill="#fff"/>
+                <circle cx="39.5" cy="38.5" r=".9" fill="#fff" opacity=".7"/><circle cx="65.5" cy="38.5" r=".9" fill="#fff" opacity=".7"/>
+                <ellipse class="o-lid" cx="37" cy="36" rx="9.4" ry="9.4" fill="#9a7b5f"/><ellipse class="o-lid" cx="63" cy="36" rx="9.4" ry="9.4" fill="#9a7b5f"/>
+                <path d="M46 42 Q50 39.5 54 42 L50 53 Z" fill="url(#owlBeakG)" stroke="#a8630d" stroke-width=".6"/>
+            </svg>
+        </div>`;
+    }
+
+    function ensureLayer() {
+        if (layer) return;
+        layer = document.createElement('div');
+        layer.id = 'owlLayer';
+        layer.innerHTML = DEFS;
+        document.body.appendChild(layer);
+        layer.addEventListener('click', (e) => { if (e.target.closest('.owl3d.perched')) shoot(); });
+    }
+
+    function buildOwl() {
+        const wrap = document.createElement('div');
+        wrap.innerHTML = owlMarkup(HUES[spawnCount % HUES.length]);
+        spawnCount += 1;
+        owl = wrap.firstElementChild;
+        layer.appendChild(owl);
+        parts = { wl: owl.querySelector('.o-wl'), wr: owl.querySelector('.o-wr'), head: owl.querySelector('.o-head') };
+        owl.style.opacity = '0';
+    }
+
+    // Điểm đậu: ngay trên chữ "Lịch Làm Việc"
+    function perchPoint() {
+    const h6 = document.querySelector('#mainContent .modern-card-header-text h6');
+    if (!h6) return null;
+    if (!perchRange) perchRange = document.createRange();
+    perchRange.selectNodeContents(h6);
+    const r = perchRange.getBoundingClientRect();
+    if (!r.width || !r.height) return null;
+    const feetY = r.top + 5;
+    return {
+        x: r.left + Math.min(r.width, 120) / 2,
+        y: feetY - H * 0.46,
+        // Chỉ cần h6 còn nằm trong viewport (đủ chỗ cho cú đậu)
+        visible: feetY - H > 0 && feetY < window.innerHeight + H
+    };
+}
+
+    function pose(p) {
+        if (!owl) return;
+        owl.style.opacity = p.opacity == null ? 1 : p.opacity;
+        owl.style.transform =
+            `translate3d(${p.x - W / 2}px,${p.y - H / 2}px,0) perspective(${PERSP}px) translateZ(${p.z || 0}px) ` +
+            `rotateX(${p.pitch || 0}deg) rotateY(${p.yaw || 0}deg) rotateZ(${p.roll || 0}deg) scale(${p.scale || 1})`;
+        const th = p.wing || 0, sw = p.sweep || 0, ws = p.wscale || 1;
+        parts.wl.style.transform = `translateZ(7px) rotateY(${-sw}deg) rotateZ(${th}deg) scale(1,${ws})`;
+        parts.wr.style.transform = `translateZ(7px) rotateY(${sw}deg) rotateZ(${-th}deg) scale(1,${ws})`;
+        parts.head.style.transform = `translateZ(12px) translateY(${p.headDy || 0}px) rotateY(${p.headYaw || 0}deg) rotateZ(${p.headRoll || 0}deg)`;
+    }
+
+    // ---------- bay ----------
+    function startFly(E) {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    A = {
+        t0: performance.now(), dur: 4300,
+        S:  { x: vw + 130, y: clamp(E.y - vh * 0.5, 50, Math.max(60, E.y - 140)) },
+        P1: { x: vw * 0.6, y: Math.max(24, E.y - vh * 0.65) },
+        roll: 0
+    };
+    mode = 'fly';
+}
+
+    function stepFly(now, dt) {
+        const E = perchPoint();
+        if (!E) { despawn(); return; }
+        const t = clamp((now - A.t0) / A.dur, 0, 1);
+        const u = 1 - Math.pow(1 - t, 1.9);                         // chậm dần khi tới nơi
+        const P2 = { x: E.x + 340, y: E.y - 150 };
+        const x = bez(A.S.x, A.P1.x, P2.x, E.x, u), y = bez(A.S.y, A.P1.y, P2.y, E.y, u);
+        const u2 = Math.min(1, u + 0.02);
+        const vxn = clamp((bez(A.S.x, A.P1.x, P2.x, E.x, u2) - x) / 0.02 / 1400, -1, 1);
+        const flare = Math.sin(Math.PI * clamp((t - 0.72) / 0.28, 0, 1));   // ngửa người hãm đà
+        phase += dt * Math.PI * 2 * lerp(6.2, 3.0, t);
+        const f = Math.sin(phase);
+        A.roll = lerp(A.roll, vxn * 16, 0.08);
+        pose({
+    x, y: y - Math.cos(phase) * 5,
+    z: -260 * Math.pow(1 - u, 1.5),                 // nhẹ thôi, chủ yếu dùng scale
+    roll: A.roll + 3 * Math.sin(phase * 0.5),
+    yaw: vxn * 26,
+    pitch: flare * 22 - (1 - t) * 8,
+    wing: 58 + 24 * flare + (46 + 14 * flare) * f,
+    sweep: 16 * Math.cos(phase),
+    wscale: 1.55,
+    headDy: Math.cos(phase) * 1.5,
+    opacity: clamp(t / 0.08, 0, 1),
+    scale: lerp(0.30, 1.0, u)                       // ← 0.30 xa → 1.0 khi đáp
+});
+        if (t >= 1) { mode = 'settle'; A = { t0: now, wing0: 58 + 70 * 0, phase0: phase }; }
+    }
+
+    function stepSettle(now, dt) {
+        const E = perchPoint();
+        if (!E) { despawn(); return; }
+        const tt = clamp((now - A.t0) / 900, 0, 1);
+        const e = 1 - Math.pow(1 - tt, 3);
+        phase += dt * Math.PI * 2 * lerp(3.0, 1.2, tt);
+        pose({
+            x: E.x, y: E.y - 7 * Math.sin(Math.PI * tt) * (1 - tt),
+            pitch: lerp(8, 0, e), wing: (1 - e) * (74 + 30 * Math.sin(phase)), sweep: (1 - e) * 10,
+            wscale: lerp(1.55, 1, e), opacity: E.visible ? 1 : 0
+        });
+        if (tt >= 1) {
+            mode = 'perch'; A = { head: 0, headTo: 0, nextLook: now + 2500 };
+            owl.classList.add('perched');
+        }
+    }
+
+    function stepPerch(now, dt) {
+        const E = perchPoint();
+        if (!E) { despawn(); return; }
+        A.lastE = E;
+        if (now > A.nextLook) { A.headTo = (Math.random() < 0.5 ? -1 : 1) * (10 + Math.random() * 16); A.nextLook = now + 2200 + Math.random() * 5000; setTimeout(() => { A.headTo = 0; }, 1100); }
+        A.head = lerp(A.head, A.headTo, 0.07);
+        const br = Math.sin(now / 900) * 0.012;
+        pose({
+            x: E.x, y: E.y, roll: Math.sin(now / 1800) * 0.9, scale: 1 + br,
+            headYaw: A.head, headRoll: A.head * 0.25, opacity: E.visible ? 1 : 0
+        });
+        owl.style.pointerEvents = E.visible ? '' : 'none';
+    }
+
+    // ---------- bị bắn & rơi ----------
+    function fx(cls, x, y) {
+        const el = document.createElement('i');
+        el.className = cls;
+        layer.appendChild(el);
+        el.style.transform = `translate(${x}px,${y}px)`;
+        return el;
+    }
+
+    function shoot() {
+        if (mode !== 'perch' || !A.lastE) return;
+        const E = A.lastE;
+        mode = 'shot';
+        owl.classList.remove('perched');
+        const vw = window.innerWidth, vh = window.innerHeight;
+        const ox = clamp(E.x - 320 + (Math.random() - 0.5) * 160, 24, vw - 24), oy = vh + 18;
+        const dx = E.x - ox, dy = E.y - oy, dist = Math.hypot(dx, dy), ang = Math.atan2(dy, dx) * 180 / Math.PI;
+        const flash = fx('owl-muzzle', ox, vh - 6);
+        flash.animate([{ opacity: 1, transform: `translate(${ox}px,${vh - 6}px) scale(.4)` }, { opacity: 0, transform: `translate(${ox}px,${vh - 6}px) scale(1.6)` }], { duration: 160 }).onfinish = () => flash.remove();
+        const b = fx('owl-bullet', ox, oy);
+        b.animate([
+            { transform: `translate(${ox}px,${oy}px) rotate(${ang}deg)` },
+            { transform: `translate(${E.x}px,${E.y}px) rotate(${ang}deg)` }
+        ], { duration: clamp(dist / 2.6, 160, 420), easing: 'linear', fill: 'forwards' }).onfinish = () => { b.remove(); impact(E); };
+    }
+
+    function impact(E) {
+        if (!owl) return;
+        const ring = fx('owl-ring', E.x, E.y);
+        ring.animate([{ opacity: 1, transform: `translate(${E.x}px,${E.y}px) scale(1)` }, { opacity: 0, transform: `translate(${E.x}px,${E.y}px) scale(7)` }], { duration: 420, easing: 'ease-out' }).onfinish = () => ring.remove();
+        for (let i = 0; i < 16; i++) {
+            const fe = fx('owl-feather', E.x, E.y);
+            const vx = (Math.random() - 0.5) * 260, vy = -40 - Math.random() * 190, rot = (Math.random() - 0.5) * 900;
+            const dur = 900 + Math.random() * 800;
+            fe.animate([
+                { opacity: 1, transform: `translate(${E.x}px,${E.y}px) rotate(0deg)` },
+                { opacity: 1, offset: 0.4, transform: `translate(${E.x + vx * 0.7}px,${E.y + vy}px) rotate(${rot * 0.5}deg)` },
+                { opacity: 0, transform: `translate(${E.x + vx}px,${E.y + vy + 260 + Math.random() * 120}px) rotate(${rot}deg)` }
+            ], { duration: dur, easing: 'cubic-bezier(.3,.6,.5,1)' }).onfinish = () => fe.remove();
+        }
+            mode = 'fall';
+    A = {
+        t0: performance.now(),
+        x: E.x, y: E.y, z: 0,
+        vx: (Math.random() - 0.5) * 100,           // ngang nhẹ
+        vy: -80 - Math.random() * 60,              // hất lên nhẹ
+        roll: 0,
+        w:  (Math.random() < 0.5 ? -1 : 1) * (240 + Math.random() * 160),  // °/s
+        pitch: 0, wp: 50 + Math.random() * 40,
+        yaw: 0,    wy: (Math.random() - 0.5) * 80,
+        wingsOpen: 1                               // 1 = xoè (vừa trúng đạn)
+    };
+    }
+
+    function stepFall(now, dt) {
+    const tt = (now - A.t0) / 1000;
+
+    // ── Vật lý ──
+    A.vy += 1500 * dt;                             // trọng lực
+    A.vx *= Math.max(0, 1 - 0.8 * dt);             // cản không khí ngang
+    A.x += A.vx * dt;
+    A.y += A.vy * dt;
+
+    // ── Xoay có quán tính (angular drag) ──
+    const drag = Math.max(0, 1 - 0.25 * dt);
+    A.w  *= drag;
+    A.wp *= drag;
+    A.wy *= drag;
+    A.roll  += A.w  * dt;
+    A.pitch += A.wp * dt;
+    A.yaw   += A.wy * dt;
+
+    // ── Cánh co vào nhanh trong ~0.35s đầu ──
+    A.wingsOpen = Math.max(0, A.wingsOpen - dt * 3);
+
+    // ── Nhỏ dần khi rơi xa camera ──
+    const fallScale = Math.max(0.30, 1 - tt * 0.30);
+
+    pose({
+        x: A.x, y: A.y, z: 0,
+        roll: A.roll, pitch: A.pitch, yaw: A.yaw,
+        wing:   18 + A.wingsOpen * 55,             // lúc đầu xoè, sau co xuống
+        sweep:  A.wingsOpen * 14,
+        wscale: 1 + A.wingsOpen * 0.35,
+        headYaw: 0,
+        scale: fallScale,
+        opacity: 1
+    });
+
+    if (A.y > window.innerHeight + H * 2 || tt > 3.5) {
+        removeOwl();
+        scheduleSpawn(1600);
+    }
+}
+
+    // ---------- vòng lặp & vòng đời ----------
+    function loop(now) {
+        if (mode === 'none') { raf = 0; return; }
+        raf = requestAnimationFrame(loop);
+        const dt = Math.min(0.05, (now - (last || now)) / 1000);
+        last = now;
+        if (mode === 'fly') stepFly(now, dt);
+        else if (mode === 'settle') stepSettle(now, dt);
+        else if (mode === 'perch') stepPerch(now, dt);
+        else if (mode === 'fall') stepFall(now, dt);
+    }
+
+    function startLoop() { if (!raf) { last = 0; raf = requestAnimationFrame(loop); } }
+
+    function removeOwl() {
+        if (owl) owl.remove();
+        owl = null; mode = 'none';
+    }
+
+    function spawn() {
+        if (mode !== 'none') return;
+        const E = perchPoint();
+        if (!E) return;
+        ensureLayer();
+        buildOwl();
+        if (reduced()) {                       // giảm chuyển động: đậu luôn, không bay
+            mode = 'perch'; A = { head: 0, headTo: 0, nextLook: Infinity };
+            owl.classList.add('perched');
+        } else {
+            startFly(E);
+        }
+        startLoop();
+    }
+
+    function scheduleSpawn(ms) {
+        if (spawnTimer) clearTimeout(spawnTimer);
+        spawnTimer = setTimeout(() => { spawnTimer = 0; if (wanted()) spawn(); }, ms);
+    }
+
+    
+    function despawn() {
+    if (spawnTimer) { clearTimeout(spawnTimer); spawnTimer = 0; }
+    if (layer) layer.querySelectorAll('.owl-bullet,.owl-feather,.owl-ring,.owl-muzzle').forEach(n => n.remove());
+    const old = owl;
+    owl = null; mode = 'none';
+    if (old) {
+        old.classList.remove('perched');       // ← bỏ class có pointer-events: auto
+        old.style.pointerEvents = 'none';      // ← chắc chắn không chặn click trong lúc fade
+        old.style.transition = 'opacity .35s ease';
+        old.style.opacity = '0';
+        setTimeout(() => old.remove(), 400);
+    }
+}
+
+    function wanted() {
+        const auth = document.getElementById('authScreen');
+        return document.body.classList.contains('theme-dark')
+            && !!auth && auth.classList.contains('d-none')
+            && window.innerWidth > 576
+            && !!perchPoint();
+    }
+
+    function sync() {
+        if (wanted()) {
+            if (mode === 'none' && !spawnTimer) scheduleSpawn(700);
+        } else if (mode !== 'none' || spawnTimer || owl) {
+            despawn();
+        }
+    }
+
+    function init() {
+        owlSyncHook = sync;
+        setInterval(sync, 1200);              // theo dõi đăng nhập/đăng xuất, ẩn/hiện header, đổi kích thước
+        window.addEventListener('resize', sync);
+        sync();
+    }
+
+    return { init, sync };
+})();
+
+// ============================================================
 // BỘ PHẬN LÀM VIỆC
 // Firestore: collection "departments" (docId = slug) { name, createdBy, createdAt }
 //            users/{...}.department = id bộ phận
@@ -5431,6 +5987,8 @@ function initDeptState() {
     spinDeptFilter = spin !== null ? spin : (own || DEPT_ALL);
     statsDeptFilter = stats !== null ? stats : (own || DEPT_ALL);
     workHoursViewDept = hours !== null ? hours : own;
+    const off = loadDeptPref('dayoff');
+    dayOffDeptFilter = off !== null ? off : (own || DEPT_ALL);
 }
 
 function deptOptionsHtml(opts = {}) {
@@ -5456,6 +6014,7 @@ function refreshDeptSelects() {
     fillDeptSelect(document.getElementById('spinDeptSelect'), spinDeptFilter, { all: true, none: true, noneLabel: 'Chưa phân bộ phận' });
     fillDeptSelect(document.getElementById('statsDeptSelect'), statsDeptFilter, { all: true, none: true, noneLabel: 'Chưa phân bộ phận' });
     fillDeptSelect(document.getElementById('whDeptSelect'), workHoursViewDept, { none: true, noneLabel: 'Chưa phân bộ phận' });
+    fillDeptSelect(document.getElementById('dayOffDeptSelect'), dayOffDeptFilter, { all: true, none: true, noneLabel: 'Chưa phân bộ phận' });
 }
 
 function rebuildDepartmentsList() {
@@ -5497,6 +6056,7 @@ async function saveUserDepartment(deptId) {
         // Bộ lọc chưa từng chọn tay thì đi theo bộ phận mới của mình
         if (loadDeptPref('spin') === null) spinDeptFilter = value || DEPT_ALL;
         if (loadDeptPref('stats') === null) statsDeptFilter = value || DEPT_ALL;
+        if (loadDeptPref('dayoff') === null) dayOffDeptFilter = value || DEPT_ALL;
         if (loadDeptPref('hours') === null) { workHoursViewDept = value; rebuildWorkHoursMap(); renderSchedule(); }
         rebuildDepartmentsList();
         showNotification('Đã lưu', value ? `Bộ phận của bạn: ${getDeptName(value)}.` : 'Đã bỏ chọn bộ phận.', false, 'success');
@@ -5558,6 +6118,12 @@ function initDepartmentUi() {
         statsDeptFilter = e.target.value;
         saveDeptPref('stats', statsDeptFilter);
         renderStatistics();
+    });
+    document.getElementById('dayOffDeptSelect').addEventListener('change', (e) => {
+        dayOffDeptFilter = e.target.value;
+        saveDeptPref('dayoff', dayOffDeptFilter);
+        dayOffFocusUid = null;
+        if (dayOffModalOpen) renderDayOffModal();
     });
     document.getElementById('whDeptSelect').addEventListener('change', (e) => {
         workHoursViewDept = e.target.value;
@@ -5973,6 +6539,7 @@ async function openDayOffModal() {
     dayOffSelected = new Set(Object.keys(getMyOffMap()));
     document.getElementById('dayOffReason').value = '';
     buildDayOffUsers([]);
+    fillDeptSelect(document.getElementById('dayOffDeptSelect'), dayOffDeptFilter, { all: true, none: true, noneLabel: 'Chưa phân bộ phận' });
     dayOffModal.show();
     renderDayOffModal();
 
@@ -5987,8 +6554,14 @@ async function openDayOffModal() {
             if (user.uid) {
                 users.push(user);
                 if (user.avatar) usersAvatarCache[user.uid] = user.avatar;
+                usersInfoCache[user.uid] = Object.assign(
+                    { displayName: user.displayName || '', email: user.email || '', avatar: user.avatar || null },
+                    usersInfoCache[user.uid] || {},
+                    { department: user.department || '' }
+                );
             }
         });
+        rebuildDepartmentsList();
         buildDayOffUsers(users);
         if (dayOffModalOpen) renderDayOffModal();
     } catch (error) {
@@ -6027,10 +6600,17 @@ function countUpcomingOffs(uid, todayKey) {
     return dayOffsList.filter(o => o.userId === uid && o.date >= todayKey).length;
 }
 
+// Người nằm trong bộ phận đang lọc ở form lịch off (bản thân tôi luôn được giữ lại để còn đăng ký)
+function dayOffInDept(uid) {
+    return (currentUser && uid === currentUser.uid) || deptMatches(uid, dayOffDeptFilter);
+}
+
 function renderDayOffUsers() {
     const todayKey = localDateKey(new Date());
-    document.getElementById('dayOffUsersCount').textContent = dayOffUsers.length;
-    document.getElementById('dayOffUsersList').innerHTML = dayOffUsers.map(user => {
+    const visibleUsers = dayOffUsers.filter(u => dayOffInDept(u.uid));
+    if (dayOffFocusUid && !visibleUsers.some(u => u.uid === dayOffFocusUid)) dayOffFocusUid = null;
+    document.getElementById('dayOffUsersCount').textContent = visibleUsers.length;
+    document.getElementById('dayOffUsersList').innerHTML = visibleUsers.map(user => {
         const isMe = user.uid === currentUser.uid;
         const name = user.displayName || user.email || 'Chưa đặt tên';
         const count = countUpcomingOffs(user.uid, todayKey);
@@ -6059,6 +6639,7 @@ function renderDayOffCalendars() {
     const othersByDate = {};
     dayOffsList.forEach(o => {
         if (o.userId === currentUser.uid) return;
+        if (!dayOffInDept(o.userId)) return;
         if (dayOffFocusUid && o.userId !== dayOffFocusUid) return;
         (othersByDate[o.date] = othersByDate[o.date] || []).push(o);
     });
@@ -6145,7 +6726,7 @@ function renderDayOffSummary() {
 function renderDayOffDetails() {
     const todayKey = localDateKey(new Date());
     const rows = dayOffsList
-        .filter(o => o.date >= todayKey && (!dayOffFocusUid || o.userId === dayOffFocusUid))
+        .filter(o => o.date >= todayKey && dayOffInDept(o.userId) && (!dayOffFocusUid || o.userId === dayOffFocusUid))
                 .sort((a, b) => {
             // Ưu tiên mới đăng ký (createdAt) lên đầu
             const ca = a.createdAt || '';
@@ -6158,7 +6739,7 @@ function renderDayOffDetails() {
 
     document.getElementById('dayOffDetailTitle').textContent = dayOffFocusUid
         ? `Lịch off của ${dayOffUserName(dayOffFocusUid)}`
-        : 'Lịch off sắp tới của mọi người';
+        : (dayOffDeptFilter === DEPT_ALL ? 'Lịch off sắp tới của mọi người' : `Lịch off sắp tới · ${getDeptName(dayOffDeptFilter)}`);
 
     if (!rows.length) {
         document.getElementById('dayOffDetailList').innerHTML = '<div class="empty-state empty-state-sm"><i class="bi bi-calendar-check"></i><br>Chưa có lịch off nào</div>';

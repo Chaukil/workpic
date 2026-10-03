@@ -16,24 +16,52 @@
 <body class="app-intro">
     <div id="authScreen" class="auth-screen">
         <div class="auth-panel">
+            <div class="topbar-sky auth-sky" aria-hidden="true">
+                <div class="sky-layer sky-day"></div>
+                <div class="sky-layer sky-night"></div>
+                <div class="sky-clouds"><span class="cloud c1"></span><span class="cloud c2"></span><span class="cloud c3"></span></div>
+                <div class="sky-stars"><i class="shoot s1"></i><i class="shoot s2"></i><i class="shoot s3"></i></div>
+                <div class="sky-body sky-sun"><span class="sun-rays"></span><span class="sun-core"></span></div>
+                <div class="sky-body sky-moon"><span class="moon-core"></span></div>
+            </div>
+            <button type="button" class="auth-theme-btn" id="authThemeBtn" title="Đổi chế độ sáng / tối" aria-label="Đổi chế độ sáng / tối">
+                <i class="bi bi-moon-fill"></i>
+            </button>
             <p class="topbar-eyebrow">WorkPIC</p>
             <h1>Job Schedule Manager</h1>
-            <p class="auth-subtitle">Đăng nhập để quản lý lịch công việc của bạn.</p>
-            <div class="auth-tabs" role="tablist">
+            <p class="auth-subtitle" id="authSubtitle">Đăng nhập để quản lý lịch công việc của bạn.</p>
+            <div class="auth-tabs" role="tablist" id="authTabs">
                 <button type="button" class="auth-tab active" id="loginTab">Đăng nhập</button>
                 <button type="button" class="auth-tab" id="registerTab">Đăng ký</button>
             </div>
             <form id="authForm">
                 <label class="form-label" for="authEmail">Email</label>
                 <input class="form-control" type="email" id="authEmail" autocomplete="email" required>
-                <label class="form-label mt-3" for="authPassword">Mật khẩu</label>
-                <input class="form-control" type="password" id="authPassword" autocomplete="current-password" minlength="6" required>
+                <div id="authPasswordBlock">
+                    <label class="form-label mt-3" for="authPassword">Mật khẩu</label>
+                    <div class="auth-pw-wrap">
+    <input class="form-control" type="password" id="authPassword" autocomplete="current-password" minlength="6" required>
+    <div class="auth-pw-reveal" id="authPwReveal" aria-hidden="true"></div>
+    <button type="button" class="auth-pw-toggle" id="authPwToggle" aria-label="Hiện mật khẩu" aria-pressed="false" title="Hiện mật khẩu">
+        <i class="bi bi-eye-fill pw-eye"></i>
+        <svg class="pw-torch" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8.2 1.5h7.6l-1.3 5.2H9.5z" fill="currentColor"/>
+            <rect x="9.4" y="7.6" width="5.2" height="13.4" rx="1.6" fill="currentColor" opacity=".9"/>
+            <rect x="11.1" y="11" width="1.8" height="3" rx=".9" fill="#0f172a" opacity=".55"/>
+        </svg>
+    </button>
+</div>
+                    <button type="button" class="auth-forgot" id="authForgotBtn">Quên mật khẩu?</button>
+                </div>
                 <label class="form-label mt-3 d-none" id="authNameLabel" for="authName">Tên hiển thị</label>
                 <input class="form-control d-none" type="text" id="authName" autocomplete="name">
                 <button class="btn btn-save w-100 mt-4" type="submit" id="authSubmitBtn">Đăng nhập</button>
+                <button type="button" class="auth-back d-none" id="authBackBtn"><i class="bi bi-arrow-left"></i> Quay lại đăng nhập</button>
                 <p class="auth-error" id="authError" role="alert"></p>
+                <p class="auth-info" id="authInfo" role="status"></p>
             </form>
         </div>
+        <div class="flash-beam" id="flashBeam" aria-hidden="true"></div>
     </div>
 
     <div id="notificationContainer" class="notification-container"></div>
@@ -236,24 +264,6 @@
                                 <i class="bi bi-calendar3"></i>
                             </div>
                             <div class="modern-card-header-text">
-                                <span class="owl" aria-hidden="true">
-                                    <svg viewBox="0 0 40 40" width="32" height="32">
-                                        <g class="owl-wing owl-wing-l"><g class="owl-flap"><path d="M13 17 C5 19 4 30 9 36 C13 33 15 26 15 19 Z" fill="#6b4f3a"/><path d="M11 23 C8 26 8 30 9.5 33" stroke="#8b6f55" stroke-width="1" fill="none" stroke-linecap="round"/></g></g>
-                                        <g class="owl-wing owl-wing-r"><g class="owl-flap"><path d="M27 17 C35 19 36 30 31 36 C27 33 25 26 25 19 Z" fill="#6b4f3a"/><path d="M29 23 C32 26 32 30 30.5 33" stroke="#8b6f55" stroke-width="1" fill="none" stroke-linecap="round"/></g></g>
-                                        <ellipse cx="20" cy="26" rx="9.5" ry="11" fill="#8b6f55"/>
-                                        <ellipse cx="20" cy="29" rx="6" ry="7.5" fill="#e8d5b0"/>
-                                        <path d="M17 25 q3 2 6 0 M16.5 29 q3.5 2 7 0 M17 33 q3 2 6 0" stroke="#b89a6e" stroke-width=".9" fill="none" stroke-linecap="round"/>
-                                        <path d="M10.5 13 L11.5 4 L17 9 Z" fill="#7a5f47"/><path d="M29.5 13 L28.5 4 L23 9 Z" fill="#7a5f47"/>
-                                        <ellipse cx="20" cy="15" rx="10.5" ry="9" fill="#9a7b5f"/>
-                                        <circle cx="15" cy="15" r="4.6" fill="#fff4cf"/><circle cx="25" cy="15" r="4.6" fill="#fff4cf"/>
-                                        <circle cx="15" cy="15" r="3" fill="#f59e0b"/><circle cx="25" cy="15" r="3" fill="#f59e0b"/>
-                                        <circle cx="15" cy="15" r="1.7" fill="#1a1426"/><circle cx="25" cy="15" r="1.7" fill="#1a1426"/>
-                                        <circle cx="15.7" cy="14.2" r=".6" fill="#fff"/><circle cx="25.7" cy="14.2" r=".6" fill="#fff"/>
-                                        <ellipse class="owl-lid" cx="15" cy="15" rx="4.8" ry="4.8" fill="#9a7b5f"/><ellipse class="owl-lid" cx="25" cy="15" rx="4.8" ry="4.8" fill="#9a7b5f"/>
-                                        <path d="M18.5 18.5 L21.5 18.5 L20 21.8 Z" fill="#f59e0b"/>
-                                        <path d="M16 36.5 h2.6 M21.4 36.5 h2.6" stroke="#f59e0b" stroke-width="1.6" stroke-linecap="round"/>
-                                    </svg>
-                                </span>
                                 <h6 class="mb-0">Lịch Làm Việc</h6>
                                 <small>2 tuần tới · công việc định kỳ</small>
                             </div>
@@ -823,6 +833,10 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
         <div class="spin-users-title">
             <i class="bi bi-people-fill"></i> Thành viên
             <span class="spin-users-count" id="dayOffUsersCount">0</span>
+        </div>
+        <div class="dept-filter">
+            <label for="dayOffDeptSelect"><i class="bi bi-diagram-3-fill"></i> Bộ phận</label>
+            <select class="form-select form-select-sm" id="dayOffDeptSelect"></select>
         </div>
         <div class="spin-users-hint">Bấm tên để xem riêng lịch off của người đó. Lịch của người khác chỉ để xem.</div>
         <div class="dayoff-users-list" id="dayOffUsersList"></div>

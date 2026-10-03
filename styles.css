@@ -5524,48 +5524,7 @@ body.theme-dark .layout-dropdown-menu { box-shadow: 0 18px 40px rgba(0, 0, 0, .5
 .layout-dropdown-item:focus-visible { background: var(--surface-muted); outline: none; }
 
 
-/* ============================================================
-   CÚ ĐÊM — chỉ xuất hiện ở chế độ tối, bay tới đậu trên chữ "Lịch Làm Việc"
-   ============================================================ */
-.modern-card-header-text { position: relative; }
-.owl {
-    position: absolute; left: 22%; bottom: calc(100% - 5px);
-    width: 32px; height: 32px;
-    z-index: 3; pointer-events: none;
-    opacity: 0; visibility: hidden;
-    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .45));
-}
-.owl svg { overflow: visible; display: block; }
-body.theme-dark .owl {
-    visibility: visible;
-    animation: owlFly 3.7s cubic-bezier(.45, .05, .35, 1) .6s both;
-}
-.owl-wing, .owl-flap { transform-box: view-box; }
-.owl-wing-l, .owl-wing-l .owl-flap { transform-origin: 13px 17px; }
-.owl-wing-r, .owl-wing-r .owl-flap { transform-origin: 27px 17px; }
-body.theme-dark .owl-wing-l { animation: owlSpreadL 3.3s ease-in-out .6s both; }
-body.theme-dark .owl-wing-r { animation: owlSpreadR 3.3s ease-in-out .6s both; }
-body.theme-dark .owl-wing-l .owl-flap { animation: owlFlapL .16s ease-in-out .6s 19 alternate; }
-body.theme-dark .owl-wing-r .owl-flap { animation: owlFlapR .16s ease-in-out .6s 19 alternate; }
-.owl-lid { transform-box: fill-box; transform-origin: 50% 0%; transform: scaleY(0); }
-body.theme-dark .owl-lid { animation: owlBlink 5.5s ease-in-out 5s infinite; }
 
-@keyframes owlFly {
-    0%   { opacity: 0; transform: translate(280px, -70px) scale(.6) rotate(8deg); }
-    8%   { opacity: 1; }
-    30%  { transform: translate(180px, -100px) scale(.8) rotate(-7deg); }
-    55%  { transform: translate(90px, -64px) scale(.95) rotate(6deg); }
-    78%  { transform: translate(26px, -28px) scale(1) rotate(-5deg); }
-    90%  { transform: translate(4px, -7px) scale(1) rotate(0deg); }
-    100% { opacity: 1; transform: translate(0, 0) scale(1) rotate(0deg); }
-}
-@keyframes owlSpreadL { 0%, 84% { transform: rotate(85deg); } 100% { transform: rotate(0deg); } }
-@keyframes owlSpreadR { 0%, 84% { transform: rotate(-85deg); } 100% { transform: rotate(0deg); } }
-@keyframes owlFlapL { from { transform: rotate(0deg); } to { transform: rotate(48deg); } }
-@keyframes owlFlapR { from { transform: rotate(0deg); } to { transform: rotate(-48deg); } }
-@keyframes owlBlink { 0%, 92%, 100% { transform: scaleY(0); } 95%, 97% { transform: scaleY(1); } }
-
-@media (max-width: 576px) { .owl { display: none; } }
 
 /* ============================================================
    BỘ LỌC BỘ PHẬN (Quay số / Thống kê / Giờ làm việc)
@@ -5578,3 +5537,164 @@ body.theme-dark .owl-lid { animation: owlBlink 5.5s ease-in-out 5s infinite; }
 .stats-toolbar .dept-filter { margin: 0; }
 .wh-dept-row { margin: 0 0 0.9rem; flex-wrap: wrap; }
 .wh-dept-hint { font-size: var(--fs-3xs); color: var(--muted); }
+
+
+/* ============================================================
+   FORM ĐĂNG NHẬP / ĐĂNG KÝ — nền trời sáng/tối, đèn pin
+   ============================================================ */
+.auth-panel { position: relative; overflow: hidden; isolation: isolate; }
+.auth-panel > :not(.topbar-sky) { position: relative; }
+.auth-sky { z-index: -1; }
+.auth-sky .sky-body { top: 26px; left: auto; right: 22px; margin-top: 0; width: 72px; height: 72px; }
+.auth-sky .sky-stars::before {
+    box-shadow: 40px 30px #fff, 120px 70px #c7d2fe, 210px 22px #fff, 300px 60px #fff, 370px 28px #e0e7ff,
+                70px 150px #fff, 340px 140px #c7d2fe, 30px 260px #fff, 390px 230px #fff, 60px 380px #e0e7ff,
+                380px 400px #fff, 20px 470px #fff, 200px 490px #c7d2fe;
+}
+.auth-sky .sky-stars::after {
+    top: 0; left: 0;
+    box-shadow: 90px 40px #fff, 260px 110px #fde68a, 330px 190px #fff, 150px 300px #fff,
+                400px 330px #c7d2fe, 240px 440px #fff, 50px 330px #e0e7ff;
+}
+.auth-sky .sky-day  { background: linear-gradient(160deg, #e0f2fe 0%, #f0f9ff 50%, #fef9e7 100%); }
+.auth-sky .sky-night { background: linear-gradient(160deg, #070b1f 0%, #0f1535 55%, #1e1b4b 100%); }
+body.theme-dark .auth-panel { border-color: rgba(129, 140, 248, .28); }
+
+.auth-panel > .auth-theme-btn {
+    position: absolute; top: 14px; left: 14px; z-index: 3;
+    width: 36px; height: 36px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid rgba(148, 163, 184, .45);
+    background: rgba(255, 255, 255, .7); color: #334155; cursor: pointer;
+    transition: transform .2s ease, background-color .2s ease;
+}
+.auth-panel > .auth-theme-btn:hover { transform: rotate(18deg) scale(1.06); }
+body.theme-dark .auth-panel > .auth-theme-btn { background: rgba(15, 23, 42, .6); color: #fde68a; border-color: rgba(165, 180, 252, .35); }
+.auth-panel .topbar-eyebrow { margin-top: 1.6rem; }
+
+.auth-pw-wrap { position: relative; }
+.auth-pw-wrap .form-control { padding-right: 46px; }
+.auth-pw-toggle {
+    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    width: 34px; height: 34px; border-radius: 50%; border: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; color: var(--muted); cursor: pointer;
+    transition: background-color .2s ease, color .2s ease, box-shadow .3s ease;
+}
+.auth-pw-toggle:hover { background: rgba(148, 163, 184, .18); }
+.auth-pw-toggle .pw-torch { display: none; width: 22px; height: 22px; transition: transform .12s linear; }
+body.theme-dark .auth-pw-toggle .pw-eye { display: none; }          /* chế độ tối: nút = đèn pin */
+body.theme-dark .auth-pw-toggle .pw-torch { display: block; }
+body.theme-dark .auth-pw-toggle { color: #cbd5e1; }
+body.theme-dark .auth-pw-toggle[aria-pressed="true"] {
+    color: #fde68a; background: rgba(250, 204, 21, .14);
+    box-shadow: 0 0 14px 3px rgba(253, 224, 71, .45);
+}
+
+.auth-pw-reveal {
+    position: absolute;
+    inset: 0;
+    padding: calc(0.45rem + 1px) calc(46px + 1px) calc(0.45rem + 1px) calc(0.6rem + 1px);
+    font-size: var(--fs-sm);
+    font-family: var(--font-family);
+    letter-spacing: 0.005em;
+    line-height: 1.5;
+    color: var(--text);
+    background: transparent;
+    pointer-events: none;
+    white-space: pre;
+    overflow: hidden;
+    display: none;
+    border-radius: 10px;
+    /* Mask radial — toạ độ được set qua JS bằng --mx / --my */
+    -webkit-mask-image: radial-gradient(
+        circle 110px at var(--mx, -2000px) var(--my, -2000px),
+        rgba(0, 0, 0, 1) 0%,
+        rgba(0, 0, 0, 1) 28%,
+        rgba(0, 0, 0, 0.55) 65%,
+        rgba(0, 0, 0, 0) 100%
+    );
+    mask-image: radial-gradient(
+        circle 110px at var(--mx, -2000px) var(--my, -2000px),
+        rgba(0, 0, 0, 1) 0%,
+        rgba(0, 0, 0, 1) 28%,
+        rgba(0, 0, 0, 0.55) 65%,
+        rgba(0, 0, 0, 0) 100%
+    );
+}
+
+body.theme-dark .auth-screen.torch-on .auth-pw-reveal {
+    display: block;
+}
+
+/* Khi đèn bật: ẩn chữ (dots) của input, chỉ giữ caret để user thấy con trỏ */
+body.theme-dark .auth-screen.torch-on #authPassword {
+    color: transparent;
+    caret-color: #fde68a;
+}
+.auth-forgot, .auth-back {
+    display: inline-block; margin-top: .45rem; padding: 0; border: 0; background: none;
+    color: var(--primary); font-size: var(--fs-2xs); font-weight: 600; cursor: pointer;
+}
+.auth-forgot:hover, .auth-back:hover { text-decoration: underline; }
+.auth-back { display: block; margin: .8rem auto 0; }
+.auth-info { min-height: 1.2rem; margin: .75rem 0 0; font-size: var(--fs-2xs); color: #15803d; }
+body.theme-dark .auth-info { color: #86efac; }
+
+/* Chùm sáng chữ V của đèn pin — chỉ chế độ tối & khi đèn đang bật */
+.flash-beam {
+    position: absolute; inset: 0; z-index: 2; pointer-events: none;
+    opacity: 0; transition: opacity .35s ease; mix-blend-mode: screen;
+    --bx: 50%; --by: 50%; --ang: 0deg;
+    background: conic-gradient(from calc(var(--ang) - 19deg) at var(--bx) var(--by),
+        rgba(255, 244, 205, 0) 0deg, rgba(255, 244, 205, .38) 5deg,
+        rgba(255, 244, 205, .38) 33deg, rgba(255, 244, 205, 0) 38deg, transparent 38deg 360deg);
+    -webkit-mask-image: radial-gradient(circle 680px at var(--bx) var(--by), #000 0, rgba(0, 0, 0, .8) 25%, rgba(0, 0, 0, .3) 65%, transparent 100%);
+            mask-image: radial-gradient(circle 680px at var(--bx) var(--by), #000 0, rgba(0, 0, 0, .8) 25%, rgba(0, 0, 0, .3) 65%, transparent 100%);
+}
+body.theme-dark .auth-screen.torch-on .flash-beam { opacity: 1; }
+body.theme-light .flash-beam { display: none; }
+
+/* ============================================================
+   CÚ ĐÊM 3D — lớp riêng toàn màn hình (không bị cắt bởi card header)
+   ============================================================ */
+#owlLayer {
+    position: fixed;
+    inset: 0;
+    z-index: 1010;              /* ↑ trên topbar (1000), dưới modal (1050) */
+    pointer-events: none;
+    overflow: hidden;
+}
+.owl3d {
+    position: absolute; left: 0; top: 0; width: 56px; height: 56px;
+    transform-style: preserve-3d; will-change: transform, opacity;
+}
+.owl3d.perched { pointer-events: auto; cursor: crosshair; }
+.owl3d .o-part { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible;
+    filter: hue-rotate(var(--owl-hue, 0deg)); }
+.owl3d .o-tail { transform: translateZ(-14px); }
+.owl3d .o-body { transform: translateZ(0); }
+.owl3d .o-wl { transform-origin: 30% 50%; }
+.owl3d .o-wr { transform-origin: 70% 50%; }
+.owl3d .o-head { transform-origin: 50% 72%; }
+.owl3d .o-lid { transform-box: fill-box; transform-origin: 50% 0%; transform: scaleY(0); animation: oBlink 5.5s ease-in-out 3s infinite; }
+@keyframes oBlink { 0%, 92%, 100% { transform: scaleY(0); } 95%, 97% { transform: scaleY(1); } }
+
+.owl-bullet {
+    position: absolute; left: 0; top: 0; width: 38px; height: 3px; border-radius: 3px;
+    background: linear-gradient(90deg, rgba(255, 220, 140, 0), #ffe9a8 55%, #fff);
+    box-shadow: 0 0 8px 2px rgba(255, 214, 120, .8); transform-origin: 100% 50%;
+}
+.owl-muzzle {
+    position: absolute; left: -20px; top: -20px; width: 40px; height: 40px; border-radius: 50%;
+    background: radial-gradient(circle, #fff 0, #ffd36b 35%, rgba(255, 140, 0, 0) 70%);
+}
+.owl-ring {
+    position: absolute; left: -6px; top: -6px; width: 12px; height: 12px; border-radius: 50%;
+    border: 2px solid rgba(255, 244, 205, .9); box-shadow: 0 0 12px rgba(255, 220, 140, .8);
+}
+.owl-feather {
+    position: absolute; left: 0; top: 0; width: 13px; height: 5px;
+    border-radius: 100% 0 100% 0; background: linear-gradient(90deg, #6c5139, #c3a47a);
+}
+@media (prefers-reduced-motion: reduce) { .owl3d .o-lid { animation: none; } }
