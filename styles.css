@@ -2072,13 +2072,8 @@ body.theme-dark .modal-backdrop.show { opacity: 0.75 !important; }
     border-radius: 6px;
     font-size: var(--fs-base);
     font-weight: 600; margin-left: 0.5rem;
-    animation: pulseGray 2s infinite;
 }
 
-@keyframes pulseGray {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.6; }
-}
 
 .schedule-item.past {
     opacity: 0.5;
@@ -2098,15 +2093,10 @@ body.theme-dark .modal-backdrop.show { opacity: 0.75 !important; }
 
 .schedule-item.today {
     box-shadow: 0 0 0 2px #ffc107, 0 4px 12px rgba(255, 193, 7, 0.4);
-    animation: pulseToday 2.4s ease-in-out infinite;
 }
 
 /* opacity-only pulse: compositor-friendly, no repaint per frame like the old
    box-shadow keyframe (which was expensive, especially with many .today items) */
-@keyframes pulseToday {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.75; }
-}
 
 .schedule-item.future { opacity: 1; }
 
@@ -2130,7 +2120,7 @@ body.theme-dark .modal-backdrop.show { opacity: 0.75 !important; }
 }
 
 .notif-bell-btn.has-unread i {
-    animation: notifRing 1.6s ease infinite;
+    animation: notifRing 1.6s ease 3;
     color: var(--primary);
 }
 
@@ -2486,13 +2476,8 @@ body.theme-dark .modal-backdrop.show { opacity: 0.75 !important; }
     border-width: 1px;
     background: rgba(239, 68, 68, 0.06);
     box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.25);
-    animation: overduePulse 2.4s ease-in-out infinite;
 }
 
-@keyframes overduePulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
-}
 
 .quick-chat-bubble.status-invited { border-left: 3px solid var(--primary); }
 
@@ -2915,12 +2900,7 @@ body.app-intro .container-fluid > .row > [class*="col-"]:last-child { animation-
 
 .modal.show .modal-dialog { transform: translateY(0) scale(1); }
 
-.quick-chat-toggle { animation: floatButton 3.5s ease-in-out infinite; }
 
-@keyframes floatButton {
-    0%, 100% { translate: 0 0; }
-    50% { translate: 0 -5px; }
-}
 
 body.theme-dark::before { background: #2563eb; opacity: .18; }
 body.theme-dark::after { background: #0d9488; opacity: .14; }
@@ -5698,3 +5678,176 @@ body.theme-light .flash-beam { display: none; }
     border-radius: 100% 0 100% 0; background: linear-gradient(90deg, #6c5139, #c3a47a);
 }
 @media (prefers-reduced-motion: reduce) { .owl3d .o-lid { animation: none; } }
+
+
+/* ============================================================
+   FIX CONFLICT + GIẢM LAG (khối cuối file – thắng các rule trùng ở trên)
+   ============================================================ */
+
+/* 1) VỆT SÁNG TRÀN RA NGOÀI NÚT
+   .btn-shine là phần tử absolute (left:-100% -> 100%). Chỉ một số nút có
+   overflow:hidden (btn-pause, btn-compare...), còn .btn-save / .btn-delete /
+   .btn-spin / .btn-confirm-spin thì không => vệt sáng trượt ra ngoài, nằm
+   cạnh nút và đè lên form. Áp chung cho MỌI nút có chứa .btn-shine. */
+.btn:has(> .btn-shine),
+.btn-save, .btn-delete, .btn-pause, .btn-compare,
+.btn-spin, .btn-confirm-spin {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;          /* nhốt vệt sáng + box-shadow trong stacking context của nút */
+}
+
+/* Vệt sáng dùng transform (GPU) thay cho left (gây reflow mỗi frame) */
+.btn-shine {
+    left: 0;
+    transform: translateX(-100%);
+    transition: transform .5s ease;
+    pointer-events: none;
+    z-index: 0;
+    will-change: auto;
+}
+.btn:hover:not(:disabled) > .btn-shine,
+.btn-add-job:hover .btn-shine,
+.btn-view-data:hover .btn-shine,
+.btn-export-pdf:hover .btn-shine,
+.btn-check-due:hover .btn-shine,
+.btn-layout-menu:hover .btn-shine,
+.btn-save:hover:not(:disabled) .btn-shine,
+.btn-delete:hover:not(:disabled) .btn-shine {
+    left: 0;
+    transform: translateX(100%);
+}
+/* Nút disabled (vd. "Lưu giờ làm việc" khi chưa có dữ liệu) không chạy hiệu ứng */
+.btn:disabled > .btn-shine { display: none; }
+
+/* Nội dung nút luôn nằm trên vệt sáng */
+.btn:has(> .btn-shine) > i,
+.btn:has(> .btn-shine) > span { position: relative; z-index: 1; }
+
+/* 2) Rule hover của nút bị khai báo 3–4 lần (-1px / -2px / -3px) + transition: all
+   => nhảy lên xuống, lệch con trỏ gây nhấp nháy hover. Gom về 1 giá trị, chỉ transition
+   thuộc tính cần thiết. */
+.btn,
+.btn-save, .btn-delete, .btn-pause, .btn-compare,
+.btn-add-job, .btn-view-data, .btn-export-pdf, .btn-check-due, .btn-layout-menu {
+    transition: transform .18s ease, box-shadow .18s ease, background-color .18s ease, filter .18s ease;
+}
+.btn:hover:not(:disabled),
+.btn-save:hover:not(:disabled), .btn-delete:hover:not(:disabled), .btn-pause:hover:not(:disabled),
+.btn-compare:hover:not(:disabled),
+.btn-add-job:hover, .btn-view-data:hover, .btn-export-pdf:hover, .btn-check-due:hover, .btn-layout-menu:hover {
+    transform: translateY(-1px);
+}
+.btn:active:not(:disabled) { transform: none; }
+.btn:disabled, .btn.disabled { transform: none !important; box-shadow: none; filter: none; }
+
+/* Glow của nút lưu: nhỏ lại, không còn quầng sáng lan sang form bên cạnh */
+.btn-save { box-shadow: 0 4px 10px rgba(34, 197, 94, .22); }
+.btn-save:hover:not(:disabled) { box-shadow: 0 6px 14px rgba(34, 197, 94, .28); }
+.btn-delete { box-shadow: 0 4px 10px rgba(239, 68, 68, .22); }
+.btn-delete:hover:not(:disabled) { box-shadow: 0 6px 14px rgba(239, 68, 68, .28); }
+
+/* 3) MAIN CONTENT: bỏ hiệu ứng nhấc lên/hạ xuống dư thừa
+   .card:hover + .job-item/.schedule-item hover làm cả khối (kèm shadow lớn) di chuyển
+   mỗi lần rê chuột => repaint nhiều lớp, lag khi danh sách dài. Trong modal/form thì
+   tắt hẳn (nguyên nhân form "giật" khi rê vào nút Lưu). */
+.card { transition: border-color .2s ease, box-shadow .2s ease; }
+.card:hover { transform: none; }
+.modal .card:hover,
+.modal .card { transform: none; }
+
+.job-item, .schedule-item, .out-of-schedule-item, .quick-chat-bubble,
+.out-of-schedule-card, .dayoff-day {
+    transition: box-shadow .2s ease, background-color .2s ease, border-color .2s ease, opacity .2s ease;
+}
+.job-item:hover, .schedule-item:hover, .out-of-schedule-item:hover, .quick-chat-bubble:hover,
+.out-of-schedule-card:hover, .dayoff-day:hover:not(.past) {
+    transform: none;
+}
+.schedule-item:hover { filter: none; box-shadow: 0 6px 14px rgba(15, 23, 42, .16); }
+
+.theme-toggle:hover, .notif-bell-btn:hover, .user-profile-btn:hover { transform: none; }
+
+/* Trạng thái "hôm nay" / "quá hạn": giữ viền tĩnh, không nhấp nháy opacity liên tục */
+.schedule-item.today { animation: none; }
+.quick-chat-bubble.overdue { animation: none; }
+.paused-indicator { animation: none; }
+
+/* 4) Nền trang trí chạy liên tục (mặt trời xoay, mây trôi, sao băng, sao nhấp nháy,
+   cú chớp mắt) chỉ chạy khi tab đang hiển thị và không đè lên thao tác trong modal. */
+body.modal-open .sun-rays,
+body.modal-open .moon-core,
+body.modal-open .cloud,
+body.modal-open .shoot,
+body.modal-open .sky-stars::before,
+body.modal-open .sky-stars::after,
+body.modal-open .owl3d .o-lid { animation-play-state: paused; }
+
+/* 5) backdrop-filter trong modal (blur chồng blur) là thủ phạm lag khi mở form lớn */
+.modal-content, .modal-body, .modal-header, .modal-footer,
+.confirm-modal, .notif-dropdown {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+}
+
+/* 6) Vùng cuộn dài: cô lập layout/paint để rê chuột không làm tính lại cả trang */
+.wh-saved-list, .wh-preview, #dayOffUsersList {
+    contain: layout paint;
+}
+
+
+/* ============================================================
+   CÚ ĐẬU TRÊN TAB ĐĂNG NHẬP / ĐĂNG KÝ + ĐÈN PIN "QUÊN MẬT KHẨU"
+   (đặt cuối file để thắng `.auth-panel > :not(.topbar-sky) { position: relative }`)
+   ============================================================ */
+.auth-panel > .auth-owl {
+    position: absolute; z-index: 4;
+    width: 56px; height: 56px;
+    opacity: 0; pointer-events: none;           /* vô hình & không chặn click khi chưa được chiếu đèn */
+    transition: opacity .28s ease;
+}
+.auth-panel > .auth-owl.lit { opacity: 1; pointer-events: auto; cursor: crosshair; }
+body.theme-light .auth-panel > .auth-owl { display: none; }
+
+.auth-owl-inner { position: absolute; inset: 0; transform-origin: 50% 100%; }
+.auth-owl .owl3d { transform: perspective(700px) scale(.82); transform-origin: 50% 100%; will-change: auto; }
+.auth-owl .o-head { transition: transform .5s ease; }
+
+/* Bong bóng hội thoại trên đầu cú */
+.auth-owl-bubble {
+    position: absolute; left: 50%; bottom: calc(100% + 4px);
+    width: max-content; max-width: 190px;
+    padding: 6px 11px; border-radius: 12px;
+    background: #fffbe8; color: #3b2a14;
+    font-size: 12px; font-weight: 600; line-height: 1.35; text-align: center;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, .35);
+    opacity: 0; transform: translateX(-50%) scale(.85); transform-origin: 50% 100%;
+    transition: opacity .2s ease, transform .2s ease;
+    pointer-events: none;
+}
+.auth-owl-bubble::after {
+    content: ""; position: absolute; left: 50%; top: 100%; margin-left: -6px;
+    border: 6px solid transparent; border-top-color: #fffbe8;
+}
+.auth-owl-bubble.show { opacity: 1; transform: translateX(-50%) scale(1); }
+.auth-owl-bubble.mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 14px; font-weight: 700; letter-spacing: .06em; color: #7c2d12;
+}
+.auth-owl-bullet { z-index: 5; pointer-events: none; }
+
+/* Nút đèn pin riêng — chỉ chế độ tối + "Quên mật khẩu" (lúc đó ô mật khẩu bị ẩn) */
+.auth-panel > .auth-torch-btn {
+    display: none; position: absolute; top: 14px; left: 58px; z-index: 3;
+    width: 36px; height: 36px; border-radius: 50%;
+    align-items: center; justify-content: center;
+    border: 1px solid rgba(165, 180, 252, .35);
+    background: rgba(15, 23, 42, .6); color: #cbd5e1; cursor: pointer;
+    transition: background-color .2s ease, color .2s ease, box-shadow .3s ease;
+}
+body.theme-dark .auth-screen[data-mode="reset"] .auth-panel > .auth-torch-btn { display: inline-flex; }
+.auth-torch-btn .pw-torch { display: block; width: 20px; height: 20px; transition: transform .12s linear; }
+.auth-torch-btn[aria-pressed="true"] {
+    color: #fde68a; background: rgba(250, 204, 21, .14);
+    box-shadow: 0 0 14px 3px rgba(253, 224, 71, .45);
+}

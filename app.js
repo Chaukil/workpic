@@ -73,6 +73,7 @@ let owlSyncHook = null;          // do OwlFx gán; applyTheme gọi để cú xu
 let authMouse = null;            // vị trí chuột trên màn hình đăng nhập (đèn pin)
 let resetCooldownTimer = null;
 let dayOffDeptFilter = DEPT_ALL;
+let usersDeptLatest = {};        // uid -> { dept, ts }: bộ phận SAU CÙNG (doc có updatedAt mới nhất) của mỗi người
 let dayOffFocusUid = null;       // đang xem riêng lịch của user nào
 let dayOffUsers = [];
 let notifyLeadMinutes = 0;      // nhắc job trước N phút (0 = đúng giờ)            // danh sách user hiển thị trong form
@@ -224,7 +225,9 @@ function setAuthMode(mode) {
     document.getElementById('authInfo').textContent = '';
     if (resetCooldownTimer) { clearInterval(resetCooldownTimer); resetCooldownTimer = null; }
     document.getElementById('authSubmitBtn').disabled = false;
-    resetAuthPwUi();
+    document.getElementById('authScreen').dataset.mode = mode;
+    resetAuthPwUi(true);          // đổi tab KHÔNG tắt đèn pin để còn thấy cú bay
+    AuthOwl.moveTo(mode);
 }
 
 function showAuthError(error) {
@@ -306,7 +309,7 @@ async function handleAuthSubmit(event) {
 }
 
 // ---- Nút hiện mật khẩu: chế độ sáng = con mắt, chế độ tối = đèn pin chiếu chùm sáng chữ V theo chuột ----
-function resetAuthPwUi() {
+function resetAuthPwUi(keepTorch = false) {
     const pw = document.getElementById('authPassword');
     const btn = document.getElementById('authPwToggle');
     const reveal = document.getElementById('authPwReveal');
@@ -318,20 +321,26 @@ function resetAuthPwUi() {
         reveal.style.setProperty('--mx', '-2000px');
         reveal.style.setProperty('--my', '-2000px');
     }
+    if (keepTorch) return;
     btn.setAttribute('aria-pressed', 'false');
     btn.setAttribute('aria-label', 'Hiện mật khẩu');
+    const tb = document.getElementById('authTorchBtn');
+    if (tb) tb.setAttribute('aria-pressed', 'false');
     document.getElementById('authScreen').classList.remove('torch-on');
+    AuthOwl.updateLit(null);
 }
 
 function updateTorch() {
-    const btn = document.getElementById('authPwToggle');
+    const pwBtn = document.getElementById('authPwToggle');
+    // Chế độ "Quên mật khẩu" ẩn ô mật khẩu => dùng nút đèn pin riêng
+    const btn = (pwBtn && pwBtn.offsetParent !== null) ? pwBtn : document.getElementById('authTorchBtn');
     const beam = document.getElementById('flashBeam');
     const reveal = document.getElementById('authPwReveal');
     const input = document.getElementById('authPassword');
     if (!btn || !beam) return;
 
-    const screenOn = document.getElementById('authScreen').classList.contains('torch-on');
-    if (!screenOn) return;
+    const screenOn = document.getElementById('authScreen').classList.contains('torch-on') && currentTheme === 'dark';
+    if (!screenOn) { AuthOwl.updateLit(null); return; }
 
     const r = btn.getBoundingClientRect();
     const ox = r.left + r.width / 2;
@@ -345,6 +354,7 @@ function updateTorch() {
 
     const torch = btn.querySelector('.pw-torch');
     if (torch) torch.style.transform = `rotate(${ang}deg)`;
+    AuthOwl.updateLit({ ox, oy, ang });
 
     // ── Mask cho lớp reveal: vị trí chuột tính theo toạ độ của input ──
     if (reveal && input) {
@@ -378,26 +388,36 @@ function initAuthExtras() {
     // Đồng bộ sau khi browser autofill (thường trễ vài chục ms)
     setTimeout(updatePwReveal, 300);
 
-    pwToggle.addEventListener('click', () => {
-    if (currentTheme === 'dark') {
-        // ── Chế độ tối: dùng chính class torch-on làm nguồn sự thật ──
-        const isOn = screen.classList.contains('torch-on');
-        const next = !isOn;
-
-        screen.classList.toggle('torch-on', next);
-        pwToggle.setAttribute('aria-pressed', String(next));
-        pwToggle.setAttribute('aria-label', next ? 'Tắt đèn pin' : 'Bật đèn pin');
-
-        if (next) updatePwReveal();   // đồng bộ text vào lớp reveal
-        updateTorch();                // cập nhật chùm sáng + mask
-    } else {
-        // ── Chế độ sáng: toggle hiện/ẩn mật khẩu bình thường ──
-        const show = pwInput.type === 'password';
-        pwInput.type = show ? 'text' : 'password';
-        pwToggle.setAttribute('aria-pressed', String(show));
-        pwToggle.setAttribute('aria-label', show ? 'Ẩn mật khẩu' : 'Hiện mật khẩu');
+    function setTorch(on) {
+        screen.classList.toggle('torch-on', on);
+        pwToggle.setAttribute('aria-pressed', String(on));
+        pwToggle.setAttribute('aria-label', on ? 'Tắt đèn pin' : 'Bật đèn pin');
+        const tb = document.getElementById('authTorchBtn');
+        if (tb) { tb.setAttribute('aria-pressed', String(on)); tb.setAttribute('aria-label', on ? 'Tắt đèn pin' : 'Bật đèn pin'); }
+        if (on) updatePwReveal();
+        updateTorch();
     }
-});
+
+    pwToggle.addEventListener('click', () => {
+        if (currentTheme === 'dark') {
+            setTorch(!screen.classList.contains('torch-on'));
+        } else {
+            // Chế độ sáng: toggle hiện/ẩn mật khẩu bình thường
+            const show = pwInput.type === 'password';
+            pwInput.type = show ? 'text' : 'password';
+            pwToggle.setAttribute('aria-pressed', String(show));
+            pwToggle.setAttribute('aria-label', show ? 'Ẩn mật khẩu' : 'Hiện mật khẩu');
+        }
+    });
+    document.getElementById('authTorchBtn').addEventListener('click', () => {
+        if (currentTheme === 'dark') setTorch(!screen.classList.contains('torch-on'));
+    });
+    // Đổi sang chế độ sáng => tắt đèn (cú biến mất)
+    document.getElementById('authThemeBtn').addEventListener('click', () => {
+        if (currentTheme !== 'dark' && screen.classList.contains('torch-on')) setTorch(false);
+    });
+    // Troll: gõ email ở "Quên mật khẩu" => cú nói chuyện (chỉ khi được chiếu đèn)
+    document.getElementById('authEmail').addEventListener('input', () => AuthOwl.onEmailChange());
 
     screen.addEventListener('pointermove', (e) => {
         authMouse = { x: e.clientX, y: e.clientY };
@@ -636,6 +656,7 @@ function handleSignedOut() {
     authMouse = null;
     resetAuthPwUi();
     try { updateTorch(); } catch (_) {}
+    setTimeout(() => AuthOwl.moveTo(authMode), 80);   // màn đăng nhập hiện lại => đặt cú về đúng tab
 
     if (unsubscribeJobs) {
         unsubscribeJobs();
@@ -851,6 +872,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     initAuthExtras();
+    AuthOwl.init();
     document.getElementById('loginTab').addEventListener('click', () => setAuthMode('login'));
     document.getElementById('registerTab').addEventListener('click', () => setAuthMode('register'));
     document.getElementById('authForm').addEventListener('submit', handleAuthSubmit);
@@ -4301,9 +4323,11 @@ function listenUsersAvatars() {
     unsubscribeUsersAvatar = onSnapshot(collection(db, 'users'), (snapshot) => {
         usersAvatarCache = {};
         usersInfoCache = {};
+        usersDeptLatest = {};
         snapshot.forEach(d => {
             const u = d.data();
             if (u.uid) {
+                collectUserDepts(u);
                 if (u.avatar) usersAvatarCache[u.uid] = u.avatar;
                 usersInfoCache[u.uid] = {
                     displayName: u.displayName || '',
@@ -5248,10 +5272,12 @@ async function openPresenterSpinModal() {
     try {
         const snapshot = await getDocs(collection(db, 'users'));
         spinAllUsers = [];
+        usersDeptLatest = {};
         snapshot.forEach(userDoc => {
             const user = userDoc.data();
             if (!user.uid) return;
             spinAllUsers.push(user);
+            collectUserDepts(user);
             // đồng bộ bộ phận vào cache (user cũ chưa có field => '')
             usersInfoCache[user.uid] = Object.assign(
                 { displayName: user.displayName || '', email: user.email || '', avatar: user.avatar || null },
@@ -5643,11 +5669,23 @@ const OwlFx = (() => {
         </div>`;
     }
 
+    // Gradient của cú: MỘT bộ duy nhất ở <body>, dùng chung cho cú lịch làm việc và cú màn đăng nhập.
+    // (Không được đặt trong phần tử có thể display:none, nếu không fill url(#...) sẽ mất => cú trong suốt.)
+    function ensureDefs() {
+        if (document.getElementById('owlDefsGlobal')) return;
+        const d = document.createElement('div');
+        d.id = 'owlDefsGlobal';
+        d.setAttribute('aria-hidden', 'true');
+        d.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;pointer-events:none';
+        d.innerHTML = DEFS;
+        document.body.appendChild(d);
+    }
+
     function ensureLayer() {
         if (layer) return;
+        ensureDefs();
         layer = document.createElement('div');
         layer.id = 'owlLayer';
-        layer.innerHTML = DEFS;
         document.body.appendChild(layer);
         layer.addEventListener('click', (e) => { if (e.target.closest('.owl3d.perched')) shoot(); });
     }
@@ -5935,7 +5973,237 @@ const OwlFx = (() => {
         sync();
     }
 
-    return { init, sync };
+    return { init, sync, markup: owlMarkup, ensureDefs };
+})();
+
+// ============================================================
+// CÚ ĐẬU TRÊN NÚT ĐĂNG NHẬP / ĐĂNG KÝ (màn hình đăng nhập, chế độ tối)
+// - Cú vô hình; chỉ hiện khi chùm đèn pin quét trúng nó.
+// - Đậu trên tab đang chọn; đổi tab => bay sang tab kia (cung bay + vỗ cánh).
+// - Bấm (bắn) vào cú đang hiện => đạn bay tới, cú nhảy lên né.
+// - "Quên mật khẩu" + chế độ tối + chiếu đèn: cú nói "mật khẩu" trong bong bóng.
+//   (TROLL: mật khẩu là chuỗi vui ngẫu nhiên, Firebase không bao giờ cho đọc mật khẩu thật.)
+// ============================================================
+const AuthOwl = (() => {
+    const W = 56, H = 56;
+    let el = null, inner = null, bubble = null, owl = null, parts = {};
+    let cur = null, beam = null, lit = false, innerAnim = null, flyAnim = null;
+    let track = 0, quipTimer = 0, speakTimers = [], lookTimer = 0, lastMode = 'login';
+    const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const QUIPS = ['Hụt rồi nhé! 🦉', 'Chậm quá~', 'Bắn trượt! 😏', 'Hú hú, né được!'];
+    const FAKE_PW = ['123456', 'matkhau123', 'khongcho', 'qwerty-cu', 'toilacu', 'passwordhehe', 'dung-doan-nua'];
+
+    function ensure() {
+        if (el) return true;
+        const panel = document.querySelector('#authScreen .auth-panel');
+        if (!panel) return false;
+        el = document.createElement('div');
+        el.id = 'authOwl';
+        el.className = 'auth-owl';
+        el.setAttribute('aria-hidden', 'true');
+        OwlFx.ensureDefs();
+        el.innerHTML = `<div class="auth-owl-bubble"></div><div class="auth-owl-inner">${OwlFx.markup(0)}</div>`;
+        panel.appendChild(el);
+        bubble = el.querySelector('.auth-owl-bubble');
+        inner = el.querySelector('.auth-owl-inner');
+        owl = el.querySelector('.owl3d');
+        parts = { wl: owl.querySelector('.o-wl'), wr: owl.querySelector('.o-wr'), head: owl.querySelector('.o-head') };
+        parts.wl.style.transform = 'translateZ(7px)';
+        parts.wr.style.transform = 'translateZ(7px)';
+        parts.head.style.transform = 'translateZ(12px)';
+        el.addEventListener('click', onShot);
+        window.addEventListener('resize', () => place(false));
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => place(false));
+        lookTimer = setInterval(look, 3800);
+        return true;
+    }
+
+    // Vị trí đậu (toạ độ theo auth-panel): chân cú chạm mép trên của nút
+    function target(mode) {
+        const panel = el.parentElement;
+        const btn = document.getElementById(mode === 'reset' ? 'authSubmitBtn' : (mode === 'register' ? 'registerTab' : 'loginTab'));
+        if (!btn) return null;
+        const r = btn.getBoundingClientRect(), p = panel.getBoundingClientRect();
+        if (!r.width || !p.width) return null;
+        return { x: r.left - p.left + r.width / 2 - W / 2, y: r.top - p.top - H + 8 };
+    }
+
+    function place(animate, mode) {
+        if (!ensure()) return;
+        mode = mode || lastMode;
+        const t = target(mode);
+        if (!t) return;
+        const from = cur;
+        el.style.left = t.x + 'px';
+        el.style.top = t.y + 'px';
+        cur = t;
+        if (flyAnim) { flyAnim.cancel(); flyAnim = null; }
+        if (animate && from && !reduced() && (Math.abs(from.x - t.x) > 2 || Math.abs(from.y - t.y) > 2)) fly(from, t);
+        refreshLit();
+    }
+
+    function flap(times, total, deg) {
+        [['wl', 1], ['wr', -1]].forEach(([k, sgn]) => {
+            parts[k].animate([
+                { transform: 'translateZ(7px) rotateZ(0deg)' },
+                { transform: `translateZ(7px) rotateZ(${sgn * deg}deg) scale(1,1.35)` },
+                { transform: 'translateZ(7px) rotateZ(0deg)' }
+            ], { duration: total / times, iterations: times, easing: 'ease-in-out' });
+        });
+    }
+
+    function startTrack(ms) {
+        cancelAnimationFrame(track);
+        const end = performance.now() + ms;
+        const loop = () => { refreshLit(); if (performance.now() < end) track = requestAnimationFrame(loop); };
+        loop();
+    }
+
+    function fly(from, to) {
+        const dur = 720;
+        const dx = from.x - to.x, dy = from.y - to.y;
+        flyAnim = el.animate(
+            [{ transform: `translate(${dx}px,${dy}px)` }, { transform: 'translate(0,0)' }],
+            { duration: dur, easing: 'cubic-bezier(.45,.05,.35,1)' });
+        if (innerAnim) innerAnim.cancel();
+        innerAnim = inner.animate([
+            { transform: 'translateY(0) rotate(0deg)' },
+            { transform: `translateY(-30px) rotate(${dx > 0 ? -10 : 10}deg)`, offset: .45 },
+            { transform: 'translateY(0) rotate(0deg)' }
+        ], { duration: dur, easing: 'ease-in-out' });
+        flap(5, dur, 64);
+        startTrack(dur + 80);
+    }
+
+    function moveTo(mode) {
+        if (!ensure()) return;
+        const prev = lastMode;
+        lastMode = mode;
+        clearSpeech();
+        // đợi layout của mode mới ổn định rồi mới bay
+        requestAnimationFrame(() => {
+            place(prev !== mode, mode);
+            if (mode === 'reset') onEmailChange();
+        });
+    }
+
+    // Cú ngẫu nhiên xoay đầu cho sinh động
+    function look() {
+        if (!parts.head || !lit) return;
+        const y = (Math.random() < .5 ? -1 : 1) * (10 + Math.random() * 16);
+        parts.head.style.transition = 'transform .5s ease';
+        parts.head.style.transform = `translateZ(12px) rotateY(${y}deg) rotateZ(${y * .2}deg)`;
+        setTimeout(() => { parts.head.style.transform = 'translateZ(12px)'; }, 1100);
+    }
+
+    // ---------- chiếu đèn ----------
+    function center() {
+        const r = el.getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height * 0.55 };
+    }
+
+    function refreshLit() { updateLit(beam); }
+
+    function updateLit(b) {
+        beam = b;
+        if (!el && !ensure()) return;
+        let on = false;
+        if (b && currentTheme === 'dark') {
+            const c = center();
+            const dx = c.x - b.ox, dy = c.y - b.oy;
+            const dist = Math.hypot(dx, dy);
+            let diff = Math.abs(((Math.atan2(dx, -dy) * 180 / Math.PI) - b.ang + 540) % 360 - 180);
+            on = dist < 44 || (dist < 620 && diff <= 17);
+        }
+        if (on === lit) return;
+        lit = on;
+        el.classList.toggle('lit', on);
+        if (on) onLit(); else clearSpeech();
+    }
+
+    // ---------- bắn ----------
+    function onShot(e) {
+        if (!lit) return;
+        e.stopPropagation();
+        const panel = el.parentElement, p = panel.getBoundingClientRect();
+        const c = center();
+        const o = beam ? { x: beam.ox, y: beam.oy } : { x: c.x, y: c.y + 160 };
+        const dx = c.x - o.x, dy = c.y - o.y;
+        const ang = Math.atan2(dy, dx) * 180 / Math.PI;
+        const len = Math.hypot(dx, dy) || 1;
+        const ex = c.x + (dx / len) * 240, ey = c.y + (dy / len) * 240;
+        const b = document.createElement('i');
+        b.className = 'owl-bullet auth-owl-bullet';
+        panel.appendChild(b);
+        const P = (x, y) => `translate(${x - p.left}px,${y - p.top}px) rotate(${ang}deg)`;
+        b.animate([
+            { transform: P(o.x, o.y), opacity: 1 },
+            { transform: P(ex, ey), opacity: 1, offset: .8 },
+            { transform: P(ex, ey), opacity: 0 }
+        ], { duration: 380, easing: 'ease-in' }).onfinish = () => b.remove();
+        setTimeout(dodge, 120);     // né đúng lúc đạn sắp tới
+    }
+
+    function dodge() {
+        if (!inner) return;
+        clearSpeech();
+        if (innerAnim) innerAnim.cancel();
+        const side = Math.random() < .5 ? -1 : 1;
+        if (!reduced()) {
+            innerAnim = inner.animate([
+                { transform: 'translate(0,0) rotate(0deg)' },
+                { transform: `translate(${side * 4}px,-8px) scale(1,.88)`, offset: .12 },
+                { transform: `translate(${side * 10}px,-52px) rotate(${side * 14}deg)`, offset: .42 },
+                { transform: `translate(${side * 6}px,-40px) rotate(${side * 6}deg)`, offset: .62 },
+                { transform: 'translate(0,0) rotate(0deg)' }
+            ], { duration: 780, easing: 'cubic-bezier(.3,.7,.4,1)' });
+            flap(4, 640, 70);
+        }
+        say(QUIPS[Math.floor(Math.random() * QUIPS.length)], 1700);
+    }
+
+    // ---------- bong bóng nói ----------
+    function clearSpeech() {
+        speakTimers.forEach(clearTimeout); speakTimers = [];
+        clearTimeout(quipTimer);
+        if (bubble) { bubble.classList.remove('show'); bubble.textContent = ''; }
+    }
+    function say(text, ms, mono) {
+        if (!bubble) return;
+        bubble.classList.toggle('mono', !!mono);
+        bubble.textContent = text;
+        bubble.classList.add('show');
+        if (ms) { clearTimeout(quipTimer); quipTimer = setTimeout(() => bubble.classList.remove('show'), ms); }
+    }
+
+    function emailName() {
+        const v = (document.getElementById('authEmail').value || '').trim();
+        return v ? v.split('@')[0].slice(0, 16) : '';
+    }
+
+    // Troll mật khẩu: chỉ khi ở "Quên mật khẩu", đã có chữ trong ô email, và cú đang được chiếu đèn
+    function speakPassword() {
+        clearSpeech();
+        const name = emailName();
+        if (!name || lastMode !== 'reset' || !lit) return;
+        const fake = FAKE_PW[Math.floor(Math.random() * FAKE_PW.length)];
+        say(`Mật khẩu của "${name}" là…`, 0);
+        speakTimers.push(setTimeout(() => say(fake, 0, true), 1200));
+        speakTimers.push(setTimeout(() => say('…đùa thôi! 🤭 Bấm gửi link để đặt lại nhé.', 3600), 2600));
+    }
+
+    function onLit() { if (lastMode === 'reset') speakPassword(); }
+
+    function onEmailChange() {
+        if (!el) return;
+        if (lastMode !== 'reset' || !lit) { return; }
+        clearTimeout(onEmailChange.t);
+        onEmailChange.t = setTimeout(speakPassword, 450);
+    }
+
+    function init() { if (ensure()) place(false, authMode); }
+
+    return { init, moveTo, updateLit, onEmailChange };
 })();
 
 // ============================================================
@@ -5959,10 +6227,20 @@ function getDeptName(id) {
 }
 
 function getUserDept(uid) {
+    if (usersDeptLatest[uid]) return usersDeptLatest[uid].dept || '';
     const info = usersInfoCache[uid];
     if (info && info.department !== undefined) return info.department || '';
     if (currentUser && currentUser.uid === uid) return currentUser.department || '';
     return '';
+}
+
+// Mỗi uid có thể có nhiều doc trong collection users (doc cũ giữ bộ phận cũ).
+// Chỉ lấy bộ phận của doc cập nhật SAU CÙNG (updatedAt mới nhất).
+function collectUserDepts(u) {
+    if (!u || !u.uid) return;
+    const ts = String(u.updatedAt || '');
+    const cur = usersDeptLatest[u.uid];
+    if (!cur || ts >= cur.ts) usersDeptLatest[u.uid] = { dept: u.department || '', ts };
 }
 
 function deptMatches(uid, filter) {
@@ -6023,6 +6301,7 @@ function rebuildDepartmentsList() {
     Object.values(usersInfoCache).forEach(u => {
         if (u.department && !map.has(u.department)) map.set(u.department, u.department);
     });
+    Object.values(usersDeptLatest).forEach(l => { if (l.dept && !map.has(l.dept)) map.set(l.dept, l.dept); });
     if (currentUser && currentUser.department && !map.has(currentUser.department)) {
         map.set(currentUser.department, currentUser.department);
     }
@@ -6048,9 +6327,9 @@ async function saveUserDepartment(deptId) {
     const value = deptId || '';
     try {
         const snap = await getDocs(query(collection(db, 'users'), where('uid', '==', currentUser.uid)));
-        if (!snap.empty) {
-            await updateDoc(doc(db, 'users', snap.docs[0].id), { department: value, updatedAt: new Date().toISOString() });
-        }
+        const stamp = new Date().toISOString();
+        await Promise.all(snap.docs.map(d => updateDoc(doc(db, 'users', d.id), { department: value, updatedAt: stamp })));
+        usersDeptLatest[currentUser.uid] = { dept: value, ts: stamp };
         currentUser.department = value;
         if (usersInfoCache[currentUser.uid]) usersInfoCache[currentUser.uid].department = value;
         // Bộ lọc chưa từng chọn tay thì đi theo bộ phận mới của mình
@@ -6427,6 +6706,46 @@ function initWorkHoursUi() {
 const DAYOFF_COLLECTION = 'dayOffs';
 const DAYOFF_MONTHS_SHOWN = 2;   // tháng hiện tại + tháng sau
 
+// Mỗi (người, ngày) chỉ được có 1 lịch off. Gộp bản trùng (race giữa snapshot realtime và cập nhật local,
+// hoặc doc cũ id ngẫu nhiên): ưu tiên doc có id chuẩn `${uid}_${date}`, sau đó doc mới nhất.
+let dayOffExtraIds = {};              // `${uid}|${date}` -> [id các doc trùng bị loại]
+const dayOffCleaned = new Set();      // id đã gửi lệnh xóa dọn rác (tránh lặp)
+
+function normalizeDayOffs(list) {
+    const best = {};
+    const extras = {};
+    list.forEach(o => {
+        if (!o || !o.userId || !o.date) return;
+        const k = `${o.userId}|${o.date}`;
+        const cur = best[k];
+        if (!cur) { best[k] = o; return; }
+        const rank = x => (x.id === `${x.userId}_${x.date}` ? 1 : 0);
+        const winner = (rank(o) > rank(cur) || (rank(o) === rank(cur) && String(o.createdAt || '') > String(cur.createdAt || ''))) ? o : cur;
+        const loser = winner === o ? cur : o;
+        best[k] = winner;
+        if (loser.id !== winner.id) (extras[k] = extras[k] || []).push(loser.id);
+    });
+    dayOffExtraIds = extras;
+    return Object.values(best);
+}
+
+// Dọn nền các doc trùng của CHÍNH MÌNH trong Firestore (không đụng doc người khác)
+function cleanupMyDuplicateDayOffs() {
+    if (!currentUser) return;
+    Object.entries(dayOffExtraIds).forEach(([k, ids]) => {
+        if (!k.startsWith(currentUser.uid + '|')) return;
+        ids.forEach(id => {
+            if (dayOffCleaned.has(id)) return;
+            dayOffCleaned.add(id);
+            deleteDoc(doc(db, DAYOFF_COLLECTION, id)).catch(() => {});
+        });
+    });
+}
+
+function dayOffAllIds(o) {
+    return [o.id].concat(dayOffExtraIds[`${o.userId}|${o.date}`] || []);
+}
+
 function listenDayOffs() {
     if (unsubscribeDayOffs) unsubscribeDayOffs();
     // Lấy từ đầu tháng trước để tuần hiện tại (có thể nằm ở tháng trước) vẫn tính đúng
@@ -6435,7 +6754,8 @@ function listenDayOffs() {
     lower.setMonth(lower.getMonth() - 1);
     const q = query(collection(db, DAYOFF_COLLECTION), where('date', '>=', localDateKey(lower)));
     unsubscribeDayOffs = onSnapshot(q, (snapshot) => {
-        dayOffsList = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        dayOffsList = normalizeDayOffs(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+        cleanupMyDuplicateDayOffs();
         renderSchedule();
         if (dayOffModalOpen) renderDayOffModal();
     }, (error) => {
@@ -6549,10 +6869,12 @@ async function openDayOffModal() {
         // Đồng thời nạp cache avatar từ kết quả fetch này (đề phòng listener
         // listenUsersAvatars chưa fire xong hoặc chưa có user nào có avatar)
         if (!usersAvatarCache) usersAvatarCache = {};
+        usersDeptLatest = {};
         snapshot.forEach(userDoc => {
             const user = userDoc.data();
             if (user.uid) {
                 users.push(user);
+                collectUserDepts(user);
                 if (user.avatar) usersAvatarCache[user.uid] = user.avatar;
                 usersInfoCache[user.uid] = Object.assign(
                     { displayName: user.displayName || '', email: user.email || '', avatar: user.avatar || null },
@@ -6600,9 +6922,9 @@ function countUpcomingOffs(uid, todayKey) {
     return dayOffsList.filter(o => o.userId === uid && o.date >= todayKey).length;
 }
 
-// Người nằm trong bộ phận đang lọc ở form lịch off (bản thân tôi luôn được giữ lại để còn đăng ký)
+// Người có bộ phận (sau cùng) trùng bộ phận đang lọc ở form lịch off
 function dayOffInDept(uid) {
-    return (currentUser && uid === currentUser.uid) || deptMatches(uid, dayOffDeptFilter);
+    return deptMatches(uid, dayOffDeptFilter);
 }
 
 function renderDayOffUsers() {
@@ -6643,7 +6965,8 @@ function renderDayOffCalendars() {
         if (dayOffFocusUid && o.userId !== dayOffFocusUid) return;
         (othersByDate[o.date] = othersByDate[o.date] || []).push(o);
     });
-    const showMine = !dayOffFocusUid || dayOffFocusUid === currentUser.uid;
+    // Lịch của tôi chỉ hiện khi bộ phận (sau cùng) của tôi nằm trong bộ lọc đang chọn
+    const showMine = dayOffInDept(currentUser.uid) && (!dayOffFocusUid || dayOffFocusUid === currentUser.uid);
 
     let html = '';
     for (let m = 0; m < DAYOFF_MONTHS_SHOWN; m++) {
@@ -6659,7 +6982,7 @@ function renderDayOffCalendars() {
             const key = localDateKey(new Date(first.getFullYear(), first.getMonth(), d));
             const isPast = key < todayKey;
             const isSunday = (lead + d - 1) % 7 === 6;
-            const isSelected = dayOffSelected.has(key);
+            const isSelected = showMine && dayOffSelected.has(key);
             const isPending = isSelected && !savedMine[key];
 
             const entries = (othersByDate[key] || []).map(o => ({
@@ -6767,6 +7090,10 @@ function handleDayOffCalendarClick(event) {
     const cell = event.target.closest('.dayoff-day[data-date]');
     // Chỉ chọn được ngày từ hôm nay trở đi; lịch của người khác chỉ để xem
     if (!cell || cell.classList.contains('past')) return;
+    if (!dayOffInDept(currentUser.uid)) {
+        showNotification('Lịch off', `Bạn đang thuộc "${getDeptName(getUserDept(currentUser.uid))}". Hãy chọn đúng bộ phận của bạn ở bộ lọc để đăng ký ngày off.`, false, 'warning');
+        return;
+    }
     const key = cell.dataset.date;
     if (dayOffSelected.has(key)) dayOffSelected.delete(key);
     else dayOffSelected.add(key);
@@ -6793,9 +7120,11 @@ function handleDayOffDetailClick(event) {
         confirmClass: 'btn-delete',
         onConfirm: async () => {
             try {
-                await deleteDoc(doc(db, DAYOFF_COLLECTION, id));
+                const target = dayOffsList.find(o => o.id === id);
+                const ids = target ? dayOffAllIds(target) : [id];
+                await Promise.all(ids.map(x => deleteDoc(doc(db, DAYOFF_COLLECTION, x))));
                 dayOffSelected.delete(date);
-                dayOffsList = dayOffsList.filter(o => o.id !== id);
+                dayOffsList = dayOffsList.filter(o => !ids.includes(o.id));
                 renderSchedule();
                 renderDayOffModal();
                 showNotification('Đã hủy', `Đã xóa lịch off ngày ${formatDateShortDMY(date)}.`, false, 'success');
@@ -6838,16 +7167,17 @@ async function saveDayOffs() {
             });
         });
         removed.forEach(key => {
-            batch.delete(doc(db, DAYOFF_COLLECTION, saved[key].id));
+            dayOffAllIds(saved[key]).forEach(id => batch.delete(doc(db, DAYOFF_COLLECTION, id)));
         });
         await batch.commit();
 
         // Cập nhật ngay danh sách local + vẽ lại lịch cố định (không chờ snapshot)
-        const removedIds = new Set(removed.map(k => saved[k].id));
-        dayOffsList = dayOffsList.filter(o => !removedIds.has(o.id)).concat(added.map(key => ({
+        // Snapshot realtime có thể đã thêm các doc mới trước khi commit() trả về => gộp theo (người, ngày), không concat mù
+        const removedIds = new Set(removed.flatMap(k => dayOffAllIds(saved[k])));
+        dayOffsList = normalizeDayOffs(dayOffsList.filter(o => !removedIds.has(o.id)).concat(added.map(key => ({
             id: `${currentUser.uid}_${key}`, userId: currentUser.uid,
             userName: currentUser.displayName || currentUser.email || 'User', date: key, reason, createdAt: now
-        })));
+        }))));
         renderSchedule();
         renderDayOffModal();
 
@@ -7032,9 +7362,11 @@ async function ensureUsersInfoCache() {
     if (Object.keys(usersInfoCache).length > 0) return;
     try {
         const snap = await getDocs(collection(db, 'users'));
+        usersDeptLatest = {};
         snap.forEach(d => {
             const u = d.data();
             if (u.uid) {
+                collectUserDepts(u);
                 usersInfoCache[u.uid] = {
                     displayName: u.displayName || '',
                     email: u.email || '',
