@@ -4594,11 +4594,13 @@ body.theme-dark .day-override-popover {
 .salary-unit { font-size: var(--fs-3xs); color: var(--muted); margin: 0 0.5rem 0 0.25rem; }
 .salary-line-value { font-weight: 700; font-size: var(--fs-2xs); color: var(--success); min-width: 92px; text-align: right; }
 .salary-line-value-deduct { color: var(--danger); margin-left: auto; }
-.salary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; align-items: start; }
-@media (max-width: 1100px) { .salary-grid { grid-template-columns: 1fr 1fr; } }
+.salary-grid { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 1rem; align-items: start; }
 @media (max-width: 768px) { .salary-grid { grid-template-columns: 1fr; } }
 .salary-card-tax { grid-column: span 1; }
-@media (max-width: 1100px) { .salary-card-tax { grid-column: 1 / -1; } }
+@media (max-width: 1200px) {
+    .salary-grid { grid-template-columns: 1.3fr 1fr; }
+    .salary-card-tax { grid-column: 1 / -1; }
+}
 
 .salary-card {
     border-radius: 16px;
@@ -4630,7 +4632,7 @@ body.theme-dark .day-override-popover {
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
-    padding: 0.42rem 0;
+    padding: 0.38rem 0;
     border-bottom: 1px dashed var(--border);
 }
 .salary-row:last-of-type { border-bottom: none; }
@@ -4964,6 +4966,12 @@ body.theme-dark .stats-bar-wrap { background: rgba(15,23,42,0.6); }
     justify-self: end;
 }
 
+.salary-line-value-reduce { color: var(--success); margin-left: auto; }
+.salary-row-readonly .salary-line-value-reduce {
+    margin-left: 0 !important;
+    justify-self: end;
+}
+
 /* Dòng nhập tiền lớn (Ca đêm) — giữ flex nhưng canh đúng */
 .salary-row:not(.salary-row-auto):not(.salary-row-readonly):not(.salary-total-row) {
     display: grid !important;
@@ -5051,7 +5059,7 @@ body.theme-dark .stats-bar-wrap { background: rgba(15,23,42,0.6); }
 
 /* 7) Mục Thu nhập / Khấu trừ / Thuế — cân bằng chiều rộng cột */
 .salary-grid {
-    grid-template-columns: 1fr 1fr 1.1fr;
+    grid-template-columns: 1.3fr 1fr 1fr;
 }
 
 /* 8) Responsive: xuống 2 cột hoặc 1 cột */
@@ -5850,4 +5858,776 @@ body.theme-dark .auth-screen[data-mode="reset"] .auth-panel > .auth-torch-btn { 
 .auth-torch-btn[aria-pressed="true"] {
     color: #fde68a; background: rgba(250, 204, 21, .14);
     box-shadow: 0 0 14px 3px rgba(253, 224, 71, .45);
+}
+
+/* ============================================================
+   QUICK CHAT — nút mở rộng bộ lọc (Trạng thái / Người phụ trách)
+   ============================================================ */
+.quick-chat-filter-row-top {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.quick-chat-filter-row-top .quick-chat-search-input {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+}
+
+.quick-chat-filter-toggle {
+    position: relative;
+    flex: none;
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    border: 1px solid var(--border);
+    background: var(--surface-muted);
+    color: var(--muted);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color .18s ease, color .18s ease, border-color .18s ease;
+}
+
+.quick-chat-filter-toggle:hover {
+    color: var(--primary);
+    border-color: var(--primary);
+}
+
+.quick-chat-filter-toggle.active,
+.quick-chat-filter-toggle[aria-expanded="true"] {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+}
+
+.quick-chat-filter-toggle i { font-size: 0.9rem; }
+
+.quick-chat-filter-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: var(--danger);
+    color: #fff;
+    font-size: 0.6rem;
+    font-weight: 700;
+    line-height: 16px;
+    text-align: center;
+    box-shadow: 0 0 0 2px var(--surface);
+}
+
+.quick-chat-filter-extra {
+    display: flex;
+    gap: 0.4rem;
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height .25s ease, opacity .2s ease, margin-top .25s ease;
+    margin-top: 0;
+}
+
+.quick-chat-filter-extra.show {
+    max-height: 80px;
+    opacity: 1;
+    margin-top: 0.15rem;
+}
+
+.quick-chat-filter-extra .quick-chat-filter-select {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+/* ============================================================
+   ĐỒNG BỘ KÍCH THƯỚC — Quay số / Thống kê / Update giờ làm việc
+   lấy form "Đăng ký lịch off" làm chuẩn:
+   modal-xl · max-width min(98vw, 1500px) · body tự cuộn
+   ============================================================ */
+#presenterSpinModal .modal-dialog,
+#statisticsModal .modal-dialog,
+#workHoursModal .modal-dialog {
+    width: auto;
+    max-width: min(98vw, 1500px);
+    max-height: none;
+    margin: 1.75rem auto;
+}
+
+#presenterSpinModal .modal-content,
+#statisticsModal .modal-content,
+#workHoursModal .modal-content {
+    max-height: calc(100vh - 3.5rem);
+    display: flex;
+    flex-direction: column;
+}
+
+#presenterSpinModal .modal-header,
+#statisticsModal .modal-header,
+#workHoursModal .modal-header,
+#presenterSpinModal .modal-footer,
+#statisticsModal .modal-footer,
+#workHoursModal .modal-footer {
+    flex-shrink: 0;
+}
+
+#presenterSpinModal .modal-body,
+#statisticsModal .modal-body,
+#workHoursModal .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Mobile: đồng bộ với rule chung (gần full-width) */
+@media (max-width: 768px) {
+    #presenterSpinModal .modal-dialog,
+    #statisticsModal .modal-dialog,
+    #workHoursModal .modal-dialog {
+        width: calc(100vw - 1rem);
+        max-width: calc(100vw - 1rem);
+        margin: 0.5rem auto;
+    }
+    #presenterSpinModal .modal-content,
+    #statisticsModal .modal-content,
+    #workHoursModal .modal-content {
+        max-height: calc(100vh - 1rem);
+    }
+}
+
+/* ============================================================
+   SPIN — dùng hết chiều cao modal, list user cuộn nội bộ
+   ============================================================ */
+#presenterSpinModal .modal-dialog {
+    height: calc(100vh - 3.5rem);
+    max-height: calc(100vh - 3.5rem);
+}
+#presenterSpinModal .modal-content {
+    height: 100%;
+    max-height: 100%;
+}
+#presenterSpinModal .modal-body {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;              /* để con bên trong tự cuộn, không đẩy cả body */
+}
+#presenterSpinModal .spin-layout {
+    flex: 1 1 auto;
+    min-height: 0;
+    align-items: stretch;          /* 2 cột cao bằng nhau */
+}
+#presenterSpinModal .spin-wheel-col {
+    justify-content: flex-start;
+    min-height: 0;
+}
+#presenterSpinModal .spin-users-col {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;                 /* cho phép list con co lại */
+    max-height: 100%;
+}
+#presenterSpinModal .spin-users-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;              /* bỏ cap 280px cũ */
+    overflow-y: auto;
+}
+
+/* ============================================================
+   UPDATE GIỜ LÀM VIỆC — cột "Đã nhập gần đây" giãn bằng cột trái
+   ============================================================ */
+#workHoursModal .modal-dialog {
+    height: calc(100vh - 3.5rem);
+    max-height: calc(100vh - 3.5rem);
+}
+#workHoursModal .modal-content {
+    height: 100%;
+    max-height: 100%;
+}
+#workHoursModal .modal-body {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+#workHoursModal .wh-layout {
+    flex: 1 1 auto;
+    min-height: 0;
+    align-items: stretch;
+}
+#workHoursModal .wh-input-col,
+#workHoursModal .wh-saved-col {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+#workHoursModal .wh-saved-col .wh-block {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0;
+}
+#workHoursModal .wh-saved-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;              /* bỏ cap 480px cũ */
+    overflow-y: auto;
+}
+
+/* ============================================================
+   Mobile / tablet — bỏ chiều cao cố định, để trang cuộn tự nhiên
+   ============================================================ */
+@media (max-width: 991px) {
+    #presenterSpinModal .modal-dialog,
+    #workHoursModal .modal-dialog {
+        height: auto;
+        max-height: calc(100vh - 1rem);
+    }
+    #presenterSpinModal .modal-body,
+    #workHoursModal .modal-body {
+        overflow-y: auto;
+    }
+    #presenterSpinModal .spin-users-list,
+    #workHoursModal .wh-saved-list {
+        max-height: 320px;         /* trên mobile vẫn cap để không dài vô tận */
+    }
+}
+
+/* ============================================================
+   SETTINGS MODAL
+   ============================================================ */
+.settings-section {
+    background: var(--surface-muted);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1rem 1.1rem;
+    margin-bottom: 1rem;
+}
+.settings-section:last-child { margin-bottom: 0; }
+.settings-section-head {
+    display: flex; align-items: center; gap: 0.75rem;
+    margin-bottom: 0.8rem;
+}
+.settings-section-head > i {
+    width: 38px; height: 38px; flex: none;
+    border-radius: 11px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 1rem;
+    background: var(--grad-primary);
+    box-shadow: 0 6px 14px rgba(139, 92, 246, .3);
+}
+.settings-section-head h6 {
+    margin: 0; font-size: .9rem; font-weight: 700; color: var(--text);
+}
+.settings-section-head small {
+    font-size: .72rem; color: var(--muted);
+}
+
+/* Grid chọn chủ đề */
+.theme-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 0.6rem;
+}
+.theme-card {
+    position: relative;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 0.2rem;
+    padding: 0.9rem 0.6rem 0.75rem;
+    border: 2px solid var(--border);
+    border-radius: 14px;
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+    overflow: hidden;
+}
+.theme-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--primary);
+    box-shadow: 0 8px 18px rgba(139, 92, 246, .15);
+}
+.theme-card.active {
+    border-color: #8b5cf6;
+    background: linear-gradient(135deg, rgba(99,102,241,.06), rgba(139,92,246,.06));
+    box-shadow: 0 8px 20px rgba(139, 92, 246, .22);
+}
+.theme-card-emoji { font-size: 1.9rem; line-height: 1; }
+.theme-card-name {
+    font-size: .86rem; font-weight: 700; color: var(--text);
+}
+.theme-card-desc {
+    font-size: .68rem; color: var(--muted); text-align: center;
+    line-height: 1.35;
+}
+.theme-card-check {
+    position: absolute; top: 6px; right: 6px;
+    color: #8b5cf6; font-size: 1rem;
+    opacity: 0; transform: scale(.7);
+    transition: opacity .15s ease, transform .15s ease;
+}
+.theme-card.active .theme-card-check { opacity: 1; transform: scale(1); }
+
+/* ============================================================
+   CHỦ ĐỀ TOPBAR — sáng/tối khác biệt rõ, logic đúng
+   ============================================================ */
+.topbar .theme-deco {
+    position: absolute; inset: 0;
+    pointer-events: none;
+    display: none;
+    overflow: hidden;
+}
+body[data-topbar-theme="tet"]      .topbar .theme-deco-tet      { display: block; }
+body[data-topbar-theme="trungthu"] .topbar .theme-deco-trongthu { display: block; }
+body[data-topbar-theme="noel"]     .topbar .theme-deco-noel     { display: block; }
+body[data-topbar-theme="rain"]     .topbar .theme-deco-rain     { display: block; }
+
+/* ---------- NỀN: sáng/tối tách biệt cho từng theme ---------- */
+body.theme-light[data-topbar-theme="tet"] .topbar-sky .sky-day {
+    background: linear-gradient(105deg, #ffe4e6 0%, #fecdd3 45%, #fef2f2 100%);
+}
+body.theme-dark[data-topbar-theme="tet"] .topbar-sky .sky-night {
+    background: linear-gradient(105deg, #15060a 0%, #3a0c1a 48%, #240710 100%);
+}
+
+body.theme-light[data-topbar-theme="trungthu"] .topbar-sky .sky-day {
+    background: linear-gradient(105deg, #fef9e7 0%, #fde68a 45%, #fefce8 100%);
+}
+body.theme-dark[data-topbar-theme="trungthu"] .topbar-sky .sky-night {
+    background: linear-gradient(105deg, #0a0e28 0%, #1e1b4b 50%, #1e3a8a 100%);
+}
+
+body.theme-light[data-topbar-theme="noel"] .topbar-sky .sky-day {
+    background: linear-gradient(105deg, #dbeafe 0%, #bfdbfe 45%, #e0f2fe 100%);
+}
+body.theme-dark[data-topbar-theme="noel"] .topbar-sky .sky-night {
+    background: linear-gradient(105deg, #030711 0%, #0b1220 50%, #111827 100%);
+}
+
+body.theme-light[data-topbar-theme="rain"] .topbar-sky .sky-day {
+    background: linear-gradient(105deg, #cbd5e1 0%, #94a3b8 50%, #64748b 100%);
+}
+body.theme-dark[data-topbar-theme="rain"] .topbar-sky .sky-night {
+    background: linear-gradient(105deg, #010409 0%, #0a1220 50%, #111827 100%);
+}
+
+/* ---------- ẨN sun/moon hệ thống khi không phù hợp ----------
+   - rain: ẩn cả hai
+   - tet: ẩn moon (dùng .tet-moon khuyết), giữ sun cho ban ngày
+   - trungthu: ẩn moon (dùng .tt-moon), giữ sun cho ban ngày
+   - noel: GIỮ cả hai (có sun ban ngày, moon ban đêm)
+   - ghi đè rule cũ đang ẩn sky-body cho noel
+*/
+body[data-topbar-theme="rain"] .topbar-sky .sky-body { display: none; }
+body[data-topbar-theme="noel"] .topbar-sky .sky-body { display: block !important; }
+body[data-topbar-theme="tet"] .topbar-sky .sky-body  { display: block !important; }
+body[data-topbar-theme="trungthu"] .topbar-sky .sky-body { display: block !important; }
+
+body[data-topbar-theme="tet"]      .topbar-sky .sky-moon { display: none !important; }
+body[data-topbar-theme="trungthu"] .topbar-sky .sky-moon { display: none !important; }
+
+/* ============================================================
+   TẾT — hoa đào + đèn lồng + trăng khuyết
+   ============================================================ */
+.tet-flower {
+    position: absolute; font-size: 22px;
+    animation: tetFlowerSway 4s ease-in-out infinite;
+    filter: drop-shadow(0 2px 3px rgba(190, 24, 93, .35));
+    z-index: 2;
+}
+.tet-flower.f1 { top: 8%;  left: 6%;  animation-delay: 0s; }
+.tet-flower.f2 { top: 62%; left: 3%;  font-size: 18px; animation-delay: .8s; }
+.tet-flower.f3 { top: 14%; right: 8%; animation-delay: 1.5s; }
+.tet-flower.f4 { top: 70%; right: 4%; font-size: 16px; animation-delay: 2.1s; }
+
+@keyframes tetFlowerSway {
+    0%, 100% { transform: rotate(-6deg) translateY(0); }
+    50%      { transform: rotate(6deg) translateY(-3px); }
+}
+
+.tet-lantern {
+    position: absolute; top: -4px;
+    font-size: 26px;
+    transform-origin: 50% 0%;
+    animation: tetLanternSway 3.5s ease-in-out infinite;
+    filter: drop-shadow(0 4px 6px rgba(220, 38, 38, .4));
+    z-index: 2;
+}
+.tet-lantern::before {
+    content: ''; position: absolute; top: -12px; left: 50%;
+    width: 1px; height: 14px; background: #7f1d1d;
+}
+.tet-lantern.l1 { left: 22%; animation-delay: 0s; }
+.tet-lantern.l2 { right: 24%; animation-delay: .6s; }
+
+@keyframes tetLanternSway {
+    0%, 100% { transform: rotate(-8deg); }
+    50%      { transform: rotate(8deg); }
+}
+
+.tet-petals {
+    position: absolute; inset: 0;
+    background-image:
+        radial-gradient(4px 4px at 10% 0%,  #f9a8d4 50%, transparent 51%),
+        radial-gradient(3px 3px at 30% 20%, #fbcfe8 50%, transparent 51%),
+        radial-gradient(4px 4px at 55% 10%, #f9a8d4 50%, transparent 51%),
+        radial-gradient(3px 3px at 78% 30%, #fbcfe8 50%, transparent 51%),
+        radial-gradient(4px 4px at 92% 5%,  #f9a8d4 50%, transparent 51%);
+    background-size: 400px 100px;
+    background-repeat: repeat;
+    animation: tetPetalsFall 9s linear infinite;
+    opacity: .85;
+}
+@keyframes tetPetalsFall {
+    from { background-position: 0 0; }
+    to   { background-position: -100px 110px; }
+}
+
+/* Trăng khuyết — chỉ hiện ban đêm */
+.tet-moon {
+    display: none;
+    position: absolute;
+    top: 12%; right: 8%;
+    width: 44px; height: 44px;
+    z-index: 1;
+}
+body.theme-dark[data-topbar-theme="tet"] .theme-deco-tet .tet-moon { display: block; }
+.tet-moon::before {
+    content: '';
+    position: absolute; inset: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 32%, #fffce8 0%, #fde68a 55%, #d4a017 100%);
+    /* mask cắt đường tròn lệch góc trên-phải → tạo hình trăng khuyết 🌙 */
+    -webkit-mask: radial-gradient(circle at 72% 30%, transparent 55%, #000 57%);
+            mask: radial-gradient(circle at 72% 30%, transparent 55%, #000 57%);
+    filter: drop-shadow(0 0 14px rgba(253, 224, 71, .55))
+            drop-shadow(0 0 40px rgba(251, 191, 36, .25));
+}
+
+/* ============================================================
+   TRUNG THU — trăng rằm + đèn lồng trôi
+   ============================================================ */
+.tt-moon {
+    display: none;
+    position: absolute;
+    top: 10%; right: 6%;
+    width: 46px; height: 46px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 32%, #fff7d1 0%, #fde68a 55%, #f59e0b 100%);
+    box-shadow:
+        0 0 22px 8px rgba(253, 224, 71, .55),
+        0 0 60px 22px rgba(251, 191, 36, .25);
+    z-index: 1;
+}
+/* Trăng trung thu CHỈ hiện ban đêm */
+body.theme-dark[data-topbar-theme="trungthu"] .theme-deco-trongthu .tt-moon { display: block; }
+.tt-moon::after {
+    content: ''; position: absolute; inset: 0; border-radius: 50%;
+    background:
+        radial-gradient(circle at 30% 40%, rgba(180, 130, 50, .25) 0 4px, transparent 5px),
+        radial-gradient(circle at 60% 55%, rgba(180, 130, 50, .20) 0 5px, transparent 6px),
+        radial-gradient(circle at 40% 70%, rgba(180, 130, 50, .22) 0 3px, transparent 4px);
+}
+
+.tt-lantern {
+    position: absolute; font-size: 20px;
+    bottom: -30px;
+    filter: drop-shadow(0 0 6px rgba(251, 191, 36, .7));
+    animation: ttLanternFloat 9s linear infinite;
+    z-index: 2;
+}
+.tt-lantern.l1 { left: 12%;  animation-delay: 0s;   font-size: 22px; }
+.tt-lantern.l2 { left: 35%;  animation-delay: 2.5s; font-size: 18px; }
+.tt-lantern.l3 { left: 58%;  animation-delay: 5s;   font-size: 20px; }
+.tt-lantern.l4 { left: 82%;  animation-delay: 1.2s; font-size: 16px; }
+
+@keyframes ttLanternFloat {
+    0%   { bottom: -30px; opacity: 0; transform: translateX(0) scale(.85); }
+    10%  { opacity: 1; }
+    50%  { transform: translateX(15px) scale(1); }
+    90%  { opacity: 1; }
+    100% { bottom: 100%; opacity: 0; transform: translateX(-10px) scale(.9); }
+}
+
+/* ============================================================
+   NOEL — tuyết rơi, cây thông, xe trượt tuyết 🦌🎅🛷
+   ============================================================ */
+.noel-snow {
+    position: absolute; inset: 0;
+    background-image:
+        radial-gradient(2px 2px at 20px 30px,  #fff, transparent),
+        radial-gradient(2px 2px at 90px 80px,  #fff, transparent),
+        radial-gradient(1.5px 1.5px at 160px 50px, #fff, transparent),
+        radial-gradient(2.5px 2.5px at 220px 120px, #fff, transparent),
+        radial-gradient(1.5px 1.5px at 280px 40px, #fff, transparent),
+        radial-gradient(2px 2px at 340px 100px, #fff, transparent),
+        radial-gradient(2px 2px at 60px 140px,  #fff, transparent);
+    background-size: 400px 180px;
+    background-repeat: repeat;
+    animation: noelSnowFall 6s linear infinite;
+    opacity: .9;
+}
+body.theme-dark[data-topbar-theme="noel"] .noel-snow { opacity: .75; }
+
+@keyframes noelSnowFall {
+    from { background-position: 0 0; }
+    to   { background-position: 30px 180px; }
+}
+
+.noel-tree {
+    position: absolute; bottom: 4px; font-size: 28px;
+    filter: drop-shadow(0 3px 4px rgba(22, 101, 52, .4));
+}
+.noel-tree.tl { left: 6%; }
+.noel-tree.tr { right: 6%; font-size: 22px; }
+
+.noel-sleigh {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 22px;
+    white-space: nowrap;
+    letter-spacing: -2px;
+    filter: drop-shadow(0 3px 6px rgba(30, 58, 138, .45));
+    animation: noelSleighRun 14s linear infinite;
+    z-index: 2;
+}
+.noel-sleigh span { display: inline-block; }
+.noel-sleigh span:nth-child(1),
+.noel-sleigh span:nth-child(2) {
+    animation: noelDeerBounce .5s ease-in-out infinite alternate;
+}
+.noel-sleigh span:nth-child(2) { animation-delay: .1s; }
+
+@keyframes noelSleighRun {
+    0%   { left: 100%; }
+    100% { left: -220px; }
+}
+@keyframes noelDeerBounce {
+    from { transform: translateY(0); }
+    to   { transform: translateY(-2px); }
+}
+
+/* ============================================================
+   MƯA — giọt NGẮN (ellipse 3-9px), 3 lớp parallax, sấm chớp ban đêm
+   ============================================================ */
+
+/* ---------- Mây: ban ngày hóa ĐEN, ban đêm xám tối ---------- */
+.rain-cloud {
+    position: absolute; font-size: 32px;
+    opacity: .9;
+    transition: filter .4s ease;
+}
+body.theme-light[data-topbar-theme="rain"] .rain-cloud {
+    /* ☁️ trắng → mây đen */
+    filter: brightness(.35) contrast(1.6) sepia(.2)
+            drop-shadow(0 3px 5px rgba(15, 23, 42, .55));
+}
+body.theme-dark[data-topbar-theme="rain"] .rain-cloud {
+    filter: brightness(.65) contrast(1.2)
+            drop-shadow(0 3px 5px rgba(0, 0, 0, .7));
+}
+.rain-cloud.c1 { top: 6%;  left: 8%;  font-size: 30px; animation: rainCloudDrift 20s linear infinite; }
+.rain-cloud.c2 { top: 2%;  left: 42%; font-size: 38px; animation: rainCloudDrift 26s linear infinite -8s; }
+.rain-cloud.c3 { top: 12%; left: 76%; font-size: 26px; animation: rainCloudDrift 22s linear infinite -14s; }
+
+@keyframes rainCloudDrift {
+    from { transform: translateX(0); }
+    to   { transform: translateX(60px); }
+}
+
+/* ---------- 3 lớp mưa — giọt NGẮN bằng radial ellipse ---------- */
+.rain-drops {
+    position: absolute;
+    inset: -15% 0 0 0;
+    /* perspective + rotateX: nghiêng mặt phẳng; skewX: giọt xiên như mưa thật */
+    transform: perspective(600px) rotateX(12deg) skewX(-9deg);
+    transform-origin: top center;
+    pointer-events: none;
+
+    /* Giọt gần: dài 9px, rộng 1.3px */
+    background-image: radial-gradient(
+        ellipse 1.3px 9px at 50% 50%,
+        rgba(219, 234, 254, .95),
+        transparent 72%
+    );
+    background-size: 34px 64px;
+    background-repeat: repeat;
+    animation: rainFallNear .55s linear infinite;
+}
+
+/* Giọt giữa: dài 6px, mờ hơn */
+.rain-drops::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image: radial-gradient(
+        ellipse 1px 6px at 50% 50%,
+        rgba(147, 197, 253, .8),
+        transparent 70%
+    );
+    background-size: 24px 42px;
+    background-position: 12px 6px;
+    background-repeat: repeat;
+    animation: rainFallMid .95s linear infinite;
+}
+
+/* Giọt xa: dài 4px, blur nhẹ → tạo chiều sâu 3D */
+.rain-drops::after {
+    content: '';
+    position: absolute; inset: 0;
+    background-image: radial-gradient(
+        ellipse 0.8px 4px at 50% 50%,
+        rgba(96, 165, 250, .55),
+        transparent 68%
+    );
+    background-size: 16px 28px;
+    background-position: 8px 4px;
+    background-repeat: repeat;
+    animation: rainFallFar 1.5s linear infinite;
+    filter: blur(.4px);
+}
+
+@keyframes rainFallNear {
+    from { background-position: 0 0; }
+    to   { background-position: -8px 64px; }
+}
+@keyframes rainFallMid {
+    from { background-position: 12px 6px; }
+    to   { background-position: 4px 48px; }
+}
+@keyframes rainFallFar {
+    from { background-position: 8px 4px; }
+    to   { background-position: 2px 32px; }
+}
+
+/* ---------- BAN NGÀY: mưa lâm râm — thưa, mờ, bỏ lớp xa ---------- */
+body.theme-light[data-topbar-theme="rain"] .rain-drops {
+    opacity: .55;
+    background-size: 90px 130px;    /* tile to → giọt thưa hơn */
+    animation-duration: 1.1s;
+}
+body.theme-light[data-topbar-theme="rain"] .rain-drops::before {
+    opacity: .5;
+    background-size: 70px 100px;
+    animation-duration: 1.5s;
+}
+body.theme-light[data-topbar-theme="rain"] .rain-drops::after {
+    display: none;                   /* ban ngày bỏ lớp xa */
+}
+
+/* ---------- SẤM CHỚP — 3 nhịp lóe + after-glow, chỉ ban đêm ---------- */
+.rain-flash {
+    position: absolute; inset: 0;
+    background:
+        radial-gradient(ellipse 280px 90px at 28% 22%, rgba(255, 255, 255, .95), transparent 72%),
+        radial-gradient(ellipse 380px 110px at 72% 42%, rgba(220, 230, 255, .75), transparent 72%);
+    opacity: 0;
+    animation: lightningStrike 11s ease-in-out infinite;
+    mix-blend-mode: screen;
+    pointer-events: none;
+}
+
+/* Ban ngày: tắt hẳn sấm chớp */
+body.theme-light[data-topbar-theme="rain"] .rain-flash {
+    animation: none;
+    opacity: 0;
+}
+
+@keyframes lightningStrike {
+    0%, 76%, 78%, 80%, 82%, 100% { opacity: 0; }
+    77% { opacity: 1; }
+    79% { opacity: .25; }
+    81% { opacity: .9; }
+    90% { opacity: .45; }   /* tia chớp phụ xa xa */
+    91% { opacity: 0; }
+}
+
+/* ---------- Nền: ban ngày mây đen (xám đậm), ban đêm đen tuyền ---------- */
+body.theme-light[data-topbar-theme="rain"] .topbar-sky .sky-day {
+    background: linear-gradient(105deg, #e2e8f0 0%, #cbd5e1 50%, #b6c2cf 100%);
+}
+body.theme-dark[data-topbar-theme="rain"] .topbar-sky .sky-night {
+    background: linear-gradient(105deg, #010409 0%, #0a1220 50%, #111827 100%);
+}
+/* Giảm lag khi mở modal */
+body.modal-open .theme-deco,
+body.modal-open .theme-deco * { animation-play-state: paused !important; }
+@media (prefers-reduced-motion: reduce) {
+    .theme-deco, .theme-deco * { animation: none !important; }
+}
+@media (max-width: 576px) {
+    .tet-flower, .tet-lantern, .tt-lantern, .noel-tree { display: none; }
+    .noel-sleigh { font-size: 18px; }
+    .tt-moon, .tet-moon { width: 32px; height: 32px; }
+}
+
+/* ============================================================
+   USER PROFILE MODAL — avatar căn giữa, phần còn lại căn trái
+   ============================================================ */
+#userProfileModal .profile-avatar-container {
+    display: block;
+    width: fit-content;             /* co lại đúng bằng ảnh */
+    margin: 0 auto 1.25rem;         /* căn giữa bằng auto margin */
+    position: relative;             /* giữ mốc cho nút absolute */
+}
+
+#userProfileModal .modal-body {
+    text-align: left;
+}
+
+#userProfileModal .form-label,
+#userProfileModal .form-control-static,
+#userProfileModal .form-text,
+#userProfileModal .input-group {
+    text-align: left;
+}
+
+/* ============================================================
+   FIX NHẢY CHỮ KHI ĐỔI THEME
+   Browser đổi anti-aliasing mode giữa nền sáng (subpixel) và nền
+   tối (grayscale) → chữ mảnh/dày khác nhau. Force grayscale AA
+   cho toàn bộ app để chữ luôn render đồng nhất bất kể theme nào.
+   ============================================================ */
+html, body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+html *, body * {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Trong khoảnh khắc đổi theme, khóa mọi transform/scale/animation
+   trên các nút topbar — chống "nảy" chữ do animation restart. */
+body.no-theme-transition .topbar-badges,
+body.no-theme-transition .topbar-badges *,
+body.no-theme-transition .topbar-badges *::before,
+body.no-theme-transition .topbar-badges *::after {
+    transform: none !important;
+    scale: 1 !important;
+    animation: none !important;
+}
+
+/* Đảm bảo 2 nút không bị ép font-size theo theme (kế thừa --fs-xs) */
+.topbar .theme-toggle,
+.topbar .user-profile-btn .user-name,
+.topbar .notif-bell-btn {
+    font-size: 0.78rem;
+    line-height: 1;
+}
+
+.theme-toggle,
+.theme-toggle span,
+.user-profile-btn,
+.user-profile-btn .user-name {
+    font-variation-settings: normal;
+    font-optical-sizing: none;
+    font-feature-settings: normal;
+    letter-spacing: normal;
 }

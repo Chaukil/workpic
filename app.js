@@ -94,6 +94,7 @@ let usersAvatarCache = null;      // { uid: dataUrl }
 let unsubscribeUsersAvatar = null; // listener realtime để thấy avatar mới của người khác
 
 let userProfileModal;
+let settingsModal = null;
 let transferConfirmModal;
 let pendingTransferJob = null;
 let pendingTransferFromUser = null;
@@ -186,6 +187,58 @@ function applyTheme(theme) {
     }));
 }
 
+// ============================================================
+// TOPBAR THEME — trang trí riêng cho thanh header
+// ============================================================
+const TOPBAR_THEMES = [
+    { id: 'default',  name: 'Mặc định',  emoji: '☀️',  desc: 'Trời sáng/tối tự nhiên' },
+    { id: 'tet',      name: 'Tết',       emoji: '🌸',  desc: 'Hoa đào, câu đối, đèn lồng đỏ' },
+    { id: 'trungthu', name: 'Trung Thu', emoji: '🌕',  desc: 'Trăng rằm, đèn lồng trôi' },
+    { id: 'noel',     name: 'Noel',      emoji: '🎄',  desc: 'Tuyết rơi, ông già Noel chạy ngang' },
+    { id: 'rain',     name: 'Mưa',       emoji: '🌧️', desc: 'Mưa rơi, mây đen, chớp' }
+];
+const TOPBAR_THEME_STORAGE_KEY = 'workpic-topbar-theme';
+let currentTopbarTheme = 'default';
+
+function getSavedTopbarTheme() {
+    const saved = localStorage.getItem(TOPBAR_THEME_STORAGE_KEY);
+    return TOPBAR_THEMES.some(t => t.id === saved) ? saved : 'default';
+}
+
+function applyTopbarTheme(themeId) {
+    if (!TOPBAR_THEMES.some(t => t.id === themeId)) themeId = 'default';
+    currentTopbarTheme = themeId;
+    document.body.dataset.topbarTheme = themeId;
+    try { localStorage.setItem(TOPBAR_THEME_STORAGE_KEY, themeId); } catch (e) { /* ignore */ }
+    // Cập nhật trạng thái active trên các thẻ chủ đề (nếu modal đang mở)
+    document.querySelectorAll('#themeGrid .theme-card').forEach(card => {
+        card.classList.toggle('active', card.dataset.theme === themeId);
+    });
+}
+
+function renderThemeGrid() {
+    const grid = document.getElementById('themeGrid');
+    if (!grid) return;
+    grid.innerHTML = TOPBAR_THEMES.map(t => `
+        <button type="button" class="theme-card ${t.id === currentTopbarTheme ? 'active' : ''}" data-theme="${t.id}">
+            <span class="theme-card-emoji">${t.emoji}</span>
+            <span class="theme-card-name">${escapeHtml(t.name)}</span>
+            <span class="theme-card-desc">${escapeHtml(t.desc)}</span>
+            <span class="theme-card-check"><i class="bi bi-check-circle-fill"></i></span>
+        </button>
+    `).join('');
+    grid.querySelectorAll('.theme-card').forEach(btn => {
+        btn.addEventListener('click', () => applyTopbarTheme(btn.dataset.theme));
+    });
+}
+
+function openSettingsModal() {
+    if (!currentUser) return;
+    document.getElementById('settingsNotifyLead').value = String(notifyLeadMinutes);
+    renderThemeGrid();
+    settingsModal.show();
+}
+
 function enableSkyAnimation() {
     // Bật transition cho nền topbar sau lần vẽ đầu tiên (tránh chạy animation lúc mới tải trang)
     setTimeout(() => {
@@ -199,6 +252,7 @@ function initTheme() {
     const savedTheme = localStorage.getItem('workpic-theme');
     const preferredTheme = savedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     applyTheme(preferredTheme);
+    applyTopbarTheme(getSavedTopbarTheme());
     enableSkyAnimation();
 }
 
@@ -504,11 +558,9 @@ function updateUserProfileUI() {
 function openUserProfileModal() {
     if (!currentUser) return;
     document.getElementById('profileEmail').textContent = currentUser.email || '---';
-    document.getElementById('profileUid').textContent = currentUser.uid || '---';
 
     const displayName = currentUser.displayName || currentUser.email?.split('@')[0] || '';
     document.getElementById('profileDisplayName').value = displayName;
-    document.getElementById('profileNotifyLead').value = String(notifyLeadMinutes);
     fillDeptSelect(document.getElementById('profileDepartment'), currentUser.department || '', { none: true, noneLabel: '— Chưa chọn —' });
     document.getElementById('profileNewDeptRow').classList.add('d-none');
 
@@ -549,15 +601,23 @@ function normalizeLeadMinutes(value) {
     return Number.isFinite(n) ? Math.min(Math.max(n, 0), 1440) : 0;
 }
 
-async function saveNotifyLead() {
+async function saveNotifyLead(minutes) {
     if (!currentUser) return;
-    const minutes = normalizeLeadMinutes(document.getElementById('profileNotifyLead').value);
+    minutes = normalizeLeadMinutes(minutes);
     notifyLeadMinutes = minutes;
     localStorage.setItem(`notifyLead_${currentUser.uid}`, String(minutes));
+
+    // Đồng bộ giá trị cả 2 select (Profile & Settings)
+    const s = document.getElementById('settingsNotifyLead');
+    if (s) s.value = String(minutes);
+
     try {
         const snapshot = await getDocs(query(collection(db, 'users'), where('uid', '==', currentUser.uid)));
         if (!snapshot.empty) {
-            await updateDoc(doc(db, 'users', snapshot.docs[0].id), { notifyLeadMinutes: minutes, updatedAt: new Date().toISOString() });
+            await updateDoc(doc(db, 'users', snapshot.docs[0].id), {
+                notifyLeadMinutes: minutes,
+                updatedAt: new Date().toISOString()
+            });
         }
         showNotification('Đã lưu', minutes > 0 ? `Bạn sẽ được nhắc job trước ${minutes} phút.` : 'Bạn sẽ được nhắc đúng giờ job.', false, 'success');
     } catch (error) {
@@ -769,6 +829,7 @@ document.addEventListener('DOMContentLoaded', function() {
         keyboard: true,
         focus: true
     });
+    settingsModal = new bootstrap.Modal(document.getElementById('settingsModal'));
     migrateLegacyJobsModal = new bootstrap.Modal(document.getElementById('migrateLegacyJobsModal'));
     viewDataModal = new bootstrap.Modal(document.getElementById('viewDataModal'));
     checkDueModal = new bootstrap.Modal(document.getElementById('checkDueModal'));
@@ -791,7 +852,6 @@ document.addEventListener('DOMContentLoaded', function() {
     initDepartmentUi();
     OwlFx.init();
     document.getElementById('salaryCalcBtn').addEventListener('click', openSalaryCalcModal);
-    document.getElementById('salaryResetBtn').addEventListener('click', resetSalaryCalc);
         // Ô nhập tiền → tự chèn dấu "." ngăn cách nghìn, giữ vị trí con trỏ
         const MONEY_INPUT_IDS = ['salLCB'];
     function handleMoneyInput(e) {
@@ -926,9 +986,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    document.getElementById('settingsBtn').addEventListener('click', openSettingsModal);
+document.getElementById('settingsNotifyLead').addEventListener('change', (e) => saveNotifyLead(e.target.value));
+
     document.getElementById('userProfileBtn').addEventListener('click', openUserProfileModal);
     document.getElementById('saveProfileBtn').addEventListener('click', saveUserProfile);
-    document.getElementById('profileNotifyLead').addEventListener('change', saveNotifyLead);
     document.getElementById('changeAvatarBtn').addEventListener('click', () => {
         document.getElementById('avatarFileInput').click();
     });
@@ -4613,6 +4675,41 @@ function initQuickChatUi() {
     const statusFilter = document.getElementById('quickChatStatusFilter');
     const assigneeFilter = document.getElementById('quickChatAssigneeFilter');
 
+    // ===== Nút mở rộng bộ lọc =====
+    const filterToggle = document.getElementById('quickChatFilterToggle');
+    const filterExtra  = document.getElementById('quickChatFilterExtra');
+    const filterBadge  = document.getElementById('quickChatFilterBadge');
+
+    function updateQuickChatFilterBadge() {
+        let count = 0;
+        if (quickChatStatusFilter !== 'all') count++;
+        if (quickChatAssigneeFilter !== 'all') count++;
+        if (filterBadge) {
+            filterBadge.textContent = String(count);
+            filterBadge.classList.toggle('d-none', count === 0);
+        }
+    }
+
+    function setQuickChatFilterOpen(open) {
+        if (!filterExtra || !filterToggle) return;
+        filterExtra.classList.toggle('show', open);
+        filterToggle.classList.toggle('active', open);
+        filterToggle.setAttribute('aria-expanded', String(open));
+    }
+
+    if (filterToggle && filterExtra) {
+        filterToggle.addEventListener('click', () => {
+            setQuickChatFilterOpen(!filterExtra.classList.contains('show'));
+        });
+    }
+
+    // Mở sẵn panel nếu đang có filter ngoài 'all' (mở lại panel chat giữa chừng)
+    if (quickChatStatusFilter !== 'all' || quickChatAssigneeFilter !== 'all') {
+        setQuickChatFilterOpen(true);
+    }
+    updateQuickChatFilterBadge();
+    // ==============================
+    
     if (tabAll) tabAll.addEventListener('click', () => setQuickChatTab('all'));
     if (tabMine) tabMine.addEventListener('click', () => setQuickChatTab('mine'));
     if (guideBtn) guideBtn.addEventListener('click', () => guideModal.show());
@@ -7232,7 +7329,7 @@ const SALARY_UNION_FEE = 30000;
 const SALARY_INSURANCE_RATE = 0.105;
 const SALARY_DEFAULT_STANDARD_DAYS = 26;
 const SALARY_MONEY_FIELDS = ['salLCB'];
-const SALARY_COUNT_FIELDS = ['salWorkDay', 'salHoliday', 'salAnnualLeave', 'salPaidLeave', 'salOtNormal', 'salOtSunday', 'salNightShift'];
+const SALARY_COUNT_FIELDS = ['salWorkDay', 'salHoliday', 'salAnnualLeave', 'salPaidLeave', 'salOtNormal', 'salOtSunday', 'salOtHoliday', 'salNightShift'];
 const SALARY_ALL_INPUT_FIELDS = [...SALARY_MONEY_FIELDS, ...SALARY_COUNT_FIELDS, 'salStandardDays', 'salDependents'];
 
 function formatSalaryVND(n) {
@@ -7298,11 +7395,12 @@ function updateSalaryTotals() {
 
     const lineValues = {
         salWorkDayValue: parseSalaryNumber('salWorkDay') * dailyRate,
-        salHolidayValue: parseSalaryNumber('salHoliday') * dailyRate * 3,
+        salHolidayValue: parseSalaryNumber('salHoliday') * dailyRate,
         salAnnualLeaveValue: parseSalaryNumber('salAnnualLeave') * dailyRate,
         salPaidLeaveValue: parseSalaryNumber('salPaidLeave') * dailyRate,
         salOtNormalValue: parseSalaryNumber('salOtNormal') * hourlyRate * 1.5,
         salOtSundayValue: parseSalaryNumber('salOtSunday') * hourlyRate * 2,
+        salOtHolidayValue: parseSalaryNumber('salOtHoliday') * hourlyRate * 3,
         salNightShiftValue: nightShiftPay
     };
     Object.entries(lineValues).forEach(([id, val]) => {

@@ -97,6 +97,39 @@
                 <div class="sky-stars"><i class="shoot s1"></i><i class="shoot s2"></i><i class="shoot s3"></i></div>
                 <div class="sky-body sky-sun"><span class="sun-rays"></span><span class="sun-core"></span></div>
                 <div class="sky-body sky-moon"><span class="moon-core"></span></div>
+                <!-- Chủ đề topbar (chỉ 1 cái hiện theo body[data-topbar-theme]) -->
+<div class="theme-deco theme-deco-tet">
+    <span class="tet-flower f1">🌸</span>
+    <span class="tet-flower f2">🌸</span>
+    <span class="tet-flower f3">🌸</span>
+    <span class="tet-flower f4">🌸</span>
+    <span class="tet-lantern l1">🏮</span>
+    <span class="tet-lantern l2">🏮</span>
+    <span class="tet-petals"></span>
+    <span class="tet-moon"></span>
+</div>
+<div class="theme-deco theme-deco-trongthu">
+    <span class="tt-moon"></span>
+    <span class="tt-lantern l1">🏮</span>
+    <span class="tt-lantern l2">⭐</span>
+    <span class="tt-lantern l3">🏮</span>
+    <span class="tt-lantern l4">🌟</span>
+</div>
+<div class="theme-deco theme-deco-noel">
+    <span class="noel-snow"></span>
+    <span class="noel-tree tl">🎄</span>
+    <span class="noel-tree tr">🎄</span>
+    <div class="noel-sleigh">
+        <span>🦌</span><span>🦌</span><span>🎅</span><span>🛷</span>
+    </div>
+</div>
+<div class="theme-deco theme-deco-rain">
+    <span class="rain-cloud c1">☁️</span>
+    <span class="rain-cloud c2">☁️</span>
+    <span class="rain-cloud c3">☁️</span>
+    <span class="rain-drops"></span>
+    <span class="rain-flash"></span>
+</div>
             </div>
             <div class="topbar-left">
                 <div class="topbar-logo">
@@ -131,6 +164,9 @@
                             </div>
                         </div>
                     </div>
+                    <button type="button" class="notif-bell-btn" id="settingsBtn" title="Cài đặt">
+    <i class="bi bi-gear-fill"></i>
+</button>
                     <button class="user-profile-btn" id="userProfileBtn" title="Thông tin tài khoản">
                         <img id="userAvatar" class="user-avatar" src="" alt="Avatar">
                         <span id="userDisplayName" class="user-name"></span>
@@ -992,7 +1028,7 @@ Ngày nhận: d/m, d/m/yyyy, yyyy-mm-dd. Số thập phân dùng . hoặc ,"></t
                                     <span class="salary-line-value" id="salWorkDayValue">0 VNĐ</span>
                                 </div>
                                 <div class="salary-row salary-row-auto">
-                                    <label for="salHoliday"><i class="bi bi-flag-fill"></i> Ngày lễ<span class="salary-formula">× 3 LCB/ngày</span></label>
+                                    <label for="salHoliday"><i class="bi bi-flag-fill"></i> Ngày lễ<span class="salary-formula">× 1 LCB/ngày</span></label>
                                     <input type="text" inputmode="decimal" class="salary-count-input" id="salHoliday" data-unit="ngày" placeholder="0"><span class="salary-unit">ngày</span>
                                     <span class="salary-line-value" id="salHolidayValue">0 VNĐ</span>
                                 </div>
@@ -1015,6 +1051,11 @@ Ngày nhận: d/m, d/m/yyyy, yyyy-mm-dd. Số thập phân dùng . hoặc ,"></t
                                     <label for="salOtSunday"><i class="bi bi-gear-fill"></i> Tăng ca CN<span class="salary-formula">× 2 LCB/8</span></label>
                                     <input type="text" inputmode="decimal" class="salary-count-input" id="salOtSunday" data-unit="giờ" placeholder="0"><span class="salary-unit">giờ</span>
                                     <span class="salary-line-value" id="salOtSundayValue">0 VNĐ</span>
+                                </div>
+                                <div class="salary-row salary-row-auto">
+                                    <label for="salOtHoliday"><i class="bi bi-award-fill"></i> Tăng ca ngày lễ<span class="salary-formula">× 3 LCB/8</span></label>
+                                    <input type="text" inputmode="decimal" class="salary-count-input" id="salOtHoliday" data-unit="giờ" placeholder="0"><span class="salary-unit">giờ</span>
+                                    <span class="salary-line-value" id="salOtHolidayValue">0 VNĐ</span>
                                 </div>
                                 <div class="salary-row salary-row-auto">
                                     <label for="salNightShift"><i class="bi bi-moon-stars-fill"></i> Ca đêm<span class="salary-formula">× 0.3 LCB/8 + 10K/8h</span></label>
@@ -1059,15 +1100,15 @@ Ngày nhận: d/m, d/m/yyyy, yyyy-mm-dd. Số thập phân dùng . hoặc ,"></t
                             </div>
                             <div class="salary-row salary-row-readonly">
                                 <label><i class="bi bi-dash-square"></i> Giảm trừ bản thân</label>
-                                <span class="salary-line-value salary-line-value-deduct" id="salSelfDeductValue">15.500.000 VNĐ</span>
+                                <span class="salary-line-value salary-line-value-reduce" id="salSelfDeductValue">15.500.000 VNĐ</span>
                             </div>
                             <div class="salary-row salary-row-readonly">
                                 <label><i class="bi bi-dash-square"></i> Giảm trừ người phụ thuộc</label>
-                                <span class="salary-line-value salary-line-value-deduct" id="salDependentDeductValue">0 VNĐ</span>
+                                <span class="salary-line-value salary-line-value-reduce" id="salDependentDeductValue">0 VNĐ</span>
                             </div>
                             <div class="salary-row salary-row-readonly">
                                 <label><i class="bi bi-dash-square"></i> Bảo hiểm bắt buộc (đã trừ ở trên)</label>
-                                <span class="salary-line-value salary-line-value-deduct" id="salInsuranceRefValue">0 VNĐ</span>
+                                <span class="salary-line-value salary-line-value-reduce" id="salInsuranceRefValue">0 VNĐ</span>
                             </div>
                             <div class="salary-row salary-total-row">
                                 <label>Thu nhập tính thuế:</label>
@@ -1094,9 +1135,7 @@ Ngày nhận: d/m, d/m/yyyy, yyyy-mm-dd. Số thập phân dùng . hoặc ,"></t
                         <i class="bi bi-info-circle"></i> Chỉ dùng để ước tính, số liệu không được lưu lại. Form sẽ tự xóa khi đóng.
                     </div>
 
-                    <div class="d-flex justify-content-end mt-3">
-                        <button type="button" class="btn btn-cancel" id="salaryResetBtn"><i class="bi bi-arrow-counterclockwise"></i> Xóa hết</button>
-                    </div>
+                    
                 </div>
             </div>
         </div>
@@ -1118,7 +1157,7 @@ Ngày nhận: d/m, d/m/yyyy, yyyy-mm-dd. Số thập phân dùng . hoặc ,"></t
                     </div>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body text-center">
+                <div class="modal-body">
                     <div class="profile-avatar-container mb-3">
                         <img id="profileAvatar" class="profile-avatar-img" src="" alt="Avatar">
                         <button class="btn btn-sm btn-avatar-edit" id="changeAvatarBtn" title="Đổi ảnh đại diện">
@@ -1148,25 +1187,7 @@ Ngày nhận: d/m, d/m/yyyy, yyyy-mm-dd. Số thập phân dùng . hoặc ,"></t
                         <div class="input-group mt-2 d-none" id="profileNewDeptRow">
                             <input type="text" class="form-control" id="profileNewDeptName" maxlength="40" placeholder="Tên bộ phận mới">
                             <button class="btn btn-save" type="button" id="profileNewDeptSaveBtn"><i class="bi bi-check-lg"></i> Thêm</button>
-                        </div>
-                        <div class="form-text">Tự lưu khi chọn. Dùng để lọc ở Quay số, Thống kê job và Giờ làm việc. Để trống nếu chưa có.</div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold" for="profileNotifyLead"><i class="bi bi-bell-fill"></i> Nhắc job trước</label>
-                        <select class="form-select" id="profileNotifyLead">
-                            <option value="0">Đúng giờ (không nhắc trước)</option>
-                            <option value="5">5 phút</option>
-                            <option value="10">10 phút</option>
-                            <option value="15">15 phút</option>
-                            <option value="30">30 phút</option>
-                            <option value="60">1 giờ</option>
-                            <option value="120">2 giờ</option>
-                        </select>
-                        <div class="form-text">Tự lưu khi chọn. Nhắc trước và vẫn nhắc lại đúng giờ.</div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">UID</label>
-                        <p class="form-control-static text-muted small" id="profileUid">---</p>
+                        </div>                       
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -1178,6 +1199,57 @@ Ngày nhận: d/m, d/m/yyyy, yyyy-mm-dd. Số thập phân dùng . hoặc ,"></t
             </div>
         </div>
     </div>
+
+    <div class="modal fade" id="settingsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header modern-header modern-header-primary">
+                <div class="modern-header-inner">
+                    <div class="modern-header-icon"><i class="bi bi-gear-fill"></i></div>
+                    <div class="modern-header-text">
+                        <h5 class="modal-title mb-0">Cài đặt</h5>
+                        <p class="modern-header-subtitle mb-0">Tùy chỉnh trải nghiệm sử dụng</p>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <section class="settings-section">
+                    <div class="settings-section-head">
+                        <i class="bi bi-bell-fill"></i>
+                        <div>
+                            <h6>Nhắc job trước</h6>
+                            <small>Thông báo desktop sẽ xuất hiện sớm hơn giờ job</small>
+                        </div>
+                    </div>
+                    <select class="form-select" id="settingsNotifyLead">
+                        <option value="0">Đúng giờ (không nhắc trước)</option>
+                        <option value="5">5 phút</option>
+                        <option value="10">10 phút</option>
+                        <option value="15">15 phút</option>
+                        <option value="30">30 phút</option>
+                        <option value="60">1 giờ</option>
+                        <option value="120">2 giờ</option>
+                    </select>
+                </section>
+
+                <section class="settings-section">
+                    <div class="settings-section-head">
+                        <i class="bi bi-palette-fill"></i>
+                        <div>
+                            <h6>Chủ đề thanh Header</h6>
+                            <small>Trang trí riêng cho thanh trên cùng — không ảnh hưởng phần còn lại</small>
+                        </div>
+                    </div>
+                    <div class="theme-grid" id="themeGrid"></div>
+                </section>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-cancel" data-bs-dismiss="modal">Đóng</button>
+            </div>
+        </div>
+    </div>
+</div>
 
     <!-- Transfer Confirmation Modal -->
     <div class="modal fade" id="transferConfirmModal" tabindex="-1">
@@ -1583,18 +1655,27 @@ Ngày nhận: d/m, d/m/yyyy, yyyy-mm-dd. Số thập phân dùng . hoặc ,"></t
             </button>
         </div>
         <div class="quick-chat-filter-bar">
-            <input type="text" id="quickChatSearchInput" class="quick-chat-search-input" placeholder="🔍 Tìm nội dung job...">
-            <select id="quickChatStatusFilter" class="quick-chat-filter-select">
-                <option value="all">Tất cả trạng thái</option>
-                <option value="open">Chưa nhận</option>
-                <option value="invited">Đã chỉ định</option>
-                <option value="claimed">Đang làm</option>
-                <option value="completed">Hoàn thành</option>
-            </select>
-            <select id="quickChatAssigneeFilter" class="quick-chat-filter-select">
-                <option value="all">Tất cả người phụ trách</option>
-            </select>
-        </div>
+    <div class="quick-chat-filter-row-top">
+        <input type="text" id="quickChatSearchInput" class="quick-chat-search-input" placeholder="🔍 Tìm nội dung job...">
+        <button type="button" class="quick-chat-filter-toggle" id="quickChatFilterToggle"
+                title="Bộ lọc nâng cao" aria-expanded="false" aria-controls="quickChatFilterExtra">
+            <i class="bi bi-funnel-fill"></i>
+            <span class="quick-chat-filter-badge d-none" id="quickChatFilterBadge">0</span>
+        </button>
+    </div>
+    <div class="quick-chat-filter-extra" id="quickChatFilterExtra">
+        <select id="quickChatStatusFilter" class="quick-chat-filter-select">
+            <option value="all">Tất cả trạng thái</option>
+            <option value="open">Chưa nhận</option>
+            <option value="invited">Đã chỉ định</option>
+            <option value="claimed">Đang làm</option>
+            <option value="completed">Hoàn thành</option>
+        </select>
+        <select id="quickChatAssigneeFilter" class="quick-chat-filter-select">
+            <option value="all">Tất cả người phụ trách</option>
+        </select>
+    </div>
+</div>
         <div class="quick-chat-messages" id="quickChatMessages">
             <p class="quick-chat-empty">Chưa có job phát sinh nào trong hôm nay. Hãy nhập bên dưới để báo cho mọi người!</p>
         </div>
