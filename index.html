@@ -220,11 +220,22 @@
                                             <button class="layout-dropdown-item" id="checkDueBtn" type="button">
                                                 <span class="layout-item-ic"><i class="bi bi-calendar2-check-fill"></i></span>
                                                 <span class="layout-item-text">
-                                                    <span class="layout-item-title">Check Due</span>
+                                                    <span class="layout-item-title">Check Change Due</span>
                                                     <span class="layout-item-sub">So sánh dữ liệu due</span>
                                                 </span>
                                             </button>
                                         </li>
+                                        <li>
+    <button class="layout-dropdown-item" id="checkEtaDirectBtn" type="button">
+        <span class="layout-item-ic layout-item-ic-eta">
+            <i class="bi bi-calendar2-range-fill"></i>
+        </span>
+        <span class="layout-item-text">
+            <span class="layout-item-title">Check ETA &amp; Direct</span>
+            <span class="layout-item-sub">Ràng buộc vật tư · ngày giao hàng</span>
+        </span>
+    </button>
+</li>
                                         <li>
                                             <button class="layout-dropdown-item" id="presenterSpinBtn" type="button">
                                                 <span class="layout-item-ic layout-item-ic-spin"><i class="bi bi-dice-5-fill"></i></span>
@@ -796,6 +807,125 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
             </div>
         </div>
     </div>
+
+    <!-- Check ETA & Direct Modal -->
+<div class="modal fade" id="checkEtaDirectModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header modern-header modern-header-eta">
+                <div class="modern-header-inner">
+                    <div class="modern-header-icon"><i class="bi bi-calendar2-range-fill"></i></div>
+                    <div class="modern-header-text">
+                        <h5 class="modal-title mb-0">Check ETA &amp; Direct</h5>
+                        <p class="modern-header-subtitle mb-0">Ràng buộc LINE ALLOCATED · DIRECT · ETA · PICK UP · ASHTON</p>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+
+                <!-- VÙNG CÓ THỂ ẨN: từ mode tabs → toolbar (chứa nút Phân tích) -->
+                <div id="etaDirectInputWrap">
+
+                    <!-- Mode tabs -->
+                    <div class="check-due-mode-tabs" role="tablist">
+                        <button class="check-due-mode-tab active" id="etaDirectPasteTab"
+                                data-bs-toggle="tab" data-bs-target="#etaDirectPastePane"
+                                type="button" role="tab">
+                            <i class="bi bi-clipboard-data-fill"></i> Dán dữ liệu
+                        </button>
+                        <button class="check-due-mode-tab" id="etaDirectFileTab"
+                                data-bs-toggle="tab" data-bs-target="#etaDirectFilePane"
+                                type="button" role="tab">
+                            <i class="bi bi-cloud-arrow-up-fill"></i> Tải file Excel
+                        </button>
+                    </div>
+
+                    <div class="tab-content">
+                        <!-- Paste pane -->
+                        <div class="tab-pane fade show active" id="etaDirectPastePane" role="tabpanel">
+                            <div class="eta-input-block">
+                                <div class="eta-input-head">
+                                    <div class="eta-input-icon"><i class="bi bi-clipboard-data-fill"></i></div>
+                                    <div class="eta-input-info">
+                                        <h6>Dán dữ liệu từ Excel</h6>
+                                        <span>Dòng 1: ngày/đêm (mm/dd) · Dòng 2: header · Các dòng sau: dữ liệu</span>
+                                    </div>
+                                    <span class="eta-input-badge" id="etaDirectPasteBadge">0 dòng</span>
+                                </div>
+                                <textarea class="check-due-textarea eta-textarea-full" id="etaDirectPaste" rows="12"
+placeholder="Dán dữ liệu vào đây...
+
+Cấu trúc cần có:
+  · Dòng đầu tiên: các mốc ngày/đêm dạng mm/dd (VD: 10/8  10/8  10/9  10/9 ...)
+  · Dòng header: STYLE | LINE ALLOCATED | ... | ITEM | LINE | 1..14 | TOTAL | ... | ASHTON | DIRECT | ETA | PICK UP
+  · Các dòng dữ liệu bên dưới
+
+Hệ thống tự nhận diện cột theo tên header, không cần đúng thứ tự."></textarea>
+                            </div>
+                        </div>
+
+                        <!-- File pane -->
+                        <div class="tab-pane fade" id="etaDirectFilePane" role="tabpanel">
+                            <div class="eta-input-block">
+                                <label class="check-due-dropzone" for="etaDirectFile">
+                                    <i class="bi bi-cloud-arrow-up-fill"></i>
+                                    <span class="check-due-dropzone-title">Kéo thả hoặc bấm để chọn file Excel</span>
+                                    <span class="check-due-dropzone-hint">.xlsx · .xls · .xlsm · .xlsb · .csv</span>
+                                    <input type="file" id="etaDirectFile" accept=".xlsx,.xls,.xlsm,.xlsb,.csv" hidden>
+                                </label>
+                                <div class="check-due-file-info" id="etaDirectFileInfo">Chưa chọn file</div>
+                                <div class="eta-file-hint">
+                                    <i class="bi bi-info-circle"></i>
+                                    Tool tự dò tìm bảng dữ liệu: tự nhận diện dòng chứa ngày (mm/dd) và dòng header
+                                    (STYLE, LINE ALLOCATED, ITEM, DIRECT, ETA, PICK UP…), không cần đặt bảng ở A1.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Toolbar (chứa nút Phân tích) -->
+                    <div class="eta-toolbar-row">
+                        <div class="check-due-status" id="etaDirectStatus">
+                            <i class="bi bi-info-circle"></i> Sẵn sàng phân tích
+                        </div>
+                        <div class="check-due-toolbar-actions">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="etaDirectToggleInputBtn" title="Ẩn/hiện vùng dán dữ liệu">
+                                <i class="bi bi-eye-slash-fill"></i> <span>Ẩn dán dữ liệu</span>
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="etaDirectClearBtn">
+                                <i class="bi bi-eraser-fill"></i> Xóa
+                            </button>
+                            <button type="button" class="btn btn-compare" id="etaDirectAnalyzeBtn">
+                                <i class="bi bi-search"></i> Phân tích
+                                <div class="btn-shine"></div>
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+                <!-- /#etaDirectInputWrap -->
+
+                <section class="eta-result" id="etaDirectResultSection" style="display:none;">
+                    <div class="eta-stat-row" id="etaDirectStats"></div>
+                    <div class="eta-result-filters">
+                        <label class="eta-filter-toggle">
+                            <input type="checkbox" id="etaDirectOnlyIssues" checked>
+                            <span>Chỉ hiện dòng có vi phạm</span>
+                        </label>
+                        <div class="eta-legend">
+                            <span class="eta-legend-chip item-chip"><i class="bi bi-x-octagon-fill"></i> Vấn đề ITEM</span>
+                            <span class="eta-legend-chip row-chip"><i class="bi bi-x-circle-fill"></i> Vấn đề DÒNG</span>
+                            <span class="eta-legend-chip"><i class="bi bi-square-fill"></i> Ô vi phạm</span>
+                            <span class="eta-legend-chip direct-chip"><i class="bi bi-square-fill"></i> Ô chứa DIRECT</span>
+                        </div>
+                    </div>
+                    <div class="eta-grid-wrap" id="etaDirectGrid"></div>
+                </section>
+            </div>
+        </div>
+    </div>
+</div>
 
     <!-- Presenter Spin Modal -->
     <div class="modal fade" id="presenterSpinModal" tabindex="-1">

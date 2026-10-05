@@ -1082,6 +1082,27 @@ body.theme-dark .check-due-result-table thead th {
     color: var(--text);
 }
 
+body.theme-dark .check-due-result-table table,
+body.theme-dark .check-due-result-table thead,
+body.theme-dark .check-due-result-table tbody,
+body.theme-dark .check-due-result-table tr,
+body.theme-dark .check-due-result-table th,
+body.theme-dark .check-due-result-table td {
+    --bs-table-bg: transparent;
+    --bs-table-color: var(--text);
+    --bs-table-border-color: var(--border);
+    --bs-table-striped-bg: rgba(255,255,255,.02);
+    --bs-table-hover-bg: rgba(139,92,246,.08);
+    background-color: transparent;
+    color: var(--text);
+    border-color: var(--border);
+}
+
+body.theme-dark .check-due-diff {
+    background: rgba(220,38,38,.22);
+    color: #fca5a5;
+}
+
 /* ---------- Responsive ---------- */
 @media (max-width: 768px) {
     .check-due-body { padding: 1rem; }
@@ -6630,4 +6651,437 @@ body.no-theme-transition .topbar-badges *::after {
     font-optical-sizing: none;
     font-feature-settings: normal;
     letter-spacing: normal;
+}
+
+/* ============================================================
+   CHECK ETA & DIRECT — v3
+   ============================================================ */
+.layout-item-ic-eta {
+    background: linear-gradient(135deg, #f59e0b 0%, #ef4444 55%, #dc2626 100%);
+}
+.modal-header.modern-header-eta {
+    background: linear-gradient(135deg, #f59e0b 0%, #ef4444 55%, #dc2626 100%);
+}
+
+/* Modal rộng 99% viewport */
+#checkEtaDirectModal .modal-dialog {
+    width: 99vw;
+    max-width: 99vw;
+    margin: 0.5rem auto;
+}
+#checkEtaDirectModal .modal-content { max-height: calc(100vh - 1rem); }
+#checkEtaDirectModal .modal-body {
+    padding: 1rem 1.1rem 1.4rem;
+}
+
+/* --- Fix textarea bị thu nhỏ 1 bên --- */
+.eta-input-block {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1rem;
+    background: var(--surface-muted);
+    margin-bottom: 1rem;
+    width: 100%;
+    box-sizing: border-box;
+}
+.eta-input-head {
+    display: flex; align-items: center; gap: 0.75rem;
+    margin-bottom: 0.75rem; flex-wrap: wrap;
+}
+.eta-input-icon {
+    width: 38px; height: 38px; flex: none;
+    border-radius: 11px; color: #fff; font-size: 1.05rem;
+    display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #f59e0b, #ef4444);
+    box-shadow: 0 6px 14px rgba(239, 68, 68, 0.28);
+}
+.eta-input-info { flex: 1 1 200px; min-width: 0; }
+.eta-input-info h6 { margin: 0; font-size: 0.95rem; font-weight: 700; color: var(--text); }
+.eta-input-info span { display: block; font-size: 0.72rem; color: var(--muted); margin-top: 0.1rem; }
+.eta-input-badge {
+    padding: 0.28rem 0.7rem; border-radius: 999px;
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--muted); font-size: 0.7rem; font-weight: 700;
+    white-space: nowrap; transition: all 0.25s ease;
+}
+.eta-input-badge.has-data {
+    background: rgba(34, 197, 94, 0.12);
+    border-color: rgba(34, 197, 94, 0.35);
+    color: #16a34a;
+}
+
+.eta-textarea-full {
+    display: block;
+    width: 100% !important;
+    max-width: 100%;
+    min-height: 240px;
+    box-sizing: border-box;
+}
+
+.eta-file-hint {
+    margin-top: 0.75rem;
+    padding: 0.6rem 0.8rem;
+    background: var(--primary-soft);
+    border-radius: 10px;
+    color: var(--primary);
+    font-size: 0.74rem;
+    line-height: 1.4;
+}
+body.theme-dark .eta-file-hint {
+    background: rgba(122, 169, 255, 0.1);
+    color: #a5b4fc;
+}
+
+.eta-toolbar-row {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem; flex-wrap: wrap;
+    padding: 0.85rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    margin-bottom: 1rem;
+}
+
+.eta-result {
+    padding: 1.25rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+}
+.eta-stat-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+.eta-stat {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.85rem 1rem;
+    background: var(--surface-muted);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+}
+.eta-stat-icon {
+    width: 40px; height: 40px; flex: none;
+    border-radius: 11px; color: #fff; font-size: 1.05rem;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.15);
+}
+.eta-stat-icon.total   { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
+.eta-stat-icon.error   { background: linear-gradient(135deg, #ef4444, #dc2626); }
+.eta-stat-icon.warning { background: linear-gradient(135deg, #f59e0b, #d97706); }
+.eta-stat-icon.ok      { background: linear-gradient(135deg, #10b981, #16a34a); }
+.eta-stat-value {
+    font-size: 1.35rem; font-weight: 800; color: var(--text);
+    line-height: 1; letter-spacing: -0.02em;
+}
+.eta-stat-label {
+    margin-top: 0.25rem; font-size: 0.68rem; color: var(--muted);
+    font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+}
+
+.eta-result-filters {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem; flex-wrap: wrap;
+    margin-bottom: 0.85rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px dashed var(--border);
+}
+.eta-filter-toggle {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    font-size: 0.8rem; color: var(--text); cursor: pointer;
+}
+.eta-filter-toggle input { margin: 0; cursor: pointer; }
+.eta-legend { display: flex; gap: 0.85rem; flex-wrap: wrap; }
+.eta-legend-chip {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    font-size: 0.72rem; color: var(--muted); font-weight: 600;
+}
+.eta-legend-chip i { color: #ef4444; font-size: 0.9rem; }
+.eta-legend-chip.direct-chip i { color: #3b82f6; }
+.eta-legend-chip.item-chip i { color: #dc2626; }
+.eta-legend-chip.row-chip i { color: #ea580c; }
+
+/* ---------- Grid Excel ---------- */
+.eta-grid-wrap {
+    overflow: auto;
+    max-height: 68vh;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+}
+
+.eta-grid {
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.74rem;
+    width: max-content;
+    min-width: 100%;
+    font-family: var(--font-family);
+}
+.eta-grid th,
+.eta-grid td {
+    padding: 0.35rem 0.5rem;
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    text-align: left;
+    color: var(--text);
+    background: var(--surface);
+}
+.eta-grid thead th {
+    position: sticky;
+    background: var(--surface-strong);
+    font-weight: 700;
+    font-size: 0.66rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--text);
+    z-index: 2;
+    line-height: 1.15;
+}
+.eta-grid thead tr:first-child th { top: 0; }
+.eta-grid thead tr:nth-child(2) th { top: 30px; }
+
+/* Cột # — sticky duy nhất bên trái */
+.eta-grid .col-num {
+    position: sticky; left: 0; z-index: 5;
+    background: var(--surface-strong) !important;
+    min-width: 42px; text-align: center;
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+}
+.eta-grid thead .col-num { z-index: 6; }
+
+/* Cột ITEM / FRAME */
+.eta-grid .col-item {
+    min-width: 130px;
+    vertical-align: top;
+    background: var(--surface-strong) !important;
+}
+.eta-grid .col-item .item-name {
+    font-weight: 800;
+    font-size: 0.82rem;
+    color: var(--text);
+    line-height: 1.2;
+}
+.eta-grid .col-item .item-frame {
+    font-size: 0.66rem;
+    color: var(--muted);
+    margin-top: 2px;
+    line-height: 1.25;
+    font-weight: 500;
+}
+.eta-grid .col-item .item-total-badge {
+    display: inline-block;
+    margin-top: 4px;
+    padding: 1px 7px;
+    background: rgba(99, 102, 241, 0.14);
+    color: #4f46e5;
+    font-size: 0.68rem;
+    font-weight: 700;
+    border-radius: 999px;
+    letter-spacing: 0.01em;
+}
+body.theme-dark .eta-grid .col-item .item-total-badge {
+    background: rgba(165, 180, 252, 0.2);
+    color: #c7d2fe;
+}
+
+/* Cột LINE — gộp LINE + LINE ALLOCATED */
+.eta-grid .col-line {
+    min-width: 118px;
+    max-width: 160px;
+    vertical-align: top;
+    white-space: normal;
+    line-height: 1.2;
+}
+.eta-grid .col-line .line-main {
+    font-weight: 800;
+    color: var(--text);
+    font-size: 0.82rem;
+    letter-spacing: 0.01em;
+}
+.eta-grid .col-line .line-alloc {
+    display: block;
+    margin-top: 3px;
+    padding-top: 2px;
+    border-top: 1px dashed rgba(148, 163, 184, 0.35);
+    font-size: 0.6rem;
+    font-weight: 500;
+    color: var(--muted);
+    line-height: 1.3;
+    word-break: break-word;
+}
+body.theme-dark .eta-grid .col-line .line-alloc {
+    border-top-color: rgba(71, 85, 105, 0.6);
+}
+
+.eta-grid .col-qty   { min-width: 55px; text-align: right; font-variant-numeric: tabular-nums; }
+.eta-grid .col-day   { min-width: 42px; text-align: center; font-variant-numeric: tabular-nums; }
+.eta-grid .col-total { min-width: 62px; text-align: right; font-weight: 700; }
+.eta-grid .col-eta    { min-width: 60px; text-align: center; }
+.eta-grid .col-pickup { min-width: 65px; text-align: center; }
+
+/* Border đậm phân tách các NGÀY (2 cột day/night = 1 ngày) */
+.eta-grid th.day-group-end,
+.eta-grid td.day-group-end {
+    border-right: 2px solid rgba(99, 102, 241, 0.55) !important;
+}
+body.theme-dark .eta-grid th.day-group-end,
+body.theme-dark .eta-grid td.day-group-end {
+    border-right: 2px solid rgba(165, 180, 252, 0.5) !important;
+}
+
+/* Ô số lượng ngày */
+.eta-grid .cell-qty {
+    position: relative;
+    transition: background 0.15s ease;
+}
+.eta-grid .cell-qty.has-qty {
+    background: rgba(34, 197, 94, 0.08);
+    color: #15803d;
+    font-weight: 700;
+}
+body.theme-dark .eta-grid .cell-qty.has-qty {
+    background: rgba(34, 197, 94, 0.15);
+    color: #6ee7b7;
+}
+
+/* Ô vi phạm — tô đỏ */
+.eta-grid .cell-qty.violation {
+    background: rgba(239, 68, 68, 0.22) !important;
+    color: #991b1b !important;
+    box-shadow: inset 0 0 0 2px #dc2626;
+    font-weight: 800;
+}
+body.theme-dark .eta-grid .cell-qty.violation {
+    background: rgba(239, 68, 68, 0.35) !important;
+    color: #fecaca !important;
+    box-shadow: inset 0 0 0 2px #f87171;
+}
+.eta-grid .cell-qty.violation-eta::after {
+    content: '⛔';
+    position: absolute;
+    top: -3px; right: -3px;
+    font-size: 0.65rem;
+}
+
+/* Phân tách các dòng của cùng 1 item */
+.eta-grid tbody tr.item-row td:not(.col-item):not(.col-item-issues) {
+    border-top: 1px dashed rgba(148, 163, 184, 0.22);
+}
+.eta-grid tbody tr.item-row:first-child td,
+.eta-grid tbody tr.item-row + tr:not(.item-row) td { border-top: 1px solid var(--border); }
+.eta-grid tbody tr.item-row-last td,
+.eta-grid tbody tr.item-row:has(+ tr:not(.item-row)) td {
+    border-bottom: 2px solid rgba(99, 102, 241, 0.28) !important;
+}
+body.theme-dark .eta-grid tbody tr.item-row td:not(.col-item):not(.col-item-issues) {
+    border-top-color: rgba(71, 85, 105, 0.4);
+}
+body.theme-dark .eta-grid tbody tr.item-row-last td {
+    border-bottom-color: rgba(165, 180, 252, 0.35) !important;
+}
+
+/* Cột vấn đề ITEM (rowspan) */
+.eta-grid .col-item-issues {
+    min-width: 280px;
+    max-width: 380px;
+    white-space: normal;
+    vertical-align: top;
+    background: rgba(239, 68, 68, 0.04);
+    border-left: 2px solid rgba(239, 68, 68, 0.35);
+}
+body.theme-dark .eta-grid .col-item-issues {
+    background: rgba(239, 68, 68, 0.08);
+    border-left-color: rgba(248, 113, 113, 0.5);
+}
+
+/* Cột vấn đề DÒNG */
+.eta-grid .col-row-issues {
+    min-width: 240px;
+    max-width: 340px;
+    white-space: normal;
+    vertical-align: top;
+    background: rgba(234, 88, 12, 0.03);
+    border-left: 2px solid rgba(234, 88, 12, 0.3);
+}
+body.theme-dark .eta-grid .col-row-issues {
+    background: rgba(234, 88, 12, 0.08);
+    border-left-color: rgba(251, 146, 60, 0.45);
+}
+
+/* Issue blocks */
+.eta-issue-list { display: flex; flex-direction: column; gap: 0.3rem; }
+.eta-issue {
+    display: flex; align-items: flex-start; gap: 0.4rem;
+    padding: 0.3rem 0.55rem; border-radius: 8px;
+    font-size: 0.72rem; line-height: 1.35;
+}
+.eta-issue.error   { background: rgba(239, 68, 68, 0.12); color: #b91c1c; font-weight: 600; }
+.eta-issue.warning { background: rgba(245, 158, 11, 0.14); color: #b45309; font-weight: 600; }
+body.theme-dark .eta-issue.error   { background: rgba(239, 68, 68, 0.22); color: #fca5a5; }
+body.theme-dark .eta-issue.warning { background: rgba(245, 158, 11, 0.22); color: #fcd34d; }
+
+/* Item-level issues: viền trái đậm hơn để phân biệt */
+.eta-issue.item-level {
+    border-left: 3px solid #dc2626;
+    background: rgba(220, 38, 38, 0.15);
+}
+.eta-issue.item-level.warning { border-left-color: #f59e0b; background: rgba(245, 158, 11, 0.16); }
+body.theme-dark .eta-issue.item-level { background: rgba(220, 38, 38, 0.28); }
+body.theme-dark .eta-issue.item-level.warning { background: rgba(245, 158, 11, 0.28); }
+
+.eta-pill {
+    display: inline-block; padding: 0.1rem 0.45rem;
+    border-radius: 999px; font-weight: 700; font-size: 0.66rem;
+    white-space: nowrap;
+}
+.eta-pill.direct { background: rgba(59, 130, 246, 0.15); color: #2563eb; }
+.eta-pill.ashton { background: rgba(236, 72, 153, 0.15); color: #db2777; }
+.eta-pill.eta    { background: rgba(239, 68, 68, 0.15); color: #dc2626; }
+.eta-pill.pickup { background: rgba(245, 158, 11, 0.18); color: #b45309; }
+
+.eta-empty {
+    text-align: center; padding: 2rem 1rem;
+    color: var(--muted); font-size: 0.88rem;
+}
+.eta-empty i { font-size: 2.2rem; color: #16a34a; display: block; margin-bottom: 0.5rem; }
+
+/* Dark mode override */
+body.theme-dark .eta-grid th,
+body.theme-dark .eta-grid td { border-color: #2c3a4d; }
+body.theme-dark .eta-grid tbody td { background: #111827; }
+body.theme-dark .eta-grid tbody tr:nth-child(even) td:not(.col-item):not(.col-num):not(.col-item-issues) { background: #0f172a; }
+body.theme-dark .eta-grid .col-num,
+body.theme-dark .eta-grid .col-item { background: #1d293a !important; }
+body.theme-dark .eta-grid thead th { background: #1d293a; }
+body.theme-dark .eta-grid-wrap { background: #0b1220; }
+
+@media (max-width: 768px) {
+    .eta-toolbar-row { flex-direction: column; align-items: stretch; }
+    .eta-result { padding: 0.85rem; }
+    .eta-grid { font-size: 0.68rem; }
+    .eta-grid th, .eta-grid td { padding: 0.28rem 0.35rem; }
+}
+
+/* Vùng dán dữ liệu có thể ẩn/hiện bằng nút "Ẩn dán dữ liệu" */
+#etaDirectInputWrap {
+    transition: opacity .2s ease;
+}
+
+#etaDirectInputWrap.eta-hidden {
+    display: none !important;
+}
+
+/* Nút toggle: giữ icon + label thẳng hàng */
+#etaDirectToggleInputBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    white-space: nowrap;
+}
+#etaDirectToggleInputBtn i {
+    font-size: 0.85rem;
 }

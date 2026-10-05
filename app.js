@@ -134,6 +134,9 @@ let pendingTransferRequestsList = [];
 let transferRequestsInitialLoadDone = false;
 let quickJobTransferInitialLoadDone = false;
 
+let checkEtaDirectModal = null;
+let checkEtaDirectParsed = null;
+let checkEtaDirectResults = [];
 
 // Statistics
 let statisticsModal = null;
@@ -833,6 +836,13 @@ document.addEventListener('DOMContentLoaded', function() {
     migrateLegacyJobsModal = new bootstrap.Modal(document.getElementById('migrateLegacyJobsModal'));
     viewDataModal = new bootstrap.Modal(document.getElementById('viewDataModal'));
     checkDueModal = new bootstrap.Modal(document.getElementById('checkDueModal'));
+    checkEtaDirectModal = new bootstrap.Modal(document.getElementById('checkEtaDirectModal'));
+
+document.getElementById('checkEtaDirectBtn').addEventListener('click', openCheckEtaDirectModal);
+document.getElementById('etaDirectAnalyzeBtn').addEventListener('click', runEtaDirectAnalysis);
+document.getElementById('etaDirectClearBtn').addEventListener('click', clearEtaDirectForm);
+document.getElementById('etaDirectPaste').addEventListener('input', scheduleEtaDirectBadgeUpdate);
+
     presenterSpinModal = new bootstrap.Modal(document.getElementById('presenterSpinModal'));
     dayOffModal = new bootstrap.Modal(document.getElementById('dayOffModal'));
     salaryCalcModal = new bootstrap.Modal(document.getElementById('salaryCalcModal'));
@@ -7696,6 +7706,671 @@ function renderStatistics() {
     });
     html += '</tbody></table>';
     tableEl.innerHTML = html;
+}
+
+// ============================================================
+// CHECK ETA & DIRECT — v3
+// - Line S112 / M177 là BACKUP LINE → bỏ qua check LINE ALLOCATED
+// - 2 cột day+night cùng ngày → gộp khi check direct & pickup
+// - Nhiều line cùng 1 ITEM → gộp tổng SL theo item để check direct
+// ============================================================
+
+const ETA_DIRECT_DATE_RE = /^\d{1,2}\/\d{1,2}$/;
+const ETA_BACKUP_LINES = ['S112', 'M177'];
+
+// `checkEtaDirectModal`, `checkEtaDirectParsed`, `checkEtaDirectResults` đã khai báo ở đầu file.
+
+function isBackupLine(line) {
+    if (!line) return false;
+    return ETA_BACKUP_LINES.includes(String(line).trim().toUpperCase());
+}
+
+function openCheckEtaDirectModal() {
+    checkEtaDirectModal.show();
+
+    // Đồng bộ nút toggle với trạng thái hiện tại của vùng dán
+    const wrap = document.getElementById('etaDirectInputWrap');
+    const btn = document.getElementById('etaDirectToggleInputBtn');
+    if (wrap && btn) {
+        const hidden = wrap.classList.contains('eta-hidden');
+        btn.querySelector('i').className = hidden ? 'bi bi-eye-fill' : 'bi bi-eye-slash-fill';
+        btn.querySelector('span').textContent = hidden ? 'Hiện dán dữ liệu' : 'Ẩn dán dữ liệu';
+    }
+
+    updateEtaDirectStatus('Sẵn sàng phân tích');
+}
+
+function clearEtaDirectForm() {
+    const ta = document.getElementById('etaDirectPaste');
+    if (ta) ta.value = '';
+    const fi = document.getElementById('etaDirectFile');
+    if (fi) fi.value = '';
+    checkEtaDirectParsed = null;
+    checkEtaDirectResults = [];
+    document.getElementById('etaDirectResultSection').style.display = 'none';
+    document.getElementById('etaDirectPasteBadge').textContent = '0 dòng';
+    document.getElementById('etaDirectPasteBadge').classList.remove('has-data');
+    const fileInfo = document.getElementById('etaDirectFileInfo');
+    fileInfo.textContent = 'Chưa chọn file';
+    fileInfo.classList.remove('has-file');
+    updateEtaDirectStatus('Sẵn sàng phân tích');
+
+    document.getElementById('etaDirectInputWrap')?.classList.remove('eta-hidden');
+    const btn = document.getElementById('etaDirectToggleInputBtn');
+    if (btn) {
+        btn.querySelector('i').className = 'bi bi-eye-slash-fill';
+        btn.querySelector('span').textContent = 'Ẩn dán dữ liệu';
+    }
+}
+
+function updateEtaDirectStatus(msg) {
+    const el = document.getElementById('etaDirectStatus');
+    if (!el) return;
+    el.innerHTML = msg
+        ? `<i class="bi bi-info-circle"></i> ${escapeHtml(msg)}`
+        : `<i class="bi bi-info-circle"></i> Sẵn sàng phân tích`;
+}
+
+let etaDirectBadgeTimer = null;
+function scheduleEtaDirectBadgeUpdate() {
+    clearTimeout(etaDirectBadgeTimer);
+    etaDirectBadgeTimer = setTimeout(() => {
+        const text = document.getElementById('etaDirectPaste').value;
+        const badge = document.getElementById('etaDirectPasteBadge');
+        if (!text.trim()) {
+            badge.textContent = '0 dòng';
+            badge.classList.remove('has-data');
+            return;
+        }
+        const lines = text.split(/\r?\n/).filter(l => l.trim());
+        const count = Math.max(0, lines.length - 2);
+        badge.textContent = `${count} dòng`;
+        badge.classList.toggle('has-data', count > 0);
+    }, 180);
+}
+
+function parseEtaDateMMDD(str) {
+    if (!str) return null;
+    const m = String(str).trim().match(/^(\d{1,2})\/(\d{1,2})$/);
+    if (!m) return null;
+    const month = parseInt(m[1], 10), day = parseInt(m[2], 10);
+    if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+    const d = new Date(2026, month - 1, day);
+    if (d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+    return d;
+}
+
+function etaParseNum(v) {
+    if (v == null) return 0;
+    const s = String(v).trim().replace(/,/g, '');
+    if (!s) return 0;
+    const n = parseFloat(s);
+    return Number.isFinite(n) ? n : 0;
+}
+
+function etaSplitLine(line) {
+    if (line.includes('\t')) return line.split('\t');
+    return line.split(/\s{2,}/);
+}
+
+function etaMatrixToText(matrix) {
+    if (!matrix || !matrix.length) return '';
+    return matrix.map(row => (row || []).map(c => c == null ? '' : String(c)).join('\t')).join('\n');
+}
+
+function findEtaTable(text) {
+    const rawLines = String(text || '').split(/\r?\n/);
+    let dateLineIdx = -1;
+
+    for (let i = 0; i < rawLines.length; i++) {
+        const cells = etaSplitLine(rawLines[i]);
+        const dateCount = cells.filter(c => ETA_DIRECT_DATE_RE.test((c || '').trim())).length;
+        if (dateCount >= 2) { dateLineIdx = i; break; }
+    }
+    if (dateLineIdx === -1) return null;
+
+    let headerLineIdx = -1;
+    const KEYWORDS = ['STYLE', 'ITEM', 'LINE', 'DIRECT', 'ETA', 'PICK UP', 'PICKUP', 'FRAME', 'LINE ALLOCATED'];
+    for (let i = dateLineIdx + 1; i < Math.min(dateLineIdx + 6, rawLines.length); i++) {
+        const upper = rawLines[i].toUpperCase();
+        let hits = 0;
+        KEYWORDS.forEach(k => { if (upper.includes(k)) hits++; });
+        if (hits >= 2) { headerLineIdx = i; break; }
+    }
+    if (headerLineIdx === -1) return null;
+
+    return { rawLines, dateLineIdx, headerLineIdx };
+}
+
+function parseEtaDirectFromText(text) {
+    const found = findEtaTable(text);
+    if (!found) {
+        return { error: 'Không tìm thấy bảng: cần 1 dòng chứa ngày (mm/dd) và 1 dòng header (STYLE/LINE ALLOCATED/ITEM/DIRECT/ETA…).' };
+    }
+
+    const { rawLines, dateLineIdx, headerLineIdx } = found;
+    const dateCells   = etaSplitLine(rawLines[dateLineIdx]);
+    const headerCells = etaSplitLine(rawLines[headerLineIdx]).map(c => (c || '').trim().toUpperCase());
+
+    const dayColumns = [];
+    dateCells.forEach((cell, i) => {
+        const v = (cell || '').trim();
+        if (ETA_DIRECT_DATE_RE.test(v)) dayColumns.push({ index: i, date: v });
+    });
+    if (!dayColumns.length) return { error: 'Dòng ngày không có mốc mm/dd hợp lệ.' };
+
+    const findCol = (pred) => headerCells.findIndex(pred);
+    const colStyle     = findCol(h => h === 'STYLE');
+    const colLineAlloc = findCol(h => h.includes('LINE ALLOCATED'));
+    const colFrame     = findCol(h => h === 'FRAME');
+    const colEff       = findCol(h => h === 'EFF');
+    const colItem      = findCol(h => h === 'ITEM');
+    const colTotal     = findCol(h => h === 'TOTAL');
+    const colLock      = findCol(h => h === 'LOCK_QTY');
+    const colRemain    = findCol(h => h === 'REMAIN');
+    const colAshton    = findCol(h => h === 'ASHTON');
+    const colDirect    = findCol(h => h === 'DIRECT');
+    const colEta       = findCol(h => h === 'ETA');
+    const colPickup    = findCol(h => h === 'PICK UP' || h === 'PICKUP' || h === 'PICK_UP');
+
+    let colLine = -1;
+    const afterAlloc = colLineAlloc >= 0 ? colLineAlloc + 1 : 0;
+    const beforeDay = dayColumns[0].index;
+    for (let i = afterAlloc; i < beforeDay; i++) {
+        if (headerCells[i] === 'LINE') { colLine = i; break; }
+    }
+    if (colLine === -1) colLine = findCol(h => h === 'LINE');
+
+    if (colItem === -1) return { error: 'Không tìm thấy cột ITEM trong header.' };
+
+    const rows = [];
+    for (let i = headerLineIdx + 1; i < rawLines.length; i++) {
+        if (!rawLines[i].trim()) continue;
+        const cells = etaSplitLine(rawLines[i]);
+        const item = (cells[colItem] || '').trim();
+        if (!item) continue;
+
+        rows.push({
+            rowIndex: rows.length + 1,
+            style:         colStyle >= 0 ? (cells[colStyle] || '').trim() : '',
+            lineAllocated: colLineAlloc >= 0 ? (cells[colLineAlloc] || '').trim() : '',
+            frame:         colFrame >= 0 ? (cells[colFrame] || '').trim() : '',
+            eff:           colEff >= 0 ? (cells[colEff] || '').trim() : '',
+            item,
+            line:          colLine >= 0 ? (cells[colLine] || '').trim() : '',
+            total:   colTotal >= 0  ? etaParseNum(cells[colTotal])  : 0,
+            lockQty: colLock >= 0   ? etaParseNum(cells[colLock])   : 0,
+            remain:  colRemain >= 0 ? etaParseNum(cells[colRemain]) : 0,
+            ashton:  colAshton >= 0 ? etaParseNum(cells[colAshton]) : 0,
+            direct:  colDirect >= 0 ? etaParseNum(cells[colDirect]) : 0,
+            eta:     colEta >= 0    ? (cells[colEta] || '').trim()    : '',
+            pickup:  colPickup >= 0 ? (cells[colPickup] || '').trim() : '',
+            dailyQty: dayColumns.map(dc => ({
+                date: dc.date,
+                qty: etaParseNum(cells[dc.index])
+            }))
+        });
+    }
+
+    if (!rows.length) return { error: 'Không có dòng dữ liệu hợp lệ (cột ITEM rỗng toàn bộ).' };
+
+    return { dayColumns, headerCells, rows };
+}
+
+// Group các cột theo ngày (2 cột day/night cùng 1 ngày → 1 group)
+function buildDayGroups(dayColumns) {
+    const groups = [];
+    const map = new Map();
+    dayColumns.forEach((dc, i) => {
+        if (!map.has(dc.date)) {
+            const g = { date: dc.date, indexes: [] };
+            map.set(dc.date, g);
+            groups.push(g);
+        }
+        map.get(dc.date).indexes.push(i);
+    });
+    return groups;
+}
+
+// ── Row-level checks: LINE ALLOCATED (bỏ qua backup), không chạy trước ETA ──
+function analyzeRowLevelEta(row) {
+    const rowIssues = [];
+    const rowViolations = new Map();  // colIdx → 'eta'
+
+    // LINE ALLOCATED — bỏ qua nếu line là backup (S112, M177)
+    if (row.line && !isBackupLine(row.line) && row.lineAllocated) {
+        const allowed = row.lineAllocated.split(/[,;]/)
+            .map(s => s.trim().toUpperCase()).filter(Boolean);
+        if (allowed.length && !allowed.includes(row.line.toUpperCase())) {
+            rowIssues.push({
+                level: 'error', code: 'LINE', scope: 'row',
+                msg: `Line "${row.line}" không nằm trong LINE ALLOCATED (${row.lineAllocated})`
+            });
+        }
+    }
+
+    // ETA — không được có SL trước ngày ETA
+    const etaDate = parseEtaDateMMDD(row.eta);
+    if (etaDate) {
+        let sumBefore = 0;
+        row.dailyQty.forEach((d, ci) => {
+            if (d.qty <= 0) return;
+            const dd = parseEtaDateMMDD(d.date);
+            if (dd && dd.getTime() < etaDate.getTime()) {
+                rowViolations.set(ci, 'eta');
+                sumBefore += d.qty;
+            }
+        });
+        if (sumBefore > 0) {
+            rowIssues.push({
+                level: 'error', code: 'ETA', scope: 'row',
+                msg: `Chạy ${sumBefore} SL trước ETA ${row.eta}`
+            });
+        }
+    }
+
+    return { rowIssues, rowViolations };
+}
+
+// ── Item-level checks ──
+// (gộp tất cả line cùng ITEM, tổng 2 ô cùng ngày là 1 ngày)
+function analyzeItemLevelEta(itemRows, dayColumns) {
+    const itemIssues = [];
+    const dayGroups = buildDayGroups(dayColumns);
+
+    // Tổng SL của item theo từng ngày (cộng 2 cột day+night của cùng ngày, cộng mọi line)
+    const dayTotals = dayGroups.map(g => {
+        const qty = itemRows.reduce((sum, row) =>
+            sum + g.indexes.reduce((s, ci) => s + (row.dailyQty[ci]?.qty || 0), 0), 0);
+        return { date: g.date, dateObj: parseEtaDateMMDD(g.date), qty };
+    });
+    const totalSL = dayTotals.reduce((s, d) => s + d.qty, 0);
+
+    // Direct / Ashton: lấy max trên tất cả các dòng của item
+    const direct = Math.max(0, ...itemRows.map(r => r.direct || 0));
+    const ashton = Math.max(0, ...itemRows.map(r => r.ashton || 0));
+
+    // 1) Đủ DIRECT — tổng SL 14 cột phải ≥ DIRECT (không cần đúng ngày)
+    if (direct > 0 && totalSL < direct) {
+        itemIssues.push({
+            level: 'error', code: 'DIRECT', scope: 'item',
+            msg: `Tổng SL ${totalSL} < DIRECT ${direct} — thiếu ${direct - totalSL}`
+        });
+    }
+
+    // 2) Đủ ASHTON — CHECK RIÊNG, KHÔNG gộp với DIRECT.
+    //    ASHTON chỉ cần lên đủ số lượng trong 14 cột, ngày nào cũng được,
+    //    không cần đúng ngày PICKUP, không cộng thêm DIRECT để so.
+    if (ashton > 0 && totalSL < ashton) {
+        itemIssues.push({
+            level: 'error', code: 'ASHTON', scope: 'item',
+            msg: `Tổng SL ${totalSL} < ASHTON ${ashton} — thiếu ${ashton - totalSL}`
+        });
+    }
+
+    // 3) ETA > PICK UP → không thể đáp ứng đúng hạn (chỉ cảnh báo, không tính SL)
+    const etas = itemRows.map(r => parseEtaDateMMDD(r.eta)).filter(Boolean);
+    const pickups = itemRows.map(r => parseEtaDateMMDD(r.pickup)).filter(Boolean);
+    if (etas.length && pickups.length) {
+        const latestEta = new Date(Math.max(...etas.map(d => d.getTime())));
+        const earliestPickup = new Date(Math.min(...pickups.map(d => d.getTime())));
+        if (latestEta.getTime() > earliestPickup.getTime()) {
+            const etaLabel = itemRows.find(r => r.eta)?.eta || '';
+            const pickupLabel = itemRows.find(r => r.pickup)?.pickup || '';
+            itemIssues.push({
+                level: 'warning', code: 'ETA_PICKUP', scope: 'item',
+                msg: `ETA ${etaLabel} → không thể lên PICK UP ${pickupLabel}`
+            });
+        }
+    }
+
+    return { itemIssues, totalSL, direct, ashton, dayTotals };
+}
+
+function runEtaDirectAnalysis() {
+    const text = document.getElementById('etaDirectPaste').value;
+    const isFileTab = document.getElementById('etaDirectFileTab').classList.contains('active');
+    const fileInput = document.getElementById('etaDirectFile');
+    const fileChosen = fileInput && fileInput.files && fileInput.files[0];
+
+    if (isFileTab && !fileChosen) {
+        updateEtaDirectStatus('Vui lòng chọn file Excel trước khi phân tích.');
+        return;
+    }
+    if (!isFileTab && !text.trim()) {
+        updateEtaDirectStatus('Vui lòng dán dữ liệu trước khi phân tích.');
+        return;
+    }
+
+    const btn = document.getElementById('etaDirectAnalyzeBtn');
+    const originalHTML = btn.innerHTML;
+    btn.innerHTML = '<span class="loading"></span> Đang phân tích...';
+    btn.disabled = true;
+
+    const finish = (textOrError) => {
+        if (typeof textOrError === 'string' && textOrError.startsWith('__ERR__:')) {
+            updateEtaDirectStatus(textOrError.replace('__ERR__:', 'Lỗi: '));
+            btn.innerHTML = originalHTML; btn.disabled = false;
+            return;
+        }
+        const parsed = parseEtaDirectFromText(textOrError);
+        if (parsed.error) {
+            updateEtaDirectStatus(`Lỗi: ${parsed.error}`);
+            btn.innerHTML = originalHTML; btn.disabled = false;
+            return;
+        }
+        checkEtaDirectParsed = parsed;
+
+        // Row-level: tính cho từng dòng Excel
+        const rowLevels = parsed.rows.map(row => analyzeRowLevelEta(row));
+
+        // Group by ITEM để check item-level
+        const itemGroupsMap = new Map();
+        parsed.rows.forEach(row => {
+            if (!itemGroupsMap.has(row.item)) itemGroupsMap.set(row.item, []);
+            itemGroupsMap.get(row.item).push(row);
+        });
+        const itemLevels = new Map();
+        itemGroupsMap.forEach((rows, item) => {
+            itemLevels.set(item, analyzeItemLevelEta(rows, parsed.dayColumns));
+        });
+
+        checkEtaDirectResults = parsed.rows.map((row, idx) => ({
+            row,
+            rowLevel: rowLevels[idx],
+            itemKey: row.item,
+            itemLevel: itemLevels.get(row.item),
+            sumDaily: row.dailyQty.reduce((s, d) => s + (d.qty || 0), 0),
+        }));
+
+        renderEtaDirectResults();
+        btn.innerHTML = originalHTML; btn.disabled = false;
+        updateEtaDirectStatus(`Đã phân tích ${parsed.rows.length} dòng · ${itemGroupsMap.size} item · ${parsed.dayColumns.length} cột ngày/đêm`);
+    };
+
+    if (isFileTab && fileChosen) {
+        readExcelRawMatrix(fileChosen).then(({ matrix }) => {
+            finish(etaMatrixToText(matrix));
+        }).catch(err => {
+            console.error('Lỗi đọc file ETA Direct:', err);
+            finish('__ERR__:Không đọc được file Excel. Kiểm tra lại định dạng.');
+        });
+    } else {
+        setTimeout(() => finish(text), 250);
+    }
+}
+
+function renderEtaDirectResults() {
+    const section = document.getElementById('etaDirectResultSection');
+    section.style.display = '';
+
+    const total = checkEtaDirectResults.length;
+    const uniqueItems = new Set(checkEtaDirectResults.map(r => r.itemKey));
+
+    const hasErrorRow = (r) => r.itemLevel.itemIssues.some(i => i.level === 'error') ||
+                              r.rowLevel.rowIssues.some(i => i.level === 'error');
+    const hasWarnRow  = (r) => !hasErrorRow(r) &&
+                              (r.itemLevel.itemIssues.length > 0 || r.rowLevel.rowIssues.length > 0);
+
+    const withError = checkEtaDirectResults.filter(hasErrorRow).length;
+    const withWarn  = checkEtaDirectResults.filter(hasWarnRow).length;
+    const okCount   = total - withError - withWarn;
+    const totalDirect = checkEtaDirectResults.reduce((s, r) => s + (r.row.direct || 0), 0);
+
+    document.getElementById('etaDirectStats').innerHTML = `
+        <div class="eta-stat">
+            <div class="eta-stat-icon total"><i class="bi bi-list-ul"></i></div>
+            <div>
+                <div class="eta-stat-value">${total}</div>
+                <div class="eta-stat-label">Tổng dòng · ${uniqueItems.size} item</div>
+            </div>
+        </div>
+        <div class="eta-stat">
+            <div class="eta-stat-icon error"><i class="bi bi-x-octagon-fill"></i></div>
+            <div>
+                <div class="eta-stat-value">${withError}</div>
+                <div class="eta-stat-label">Dòng vi phạm</div>
+            </div>
+        </div>
+        <div class="eta-stat">
+            <div class="eta-stat-icon warning"><i class="bi bi-exclamation-triangle-fill"></i></div>
+            <div>
+                <div class="eta-stat-value">${withWarn}</div>
+                <div class="eta-stat-label">Dòng cảnh báo</div>
+            </div>
+        </div>
+        <div class="eta-stat">
+            <div class="eta-stat-icon ok"><i class="bi bi-check-circle-fill"></i></div>
+            <div>
+                <div class="eta-stat-value">${okCount}</div>
+                <div class="eta-stat-label">Dòng hợp lệ</div>
+            </div>
+        </div>
+        <div class="eta-stat">
+            <div class="eta-stat-icon total"><i class="bi bi-flag-fill"></i></div>
+            <div>
+                <div class="eta-stat-value">${totalDirect.toLocaleString('vi-VN')}</div>
+                <div class="eta-stat-label">Tổng DIRECT</div>
+            </div>
+        </div>
+    `;
+
+    renderEtaDirectGrid();
+}
+
+function renderEtaDirectRowCells(res, dayColumns) {
+    const row = res.row;
+    const rl = res.rowLevel;
+
+    // Cột LINE — gộp LINE + LINE ALLOCATED
+    const lineCell = `<td class="col-line">
+        <div class="line-main">${escapeHtml(row.line || '—')}</div>
+        ${row.lineAllocated ? `<span class="line-alloc" title="LINE ALLOCATED: ${escapeHtml(row.lineAllocated)}">${escapeHtml(row.lineAllocated)}</span>` : ''}
+    </td>`;
+
+    const etaCell    = `<td class="col-eta">${row.eta    ? `<span class="eta-pill eta">${escapeHtml(row.eta)}</span>` : '<span class="text-muted">—</span>'}</td>`;
+    const pickupCell = `<td class="col-pickup">${row.pickup ? `<span class="eta-pill pickup">${escapeHtml(row.pickup)}</span>` : '<span class="text-muted">—</span>'}</td>`;
+    const directCell = `<td class="col-qty">${row.direct > 0 ? `<span class="eta-pill direct">${row.direct}</span>` : '<span class="text-muted">—</span>'}</td>`;
+    const ashtonCell = `<td class="col-qty">${row.ashton > 0 ? `<span class="eta-pill ashton">${row.ashton}</span>` : '<span class="text-muted">—</span>'}</td>`;
+
+    const qtyCells = row.dailyQty.map((d, ci) => {
+        const v = rl.rowViolations.get(ci);
+        const classes = ['col-day', 'cell-qty'];
+        if (d.qty > 0) classes.push('has-qty');
+        const nextDate = dayColumns[ci + 1]?.date;
+        if (!nextDate || nextDate !== d.date) classes.push('day-group-end');
+        if (v) {
+            classes.push('violation');
+            if (v === 'eta') classes.push('violation-eta');
+        }
+        const title = `${d.qty > 0 ? 'SL ' + d.qty : ''}${v ? ' · Vi phạm' : ''}`;
+        return `<td class="${classes.join(' ')}" title="${title.trim()}">${d.qty > 0 ? d.qty : ''}</td>`;
+    }).join('');
+
+    const totalCell = `<td class="col-total">${res.sumDaily.toLocaleString('vi-VN')}</td>`;
+
+    return lineCell + etaCell + pickupCell + directCell + ashtonCell + qtyCells + totalCell;
+}
+
+function renderEtaDirectGrid() {
+    const gridEl = document.getElementById('etaDirectGrid');
+    if (!checkEtaDirectParsed) { gridEl.innerHTML = ''; return; }
+
+    const onlyIssues = document.getElementById('etaDirectOnlyIssues').checked;
+    const { dayColumns } = checkEtaDirectParsed;
+
+    // Nhóm dòng theo ITEM
+    const itemGroups = [];
+    const itemMap = new Map();
+    checkEtaDirectResults.forEach((r, i) => {
+        if (!itemMap.has(r.itemKey)) {
+            const g = { item: r.itemKey, indexes: [] };
+            itemMap.set(r.itemKey, g);
+            itemGroups.push(g);
+        }
+        itemMap.get(r.itemKey).indexes.push(i);
+    });
+
+    // Sắp xếp: item có lỗi → warning → ok
+    const groupSeverity = (g) => {
+        const firstRes = checkEtaDirectResults[g.indexes[0]];
+        if (firstRes.itemLevel.itemIssues.some(i => i.level === 'error') ||
+            g.indexes.some(i => checkEtaDirectResults[i].rowLevel.rowIssues.some(x => x.level === 'error'))) return 0;
+        if (firstRes.itemLevel.itemIssues.length ||
+            g.indexes.some(i => checkEtaDirectResults[i].rowLevel.rowIssues.length)) return 1;
+        return 2;
+    };
+    itemGroups.sort((a, b) => {
+        const s = groupSeverity(a) - groupSeverity(b);
+        return s !== 0 ? s : a.indexes[0] - b.indexes[0];
+    });
+
+    // Lọc
+    const visibleItems = onlyIssues
+        ? itemGroups.filter(g => groupSeverity(g) < 2)
+        : itemGroups;
+
+    if (!visibleItems.length) {
+        gridEl.innerHTML = `
+            <div class="eta-empty">
+                <i class="bi bi-shield-check"></i>
+                <strong>Không phát hiện vi phạm nào!</strong><br>
+                Tất cả ${itemGroups.length} item đều thỏa mãn ràng buộc LINE · DIRECT · ETA · PICK UP.
+            </div>`;
+        return;
+    }
+
+    // THEAD
+    const dateHeaderCells = dayColumns.map((dc, i) => {
+        const nextDate = dayColumns[i + 1]?.date;
+        const isLastInDay = !nextDate || nextDate !== dc.date;
+        return `<th class="col-day ${isLastInDay ? 'day-group-end' : ''}">${escapeHtml(dc.date)}</th>`;
+    }).join('');
+    const numHeaderCells = dayColumns.map((_, i) => {
+        const nextDate = dayColumns[i + 1]?.date;
+        const isLastInDay = !nextDate || nextDate !== dayColumns[i].date;
+        return `<th class="col-day ${isLastInDay ? 'day-group-end' : ''}">${i + 1}</th>`;
+    }).join('');
+
+    const thead = `
+        <thead>
+            <tr>
+                <th class="col-num" rowspan="2">#</th>
+                <th class="col-item" rowspan="2">ITEM / FRAME</th>
+                <th class="col-line" rowspan="2">LINE /<br><small style="font-weight:500;opacity:.8">ALLOCATED</small></th>
+                <th class="col-eta" rowspan="2">ETA</th>
+                <th class="col-pickup" rowspan="2">PICK UP</th>
+                <th class="col-qty" rowspan="2">DIRECT</th>
+                <th class="col-qty" rowspan="2">ASHTON</th>
+                ${dateHeaderCells}
+                <th class="col-total" rowspan="2">SL<br>DÒNG</th>
+                <th class="col-item-issues" rowspan="2">VẤN ĐỀ ETA &amp; PICKUP</th>
+                <th class="col-row-issues" rowspan="2">VẤN ĐỀ LINE ALLOCATED</th>
+            </tr>
+            <tr>${numHeaderCells}</tr>
+        </thead>`;
+
+    // TBODY
+    let tbody = '';
+    visibleItems.forEach(group => {
+        const idxs = group.indexes;
+        const rowspan = idxs.length;
+        const firstRes = checkEtaDirectResults[idxs[0]];
+        const itemLevel = firstRes.itemLevel;
+        const firstRow = firstRes.row;
+
+        const itemHasError = itemLevel.itemIssues.some(i => i.level === 'error');
+
+        const itemIssuesHtml = itemLevel.itemIssues.length
+            ? `<div class="eta-issue-list">${itemLevel.itemIssues.map(it => `
+                <div class="eta-issue ${it.level} item-level">
+                    <i class="bi ${it.level === 'error' ? 'bi-x-octagon-fill' : 'bi-exclamation-triangle-fill'}"></i>
+                    <span>${escapeHtml(it.msg)}</span>
+                </div>`).join('')}</div>`
+            : '<span class="text-muted">—</span>';
+
+        // Dòng đầu của item: có cột ITEM và cột ITEM-ISSUES với rowspan
+        tbody += `<tr class="item-row ${itemHasError ? 'row-has-error' : ''}">`;
+        tbody += `<td class="col-num">${firstRow.rowIndex}</td>`;
+        tbody += `<td class="col-item" rowspan="${rowspan}">
+            <div class="item-name">${escapeHtml(firstRow.item)}</div>
+            ${firstRow.frame ? `<div class="item-frame">${escapeHtml(firstRow.frame)}</div>` : ''}
+            <div class="item-total-badge" title="Tổng SL của item (đã gộp các line, 2 cột day/night cùng ngày)">SL: ${itemLevel.totalSL}</div>
+        </td>`;
+        tbody += renderEtaDirectRowCells(firstRes, dayColumns);
+        tbody += `<td class="col-item-issues" rowspan="${rowspan}">${itemIssuesHtml}</td>`;
+
+        const rowIssuesHtml = firstRes.rowLevel.rowIssues.length
+            ? `<div class="eta-issue-list">${firstRes.rowLevel.rowIssues.map(it => `
+                <div class="eta-issue ${it.level}">
+                    <i class="bi ${it.level === 'error' ? 'bi-x-circle-fill' : 'bi-exclamation-triangle-fill'}"></i>
+                    <span>${escapeHtml(it.msg)}</span>
+                </div>`).join('')}</div>`
+            : '<span class="text-muted">—</span>';
+        tbody += `<td class="col-row-issues">${rowIssuesHtml}</td>`;
+        tbody += `</tr>`;
+
+        // Các dòng tiếp theo của item
+        for (let i = 1; i < idxs.length; i++) {
+            const res = checkEtaDirectResults[idxs[i]];
+            const isLast = i === idxs.length - 1;
+            tbody += `<tr class="item-row ${isLast ? 'item-row-last' : ''}">`;
+            tbody += `<td class="col-num">${res.row.rowIndex}</td>`;
+            tbody += renderEtaDirectRowCells(res, dayColumns);
+            const rIssuesHtml = res.rowLevel.rowIssues.length
+                ? `<div class="eta-issue-list">${res.rowLevel.rowIssues.map(it => `
+                    <div class="eta-issue ${it.level}">
+                        <i class="bi ${it.level === 'error' ? 'bi-x-circle-fill' : 'bi-exclamation-triangle-fill'}"></i>
+                        <span>${escapeHtml(it.msg)}</span>
+                    </div>`).join('')}</div>`
+                : '<span class="text-muted">—</span>';
+            tbody += `<td class="col-row-issues">${rIssuesHtml}</td>`;
+            tbody += `</tr>`;
+        }
+    });
+
+    gridEl.innerHTML = `<table class="eta-grid">${thead}<tbody>${tbody}</tbody></table>`;
+}
+
+function initCheckEtaDirectUi() {
+    checkEtaDirectModal = new bootstrap.Modal(document.getElementById('checkEtaDirectModal'));
+    document.getElementById('checkEtaDirectBtn').addEventListener('click', openCheckEtaDirectModal);
+    document.getElementById('etaDirectAnalyzeBtn').addEventListener('click', runEtaDirectAnalysis);
+    document.getElementById('etaDirectClearBtn').addEventListener('click', clearEtaDirectForm);
+    document.getElementById('etaDirectPaste').addEventListener('input', scheduleEtaDirectBadgeUpdate);
+
+    document.getElementById('etaDirectToggleInputBtn').addEventListener('click', () => {
+        const wrap = document.getElementById('etaDirectInputWrap');
+        const btn = document.getElementById('etaDirectToggleInputBtn');
+        const icon = btn.querySelector('i');
+        const label = btn.querySelector('span');
+        const isHidden = wrap.classList.toggle('eta-hidden');
+        icon.className = isHidden ? 'bi bi-eye-fill' : 'bi bi-eye-slash-fill';
+        label.textContent = isHidden ? 'Hiện dán dữ liệu' : 'Ẩn dán dữ liệu';
+    });
+
+    document.getElementById('etaDirectFile').addEventListener('change', async (e) => {
+        const file = e.target.files && e.target.files[0];
+        const info = document.getElementById('etaDirectFileInfo');
+        if (!file) {
+            info.textContent = 'Chưa chọn file';
+            info.classList.remove('has-file');
+            return;
+        }
+        info.textContent = `Đã chọn: ${file.name} (${Math.round(file.size / 1024)} KB)`;
+        info.classList.add('has-file');
+        try {
+            const { matrix, sheetName } = await readExcelRawMatrix(file);
+            document.getElementById('etaDirectPaste').value = etaMatrixToText(matrix);
+            scheduleEtaDirectBadgeUpdate();
+            if (sheetName) info.textContent = `Đã chọn: ${file.name} · sheet "${sheetName}"`;
+        } catch (err) {
+            console.error('Lỗi đọc file:', err);
+            info.textContent = `✕ Không đọc được "${file.name}"`;
+            info.classList.remove('has-file');
+        }
+    });
+    document.getElementById('etaDirectOnlyIssues').addEventListener('change', renderEtaDirectGrid);
 }
 
 window.addEventListener('beforeunload', () => {
