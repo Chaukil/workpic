@@ -824,6 +824,16 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
             </div>
             <div class="modal-body">
 
+                <!-- Thanh luôn hiện: trạng thái + nút ẩn/hiện vùng nhập (Dán dữ liệu → Phân tích) -->
+                <div class="eta-topbar" id="etaDirectTopBar">
+                    <div class="check-due-status" id="etaDirectStatus">
+                        <i class="bi bi-info-circle"></i> Sẵn sàng phân tích
+                    </div>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="etaDirectToggleInputBtn" title="Ẩn/hiện vùng dán dữ liệu">
+                        <i class="bi bi-eye-slash-fill"></i> <span>Ẩn dán dữ liệu</span>
+                    </button>
+                </div>
+
                 <!-- VÙNG CÓ THỂ ẨN: từ mode tabs → toolbar (chứa nút Phân tích) -->
                 <div id="etaDirectInputWrap">
 
@@ -886,13 +896,7 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
 
                     <!-- Toolbar (chứa nút Phân tích) -->
                     <div class="eta-toolbar-row">
-                        <div class="check-due-status" id="etaDirectStatus">
-                            <i class="bi bi-info-circle"></i> Sẵn sàng phân tích
-                        </div>
-                        <div class="check-due-toolbar-actions">
-                            <button type="button" class="btn btn-outline-secondary btn-sm" id="etaDirectToggleInputBtn" title="Ẩn/hiện vùng dán dữ liệu">
-                                <i class="bi bi-eye-slash-fill"></i> <span>Ẩn dán dữ liệu</span>
-                            </button>
+                        <div class="check-due-toolbar-actions ms-auto">
                             <button type="button" class="btn btn-outline-secondary btn-sm" id="etaDirectClearBtn">
                                 <i class="bi bi-eraser-fill"></i> Xóa
                             </button>
@@ -909,15 +913,35 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
                 <section class="eta-result" id="etaDirectResultSection" style="display:none;">
                     <div class="eta-stat-row" id="etaDirectStats"></div>
                     <div class="eta-result-filters">
-                        <label class="eta-filter-toggle">
-                            <input type="checkbox" id="etaDirectOnlyIssues" checked>
-                            <span>Chỉ hiện dòng có vi phạm</span>
-                        </label>
+                        <div class="eta-filter-controls">
+                            <label class="eta-filter-toggle">
+                                <input type="checkbox" id="etaDirectOnlyIssues" checked>
+                                <span>Chỉ hiện dòng có vi phạm</span>
+                            </label>
+                            <label class="eta-filter-toggle" title="Chỉ hiện các item xuất hiện ở nhiều dòng (nhiều line / nhiều ngày), xếp sát nhau">
+                                <input type="checkbox" id="etaDirectOnlyDup">
+                                <span>Chỉ item trùng</span>
+                            </label>
+                            <select class="form-select form-select-sm eta-filter-select" id="etaDirectLineFilter" title="Lọc theo LINE">
+                                <option value="">Tất cả line</option>
+                            </select>
+                            <div class="eta-search-box">
+                                <i class="bi bi-search"></i>
+                                <input type="search" class="form-control form-control-sm" id="etaDirectSearch"
+                                       placeholder="Tìm item / frame..." autocomplete="off">
+                            </div>
+                            <select class="form-select form-select-sm eta-filter-select" id="etaDirectSort" title="Sắp xếp">
+                                <option value="date" selected>Sắp xếp: Ngày lên hàng (nối ca)</option>
+                                <option value="severity">Sắp xếp: Mức độ vi phạm</option>
+                            </select>
+                            <span class="eta-count" id="etaDirectCount"></span>
+                        </div>
                         <div class="eta-legend">
                             <span class="eta-legend-chip item-chip"><i class="bi bi-x-octagon-fill"></i> Vấn đề ITEM</span>
                             <span class="eta-legend-chip row-chip"><i class="bi bi-x-circle-fill"></i> Vấn đề DÒNG</span>
                             <span class="eta-legend-chip"><i class="bi bi-square-fill"></i> Ô vi phạm</span>
                             <span class="eta-legend-chip direct-chip"><i class="bi bi-square-fill"></i> Ô chứa DIRECT</span>
+                            <span class="eta-legend-chip dup-chip"><i class="bi bi-square-fill"></i> Item lặp nhiều dòng</span>
                         </div>
                     </div>
                     <div class="eta-grid-wrap" id="etaDirectGrid"></div>
@@ -1077,8 +1101,8 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
                                 <div class="wh-block-title"><i class="bi bi-plus-circle-fill"></i> Thêm nhanh 1 ngày</div>
                                 <div class="wh-quick-row">
                                     <input type="date" class="form-control form-control-sm" id="whQuickDate">
-                                    <input type="text" inputmode="decimal" class="form-control form-control-sm" id="whQuickMotion" placeholder="Motion (h)">
-                                    <input type="text" inputmode="decimal" class="form-control form-control-sm" id="whQuickStation" placeholder="Station (h)">
+                                    <input type="text" inputmode="decimal" class="form-control form-control-sm" id="whQuickMotion" placeholder="Motion (h) — tùy chọn">
+                                    <input type="text" inputmode="decimal" class="form-control form-control-sm" id="whQuickStation" placeholder="Station (h) — tùy chọn">
                                     <button type="button" class="btn btn-sm btn-save" id="whQuickAddBtn"><i class="bi bi-plus-lg"></i></button>
                                 </div>
                             </div>
@@ -1087,10 +1111,12 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
                                 <textarea class="form-control wh-textarea" id="whPasteArea" rows="8" placeholder="Dán từ Excel, mỗi dòng 1 ngày, 3 cột theo thứ tự:
 Ngày  |  Giờ Motion  |  Giờ Station
 
-VD:
+VD (đủ 2 cột):
 28/9	9.75	9.75
 29/9	8	7.5
-30/9/2026	10	9,25
+
+VD (chỉ nhập Motion):
+30/9/2026	10
 
 Ngày nhận: d/m, d/m/yyyy, yyyy-mm-dd. Số thập phân dùng . hoặc ,"></textarea>
                                 <div class="wh-hint"><i class="bi bi-info-circle"></i> Dòng tiêu đề (nếu có) sẽ tự bỏ qua. Ngày đã có dữ liệu sẽ được hỏi trước khi cập nhật.</div>

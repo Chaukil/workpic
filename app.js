@@ -54,6 +54,7 @@ let dayOffSelected = new Set();  // các ngày (YYYY-MM-DD) MÌNH đang chọn o
 let workHoursModal;
 let workHoursModalOpen = false;
 let workHoursMap = {};           // { 'YYYY-MM-DD': { date, motion, station, ... } }
+let scheduleWorkHoursMap = {};
 let unsubscribeWorkHours = null;
 let workHoursParsed = [];        // kết quả phân tích ô dán
 const WORKHOURS_COLLECTION = 'workHours';
@@ -842,6 +843,7 @@ document.getElementById('checkEtaDirectBtn').addEventListener('click', openCheck
 document.getElementById('etaDirectAnalyzeBtn').addEventListener('click', runEtaDirectAnalysis);
 document.getElementById('etaDirectClearBtn').addEventListener('click', clearEtaDirectForm);
 document.getElementById('etaDirectPaste').addEventListener('input', scheduleEtaDirectBadgeUpdate);
+initCheckEtaDirectUi();
 
     presenterSpinModal = new bootstrap.Modal(document.getElementById('presenterSpinModal'));
     dayOffModal = new bootstrap.Modal(document.getElementById('dayOffModal'));
@@ -1744,10 +1746,20 @@ function renderSchedule() {
             // Date header
             const dateHeader = document.createElement('div');
             dateHeader.className = 'date-header text-muted small';
-            const whDoc = workHoursMap[dateStr] || null;
-            const whBadge = whDoc
-                ? `<span class="wh-badges"><span class="wh-badge wh-m" title="Giờ Motion${workHoursViewDept ? ' · ' + escapeHtml(getDeptName(workHoursViewDept)) : ''}">M-${formatWorkHours(whDoc.motion)}h</span><span class="wh-badge wh-s" title="Giờ Station">S-${formatWorkHours(whDoc.station)}h</span></span>`
-                : '';
+            // MỚI — luôn theo bộ phận của chính mình, không phụ thuộc bộ lọc trong modal
+                const whDoc = scheduleWorkHoursMap[dateStr] || null;
+const myDeptId = (currentUser && currentUser.department) || '';
+const myDeptLabel = myDeptId ? escapeHtml(getDeptName(myDeptId)) : '';
+const badges = [];
+if (whDoc) {
+    if (isValidWhNumber(whDoc.motion)) {
+        badges.push(`<span class="wh-badge wh-m" title="Giờ Motion${myDeptLabel ? ' · ' + myDeptLabel : ''}">M-${formatWorkHours(whDoc.motion)}h</span>`);
+    }
+    if (isValidWhNumber(whDoc.station)) {
+        badges.push(`<span class="wh-badge wh-s" title="Giờ Station${myDeptLabel ? ' · ' + myDeptLabel : ''}">S-${formatWorkHours(whDoc.station)}h</span>`);
+    }
+}
+const whBadge = badges.length ? `<span class="wh-badges">${badges.join('')}</span>` : '';
             dateHeader.innerHTML = `<span class="date-header-left"><i class="bi bi-calendar-day"></i> ${formatDateShort(currentDate)}${offDoc ? '<span class="day-off-badge">OFF</span>' : ''}</span>${whBadge}`;
             cell.appendChild(dateHeader);
 
@@ -4413,6 +4425,8 @@ function listenUsersAvatars() {
         if (currentUser && usersInfoCache[currentUser.uid]
             && (usersInfoCache[currentUser.uid].department || '') !== (currentUser.department || '')) {
             currentUser.department = usersInfoCache[currentUser.uid].department || '';   // đổi từ thiết bị khác
+             rebuildScheduleWorkHoursMap();   // ← THÊM
+            renderSchedule();
         }
         rebuildDepartmentsList();
         if (document.getElementById('presenterSpinModal')?.classList.contains('show') && spinAllUsers.length) applySpinDeptFilter(false);
@@ -5078,10 +5092,19 @@ function showNotification(title, message, isSystemNotification = false, type = '
     if (isSystemNotification && 'Notification' in window && Notification.permission === 'granted') {
         new Notification(title, {
             body: message,
-            icon: 'https://cdn-icons-png.flaticon.com/512/1189/11890970.png'
+            icon: 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="#6366f1"/><path d="M32 14a12 12 0 0 0-12 12v8l-4 6h32l-4-6v-8a12 12 0 0 0-12-12zm-5 30a5 5 0 0 0 10 0z" fill="#fff"/></svg>')
         });
     }
     
+}
+
+function rebuildScheduleWorkHoursMap() {
+    const map = {};
+    const myDept = String((currentUser && currentUser.department) || '').trim();
+    workHoursAll.forEach(w => {
+        if (String(w.department || '').trim() === myDept) map[w.date] = w;
+    });
+    scheduleWorkHoursMap = map;
 }
 
 // ============================================================
@@ -6432,6 +6455,8 @@ function listenDepartments() {
 async function saveUserDepartment(deptId) {
     if (!currentUser) return;
     const value = deptId || '';
+    const oldValue = currentUser.department || '';
+
     try {
         const snap = await getDocs(query(collection(db, 'users'), where('uid', '==', currentUser.uid)));
         const stamp = new Date().toISOString();
@@ -6439,11 +6464,35 @@ async function saveUserDepartment(deptId) {
         usersDeptLatest[currentUser.uid] = { dept: value, ts: stamp };
         currentUser.department = value;
         if (usersInfoCache[currentUser.uid]) usersInfoCache[currentUser.uid].department = value;
-        // Bộ lọc chưa từng chọn tay thì đi theo bộ phận mới của mình
-        if (loadDeptPref('spin') === null) spinDeptFilter = value || DEPT_ALL;
-        if (loadDeptPref('stats') === null) statsDeptFilter = value || DEPT_ALL;
-        if (loadDeptPref('dayoff') === null) dayOffDeptFilter = value || DEPT_ALL;
-        if (loadDeptPref('hours') === null) { workHoursViewDept = value; rebuildWorkHoursMap(); renderSchedule(); }
+
+        const followsOld = (pref, allValue) => {
+            if (pref === null) return true;
+            if (pref === oldValue) return true;
+            if (allValue !== undefined && pref === allValue && !oldValue) return true;
+            if (allValue === undefined && pref === '' && !oldValue) return true;
+            return false;
+        };
+
+        if (followsOld(loadDeptPref('spin'),   DEPT_ALL)) { spinDeptFilter   = value || DEPT_ALL; saveDeptPref('spin',   spinDeptFilter); }
+        if (followsOld(loadDeptPref('stats'),  DEPT_ALL)) { statsDeptFilter  = value || DEPT_ALL; saveDeptPref('stats',  statsDeptFilter); }
+        if (followsOld(loadDeptPref('dayoff'), DEPT_ALL)) { dayOffDeptFilter = value || DEPT_ALL; saveDeptPref('dayoff', dayOffDeptFilter); }
+
+        // Bộ lọc trong modal Update chỉ theo dept mới nếu user chưa chọn tay
+        if (followsOld(loadDeptPref('hours'))) {
+            workHoursViewDept = value;
+            saveDeptPref('hours', workHoursViewDept);
+        }
+
+        // LỊCH CỐ ĐỊNH luôn theo dept của mình → luôn rebuild
+        rebuildScheduleWorkHoursMap();
+        renderSchedule();
+
+        if (workHoursModalOpen) {
+            rebuildWorkHoursMap();
+            renderWorkHoursSaved();
+            renderWorkHoursPreview();
+        }
+
         rebuildDepartmentsList();
         showNotification('Đã lưu', value ? `Bộ phận của bạn: ${getDeptName(value)}.` : 'Đã bỏ chọn bộ phận.', false, 'success');
     } catch (error) {
@@ -6515,7 +6564,7 @@ function initDepartmentUi() {
         workHoursViewDept = e.target.value;
         saveDeptPref('hours', workHoursViewDept);
         rebuildWorkHoursMap();
-        renderSchedule();
+       // renderSchedule();
         renderWorkHoursSaved();
         renderWorkHoursPreview();
     });
@@ -6527,8 +6576,9 @@ function initDepartmentUi() {
 //   { date, motion, station, updatedBy, updatedByName, updatedAt }
 // ============================================================
 function formatWorkHours(n) {
+    if (n === null || n === undefined) return '—';
     const v = Number(n);
-    if (!Number.isFinite(v)) return '0';
+    if (!Number.isFinite(v)) return '—';
     return String(Math.round(v * 100) / 100);
 }
 
@@ -6541,26 +6591,38 @@ function listenWorkHours() {
         const all = [];
         snapshot.forEach(d => {
             const data = d.data();
-            if (data.date) all.push({ ...data, id: d.id, department: data.department || '' });   // doc cũ không có department => ''
+            if (!data.date) return;
+            all.push({ ...data, id: d.id, department: resolveWorkHoursDept(d.id, data) });
         });
         workHoursAll = all;
         rebuildWorkHoursMap();
+        rebuildScheduleWorkHoursMap();
         renderSchedule();
-        if (workHoursModalOpen) {
-            renderWorkHoursSaved();
-            renderWorkHoursPreview();
-        }
+        if (workHoursModalOpen) { renderWorkHoursSaved(); renderWorkHoursPreview(); }
     }, (error) => {
         console.error('❌ Lỗi khi lắng nghe giờ làm việc:', error);
-        showNotification('Lỗi', 'Không tải được giờ làm việc. Kiểm tra Firestore rules cho collection "workHours".', false, 'danger');
+        showNotification('Lỗi', 'Không tải được giờ làm việc.', false, 'danger');
     });
+}
+
+function resolveWorkHoursDept(docId, data) {
+    const field = data && data.department;
+    if (field !== undefined && field !== null && String(field).trim() !== '') {
+        return String(field).trim();
+    }
+    const id = String(docId || '');
+    const date = data && data.date ? String(data.date) : '';
+    const idx = id.lastIndexOf('__');
+    if (idx > 0 && date && id.slice(idx + 2) === date) return id.slice(0, idx).trim();
+    return '';
 }
 
 // Lấy giờ của bộ phận đang xem: { 'YYYY-MM-DD': doc }
 function rebuildWorkHoursMap() {
     const map = {};
+    const target = String(workHoursViewDept || '').trim();
     workHoursAll.forEach(w => {
-        if ((w.department || '') === workHoursViewDept) map[w.date] = w;
+        if (String(w.department || '').trim() === target) map[w.date] = w;
     });
     workHoursMap = map;
 }
@@ -6573,12 +6635,14 @@ function workHoursDocId(dept, date) {
 // "9.75" | "9,75" | "9.75h" -> 9.75 ; sai định dạng -> NaN
 function parseWorkHoursNumber(raw) {
     let t = String(raw == null ? '' : raw).trim().replace(/h$/i, '').replace(/\s/g, '');
-    if (!t) return NaN;
+    if (!t) return null;
     if (t.includes(',') && !t.includes('.')) t = t.replace(',', '.');
     else t = t.replace(/,/g, '');
     if (!/^\d+(\.\d+)?$/.test(t)) return NaN;
     return parseFloat(t);
 }
+
+const isValidWhNumber = (v) => typeof v === 'number' && !Number.isNaN(v);
 
 // d/m | d/m/yyyy | d-m-yy | yyyy-mm-dd -> 'YYYY-MM-DD' (hoặc null)
 function parseWorkHoursDate(raw) {
@@ -6617,25 +6681,33 @@ function formatWorkHoursDateLabel(key) {
 function parseWorkHoursText(text) {
     const lines = String(text || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
     const rows = [];
+
     lines.forEach((line, idx) => {
         const cols = (line.includes('\t') ? line.split('\t') : line.split(/[;\s|]+/))
-            .map(c => c.trim()).filter((c, i, arr) => c !== '' || arr.length <= 3);
+            .map(c => c.trim())
+            .filter((c, i, arr) => c !== '' || arr.length <= 3);
+
         const date = parseWorkHoursDate(cols[0]);
-        // Dòng tiêu đề (đầu tiên, không có ngày hợp lệ và không có số ở cột 2-3) → bỏ qua
-        if (!date && idx === 0 && Number.isNaN(parseWorkHoursNumber(cols[1])) && Number.isNaN(parseWorkHoursNumber(cols[2]))) {
-            return;
-        }
-        const row = { line, date, motion: parseWorkHoursNumber(cols[1]), station: parseWorkHoursNumber(cols[2]), error: '', skipped: false };
+        const motion  = parseWorkHoursNumber(cols[1]);
+        const station = parseWorkHoursNumber(cols[2]);
+
+        // Dòng tiêu đề (dòng đầu, không có ngày và không có số hợp lệ nào ở 2 cột sau)
+        if (!date && idx === 0 && !isValidWhNumber(motion) && !isValidWhNumber(station)) return;
+
+        const row = { line, date, motion, station, error: '', skipped: false };
+
         if (!date) row.error = 'Ngày không hợp lệ';
-        else if (cols.length < 3) row.error = 'Thiếu cột (cần Ngày, Motion, Station)';
-        else if (Number.isNaN(row.motion)) row.error = 'Giờ Motion không hợp lệ';
-        else if (Number.isNaN(row.station)) row.error = 'Giờ Station không hợp lệ';
+        else if (motion === null && station === null) row.error = 'Cần nhập ít nhất Motion hoặc Station';
+        else if (Number.isNaN(motion)) row.error = 'Giờ Motion không hợp lệ';
+        else if (Number.isNaN(station)) row.error = 'Giờ Station không hợp lệ';
+
         rows.push(row);
     });
-    // Trùng ngày ngay trong dữ liệu dán → lấy dòng cuối cùng
+
     const lastIdx = {};
     rows.forEach((r, i) => { if (!r.error) lastIdx[r.date] = i; });
     rows.forEach((r, i) => { if (!r.error && lastIdx[r.date] !== i) r.skipped = true; });
+
     return rows;
 }
 
@@ -6650,6 +6722,10 @@ function renderWorkHoursPreview() {
     const dupCount = usable.filter(r => workHoursMap[r.date]).length;
     document.getElementById('whPreviewCount').textContent = workHoursParsed.length;
 
+    const fmtVal = (v) => isValidWhNumber(v)
+        ? `${formatWorkHours(v)}h`
+        : '<span class="text-muted">—</span>';
+
     if (workHoursParsed.length === 0) {
         host.innerHTML = '<div class="wh-empty">Chưa có dữ liệu</div>';
     } else {
@@ -6662,12 +6738,16 @@ function renderWorkHoursPreview() {
                 const old = workHoursMap[r.date];
                 let tag;
                 if (r.skipped) tag = '<span class="wh-tag skip">Trùng trong dữ liệu dán · bỏ qua</span>';
-                else if (old) tag = `<span class="wh-tag dup">Đã có · M ${formatWorkHours(old.motion)}h / S ${formatWorkHours(old.station)}h</span>`;
-                else tag = '<span class="wh-tag new">Mới</span>';
+                else if (old) {
+                    const oM = isValidWhNumber(old.motion)  ? formatWorkHours(old.motion)  + 'h' : '—';
+                    const oS = isValidWhNumber(old.station) ? formatWorkHours(old.station) + 'h' : '—';
+                    tag = `<span class="wh-tag dup">Đã có · M ${oM} / S ${oS}</span>`;
+                } else tag = '<span class="wh-tag new">Mới</span>';
+
                 return `<tr class="${r.skipped ? 'is-skip' : ''}">
                     <td>${formatWorkHoursDateLabel(r.date)}</td>
-                    <td>${formatWorkHours(r.motion)}h</td>
-                    <td>${formatWorkHours(r.station)}h</td>
+                    <td>${fmtVal(r.motion)}</td>
+                    <td>${fmtVal(r.station)}</td>
                     <td class="wh-note">${tag}</td></tr>`;
             }).join('')}</tbody></table>`;
     }
@@ -6684,18 +6764,36 @@ function renderWorkHoursSaved() {
     const items = Object.values(workHoursMap)
         .sort((a, b) => b.date.localeCompare(a.date))
         .slice(0, 40);
+
+    // Tiêu đề block hiện bộ phận đang lọc
+    const headerEl = host.closest('.wh-block')?.querySelector('.wh-block-title');
+    if (headerEl) {
+        const deptLabel = workHoursViewDept ? getDeptName(workHoursViewDept) : 'Chưa phân bộ phận';
+        headerEl.innerHTML =
+            `<i class="bi bi-calendar-check-fill"></i> Đã nhập gần đây · ${escapeHtml(deptLabel)}`;
+    }
+
     if (items.length === 0) {
-        host.innerHTML = '<div class="wh-empty">Chưa có ngày nào</div>';
+        host.innerHTML = '<div class="wh-empty">Chưa có ngày nào cho bộ phận này</div>';
         return;
     }
-    host.innerHTML = items.map(it => `
-        <div class="wh-saved-item" data-date="${escapeHtml(it.date)}">
-            <div>
-                <strong>${formatDateShortDMY(it.date)}${it.date === todayKey ? ' · hôm nay' : ''}</strong>
-                <div class="wh-saved-vals">M: ${formatWorkHours(it.motion)}h - S: ${formatWorkHours(it.station)}h</div>
-            </div>
-            <button type="button" class="wh-saved-del" data-act="del" title="Xóa ngày này"><i class="bi bi-trash-fill"></i></button>
-        </div>`).join('');
+
+    host.innerHTML = items.map(it => {
+        const mV = isValidWhNumber(it.motion)  ? `M: ${formatWorkHours(it.motion)}h`  : '';
+        const sV = isValidWhNumber(it.station) ? `S: ${formatWorkHours(it.station)}h` : '';
+        const valsText = [mV, sV].filter(Boolean).join(' · ') || '—';
+
+        return `
+            <div class="wh-saved-item" data-date="${escapeHtml(it.date)}">
+                <div>
+                    <strong>${formatDateShortDMY(it.date)}${it.date === todayKey ? ' · hôm nay' : ''}</strong>
+                    <div class="wh-saved-vals">${valsText}</div>
+                </div>
+                <button type="button" class="wh-saved-del" data-act="del" title="Xóa ngày này">
+                    <i class="bi bi-trash-fill"></i>
+                </button>
+            </div>`;
+    }).join('');
 }
 
 async function commitWorkHours(rows) {
@@ -6705,14 +6803,18 @@ async function commitWorkHours(rows) {
         const nowIso = new Date().toISOString();
         const dept = workHoursViewDept;
         const payload = rows.map(r => ({
-            date: r.date, motion: r.motion, station: r.station, department: dept,
+            date: r.date,
+            motion:  isValidWhNumber(r.motion)  ? r.motion  : null,
+            station: isValidWhNumber(r.station) ? r.station : null,
+            department: dept,
             updatedBy: currentUser.uid,
             updatedByName: currentUser.displayName || currentUser.email || '',
             updatedAt: nowIso
         }));
         for (let i = 0; i < payload.length; i += 400) {
             const batch = writeBatch(db);
-            payload.slice(i, i + 400).forEach(p => batch.set(doc(db, WORKHOURS_COLLECTION, workHoursDocId(dept, p.date)), p));
+            payload.slice(i, i + 400).forEach(p =>
+                batch.set(doc(db, WORKHOURS_COLLECTION, workHoursDocId(dept, p.date)), p));
             await batch.commit();
         }
         showNotification('Thành công', `Đã lưu giờ làm việc cho ${payload.length} ngày${dept ? ' · ' + getDeptName(dept) : ''}.`, false, 'success');
@@ -6751,15 +6853,33 @@ async function saveWorkHours() {
 }
 
 function addQuickWorkHoursRow() {
-    const dateVal = document.getElementById('whQuickDate').value;       // YYYY-MM-DD
-    const motion = document.getElementById('whQuickMotion').value.trim();
-    const station = document.getElementById('whQuickStation').value.trim();
-    if (!dateVal || Number.isNaN(parseWorkHoursNumber(motion)) || Number.isNaN(parseWorkHoursNumber(station))) {
-        showNotification('Thiếu dữ liệu', 'Chọn ngày và nhập giờ Motion, Station hợp lệ.', false, 'warning');
+    const dateVal = document.getElementById('whQuickDate').value;
+    const motionRaw = document.getElementById('whQuickMotion').value.trim();
+    const stationRaw = document.getElementById('whQuickStation').value.trim();
+
+    if (!dateVal) {
+        showNotification('Thiếu dữ liệu', 'Chọn ngày.', false, 'warning');
         return;
     }
+
+    const motion = parseWorkHoursNumber(motionRaw);
+    const station = parseWorkHoursNumber(stationRaw);
+
+    if (Number.isNaN(motion) || Number.isNaN(station)) {
+        showNotification('Sai định dạng', 'Giờ không hợp lệ (chỉ dùng số, có thể dùng . hoặc ,).', false, 'warning');
+        return;
+    }
+    if (motion === null && station === null) {
+        showNotification('Thiếu dữ liệu', 'Nhập ít nhất Motion hoặc Station.', false, 'warning');
+        return;
+    }
+
     const area = document.getElementById('whPasteArea');
-    area.value = (area.value.trim() ? area.value.replace(/\s+$/, '') + '\n' : '') + `${dateVal}\t${motion}\t${station}`;
+    const motionText  = isValidWhNumber(motion)  ? String(motion)  : '';
+    const stationText = isValidWhNumber(station) ? String(station) : '';
+    area.value = (area.value.trim() ? area.value.replace(/\s+$/, '') + '\n' : '')
+        + `${dateVal}\t${motionText}\t${stationText}`;
+
     document.getElementById('whQuickMotion').value = '';
     document.getElementById('whQuickStation').value = '';
     renderWorkHoursPreview();
@@ -6768,6 +6888,7 @@ function addQuickWorkHoursRow() {
 function openWorkHoursModal() {
     workHoursModalOpen = true;
     document.getElementById('whQuickDate').value = localDateKey(new Date());
+    rebuildWorkHoursMap();          // đảm bảo không dùng map cũ
     fillDeptSelect(document.getElementById('whDeptSelect'), workHoursViewDept, { none: true, noneLabel: 'Chưa phân bộ phận' });
     renderWorkHoursSaved();
     renderWorkHoursPreview();
@@ -7725,6 +7846,16 @@ function isBackupLine(line) {
     return ETA_BACKUP_LINES.includes(String(line).trim().toUpperCase());
 }
 
+function setEtaInputCollapsed(hidden) {
+    const wrap = document.getElementById('etaDirectInputWrap');
+    const btn = document.getElementById('etaDirectToggleInputBtn');
+    if (wrap) wrap.classList.toggle('eta-hidden', !!hidden);
+    if (btn) {
+        btn.querySelector('i').className = hidden ? 'bi bi-eye-fill' : 'bi bi-eye-slash-fill';
+        btn.querySelector('span').textContent = hidden ? 'Hiện dán dữ liệu' : 'Ẩn dán dữ liệu';
+    }
+}
+
 function openCheckEtaDirectModal() {
     checkEtaDirectModal.show();
 
@@ -7755,12 +7886,13 @@ function clearEtaDirectForm() {
     fileInfo.classList.remove('has-file');
     updateEtaDirectStatus('Sẵn sàng phân tích');
 
-    document.getElementById('etaDirectInputWrap')?.classList.remove('eta-hidden');
-    const btn = document.getElementById('etaDirectToggleInputBtn');
-    if (btn) {
-        btn.querySelector('i').className = 'bi bi-eye-slash-fill';
-        btn.querySelector('span').textContent = 'Ẩn dán dữ liệu';
-    }
+    const ls = document.getElementById('etaDirectLineFilter');
+    if (ls) ls.innerHTML = '<option value="">Tất cả line</option>';
+    const se = document.getElementById('etaDirectSearch');
+    if (se) se.value = '';
+    const ct = document.getElementById('etaDirectCount');
+    if (ct) ct.textContent = '';
+    setEtaInputCollapsed(false);
 }
 
 function updateEtaDirectStatus(msg) {
@@ -7811,6 +7943,48 @@ function etaParseNum(v) {
 function etaSplitLine(line) {
     if (line.includes('\t')) return line.split('\t');
     return line.split(/\s{2,}/);
+}
+
+/**
+ * Đọc file Excel/CSV thành ma trận thô (mảng các dòng) cho Check ETA & Direct.
+ * - Nhiều sheet: chọn sheet có dòng ngày (mm/dd) + dòng header; không có thì lấy sheet đầu.
+ * - Trả về { matrix, sheetName }.
+ */
+function readExcelRawMatrix(file) {
+    return new Promise((resolve, reject) => {
+        const isCsv = /\.(csv|txt|prn)$/i.test(file.name);
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('Không đọc được file'));
+
+        if (isCsv) {
+            reader.onload = () => {
+                try { resolve({ matrix: parseCsvText(reader.result), sheetName: '' }); }
+                catch (err) { reject(err); }
+            };
+            reader.readAsText(file, 'UTF-8');
+            return;
+        }
+
+        reader.onload = () => {
+            try {
+                const wb = XLSX.read(reader.result, { type: 'array' });
+                const toMatrix = (name) => XLSX.utils.sheet_to_json(wb.Sheets[name], {
+                    header: 1, raw: false, defval: '', blankrows: false
+                });
+                let picked = null;
+                for (const name of wb.SheetNames) {
+                    const matrix = toMatrix(name);
+                    if (findEtaTable(etaMatrixToText(matrix))) { picked = { matrix, sheetName: name }; break; }
+                }
+                if (!picked) {
+                    const first = wb.SheetNames[0];
+                    picked = { matrix: toMatrix(first), sheetName: first };
+                }
+                resolve(picked);
+            } catch (err) { reject(err); }
+        };
+        reader.readAsArrayBuffer(file);
+    });
 }
 
 function etaMatrixToText(matrix) {
@@ -7953,18 +8127,22 @@ function analyzeRowLevelEta(row) {
     const etaDate = parseEtaDateMMDD(row.eta);
     if (etaDate) {
         let sumBefore = 0;
+        const runDates = new Map();   // ngày chạy sớm → tổng kit
         row.dailyQty.forEach((d, ci) => {
             if (d.qty <= 0) return;
             const dd = parseEtaDateMMDD(d.date);
             if (dd && dd.getTime() < etaDate.getTime()) {
                 rowViolations.set(ci, 'eta');
                 sumBefore += d.qty;
+                runDates.set(d.date, (runDates.get(d.date) || 0) + d.qty);
             }
         });
         if (sumBefore > 0) {
             rowIssues.push({
                 level: 'error', code: 'ETA', scope: 'row',
-                msg: `Chạy ${sumBefore} SL trước ETA ${row.eta}`
+                msg: runDates.size > 1
+                    ? `Đang chạy ${sumBefore} kit (${[...runDates].map(([d, q]) => `${q} ngày ${d}`).join(', ')}), cảnh báo ETA ${row.eta}`
+                    : `Đang chạy ${sumBefore} kit ngày ${[...runDates.keys()][0]}, cảnh báo ETA ${row.eta}`
             });
         }
     }
@@ -8084,6 +8262,7 @@ function runEtaDirectAnalysis() {
         }));
 
         renderEtaDirectResults();
+        setEtaInputCollapsed(true); // thu gọn vùng nhập để bảng kết quả rộng hơn
         btn.innerHTML = originalHTML; btn.disabled = false;
         updateEtaDirectStatus(`Đã phân tích ${parsed.rows.length} dòng · ${itemGroupsMap.size} item · ${parsed.dayColumns.length} cột ngày/đêm`);
     };
@@ -8155,16 +8334,52 @@ function renderEtaDirectResults() {
         </div>
     `;
 
+    populateEtaLineFilter();
     renderEtaDirectGrid();
 }
 
-function renderEtaDirectRowCells(res, dayColumns) {
+function populateEtaLineFilter() {
+    const sel = document.getElementById('etaDirectLineFilter');
+    if (!sel) return;
+    const prev = sel.value;
+    const counts = new Map();
+    checkEtaDirectResults.forEach(r => {
+        const l = String(r.row.line || '').trim().toUpperCase();
+        if (l) counts.set(l, (counts.get(l) || 0) + 1);
+    });
+    const lines = [...counts.keys()].sort((x, y) => x.localeCompare(y, 'en', { numeric: true }));
+    sel.innerHTML = '<option value="">Tất cả line</option>' +
+        lines.map(l => `<option value="${escapeHtml(l)}">${escapeHtml(l)} (${counts.get(l)})</option>`).join('');
+    sel.value = counts.has(prev) ? prev : '';
+}
+
+// Ô "SL DÒNG": tổng item đủ → chỉ hiện SL của dòng (82); tổng item thiếu → hiện SL dòng/yêu cầu (82/200, màu đỏ).
+// Yêu cầu của item = max(DIRECT, ASHTON); "tổng item" gộp tất cả các dòng của item.
+function etaSlCellHtml(res, rowCount) {
+    const fmt = (n) => Number(n || 0).toLocaleString('vi-VN');
+    const il = res.itemLevel;
+    const required = Math.max(il.direct || 0, il.ashton || 0);
+    const itemTotal = il.totalSL || 0;
+    if (required > 0 && itemTotal < required) {
+        const tip = rowCount > 1
+            ? `Tổng cả item ${fmt(itemTotal)}/${fmt(required)} — thiếu ${fmt(required - itemTotal)}`
+            : `Thiếu ${fmt(required - itemTotal)} so với yêu cầu ${fmt(required)}`;
+        return `<span class="sl-short" title="${tip}">${fmt(res.sumDaily)}/${fmt(required)}</span>`;
+    }
+    return fmt(res.sumDaily);
+}
+
+function renderEtaDirectRowCells(res, dayColumns, rowCount = 1) {
     const row = res.row;
     const rl = res.rowLevel;
 
     // Cột LINE — gộp LINE + LINE ALLOCATED
+    const lineBad = rl.rowIssues.some(i => i.code === 'LINE');
+    const lineX = lineBad
+        ? `<i class="bi bi-x-circle-fill line-x" title="Line ${escapeHtml(row.line)} không nằm trong LINE ALLOCATED"></i>`
+        : '';
     const lineCell = `<td class="col-line">
-        <div class="line-main">${escapeHtml(row.line || '—')}</div>
+        <div class="line-main">${escapeHtml(row.line || '—')}${lineX}</div>
         ${row.lineAllocated ? `<span class="line-alloc" title="LINE ALLOCATED: ${escapeHtml(row.lineAllocated)}">${escapeHtml(row.lineAllocated)}</span>` : ''}
     </td>`;
 
@@ -8176,7 +8391,14 @@ function renderEtaDirectRowCells(res, dayColumns) {
     const qtyCells = row.dailyQty.map((d, ci) => {
         const v = rl.rowViolations.get(ci);
         const classes = ['col-day', 'cell-qty'];
-        if (d.qty > 0) classes.push('has-qty');
+        if (d.qty > 0) {
+            classes.push('has-qty');
+            // Viền xanh lam bao quanh cụm ô liên tiếp đang lên hàng
+            const prevHas = ci > 0 && row.dailyQty[ci - 1].qty > 0;
+            const nextHas = ci < row.dailyQty.length - 1 && row.dailyQty[ci + 1].qty > 0;
+            if (!prevHas) classes.push('run-start');
+            if (!nextHas) classes.push('run-end');
+        }
         const nextDate = dayColumns[ci + 1]?.date;
         if (!nextDate || nextDate !== d.date) classes.push('day-group-end');
         if (v) {
@@ -8187,9 +8409,28 @@ function renderEtaDirectRowCells(res, dayColumns) {
         return `<td class="${classes.join(' ')}" title="${title.trim()}">${d.qty > 0 ? d.qty : ''}</td>`;
     }).join('');
 
-    const totalCell = `<td class="col-total">${res.sumDaily.toLocaleString('vi-VN')}</td>`;
+    const totalCell = `<td class="col-total">${etaSlCellHtml(res, rowCount)}</td>`;
 
     return lineCell + etaCell + pickupCell + directCell + ashtonCell + qtyCells + totalCell;
+}
+
+// Ô "VẤN ĐỀ" gộp: lỗi cấp ITEM (ETA/PICK UP, DIRECT, ASHTON) + lỗi cấp DÒNG (ETA).
+// Lỗi LINE không in chữ vì đã có dấu X đỏ cạnh LINE.
+function etaIssuesCellHtml(itemIssues, rowIssues) {
+    const parts = [];
+    (itemIssues || []).forEach(it => parts.push(`
+        <div class="eta-issue ${it.level} item-level">
+            <i class="bi ${it.level === 'error' ? 'bi-x-octagon-fill' : 'bi-exclamation-triangle-fill'}"></i>
+            <span>${escapeHtml(it.msg)}</span>
+        </div>`));
+    (rowIssues || []).filter(it => it.code !== 'LINE').forEach(it => parts.push(`
+        <div class="eta-issue ${it.level}">
+            <i class="bi ${it.level === 'error' ? 'bi-x-circle-fill' : 'bi-exclamation-triangle-fill'}"></i>
+            <span>${escapeHtml(it.msg)}</span>
+        </div>`));
+    return parts.length
+        ? `<div class="eta-issue-list">${parts.join('')}</div>`
+        : '<span class="text-muted">—</span>';
 }
 
 function renderEtaDirectGrid() {
@@ -8197,45 +8438,101 @@ function renderEtaDirectGrid() {
     if (!checkEtaDirectParsed) { gridEl.innerHTML = ''; return; }
 
     const onlyIssues = document.getElementById('etaDirectOnlyIssues').checked;
+    const dupOnly = !!document.getElementById('etaDirectOnlyDup')?.checked;
+    const lineFilter = (document.getElementById('etaDirectLineFilter')?.value || '').trim().toUpperCase();
+    const q = (document.getElementById('etaDirectSearch')?.value || '').trim().toUpperCase();
+    const sortMode = document.getElementById('etaDirectSort')?.value || 'date';
     const { dayColumns } = checkEtaDirectParsed;
+    const countEl = document.getElementById('etaDirectCount');
 
-    // Nhóm dòng theo ITEM
-    const itemGroups = [];
-    const itemMap = new Map();
+    // So sánh line tự nhiên: S111 < S112 < S119 < S120; line rỗng xuống cuối
+    const lineCmp = (x, y) => {
+        if (!x && !y) return 0;
+        if (!x) return 1;
+        if (!y) return -1;
+        return x.localeCompare(y, 'en', { numeric: true });
+    };
+    const dateOrder = new Map();      // date → thứ tự ngày (cột ngày/đêm cùng ngày dùng chung)
+    dayColumns.forEach(dc => { if (!dateOrder.has(dc.date)) dateOrder.set(dc.date, dateOrder.size); });
+    const dateIdxOfCol = (c) => dateOrder.get(dayColumns[c]?.date) ?? 0;
+
+    // Item xuất hiện ở nhiều dòng (khác line / khác ngày) → đánh dấu trùng, mỗi item 1 màu riêng
+    const itemRowCount = new Map();
+    checkEtaDirectResults.forEach(r => itemRowCount.set(r.itemKey, (itemRowCount.get(r.itemKey) || 0) + 1));
+    const dupHue = new Map();
+    let dupN = 0;
+    itemRowCount.forEach((n, k) => { if (n > 1) dupHue.set(k, (dupN++ * 137) % 360); });
+
+    // Mỗi DÒNG được sắp xếp độc lập (item chạy nhiều line sẽ bị tách ra đúng chỗ của từng line/ngày)
+    const allRows = [];
     checkEtaDirectResults.forEach((r, i) => {
-        if (!itemMap.has(r.itemKey)) {
-            const g = { item: r.itemKey, indexes: [] };
-            itemMap.set(r.itemKey, g);
-            itemGroups.push(g);
-        }
-        itemMap.get(r.itemKey).indexes.push(i);
+        const line = String(r.row.line || '').trim().toUpperCase();
+        if (lineFilter && line !== lineFilter) return;
+        if (q && !`${r.row.item} ${r.row.frame || ''}`.toUpperCase().includes(q)) return;
+
+        let first = Infinity, last = -1;
+        r.row.dailyQty.forEach((d, c) => {
+            if (d.qty > 0) { if (c < first) first = c; if (c > last) last = c; }
+        });
+        const hasErr = r.itemLevel.itemIssues.some(x => x.level === 'error') ||
+                       r.rowLevel.rowIssues.some(x => x.level === 'error');
+        const hasAny = r.itemLevel.itemIssues.length > 0 || r.rowLevel.rowIssues.length > 0;
+        allRows.push({
+            i, res: r, line,
+            sev: hasErr ? 0 : (hasAny ? 1 : 2),
+            firstCol: first,
+            lastCol: last,
+            // Dòng chạy vắt sang ngày kế tiếp → xuống cuối khối ca bắt đầu để nối ca
+            carryOver: first !== Infinity && dateIdxOfCol(last) > dateIdxOfCol(first) ? 1 : 0,
+        });
     });
 
-    // Sắp xếp: item có lỗi → warning → ok
-    const groupSeverity = (g) => {
-        const firstRes = checkEtaDirectResults[g.indexes[0]];
-        if (firstRes.itemLevel.itemIssues.some(i => i.level === 'error') ||
-            g.indexes.some(i => checkEtaDirectResults[i].rowLevel.rowIssues.some(x => x.level === 'error'))) return 0;
-        if (firstRes.itemLevel.itemIssues.length ||
-            g.indexes.some(i => checkEtaDirectResults[i].rowLevel.rowIssues.length)) return 1;
-        return 2;
-    };
-    itemGroups.sort((a, b) => {
-        const s = groupSeverity(a) - groupSeverity(b);
-        return s !== 0 ? s : a.indexes[0] - b.indexes[0];
+    allRows.sort((a, b) => {
+        if (sortMode === 'date') {
+            // 1) Gom theo LINE: hết hàng của line này (đầu → cuối) rồi mới sang line khác
+            if (a.line !== b.line) return lineCmp(a.line, b.line);
+            // 2) Đúng thứ tự ca: 10/8 ngày → 10/8 đêm → 10/9 ngày → 10/9 đêm ...
+            if (a.firstCol !== b.firstCol) return a.firstCol < b.firstCol ? -1 : 1;
+            // 3) Cùng ca: dòng vắt sang ngày sau xuống cuối để nối ca
+            if (a.carryOver !== b.carryOver) return a.carryOver - b.carryOver;
+            if (a.lastCol !== b.lastCol) return a.lastCol - b.lastCol;
+            if (a.sev !== b.sev) return a.sev - b.sev;
+        } else if (a.sev !== b.sev) {
+            return a.sev - b.sev;
+        }
+        return a.i - b.i;
     });
 
     // Lọc
-    const visibleItems = onlyIssues
-        ? itemGroups.filter(g => groupSeverity(g) < 2)
-        : itemGroups;
+    let visibleRows = onlyIssues ? allRows.filter(r => r.sev < 2) : allRows;
+    if (dupOnly) {
+        // Chỉ giữ item lặp nhiều dòng, gom các dòng của cùng 1 item sát nhau
+        // (nhóm xếp theo vị trí dòng đầu tiên của item; trong nhóm: theo thứ tự ca rồi line)
+        const rank = new Map();
+        visibleRows = visibleRows.filter(r => (itemRowCount.get(r.res.itemKey) || 1) > 1);
+        visibleRows.forEach((r, idx) => { if (!rank.has(r.res.itemKey)) rank.set(r.res.itemKey, idx); });
+        visibleRows = visibleRows.map((r, idx) => ({ r, idx })).sort((x, y) => {
+            const gx = rank.get(x.r.res.itemKey), gy = rank.get(y.r.res.itemKey);
+            if (gx !== gy) return gx - gy;
+            if (sortMode === 'date') {
+                if (x.r.firstCol !== y.r.firstCol) return x.r.firstCol < y.r.firstCol ? -1 : 1;
+                const byLine = lineCmp(x.r.line, y.r.line);
+                if (byLine !== 0) return byLine;
+            }
+            return x.idx - y.idx;
+        }).map(o => o.r);
+    }
+    const visibleItemCount = new Set(visibleRows.map(r => r.res.itemKey)).size;
+    if (countEl) countEl.textContent = `Hiển thị ${visibleRows.length}/${allRows.length} dòng · ${visibleItemCount} item`;
 
-    if (!visibleItems.length) {
-        gridEl.innerHTML = `
-            <div class="eta-empty">
+    if (!visibleRows.length) {
+        const filtering = !!(lineFilter || q || dupOnly);
+        gridEl.innerHTML = filtering
+            ? `<div class="eta-empty"><i class="bi bi-funnel"></i><strong>Không có dòng nào khớp bộ lọc.</strong><br>${dupOnly ? 'Không có item nào bị trùng theo bộ lọc hiện tại. ' : ''}Thử đổi line / từ khóa${onlyIssues ? ' hoặc bỏ tick "Chỉ hiện dòng có vi phạm"' : ''}.</div>`
+            : `<div class="eta-empty">
                 <i class="bi bi-shield-check"></i>
                 <strong>Không phát hiện vi phạm nào!</strong><br>
-                Tất cả ${itemGroups.length} item đều thỏa mãn ràng buộc LINE · DIRECT · ETA · PICK UP.
+                Tất cả ${allRows.length} dòng đều thỏa mãn ràng buộc LINE · DIRECT · ETA · PICK UP.
             </div>`;
         return;
     }
@@ -8263,114 +8560,108 @@ function renderEtaDirectGrid() {
                 <th class="col-qty" rowspan="2">DIRECT</th>
                 <th class="col-qty" rowspan="2">ASHTON</th>
                 ${dateHeaderCells}
-                <th class="col-total" rowspan="2">SL<br>DÒNG</th>
-                <th class="col-item-issues" rowspan="2">VẤN ĐỀ ETA &amp; PICKUP</th>
-                <th class="col-row-issues" rowspan="2">VẤN ĐỀ LINE ALLOCATED</th>
+                <th class="col-total" rowspan="2">Quantity</th>
+                <th class="col-item-issues col-issues" rowspan="2">PROBLEM</th>
             </tr>
             <tr>${numHeaderCells}</tr>
         </thead>`;
 
-    // TBODY
+    // TBODY — mỗi dòng 1 <tr>, không gộp rowspan theo item
     let tbody = '';
-    visibleItems.forEach(group => {
-        const idxs = group.indexes;
-        const rowspan = idxs.length;
-        const firstRes = checkEtaDirectResults[idxs[0]];
-        const itemLevel = firstRes.itemLevel;
-        const firstRow = firstRes.row;
+    let prevLine = null;
+    visibleRows.forEach(r => {
+        const res = r.res;
+        const row = res.row;
+        const il = res.itemLevel;
+        // Vạch ngăn: đổi item (khi lọc item trùng) hoặc đổi line (khi sắp theo ngày)
+        const blockKey = dupOnly ? res.itemKey : r.line;
+        const lineStart = (dupOnly || sortMode === 'date') && prevLine !== null && blockKey !== prevLine;
+        prevLine = blockKey;
 
-        const itemHasError = itemLevel.itemIssues.some(i => i.level === 'error');
+        const nRows = itemRowCount.get(res.itemKey) || 1;
+        const isDup = nRows > 1;
+        const dupAttr = isDup ? ` style="--dup-h:${dupHue.get(res.itemKey)}"` : '';
+        const dupBadge = isDup
+            ? `<span class="dup-badge" title="Item này xuất hiện ở ${nRows} dòng (khác line / khác ngày)">TRÙNG ×${nRows}</span>`
+            : '';
 
-        const itemIssuesHtml = itemLevel.itemIssues.length
-            ? `<div class="eta-issue-list">${itemLevel.itemIssues.map(it => `
-                <div class="eta-issue ${it.level} item-level">
-                    <i class="bi ${it.level === 'error' ? 'bi-x-octagon-fill' : 'bi-exclamation-triangle-fill'}"></i>
-                    <span>${escapeHtml(it.msg)}</span>
-                </div>`).join('')}</div>`
-            : '<span class="text-muted">—</span>';
-
-        // Dòng đầu của item: có cột ITEM và cột ITEM-ISSUES với rowspan
-        tbody += `<tr class="item-row ${itemHasError ? 'row-has-error' : ''}">`;
-        tbody += `<td class="col-num">${firstRow.rowIndex}</td>`;
-        tbody += `<td class="col-item" rowspan="${rowspan}">
-            <div class="item-name">${escapeHtml(firstRow.item)}</div>
-            ${firstRow.frame ? `<div class="item-frame">${escapeHtml(firstRow.frame)}</div>` : ''}
-            <div class="item-total-badge" title="Tổng SL của item (đã gộp các line, 2 cột day/night cùng ngày)">SL: ${itemLevel.totalSL}</div>
+        tbody += `<tr class="eta-row ${r.sev === 0 ? 'row-has-error' : ''} ${lineStart ? 'line-block-start' : ''}">`;
+        tbody += `<td class="col-num">${row.rowIndex}</td>`;
+        tbody += `<td class="col-item ${isDup ? 'is-dup' : ''}"${dupAttr}>
+            <div class="item-name">${escapeHtml(row.item)}${dupBadge}</div>
+            ${row.frame ? `<div class="item-frame">${escapeHtml(row.frame)}</div>` : ''}
         </td>`;
-        tbody += renderEtaDirectRowCells(firstRes, dayColumns);
-        tbody += `<td class="col-item-issues" rowspan="${rowspan}">${itemIssuesHtml}</td>`;
-
-        const rowIssuesHtml = firstRes.rowLevel.rowIssues.length
-            ? `<div class="eta-issue-list">${firstRes.rowLevel.rowIssues.map(it => `
-                <div class="eta-issue ${it.level}">
-                    <i class="bi ${it.level === 'error' ? 'bi-x-circle-fill' : 'bi-exclamation-triangle-fill'}"></i>
-                    <span>${escapeHtml(it.msg)}</span>
-                </div>`).join('')}</div>`
-            : '<span class="text-muted">—</span>';
-        tbody += `<td class="col-row-issues">${rowIssuesHtml}</td>`;
+        tbody += renderEtaDirectRowCells(res, dayColumns, nRows);
+        tbody += `<td class="col-item-issues col-issues">${etaIssuesCellHtml(il.itemIssues, res.rowLevel.rowIssues)}</td>`;
         tbody += `</tr>`;
-
-        // Các dòng tiếp theo của item
-        for (let i = 1; i < idxs.length; i++) {
-            const res = checkEtaDirectResults[idxs[i]];
-            const isLast = i === idxs.length - 1;
-            tbody += `<tr class="item-row ${isLast ? 'item-row-last' : ''}">`;
-            tbody += `<td class="col-num">${res.row.rowIndex}</td>`;
-            tbody += renderEtaDirectRowCells(res, dayColumns);
-            const rIssuesHtml = res.rowLevel.rowIssues.length
-                ? `<div class="eta-issue-list">${res.rowLevel.rowIssues.map(it => `
-                    <div class="eta-issue ${it.level}">
-                        <i class="bi ${it.level === 'error' ? 'bi-x-circle-fill' : 'bi-exclamation-triangle-fill'}"></i>
-                        <span>${escapeHtml(it.msg)}</span>
-                    </div>`).join('')}</div>`
-                : '<span class="text-muted">—</span>';
-            tbody += `<td class="col-row-issues">${rIssuesHtml}</td>`;
-            tbody += `</tr>`;
-        }
     });
 
     gridEl.innerHTML = `<table class="eta-grid">${thead}<tbody>${tbody}</tbody></table>`;
 }
 
 function initCheckEtaDirectUi() {
-    checkEtaDirectModal = new bootstrap.Modal(document.getElementById('checkEtaDirectModal'));
-    document.getElementById('checkEtaDirectBtn').addEventListener('click', openCheckEtaDirectModal);
-    document.getElementById('etaDirectAnalyzeBtn').addEventListener('click', runEtaDirectAnalysis);
-    document.getElementById('etaDirectClearBtn').addEventListener('click', clearEtaDirectForm);
-    document.getElementById('etaDirectPaste').addEventListener('input', scheduleEtaDirectBadgeUpdate);
+    // (nút mở modal / Phân tích / Xóa / ô dán đã được gắn sự kiện ở phần khởi tạo phía trên)
+    const fileInput = document.getElementById('etaDirectFile');
+    const info = document.getElementById('etaDirectFileInfo');
 
     document.getElementById('etaDirectToggleInputBtn').addEventListener('click', () => {
         const wrap = document.getElementById('etaDirectInputWrap');
-        const btn = document.getElementById('etaDirectToggleInputBtn');
-        const icon = btn.querySelector('i');
-        const label = btn.querySelector('span');
-        const isHidden = wrap.classList.toggle('eta-hidden');
-        icon.className = isHidden ? 'bi bi-eye-fill' : 'bi bi-eye-slash-fill';
-        label.textContent = isHidden ? 'Hiện dán dữ liệu' : 'Ẩn dán dữ liệu';
+        setEtaInputCollapsed(!wrap.classList.contains('eta-hidden'));
     });
 
-    document.getElementById('etaDirectFile').addEventListener('change', async (e) => {
+    fileInput.addEventListener('change', async (e) => {
         const file = e.target.files && e.target.files[0];
-        const info = document.getElementById('etaDirectFileInfo');
         if (!file) {
             info.textContent = 'Chưa chọn file';
-            info.classList.remove('has-file');
+            info.classList.remove('has-file', 'has-error');
+            updateEtaDirectStatus('Sẵn sàng phân tích');
             return;
         }
-        info.textContent = `Đã chọn: ${file.name} (${Math.round(file.size / 1024)} KB)`;
-        info.classList.add('has-file');
+        info.classList.remove('has-error');
+        info.textContent = `Đang đọc: ${file.name} (${Math.round(file.size / 1024)} KB)...`;
+        updateEtaDirectStatus(`Đang đọc file "${file.name}"...`);
         try {
             const { matrix, sheetName } = await readExcelRawMatrix(file);
             document.getElementById('etaDirectPaste').value = etaMatrixToText(matrix);
             scheduleEtaDirectBadgeUpdate();
-            if (sheetName) info.textContent = `Đã chọn: ${file.name} · sheet "${sheetName}"`;
+            const rows = Math.max(0, matrix.filter(r => (r || []).some(c => String(c ?? '').trim())).length - 2);
+            info.textContent = `✓ Đã thêm file: ${file.name} (${Math.round(file.size / 1024)} KB)` +
+                (sheetName ? ` · sheet "${sheetName}"` : '') + ` · ~${rows} dòng`;
+            info.classList.add('has-file');
+            updateEtaDirectStatus(`Đã thêm file "${file.name}"${sheetName ? ` (sheet ${sheetName})` : ''} — bấm Phân tích để kiểm tra`);
         } catch (err) {
             console.error('Lỗi đọc file:', err);
             info.textContent = `✕ Không đọc được "${file.name}"`;
             info.classList.remove('has-file');
+            info.classList.add('has-error');
+            updateEtaDirectStatus(`Lỗi: không đọc được file "${file.name}"`);
         }
     });
+
+    // Kéo thả file vào dropzone
+    const dz = document.querySelector('label[for="etaDirectFile"]');
+    if (dz) {
+        ['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('dragover'); }));
+        ['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('dragover'); }));
+        dz.addEventListener('drop', e => {
+            const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+            if (!f) return;
+            const dt = new DataTransfer();
+            dt.items.add(f);
+            fileInput.files = dt.files;
+            fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+    }
+
     document.getElementById('etaDirectOnlyIssues').addEventListener('change', renderEtaDirectGrid);
+    document.getElementById('etaDirectOnlyDup').addEventListener('change', renderEtaDirectGrid);
+    document.getElementById('etaDirectLineFilter').addEventListener('change', renderEtaDirectGrid);
+    document.getElementById('etaDirectSort').addEventListener('change', renderEtaDirectGrid);
+    let etaSearchTimer = null;
+    document.getElementById('etaDirectSearch').addEventListener('input', () => {
+        clearTimeout(etaSearchTimer);
+        etaSearchTimer = setTimeout(renderEtaDirectGrid, 150);
+    });
 }
 
 window.addEventListener('beforeunload', () => {
