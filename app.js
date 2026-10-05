@@ -2,7 +2,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, getDocs, onSnapshot, enableIndexedDbPersistence, query, where, writeBatch, arrayUnion, arrayRemove } 
     from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail } 
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, EmailAuthProvider, reauthenticateWithCredential, updatePassword }
     from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -95,6 +95,7 @@ let usersAvatarCache = null;      // { uid: dataUrl }
 let unsubscribeUsersAvatar = null; // listener realtime để thấy avatar mới của người khác
 
 let userProfileModal;
+let changePasswordConfirmModal;
 let settingsModal = null;
 let transferConfirmModal;
 let pendingTransferJob = null;
@@ -664,6 +665,61 @@ async function saveUserProfile() {
     }
 }
 
+function handleChangePassword() {
+    if (!currentUser) return;
+    const newPw = document.getElementById('profileNewPassword').value;
+    document.getElementById('changePasswordError').textContent = '';
+    if (!newPw || newPw.length < 6) {
+        showNotification('Thiếu thông tin', 'Mật khẩu mới cần ít nhất 6 ký tự.', false, 'warning');
+        document.getElementById('profileNewPassword').focus();
+        return;
+    }
+    document.getElementById('confirmCurrentPassword').value = '';
+    changePasswordConfirmModal.show();
+    setTimeout(() => document.getElementById('confirmCurrentPassword').focus(), 320);
+}
+
+async function confirmChangePassword() {
+    if (!currentUser) return;
+    const curPw = document.getElementById('confirmCurrentPassword').value;
+    const newPw = document.getElementById('profileNewPassword').value;
+    const errEl = document.getElementById('changePasswordError');
+    const btn = document.getElementById('confirmChangePasswordBtn');
+    errEl.textContent = '';
+
+    if (!curPw) { errEl.textContent = 'Vui lòng nhập mật khẩu hiện tại.'; return; }
+    if (!newPw || newPw.length < 6) { errEl.textContent = 'Mật khẩu mới cần ít nhất 6 ký tự.'; return; }
+    if (curPw === newPw) { errEl.textContent = 'Mật khẩu mới phải khác mật khẩu hiện tại.'; return; }
+
+    const originalHTML = btn.innerHTML;
+    btn.innerHTML = '<span class="loading"></span> Đang đổi...';
+    btn.disabled = true;
+
+    try {
+        const cred = EmailAuthProvider.credential(currentUser.email, curPw);
+        await reauthenticateWithCredential(currentUser, cred);
+        await updatePassword(currentUser, newPw);
+
+        showNotification('Thành công', 'Đã đổi mật khẩu. Hãy dùng mật khẩu mới cho lần đăng nhập sau.', false, 'success');
+        document.getElementById('profileNewPassword').value = '';
+        document.getElementById('confirmCurrentPassword').value = '';
+        changePasswordConfirmModal.hide();
+    } catch (error) {
+        console.error('Lỗi đổi mật khẩu:', error);
+        const msg = {
+            'auth/wrong-password': 'Mật khẩu hiện tại không đúng.',
+            'auth/invalid-credential': 'Mật khẩu hiện tại không đúng.',
+            'auth/weak-password': 'Mật khẩu mới quá yếu (cần ít nhất 6 ký tự).',
+            'auth/requires-recent-login': 'Phiên đăng nhập đã cũ. Vui lòng đăng nhập lại rồi thử lại.',
+            'auth/too-many-requests': 'Bạn thao tác quá nhiều lần. Vui lòng đợi vài phút.',
+            'auth/network-request-failed': 'Lỗi kết nối mạng. Kiểm tra internet rồi thử lại.'
+        }[error.code] || 'Không đổi được mật khẩu. Vui lòng thử lại.';
+        errEl.textContent = msg;
+    } finally {
+        btn.innerHTML = originalHTML;
+        btn.disabled = false;
+    }
+}
 
 // Thêm function đổi avatar
 async function changeAvatar(file) {
@@ -833,6 +889,7 @@ document.addEventListener('DOMContentLoaded', function() {
         keyboard: true,
         focus: true
     });
+    changePasswordConfirmModal = new bootstrap.Modal(document.getElementById('changePasswordConfirmModal'));
     settingsModal = new bootstrap.Modal(document.getElementById('settingsModal'));
     migrateLegacyJobsModal = new bootstrap.Modal(document.getElementById('migrateLegacyJobsModal'));
     viewDataModal = new bootstrap.Modal(document.getElementById('viewDataModal'));
@@ -1003,6 +1060,15 @@ document.getElementById('settingsNotifyLead').addEventListener('change', (e) => 
 
     document.getElementById('userProfileBtn').addEventListener('click', openUserProfileModal);
     document.getElementById('saveProfileBtn').addEventListener('click', saveUserProfile);
+    document.getElementById('changePasswordBtn').addEventListener('click', handleChangePassword);
+document.getElementById('confirmChangePasswordBtn').addEventListener('click', confirmChangePassword);
+document.getElementById('confirmCurrentPassword').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); confirmChangePassword(); }
+});
+document.getElementById('userProfileModal').addEventListener('hidden.bs.modal', () => {
+    document.getElementById('profileNewPassword').value = '';
+    document.getElementById('changePasswordError').textContent = '';
+});
     document.getElementById('changeAvatarBtn').addEventListener('click', () => {
         document.getElementById('avatarFileInput').click();
     });
@@ -5746,6 +5812,7 @@ async function confirmPresenterAssignment() {
 // ============================================================
 const OwlFx = (() => {
     const W = 56, H = 56, PERSP = 700;
+    const OWL_SCALE = 0.7;
     const HUES = [0, -8, 8, -14, 14];
     let layer = null, owl = null, parts = {};
     let mode = 'none';                 // none | fly | settle | perch | shot | fall
@@ -5841,23 +5908,23 @@ const OwlFx = (() => {
     const feetY = r.top + 5;
     return {
         x: r.left + Math.min(r.width, 120) / 2,
-        y: feetY - H * 0.46,
-        // Chỉ cần h6 còn nằm trong viewport (đủ chỗ cho cú đậu)
+        y: feetY - H * 0.46 * OWL_SCALE,             // ← nhân OWL_SCALE để chân vẫn chạm chữ
         visible: feetY - H > 0 && feetY < window.innerHeight + H
     };
 }
 
     function pose(p) {
-        if (!owl) return;
-        owl.style.opacity = p.opacity == null ? 1 : p.opacity;
-        owl.style.transform =
-            `translate3d(${p.x - W / 2}px,${p.y - H / 2}px,0) perspective(${PERSP}px) translateZ(${p.z || 0}px) ` +
-            `rotateX(${p.pitch || 0}deg) rotateY(${p.yaw || 0}deg) rotateZ(${p.roll || 0}deg) scale(${p.scale || 1})`;
-        const th = p.wing || 0, sw = p.sweep || 0, ws = p.wscale || 1;
-        parts.wl.style.transform = `translateZ(7px) rotateY(${-sw}deg) rotateZ(${th}deg) scale(1,${ws})`;
-        parts.wr.style.transform = `translateZ(7px) rotateY(${sw}deg) rotateZ(${-th}deg) scale(1,${ws})`;
-        parts.head.style.transform = `translateZ(12px) translateY(${p.headDy || 0}px) rotateY(${p.headYaw || 0}deg) rotateZ(${p.headRoll || 0}deg)`;
-    }
+    if (!owl) return;
+    const s = (p.scale == null ? 1 : p.scale) * OWL_SCALE;      // ← nhân thêm OWL_SCALE
+    owl.style.opacity = p.opacity == null ? 1 : p.opacity;
+    owl.style.transform =
+        `translate3d(${p.x - W / 2}px,${p.y - H / 2}px,0) perspective(${PERSP}px) translateZ(${p.z || 0}px) ` +
+        `rotateX(${p.pitch || 0}deg) rotateY(${p.yaw || 0}deg) rotateZ(${p.roll || 0}deg) scale(${s})`;
+    const th = p.wing || 0, sw = p.sweep || 0, ws = p.wscale || 1;
+    parts.wl.style.transform = `translateZ(7px) rotateY(${-sw}deg) rotateZ(${th}deg) scale(1,${ws})`;
+    parts.wr.style.transform = `translateZ(7px) rotateY(${sw}deg) rotateZ(${-th}deg) scale(1,${ws})`;
+    parts.head.style.transform = `translateZ(12px) translateY(${p.headDy || 0}px) rotateY(${p.headYaw || 0}deg) rotateZ(${p.headRoll || 0}deg)`;
+}
 
     // ---------- bay ----------
     function startFly(E) {

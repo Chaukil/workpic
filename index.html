@@ -1345,6 +1345,17 @@ Ngày nhận: d/m, d/m/yyyy, yyyy-mm-dd. Số thập phân dùng . hoặc ,"></t
                             <button class="btn btn-save" type="button" id="profileNewDeptSaveBtn"><i class="bi bi-check-lg"></i> Thêm</button>
                         </div>                       
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold"><i class="bi bi-shield-lock-fill"></i> Mật khẩu</label>
+                        <div class="input-group">
+                        <input type="password" class="form-control" id="profileNewPassword"
+                            placeholder="Mật khẩu mới (≥ 6 ký tự)" minlength="6" autocomplete="new-password">
+                        <button class="btn btn-save" id="changePasswordBtn" type="button" title="Đổi mật khẩu">
+                            <i class="bi bi-key-fill"></i> Đổi
+                        </button>
+                </div>
+                <div class="form-text"><i class="bi bi-info-circle"></i> Bấm "Đổi" rồi nhập mật khẩu hiện tại để xác nhận.</div>
+            </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-danger" id="logoutBtn">
@@ -1355,6 +1366,39 @@ Ngày nhận: d/m, d/m/yyyy, yyyy-mm-dd. Số thập phân dùng . hoặc ,"></t
             </div>
         </div>
     </div>
+
+    <!-- Change Password Confirm Modal -->
+<div class="modal fade" id="changePasswordConfirmModal" tabindex="-1">
+    <div class="modal-dialog modal-md modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header modern-header modern-header-teal">
+                <div class="modern-header-inner">
+                    <div class="modern-header-icon"><i class="bi bi-shield-lock-fill"></i></div>
+                    <div class="modern-header-text">
+                        <h5 class="modal-title mb-0">Xác nhận đổi mật khẩu</h5>
+                        <p class="modern-header-subtitle mb-0">Nhập mật khẩu hiện tại để xác nhận</p>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label fw-bold" for="confirmCurrentPassword">Mật khẩu hiện tại *</label>
+                <input type="password" class="form-control" id="confirmCurrentPassword"
+                       autocomplete="current-password" placeholder="Nhập mật khẩu hiện tại">
+                <p class="auth-error mb-0 mt-2" id="changePasswordError" role="alert"></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-cancel" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Hủy
+                </button>
+                <button type="button" class="btn btn-save" id="confirmChangePasswordBtn">
+                    <i class="bi bi-check-circle-fill"></i> Xác nhận đổi
+                    <div class="btn-shine"></div>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
     <div class="modal fade" id="settingsModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-centered">
