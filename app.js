@@ -7905,6 +7905,8 @@ function renderStatistics() {
 
 const ETA_DIRECT_DATE_RE = /^\d{1,2}\/\d{1,2}$/;
 const ETA_BACKUP_LINES = ['S112', 'M177'];
+// PICK UP rơi vào N ngày đầu của bảng (day+night = 1 ngày) thì chỉ cần hàng lên đúng ngày ETA là OK
+const ETA_PICKUP_EARLY_DAYS = 3;
 
 // `checkEtaDirectModal`, `checkEtaDirectParsed`, `checkEtaDirectResults` đã khai báo ở đầu file.
 
@@ -8253,7 +8255,11 @@ function analyzeItemLevelEta(itemRows, dayColumns) {
         });
     }
 
-    // 3) ETA > PICK UP → không thể đáp ứng đúng hạn (chỉ cảnh báo, không tính SL)
+    // 3) ETA > PICK UP — ngày ETA là mốc sớm nhất hàng có thể lên.
+    //    Chỉ báo ĐỎ khi hàng thực sự lên TRỄ so với mốc cho phép (không báo vàng chỉ vì ETA > PICK UP):
+    //    - PICK UP nằm trong ETA_PICKUP_EARLY_DAYS ngày đầu của bảng: chỉ cần có hàng lên đúng ngày ETA là OK.
+    //    - PICK UP nằm ở các ngày cuối: tổng (ngày + đêm) của ngày ETA phải đủ số lượng yêu cầu pickup.
+    //    Hàng lên trước ngày ETA đã được báo đỏ ở row-level (code 'ETA').
     const etas = itemRows.map(r => parseEtaDateMMDD(r.eta)).filter(Boolean);
     const pickups = itemRows.map(r => parseEtaDateMMDD(r.pickup)).filter(Boolean);
     if (etas.length && pickups.length) {
@@ -8262,10 +8268,34 @@ function analyzeItemLevelEta(itemRows, dayColumns) {
         if (latestEta.getTime() > earliestPickup.getTime()) {
             const etaLabel = itemRows.find(r => r.eta)?.eta || '';
             const pickupLabel = itemRows.find(r => r.pickup)?.pickup || '';
-            itemIssues.push({
-                level: 'warning', code: 'ETA_PICKUP', scope: 'item',
-                msg: `ETA ${etaLabel} → không thể lên PICK UP ${pickupLabel}`
-            });
+            const required = direct > 0 ? direct : totalSL;
+
+            // Vị trí ngày PICK UP trong bảng (đếm số ngày đứng trước nó)
+            const pickupPos = dayTotals.filter(d => d.dateObj && d.dateObj.getTime() < earliestPickup.getTime()).length;
+            const isEarlyZone = pickupPos < ETA_PICKUP_EARLY_DAYS;
+
+            // Qty đúng ngày ETA (gộp ngày + đêm, mọi line). Nếu ETA nằm trước cột đầu thì lấy ngày đầu tiên >= ETA.
+            const etaDayTotal = dayTotals.find(d => d.dateObj && d.dateObj.getTime() >= latestEta.getTime());
+            const etaDayQty = (etaDayTotal && etaDayTotal.dateObj.getTime() === latestEta.getTime()) || (etaDayTotal && etaDayTotal === dayTotals[0])
+                ? etaDayTotal.qty : 0;
+
+            // Mô tả hàng đang thực sự lên ngày nào
+            const runList = dayTotals.filter(d => d.qty > 0).map(d => `${d.qty} ngày ${d.date}`).join(', ');
+            const runText = runList ? `đang lên: ${runList}` : 'chưa có hàng lên';
+
+            if (isEarlyZone) {
+                if (etaDayQty <= 0) {
+                    itemIssues.push({
+                        level: 'error', code: 'ETA_PICKUP', scope: 'item',
+                        msg: `Trễ: ETA ${etaLabel} (PICK UP ${pickupLabel}) nhưng không có hàng lên ngày ${etaLabel} — ${runText}`
+                    });
+                }
+            } else if (etaDayQty < required) {
+                itemIssues.push({
+                    level: 'error', code: 'ETA_PICKUP', scope: 'item',
+                    msg: `Trễ: PICK UP ${pickupLabel} cần ${required} kit, ngày ETA ${etaLabel} mới lên ${etaDayQty} (thiếu ${required - etaDayQty}) — ${runText}`
+                });
+            }
         }
     }
 
