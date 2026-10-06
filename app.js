@@ -896,11 +896,11 @@ document.addEventListener('DOMContentLoaded', function() {
     checkDueModal = new bootstrap.Modal(document.getElementById('checkDueModal'));
     checkEtaDirectModal = new bootstrap.Modal(document.getElementById('checkEtaDirectModal'));
 
-document.getElementById('checkEtaDirectBtn').addEventListener('click', openCheckEtaDirectModal);
-document.getElementById('etaDirectAnalyzeBtn').addEventListener('click', runEtaDirectAnalysis);
-document.getElementById('etaDirectClearBtn').addEventListener('click', clearEtaDirectForm);
-document.getElementById('etaDirectPaste').addEventListener('input', scheduleEtaDirectBadgeUpdate);
-initCheckEtaDirectUi();
+    document.getElementById('checkEtaDirectBtn').addEventListener('click', openCheckEtaDirectModal);
+    document.getElementById('etaDirectAnalyzeBtn').addEventListener('click', runEtaDirectAnalysis);
+    document.getElementById('etaDirectClearBtn').addEventListener('click', clearEtaDirectForm);
+    document.getElementById('etaDirectPaste').addEventListener('input', scheduleEtaDirectBadgeUpdate);
+    initCheckEtaDirectUi();
 
     presenterSpinModal = new bootstrap.Modal(document.getElementById('presenterSpinModal'));
     dayOffModal = new bootstrap.Modal(document.getElementById('dayOffModal'));
@@ -939,6 +939,46 @@ initCheckEtaDirectUi();
         }
         try { el.setSelectionRange(pos, pos); } catch (err) { /* một số input type không hỗ trợ */ }
     }
+
+    // === CHẶN AUTOFILL EMAIL/MẬT KHẨU VÀO Ô TÌM KIẾM ===
+function stripAutofillFromSearchInputs() {
+    const ids = ['searchJob', 'quickChatSearchInput', 'etaDirectSearch'];
+    ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+
+        const looksLikeCredential = v =>
+            /@/.test(v) ||                        // có @ → email
+            /password|mật khẩu|matkhau/i.test(v) // có chữ password
+        ;
+
+        const clean = () => {
+            if (looksLikeCredential(el.value)) {
+                el.value = '';
+                // nếu đang gõ filter, reset luôn kết quả đã lọc
+                if (id === 'searchJob' && typeof filteredJobs !== 'undefined' && typeof jobs !== 'undefined') {
+                    filteredJobs = jobs;
+                    if (typeof renderJobList === 'function') renderJobList();
+                }
+                if (id === 'quickChatSearchInput' && typeof quickChatSearchText !== 'undefined') {
+                    quickChatSearchText = '';
+                    if (typeof renderQuickChat === 'function') renderQuickChat();
+                }
+            }
+        };
+
+        // Chrome autofill xong mới bắn sự kiện, nên phải check nhiều mốc thời gian
+        clean();
+        setTimeout(clean, 120);
+        setTimeout(clean, 500);
+        setTimeout(clean, 1200);
+        el.addEventListener('animationstart', clean); // Chrome trigger autofill qua animation
+        el.addEventListener('change', clean);
+    });
+}
+
+document.addEventListener('DOMContentLoaded', stripAutofillFromSearchInputs);
+window.addEventListener('pageshow', stripAutofillFromSearchInputs);
 
     document.getElementById('salaryCalcModal').addEventListener('input', (e) => {
         if (MONEY_INPUT_IDS.includes(e.target.id)) {
@@ -1013,7 +1053,7 @@ initCheckEtaDirectUi();
         await new Promise(r => setTimeout(r, 200));
     } catch (e) { /* modal chưa init thì bỏ qua */ }
     try { await signOut(auth); } catch (e) { console.error(e); }
-});
+    });
     document.getElementById('confirmMigrateLegacyJobsBtn').addEventListener('click', migrateLegacyJobs);
     document.getElementById('viewDataBtn').addEventListener('click', openViewDataModal);
     document.getElementById('checkDueBtn').addEventListener('click', openCheckDueModal);
@@ -1056,19 +1096,19 @@ initCheckEtaDirectUi();
     });
 
     document.getElementById('settingsBtn').addEventListener('click', openSettingsModal);
-document.getElementById('settingsNotifyLead').addEventListener('change', (e) => saveNotifyLead(e.target.value));
+    document.getElementById('settingsNotifyLead').addEventListener('change', (e) => saveNotifyLead(e.target.value));
 
     document.getElementById('userProfileBtn').addEventListener('click', openUserProfileModal);
     document.getElementById('saveProfileBtn').addEventListener('click', saveUserProfile);
     document.getElementById('changePasswordBtn').addEventListener('click', handleChangePassword);
-document.getElementById('confirmChangePasswordBtn').addEventListener('click', confirmChangePassword);
-document.getElementById('confirmCurrentPassword').addEventListener('keydown', (e) => {
+    document.getElementById('confirmChangePasswordBtn').addEventListener('click', confirmChangePassword);
+    document.getElementById('confirmCurrentPassword').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); confirmChangePassword(); }
-});
-document.getElementById('userProfileModal').addEventListener('hidden.bs.modal', () => {
+    });
+    document.getElementById('userProfileModal').addEventListener('hidden.bs.modal', () => {
     document.getElementById('profileNewPassword').value = '';
     document.getElementById('changePasswordError').textContent = '';
-});
+    });
     document.getElementById('changeAvatarBtn').addEventListener('click', () => {
         document.getElementById('avatarFileInput').click();
     });

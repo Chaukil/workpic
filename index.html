@@ -197,7 +197,10 @@
                     </div>
                     <div class="card-body p-2">
                         <div class="mb-2">
-                            <input type="text" class="form-control form-control-sm" id="searchJob" placeholder="🔍 Tìm kiếm job...">
+                            <input type="search" class="form-control form-control-sm" id="searchJob"
+       name="job-search-q" autocomplete="off" autocorrect="off"
+       autocapitalize="off" spellcheck="false"
+       placeholder="🔍 Tìm kiếm job...">
                         </div>
                         
                         <div class="row g-2 mb-2">
@@ -1856,7 +1859,10 @@ Ngày nhận: d/m, d/m/yyyy, yyyy-mm-dd. Số thập phân dùng . hoặc ,"></t
         </div>
         <div class="quick-chat-filter-bar">
     <div class="quick-chat-filter-row-top">
-        <input type="text" id="quickChatSearchInput" class="quick-chat-search-input" placeholder="🔍 Tìm nội dung job...">
+        <input type="search" id="quickChatSearchInput" class="quick-chat-search-input"
+       name="quickchat-search-q" autocomplete="off" autocorrect="off"
+       autocapitalize="off" spellcheck="false"
+       placeholder="🔍 Tìm nội dung job...">
         <button type="button" class="quick-chat-filter-toggle" id="quickChatFilterToggle"
                 title="Bộ lọc nâng cao" aria-expanded="false" aria-controls="quickChatFilterExtra">
             <i class="bi bi-funnel-fill"></i>
