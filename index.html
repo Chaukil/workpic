@@ -612,7 +612,7 @@
                         <div>
                             <h5 class="modal-title mb-0">Check Change Due</h5>
                             <p class="check-due-header-subtitle mb-0">
-                                So sánh <strong>FG_MO</strong> giữa Ban_dau và CanDoi để phát hiện thay đổi <strong>FG_JOBNO</strong> &amp; <strong>FG_DUE</strong>
+                                So sánh <strong>FG_MO</strong> giữa system và mong muốn để phát hiện thay đổi <strong>FG_JOBNO</strong> &amp; <strong>FG_DUE</strong>
                             </p>
                         </div>
                     </div>
@@ -659,7 +659,7 @@
                                             <i class="bi bi-file-earmark-text-fill"></i>
                                         </div>
                                         <div class="check-due-source-info">
-                                            <h6>Ban_dau</h6>
+                                            <h6>Dữ liệu system</h6>
                                             <span>Dữ liệu gốc</span>
                                         </div>
                                         <span class="check-due-source-badge" id="checkDueOldPasteBadge">0 dòng</span>
@@ -669,7 +669,7 @@ placeholder="Dán dữ liệu vào đây...
 
 Hệ thống tự nhận diện cột theo NỘI DUNG:
   • FG_MO     → MX* hoặc MY*
-  • FG_DUE    → 1yymmdd (7 số)
+  • FG_DUE    → 1yymmdd | mm/dd/yyyy | mm/dd/yy | mm/dd | 5-Oct | Oct 5
   • FG_JOBNO  → LINE MSS
 
 Không cần đúng thứ tự hay tên cột."></textarea>
@@ -680,7 +680,7 @@ Không cần đúng thứ tự hay tên cột."></textarea>
                                             <i class="bi bi-file-earmark-diff-fill"></i>
                                         </div>
                                         <div class="check-due-source-info">
-                                            <h6>CanDoi</h6>
+                                            <h6>Dữ liệu mong muốn</h6>
                                             <span>Dữ liệu so sánh</span>
                                         </div>
                                         <span class="check-due-source-badge" id="checkDueNewPasteBadge">0 dòng</span>
@@ -701,7 +701,7 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
                                             <i class="bi bi-file-earmark-text-fill"></i>
                                         </div>
                                         <div class="check-due-source-info">
-                                            <h6>File Ban_dau</h6>
+                                            <h6>File dữ liệu system</h6>
                                             <span>Excel · CSV · ODS</span>
                                         </div>
                                         <span class="check-due-source-badge" id="checkDueOldFileBadge">0 dòng</span>
@@ -720,7 +720,7 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
                                             <i class="bi bi-file-earmark-diff-fill"></i>
                                         </div>
                                         <div class="check-due-source-info">
-                                            <h6>File CanDoi</h6>
+                                            <h6>File dữ liệu mong muốn</h6>
                                             <span>Excel · CSV · ODS</span>
                                         </div>
                                         <span class="check-due-source-badge" id="checkDueNewFileBadge">0 dòng</span>
@@ -728,7 +728,7 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
                                     <label class="check-due-dropzone" for="checkDueNewFile">
                                         <i class="bi bi-cloud-arrow-up-fill"></i>
                                         <span class="check-due-dropzone-title">Kéo thả hoặc bấm để chọn file</span>
-                                        <span class="check-due-dropzone-hint">Chỉ cần nếu Ban_dau &amp; CanDoi ở 2 file riêng</span>
+                                        <span class="check-due-dropzone-hint">Chỉ cần nếu Dữ liệu system &amp; Dữ liệu mong muốn ở 2 file riêng</span>
                                         <input type="file" id="checkDueNewFile" accept=".xlsx,.xls,.xlsm,.xlsb,.xltx,.xltm,.ods,.csv,.txt,.prn,.dif,.sylk" hidden>
                                     </label>
                                     <div class="check-due-file-info" id="checkDueNewFileInfo">Chưa chọn file</div>

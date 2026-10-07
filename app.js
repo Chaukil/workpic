@@ -2498,6 +2498,10 @@ function escapeHtml(value) {
 
 const CHECK_DUE_MO_REGEX = /^(MX|MY)/i;
 const CHECK_DUE_DUE_REGEX = /^1\d{6}(\.0)?$/;
+const CHECK_DUE_MONTH_MAP = {
+    jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+    jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12
+};
 
 function openCheckDueModal() {
     checkDueModal.show();
@@ -2532,6 +2536,71 @@ function clearCheckDueForm() {
 
     updateCheckDueStep(1);
     updateCheckDueStatus('Sẵn sàng so sánh');
+}
+
+function parseDueDate(input) {
+    const s = String(input ?? '').trim().replace(/\.0$/, '');
+    if (!s) return null;
+
+    // 1) 1yymmdd — 7 chữ số, bắt đầu bằng 1
+    let m = s.match(/^1(\d{2})(\d{2})(\d{2})$/);
+    if (m) return buildDueResult(2000 + Number(m[1]), Number(m[2]), Number(m[3]));
+
+    // 2) yyyy-mm-dd — ưu tiên check trước mm/dd/yyyy để không nhầm
+    m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/);
+    if (m) return buildDueResult(Number(m[1]), Number(m[2]), Number(m[3]));
+
+    // 3) mm/dd/yyyy
+    m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+    if (m) return buildDueResult(Number(m[3]), Number(m[1]), Number(m[2]));
+
+    // 4) mm/dd/yy  (2 chữ số năm → 2000 + yy)
+    m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2})$/);
+    if (m) return buildDueResult(2000 + Number(m[3]), Number(m[1]), Number(m[2]));
+
+    // 5) mm/dd  (không có năm → suy từ hôm nay)
+    m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})$/);
+    if (m) {
+        const mm = Number(m[1]), dd = Number(m[2]);
+        return buildDueResult(inferDueYear(mm, dd), mm, dd);
+    }
+
+    // 6) d-Mon / d/Mon / d Mon  (vd 5-Oct, 5/October)
+    m = s.match(/^(\d{1,2})[\s\/\-.]?([A-Za-z]{3,9})$/);
+    if (m) {
+        const dd = Number(m[1]);
+        const mm = CHECK_DUE_MONTH_MAP[m[2].slice(0, 3).toLowerCase()];
+        if (mm) return buildDueResult(inferDueYear(mm, dd), mm, dd);
+    }
+
+    // 7) Mon d / Mon-d / Mon/d  (vd Oct-5, October 5)
+    m = s.match(/^([A-Za-z]{3,9})[\s\/\-.]?(\d{1,2})$/);
+    if (m) {
+        const mm = CHECK_DUE_MONTH_MAP[m[1].slice(0, 3).toLowerCase()];
+        const dd = Number(m[2]);
+        if (mm) return buildDueResult(inferDueYear(mm, dd), mm, dd);
+    }
+
+    return null;
+}
+
+// Không có năm → suy năm: nếu ngày đã qua > 180 ngày thì coi như năm sau
+function inferDueYear(mm, dd) {
+    const now = new Date();
+    const guess = new Date(now.getFullYear(), mm - 1, dd);
+    if (guess.getTime() - now.getTime() < -180 * 86400000) return now.getFullYear() + 1;
+    return now.getFullYear();
+}
+
+// Validate ngày & tạo key + display
+function buildDueResult(yyyy, mm, dd) {
+    if (!yyyy || !mm || !dd) return null;
+    if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
+    const dt = new Date(yyyy, mm - 1, dd);
+    if (dt.getFullYear() !== yyyy || dt.getMonth() !== mm - 1 || dt.getDate() !== dd) return null;
+    const key = `${yyyy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+    const display = `${String(mm).padStart(2, '0')}/${String(dd).padStart(2, '0')}/${String(yyyy).slice(-2)}`;
+    return { key, display };
 }
 
 function updateCheckDueStatus(message) {
@@ -2577,14 +2646,8 @@ function scheduleCheckDuePasteBadgeUpdate() {
  * Nếu không đúng format thì trả nguyên chuỗi gốc.
  */
 function formatDue(dueStr) {
-    const value = String(dueStr ?? '').trim().replace(/\.0$/, '');
-    if (/^1\d{6}$/.test(value)) {
-        const yy = value.substring(1, 3);
-        const mm = value.substring(3, 5);
-        const dd = value.substring(5, 7);
-        return `${mm}/${dd}/${yy}`;
-    }
-    return value;
+    const parsed = parseDueDate(dueStr);
+    return parsed ? parsed.display : String(dueStr ?? '').trim();
 }
 
 /**
@@ -2609,6 +2672,7 @@ function classifyRowTokens(rawTokens) {
 
     let moToken = null;
     let dueToken = null;
+    let dueParsed = null;
     const rest = [];
 
     tokens.forEach(token => {
@@ -2616,18 +2680,24 @@ function classifyRowTokens(rawTokens) {
             moToken = token;
             return;
         }
-        if (dueToken === null && CHECK_DUE_DUE_REGEX.test(token)) {
-            dueToken = token;
-            return;
+        if (dueToken === null) {
+            const parsed = parseDueDate(token);
+            if (parsed) {
+                dueToken = token;
+                dueParsed = parsed;
+                return;
+            }
         }
         rest.push(token);
     });
 
-    if (!moToken) return null; // không có FG_MO -> không phải dòng dữ liệu hợp lệ (bỏ qua, kể cả header)
+    if (!moToken) return null;
 
     return {
         FG_MO: moToken.toUpperCase(),
         FG_DUE: dueToken || '',
+        FG_DUE_KEY: dueParsed ? dueParsed.key : '',
+        FG_DUE_DISPLAY: dueParsed ? dueParsed.display : '',
         FG_JOBNO: rest.join(' ').trim()
     };
 }
@@ -2819,22 +2889,24 @@ function compareFGMO(oldRows, newRows) {
         const key = row.FG_MO;
         if (!key) return;
         dict.set(key, {
-            due: String(row.FG_DUE || '').trim(),
-            line: extractLineCode(row.FG_JOBNO)
+            dueKey:     row.FG_DUE_KEY     || '',
+            dueDisplay: row.FG_DUE_DISPLAY || '',
+            line:       extractLineCode(row.FG_JOBNO)
         });
     });
 
     const results = [];
     oldRows.forEach(row => {
         const key = row.FG_MO;
-        if (!key || !dict.has(key)) return; // không có trong CanDoi -> bỏ qua
+        if (!key || !dict.has(key)) return;
 
-        const oldDue = String(row.FG_DUE || '').trim();
-        const oldLine = extractLineCode(row.FG_JOBNO);
-        const target = dict.get(key);
+        const oldDueKey = row.FG_DUE_KEY || '';
+        const oldLine   = extractLineCode(row.FG_JOBNO);
+        const target    = dict.get(key);
 
-        const resJob = (oldLine === target.line || !target.line) ? '-' : target.line;
-        const resDue = (oldDue === target.due || !target.due) ? '-' : formatDue(target.due);
+        // So sánh theo KEY (YYYY-MM-DD) → 2 định dạng khác nhau của cùng 1 ngày = KHÔNG đổi
+        const resJob = (oldLine   === target.line     || !target.line)     ? '-' : target.line;
+        const resDue = (oldDueKey === target.dueKey   || !target.dueKey)   ? '-' : target.dueDisplay;
 
         if (!(resJob === '-' && resDue === '-')) {
             results.push({ FG_MO: key, FG_JOBNO: resJob, FG_DUE: resDue });
