@@ -6823,32 +6823,86 @@ function parseWorkHoursNumber(raw) {
 
 const isValidWhNumber = (v) => typeof v === 'number' && !Number.isNaN(v);
 
-// d/m | d/m/yyyy | d-m-yy | yyyy-mm-dd -> 'YYYY-MM-DD' (hoặc null)
+// Map viết tắt tên tháng tiếng Anh → số tháng
+const WORK_HOURS_MONTH_MAP = {
+    jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+    jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12
+};
+
+// Không ghi năm → suy năm: nếu ngày đã qua > 180 ngày thì coi như năm sau
+function inferWorkHoursYear(mm, dd) {
+    const now = new Date();
+    const guess = new Date(now.getFullYear(), mm - 1, dd);
+    if (guess.getTime() - now.getTime() < -180 * 86400000) return now.getFullYear() + 1;
+    return now.getFullYear();
+}
+
+// Validate & tạo key 'YYYY-MM-DD'
+function buildWorkHoursKey(yyyy, mm, dd) {
+    if (!yyyy || !mm || !dd) return null;
+    if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
+    const dt = new Date(yyyy, mm - 1, dd);
+    if (dt.getFullYear() !== yyyy || dt.getMonth() !== mm - 1 || dt.getDate() !== dd) return null;
+    return `${yyyy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+}
+
+/**
+ * Parse ngày cho "Update giờ làm việc" — TẤT CẢ ưu tiên THÁNG trước.
+ * Chấp nhận:
+ *   1yymmdd           → 1 + yy + mm + dd (vd 1261007 = 10/07/2026)
+ *   mm/dd/yyyy        → 10/07/2026
+ *   mm/dd/yy          → 10/07/26
+ *   mm/dd             → 10/07   (năm suy theo hôm nay)
+ *   yyyy-mm-dd        → 2026-10-07
+ *   d-Mon / d/Mon     → 5-Oct, 5/October
+ *   Mon-d / Mon d     → Oct-5, October 5
+ * Trả về 'YYYY-MM-DD' hoặc null nếu không parse được.
+ */
 function parseWorkHoursDate(raw) {
-    const t = String(raw == null ? '' : raw).trim();
-    let m, y, mo, d;
-    if ((m = t.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/))) {
-        y = +m[1]; mo = +m[2]; d = +m[3];
-    } else if ((m = t.match(/^(\d{1,2})[-\/.](\d{1,2})(?:[-\/.](\d{2,4}))?$/))) {
-        d = +m[1]; mo = +m[2];
-        if (m[3]) {
-            y = +m[3];
-            if (y < 100) y += 2000;
-        } else {
-            // Không ghi năm: chọn năm gần "hôm nay" nhất (xử lý qua giao thừa)
-            const now = new Date();
-            y = now.getFullYear();
-            const cand = new Date(y, mo - 1, d);
-            const diffDays = (cand - now) / 86400000;
-            if (diffDays < -180) y += 1;
-            else if (diffDays > 180) y -= 1;
-        }
-    } else {
-        return null;
+    const s = String(raw == null ? '' : raw).trim().replace(/\.0$/, '');
+    if (!s) return null;
+    let m;
+
+    // 1) 1yymmdd — 7 chữ số bắt đầu bằng 1
+    m = s.match(/^1(\d{2})(\d{2})(\d{2})$/);
+    if (m) return buildWorkHoursKey(2000 + +m[1], +m[2], +m[3]);
+
+    // 2) yyyy-mm-dd — phải check TRƯỚC mm/dd/yyyy để không nhầm
+    m = s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/);
+    if (m) return buildWorkHoursKey(+m[1], +m[2], +m[3]);
+
+    // 3) mm/dd/yyyy
+    m = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/);
+    if (m) return buildWorkHoursKey(+m[3], +m[1], +m[2]);
+
+    // 4) mm/dd/yy  (2 chữ số năm → 2000 + yy)
+    m = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2})$/);
+    if (m) return buildWorkHoursKey(2000 + +m[3], +m[1], +m[2]);
+
+    // 5) mm/dd  (không có năm → suy từ hôm nay)
+    m = s.match(/^(\d{1,2})[-\/.](\d{1,2})$/);
+    if (m) {
+        const mm = +m[1], dd = +m[2];
+        return buildWorkHoursKey(inferWorkHoursYear(mm, dd), mm, dd);
     }
-    const dt = new Date(y, mo - 1, d);
-    if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
-    return localDateKey(dt);
+
+    // 6) d-Mon / d/Mon / d Mon  (vd 5-Oct, 5/October)
+    m = s.match(/^(\d{1,2})[\s\/\-.]?([A-Za-z]{3,9})$/);
+    if (m) {
+        const dd = +m[1];
+        const mm = WORK_HOURS_MONTH_MAP[m[2].slice(0, 3).toLowerCase()];
+        if (mm) return buildWorkHoursKey(inferWorkHoursYear(mm, dd), mm, dd);
+    }
+
+    // 7) Mon-d / Mon-d / Mon d  (vd Oct-5, October 5)
+    m = s.match(/^([A-Za-z]{3,9})[\s\/\-.]?(\d{1,2})$/);
+    if (m) {
+        const mm = WORK_HOURS_MONTH_MAP[m[1].slice(0, 3).toLowerCase()];
+        const dd = +m[2];
+        if (mm) return buildWorkHoursKey(inferWorkHoursYear(mm, dd), mm, dd);
+    }
+
+    return null;
 }
 
 function formatWorkHoursDateLabel(key) {
