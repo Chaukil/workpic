@@ -77,7 +77,14 @@ let dayOffDeptFilter = DEPT_ALL;
 let usersDeptLatest = {};        // uid -> { dept, ts }: bộ phận SAU CÙNG (doc có updatedAt mới nhất) của mỗi người
 let dayOffFocusUid = null;       // đang xem riêng lịch của user nào
 let dayOffUsers = [];
-let notifyLeadMinutes = 0;      // nhắc job trước N phút (0 = đúng giờ)            // danh sách user hiển thị trong form
+let notifyLeadMinutes = 0;      // nhắc job trước N phút (0 = đúng giờ)
+// Tích hoàn thành job trên lịch (bật trong Cài đặt). Tắt => job qua giờ mặc định là đã hoàn thành.
+let jobCompletionEnabled = false;
+let jobCompletionSince = '';     // 'YYYY-MM-DD' — chỉ job từ ngày này trở đi mới cần tích (tránh báo "chưa xong" cho lịch cũ)
+let jobsLoadedOnce = false;
+let pendingNotifAction = null;   // hành động bấm từ thông báo desktop khi app chưa sẵn sàng
+let quickJobsRaw = [];           // job trong ngày chưa lọc bộ phận
+const SNOOZE_MINUTES = 10;            // danh sách user hiển thị trong form
 let checkDueOldRows = null;
 let checkDueNewRows = null;
 let checkDueResultRows = [];
@@ -240,6 +247,8 @@ function renderThemeGrid() {
 function openSettingsModal() {
     if (!currentUser) return;
     document.getElementById('settingsNotifyLead').value = String(notifyLeadMinutes);
+    const completionToggle = document.getElementById('settingsCompletionToggle');
+    if (completionToggle) completionToggle.checked = jobCompletionEnabled;
     renderThemeGrid();
     settingsModal.show();
 }
@@ -520,6 +529,7 @@ async function handleAuthenticatedUser(user) {
         ? userData.notifyLeadMinutes
         : localStorage.getItem(`notifyLead_${user.uid}`);
     notifyLeadMinutes = normalizeLeadMinutes(savedLead);
+    loadJobCompletionSetting(user.uid, userData);
     
     document.getElementById('authScreen').classList.add('d-none');
     updateUserProfileUI();
@@ -627,6 +637,49 @@ async function saveNotifyLead(minutes) {
         showNotification('Đã lưu', minutes > 0 ? `Bạn sẽ được nhắc job trước ${minutes} phút.` : 'Bạn sẽ được nhắc đúng giờ job.', false, 'success');
     } catch (error) {
         console.error('Lỗi lưu thời gian nhắc:', error);
+        showNotification('Đã lưu trên máy này', 'Chưa đồng bộ được lên tài khoản, sẽ dùng cài đặt trên máy này.', false, 'warning');
+    }
+}
+
+function loadJobCompletionSetting(uid, userData) {
+    let local = {};
+    try { local = JSON.parse(localStorage.getItem(`jobCompletion_${uid}`) || '{}') || {}; } catch (e) { local = {}; }
+    jobCompletionEnabled = userData && userData.jobCompletionEnabled !== undefined
+        ? userData.jobCompletionEnabled === true
+        : local.enabled === true;
+    jobCompletionSince = (userData && userData.jobCompletionSince) || local.since || '';
+    if (jobCompletionEnabled && !jobCompletionSince) jobCompletionSince = todayKey();
+}
+
+async function saveJobCompletionEnabled(enabled) {
+    if (!currentUser) return;
+    jobCompletionEnabled = !!enabled;
+    // Bật lại => chỉ tính từ hôm nay, job các ngày trước vẫn xem như đã hoàn thành
+    jobCompletionSince = jobCompletionEnabled ? todayKey() : '';
+    try {
+        localStorage.setItem(`jobCompletion_${currentUser.uid}`, JSON.stringify({ enabled: jobCompletionEnabled, since: jobCompletionSince }));
+    } catch (e) { /* ignore */ }
+
+    renderSchedule();
+
+    try {
+        const snapshot = await getDocs(query(collection(db, 'users'), where('uid', '==', currentUser.uid)));
+        if (!snapshot.empty) {
+            await updateDoc(doc(db, 'users', snapshot.docs[0].id), {
+                jobCompletionEnabled,
+                jobCompletionSince,
+                updatedAt: new Date().toISOString()
+            });
+        }
+        showNotification(
+            'Đã lưu',
+            jobCompletionEnabled
+                ? 'Đã bật tích hoàn thành. Bấm nút ✓ trên ô job trong lịch hoặc nút Hoàn thành trong thông báo.'
+                : 'Đã tắt tích hoàn thành. Job qua giờ thực hiện sẽ mặc định là hoàn thành.',
+            false, 'success'
+        );
+    } catch (error) {
+        console.error('Lỗi lưu cài đặt hoàn thành job:', error);
         showNotification('Đã lưu trên máy này', 'Chưa đồng bộ được lên tài khoản, sẽ dùng cài đặt trên máy này.', false, 'warning');
     }
 }
@@ -853,6 +906,7 @@ function handleSignedOut() {
 
 function initializeAuthenticatedApp() {
     requestNotificationPermission();
+    getSwRegistration();      // đăng ký sw.js sớm để thông báo có nút Hoàn thành / Đợi tí
     startUiRefreshLoop();
     testFirestoreConnection().then(() => {
         loadJobs();
@@ -1097,6 +1151,7 @@ window.addEventListener('pageshow', stripAutofillFromSearchInputs);
 
     document.getElementById('settingsBtn').addEventListener('click', openSettingsModal);
     document.getElementById('settingsNotifyLead').addEventListener('change', (e) => saveNotifyLead(e.target.value));
+    document.getElementById('settingsCompletionToggle').addEventListener('change', (e) => saveJobCompletionEnabled(e.target.checked));
 
     document.getElementById('userProfileBtn').addEventListener('click', openUserProfileModal);
     document.getElementById('saveProfileBtn').addEventListener('click', saveUserProfile);
@@ -1156,6 +1211,7 @@ window.addEventListener('pageshow', stripAutofillFromSearchInputs);
         }
     });
     
+    initNotificationActionBridge();
     initTheme();
     loadSidebarState();
     onAuthStateChanged(auth, user => user ? handleAuthenticatedUser(user) : handleSignedOut());
@@ -1618,6 +1674,8 @@ function loadJobs() {
             renderJobList();
             renderSchedule();
             renderOutOfScheduleJobs();
+            jobsLoadedOnce = true;
+            flushPendingNotifAction();
         }, 
         (error) => {
             console.error('❌ Lỗi khi lắng nghe Firestore:', error);
@@ -1927,13 +1985,17 @@ const whBadge = badges.length ? `<span class="wh-badges">${badges.join('')}</spa
     const job = entry.job;
     let timeClass = 'future';
 
+    // "Đợi tí": job được hoãn tới snoozeUntil (chỉ áp dụng cho ngày hôm đó)
+    const snoozeDateObj = entry.snoozeUntil ? new Date(entry.snoozeUntil) : null;
+    const snoozeActive = !!(snoozeDateObj && !isNaN(snoozeDateObj.getTime()) && snoozeDateObj.getTime() > Date.now());
+
     if (cellDate < todayDate) {
         timeClass = 'past';
     } else if (cellDate.getTime() === todayDate.getTime()) {
         const [jobHours, jobMinutes] = String(entry.overrideTime || job.time).split(':').map(Number);
         if (jobHours < currentHours ||
             (jobHours === currentHours && jobMinutes < currentMinutes)) {
-            timeClass = 'past';
+            timeClass = snoozeActive ? 'today' : 'past';
         } else {
             timeClass = 'today';
         }
@@ -1951,6 +2013,12 @@ const whBadge = badges.length ? `<span class="wh-badges">${badges.join('')}</spa
     if (isShifted || isMoved) extraClasses.push('shifted');
     if (isPresenter) extraClasses.push('presenter');
 
+    // Chế độ tích hoàn thành (bật trong Cài đặt) — chỉ áp dụng từ ngày bật trở đi
+    const tickMode = jobCompletionEnabled && dateStr >= jobCompletionSince;
+    const isCompleted = tickMode && entry.completed === true;
+    if (isCompleted) extraClasses.push('completed');
+    else if (tickMode && timeClass === 'past') extraClasses.push('pending-done');
+
     const scheduleItem = document.createElement('div');
     scheduleItem.className = `schedule-item ${job.type} ${timeClass} ${extraClasses.join(' ')}`.trim();
 
@@ -1965,6 +2033,24 @@ const whBadge = badges.length ? `<span class="wh-badges">${badges.join('')}</spa
         originTagHtml = `<small class="shifted-tag" title="Job được dời từ ngày ${formatDateShortDMY(entry.movedFrom)}"><i class="bi bi-arrow-right"></i> dời từ ${formatDateShortDMY(entry.movedFrom)}</small>`;
     }
 
+    let doneBtnHtml = '';
+    if (tickMode) {
+        doneBtnHtml = `<button type="button" class="schedule-done-btn ${isCompleted ? 'is-done' : ''}"
+                    title="${isCompleted ? 'Đã hoàn thành — bấm để bỏ tích' : 'Đánh dấu đã hoàn thành'}"
+                    aria-pressed="${isCompleted ? 'true' : 'false'}"
+                    data-job-id="${job.id}"
+                    data-origin-date="${entry.originDate}">
+                    <i class="bi bi-check-lg"></i>
+                </button>`;
+    } else if (timeClass === 'past') {
+        // Không bật tích hoàn thành: qua giờ thực hiện = mặc định đã hoàn thành
+        doneBtnHtml = `<span class="schedule-auto-done" title="Đã qua giờ thực hiện — mặc định hoàn thành"><i class="bi bi-check2-all"></i></span>`;
+    }
+
+    const snoozeTagHtml = snoozeActive
+        ? `<small class="snooze-tag" title="Đã bấm Đợi tí — chỉ hoãn trong ngày hôm nay"><i class="bi bi-hourglass-split"></i> hoãn đến ${String(snoozeDateObj.getHours()).padStart(2, '0')}:${String(snoozeDateObj.getMinutes()).padStart(2, '0')}</small>`
+        : '';
+
     const noteHtml = entry.note
         ? `<span class="schedule-note" title="${escapeHtml(entry.note)}"><i class="bi bi-sticky-fill"></i> ${escapeHtml(entry.note.length > 40 ? entry.note.substring(0, 40) + '…' : entry.note)}</span>`
         : '';
@@ -1975,13 +2061,17 @@ const whBadge = badges.length ? `<span class="wh-badges">${badges.join('')}</spa
         </h6>
         <div class="schedule-time-line">
             ${timeHtml}
-            <button type="button" class="schedule-override-btn ${hasOverride ? 'has-override' : ''}"
-                title="Tùy chỉnh ngày này (đổi giờ / dời ngày / ghi chú)"
-                data-job-id="${job.id}"
-                data-origin-date="${entry.originDate}">
-                <i class="bi bi-sliders"></i>
-            </button>
+            <span class="schedule-btn-group">
+                ${doneBtnHtml}
+                <button type="button" class="schedule-override-btn ${hasOverride ? 'has-override' : ''}"
+                    title="Tùy chỉnh ngày này (đổi giờ / dời ngày / ghi chú)"
+                    data-job-id="${job.id}"
+                    data-origin-date="${entry.originDate}">
+                    <i class="bi bi-sliders"></i>
+                </button>
+            </span>
         </div>
+        ${snoozeTagHtml}
         ${originTagHtml}
         ${noteHtml}
     `;
@@ -2006,9 +2096,19 @@ const whBadge = badges.length ? `<span class="wh-badges">${badges.join('')}</spa
 
     // Click vào nội dung item → mở xem job đầy đủ (không mở override nữa)
     scheduleItem.addEventListener('click', (e) => {
-        if (e.target.closest('.schedule-override-btn')) return;
+        if (e.target.closest('.schedule-override-btn, .schedule-done-btn')) return;
         openViewJobModal(job);
     });
+
+    // Nút tích hoàn thành (chỉ có khi bật trong Cài đặt)
+    const doneBtn = scheduleItem.querySelector('.schedule-done-btn');
+    if (doneBtn) {
+        doneBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            setJobOccurrenceCompleted(job.id, entry.originDate, !isCompleted);
+        });
+        doneBtn.addEventListener('dragstart', (e) => e.preventDefault());
+    }
 
     // Nút tùy chỉnh kế giờ → mở popover
     scheduleItem.querySelector('.schedule-override-btn').addEventListener('click', (e) => {
@@ -2044,8 +2144,9 @@ async function moveJobToDate(jobId, originDate, targetDate) {
         if (!existing) return;   // chưa có override → không làm gì
         const keepTime = existing.overrideTime || null;
         const keepNote = existing.note || null;
+        const extras = overrideExtras(existing);
         try {
-            if (!keepTime && !keepNote) {
+            if (!keepTime && !keepNote && !overrideHasExtras(extras)) {
                 await deleteDoc(doc(db, 'jobDayOverrides', docId));
             } else {
                 await setDoc(doc(db, 'jobDayOverrides', docId), {
@@ -2055,6 +2156,7 @@ async function moveJobToDate(jobId, originDate, targetDate) {
                     overrideTime: keepTime,
                     overrideDate: null,
                     note: keepNote,
+                    ...extras,
                     updatedAt: new Date().toISOString()
                 });
             }
@@ -2080,6 +2182,7 @@ async function moveJobToDate(jobId, originDate, targetDate) {
             overrideTime: existing?.overrideTime || null,
             overrideDate: targetDate,
             note: existing?.note || null,
+            ...overrideExtras(existing),
             updatedAt: new Date().toISOString()
         });
         showNotification(
@@ -2187,7 +2290,8 @@ async function saveDayOverrideFromPopover() {
     try {
         const docId = `${currentUser.uid}_${job.id}_${occurrenceDate}`;
 
-        if (!overrideTime && !overrideDate && !note) {
+        const extras = overrideExtras(getOverrideFor(job.id, occurrenceDate));
+        if (!overrideTime && !overrideDate && !note && !overrideHasExtras(extras)) {
             await deleteDoc(doc(db, 'jobDayOverrides', docId));
         } else {
             await setDoc(doc(db, 'jobDayOverrides', docId), {
@@ -2197,6 +2301,7 @@ async function saveDayOverrideFromPopover() {
                 overrideTime,
                 overrideDate,
                 note,
+                ...extras,
                 updatedAt: new Date().toISOString()
             });
         }
@@ -2217,7 +2322,22 @@ async function deleteDayOverrideFromPopover() {
     const { job, occurrenceDate } = currentOverrideJob;
     const docId = `${currentUser.uid}_${job.id}_${occurrenceDate}`;
     try {
-        await deleteDoc(doc(db, 'jobDayOverrides', docId));
+        const extras = overrideExtras(getOverrideFor(job.id, occurrenceDate));
+        if (overrideHasExtras(extras)) {
+            // Còn trạng thái hoàn thành / đợi tí → chỉ xóa phần đổi giờ, dời ngày, ghi chú
+            await setDoc(doc(db, 'jobDayOverrides', docId), {
+                userId: currentUser.uid,
+                jobId: job.id,
+                occurrenceDate,
+                overrideTime: null,
+                overrideDate: null,
+                note: null,
+                ...extras,
+                updatedAt: new Date().toISOString()
+            });
+        } else {
+            await deleteDoc(doc(db, 'jobDayOverrides', docId));
+        }
         closeDayOverridePopover();
         showNotification('Đã xóa tùy chỉnh', 'Job đã trở về lịch cố định của ngày đó.', false, 'success');
     } catch (error) {
@@ -2395,16 +2515,10 @@ async function loadTransferUsers() {
     if (!select || !currentUser) return;
     select.innerHTML = '<option value="">Đang tải user...</option>';
     try {
-        const snapshot = await getDocs(collection(db, 'users'));
-        const users = [];
-        snapshot.forEach(userDoc => {
-            const user = userDoc.data();
-            if (user.uid && user.uid !== currentUser.uid) users.push(user);
-        });
+        const users = await fetchUsersExceptMe(true);   // đã lọc cùng bộ phận
         select.innerHTML = users.length
             ? '<option value="">Chọn user nhận job...</option>'
-            : '<option value="">Chưa có user khác</option>';
-        users.sort((a, b) => (a.displayName || a.email).localeCompare(b.displayName || b.email));
+            : `<option value="">${noSameDeptLabel()}</option>`;
         users.forEach(user => {
             const option = document.createElement('option');
             option.value = user.uid;
@@ -3146,6 +3260,7 @@ async function transferJob() {
         showNotification('Thiếu thông tin', 'Hãy chọn user nhận job trước.', false, 'warning');
         return;
     }
+    if (!assertSameDeptTarget(targetUid)) return;
     
     const mode = currentTransferMode; // 'transfer' hoặc 'copy'
     const actionText = mode === 'transfer' ? 'chuyển' : 'copy';
@@ -3548,7 +3663,7 @@ async function quickChatShowTransferForm(jobId) {
         const users = await fetchUsersExceptMe();
         select.innerHTML = users.length
             ? '<option value="">Chọn người nhận...</option>'
-            : '<option value="">Chưa có user khác</option>';
+            : `<option value="">${noSameDeptLabel()}</option>`;
         users.forEach(u => {
             const option = document.createElement('option');
             option.value = u.uid;
@@ -3577,6 +3692,7 @@ async function quickChatConfirmTransfer(jobId) {
     if (!job || !currentUser) return;
 
     const targetUid = select.value;
+    if (!assertSameDeptTarget(targetUid)) return;
     const targetName = select.selectedOptions[0].dataset.name || select.selectedOptions[0].textContent;
     const mode = modeInput ? modeInput.value : 'transfer';
     const actionText = mode === 'transfer' ? 'chuyển' : 'copy';
@@ -4027,6 +4143,10 @@ function listenUserNotifications() {
                         false,
                         n.type && n.type.includes('rejected') ? 'warning' : 'info'
                     );
+                    // Job trong ngày đã được làm xong → nhắc cả trên desktop như nhắc job
+                    if (n.type === 'quickjob_completed') {
+                        showQuickJobDesktopNotification('✅ Job trong ngày đã hoàn thành', n.message, n.jobId || change.doc.id);
+                    }
                 }
             });
         }
@@ -4066,10 +4186,11 @@ function listenQuickJobs() {
         const KEEP_DAYS = 30;
         const cutoff = Date.now() - KEEP_DAYS * 24 * 60 * 60 * 1000;
 
-        quickJobsList = snapshot.docs
+        quickJobsRaw = snapshot.docs
             .map(d => ({ id: d.id, ...d.data() }))
             .filter(job => job.status === 'open' || job.status === 'invited' || new Date(job.createdAt).getTime() >= cutoff);
-        quickJobsList.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+        quickJobsRaw.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+        rebuildQuickJobsList();
 
         if (quickChatInitialLoadDone) {
             snapshot.docChanges().forEach(change => {
@@ -4098,6 +4219,19 @@ function listenQuickJobs() {
     }, (error) => {
         console.error('Lỗi lắng nghe job trong ngày:', error);
     });
+}
+
+// Job trong ngày: chỉ hiện cho người cùng bộ phận với người báo job (job do mình tạo / nhận / được chỉ định luôn hiện).
+// Job cũ chưa có field department → lấy bộ phận hiện tại của người tạo.
+function isQuickJobVisibleToMe(job) {
+    if (!currentUser) return false;
+    if (job.createdBy === currentUser.uid || job.assigneeUid === currentUser.uid || job.invitedUid === currentUser.uid) return true;
+    const jobDept = (job.department !== undefined && job.department !== null) ? job.department : getUserDept(job.createdBy);
+    return (jobDept || '') === (currentUser.department || '');
+}
+
+function rebuildQuickJobsList() {
+    quickJobsList = quickJobsRaw.filter(isQuickJobVisibleToMe);
 }
 
 function checkPendingQuickInvite() {
@@ -4387,7 +4521,7 @@ function renderQuickChat() {
         if (filtered.length === 0) {
             container.innerHTML = hasActiveFilter
                 ? '<p class="quick-chat-empty">Không tìm thấy job phù hợp bộ lọc.</p>'
-                : '<p class="quick-chat-empty">Chưa có job phát sinh nào. Hãy nhập bên dưới để báo cho mọi người!</p>';
+                : '<p class="quick-chat-empty">Chưa có job phát sinh nào. Hãy nhập bên dưới để báo cho đồng nghiệp cùng bộ phận!</p>';
             return;
         }
         container.innerHTML = filtered.map(renderQuickJobBubble).join('');
@@ -4442,6 +4576,7 @@ async function sendQuickJob() {
             createdByName: currentUser.displayName || currentUser.email,
             createdAt: new Date().toISOString(),
             dateKey: todayKey(),
+            department: currentUser.department || '',    // chỉ đồng nghiệp cùng bộ phận mới thấy
             status: 'open',
             assigneeUid: null,
             assigneeName: null,
@@ -4495,17 +4630,48 @@ async function quickChatSelfClaim(jobId) {
 }
 
 let cachedUsersForAssign = null;
-async function fetchUsersExceptMe() {
-    if (cachedUsersForAssign) return cachedUsersForAssign;
-    const snapshot = await getDocs(collection(db, 'users'));
-    const users = [];
-    snapshot.forEach(d => {
-        const u = d.data();
-        if (u.uid && u.uid !== currentUser.uid) users.push(u);
-    });
-    users.sort((a, b) => (a.displayName || a.email).localeCompare(b.displayName || b.email));
-    cachedUsersForAssign = users;
-    return users;
+
+// Bộ phận của 1 user doc: ưu tiên bản đã gom theo updatedAt mới nhất, dự phòng dùng field trong doc
+function userDeptOfDoc(u) {
+    if (usersDeptLatest[u.uid]) return usersDeptLatest[u.uid].dept || '';
+    return u.department || '';
+}
+
+function isSameDeptUid(uid) {
+    if (!currentUser) return false;
+    return (getUserDept(uid) || '') === (currentUser.department || '');
+}
+
+// Các bộ phận không làm chung job với nhau → chỉ cho gửi / chuyển / copy / chỉ định job cho người CÙNG bộ phận
+function assertSameDeptTarget(targetUid) {
+    if (isSameDeptUid(targetUid)) return true;
+    showNotification('Khác bộ phận', 'Chỉ gửi job được cho người cùng bộ phận với bạn.', false, 'warning');
+    return false;
+}
+
+function noSameDeptLabel() {
+    return currentUser && currentUser.department
+        ? 'Chưa có đồng nghiệp cùng bộ phận'
+        : 'Hãy chọn bộ phận của bạn trong hồ sơ trước';
+}
+
+async function fetchUsersExceptMe(forceRefresh = false) {
+    if (!cachedUsersForAssign || forceRefresh) {
+        const snapshot = await getDocs(collection(db, 'users'));
+        // Một uid có thể có nhiều doc → chỉ giữ doc cập nhật sau cùng
+        const byUid = new Map();
+        snapshot.forEach(d => {
+            const u = d.data();
+            if (!u.uid || u.uid === currentUser.uid) return;
+            const old = byUid.get(u.uid);
+            if (!old || String(u.updatedAt || '') >= String(old.updatedAt || '')) byUid.set(u.uid, u);
+        });
+        cachedUsersForAssign = Array.from(byUid.values());
+        cachedUsersForAssign.sort((a, b) => (a.displayName || a.email).localeCompare(b.displayName || b.email));
+    }
+    // Lọc mỗi lần gọi (không cache kết quả lọc) để đổi bộ phận có hiệu lực ngay
+    const myDept = currentUser.department || '';
+    return cachedUsersForAssign.filter(u => userDeptOfDoc(u) === myDept);
 }
 
 async function quickChatShowAssignForm(jobId) {
@@ -4523,7 +4689,7 @@ async function quickChatShowAssignForm(jobId) {
         const users = await fetchUsersExceptMe();
         select.innerHTML = users.length
             ? '<option value="">Chọn người nhận...</option>'
-            : '<option value="">Chưa có user khác</option>';
+            : `<option value="">${noSameDeptLabel()}</option>`;
         users.forEach(u => {
             const option = document.createElement('option');
             option.value = u.uid;
@@ -4551,6 +4717,7 @@ async function quickChatConfirmAssign(jobId) {
     if (!job || !currentUser) return;
 
     const invitedUid = select.value;
+    if (!assertSameDeptTarget(invitedUid)) return;
     const invitedName = select.selectedOptions[0].dataset.name || select.selectedOptions[0].textContent;
     const invitedAt = new Date().toISOString();
 
@@ -4731,11 +4898,14 @@ async function quickChatComplete(jobId) {
             status: 'completed',
             completedAt: new Date().toISOString()
         });
-        if (job.createdBy && job.createdBy !== currentUser.uid) {
+        // Báo cho người tạo job và người đã chỉ định mình (nếu khác nhau), không báo cho chính mình
+        const recipients = new Set([job.createdBy, job.invitedBy].filter(uid => uid && uid !== currentUser.uid));
+        for (const uid of recipients) {
             await pushNotification(
-                job.createdBy,
+                uid,
                 'quickjob_completed',
-                `${currentUser.displayName || currentUser.email} đã hoàn thành job "${job.content}"`
+                `${currentUser.displayName || currentUser.email} đã hoàn thành job "${job.content}"`,
+                jobId
             );
         }
     } catch (error) {
@@ -5306,13 +5476,200 @@ function listenJobDayOverrides() {
     });
 }
 
+// Phần trạng thái "hoàn thành / đợi tí" của 1 doc override — phải giữ lại mỗi khi ghi đè doc (đổi giờ, dời ngày, ghi chú...)
+function overrideExtras(existing) {
+    return {
+        completed: !!(existing && existing.completed === true),
+        completedAt: (existing && existing.completedAt) || null,
+        snoozeUntil: (existing && existing.snoozeUntil) || null
+    };
+}
+function overrideHasExtras(extras) {
+    return extras.completed === true || !!extras.snoozeUntil;
+}
+
 function getOverrideFor(jobId, occurrenceDateKey) {
     return jobDayOverridesList.find(o =>
         o.jobId === jobId && o.occurrenceDate === occurrenceDateKey
     ) || null;
 }
 
-// Check Notifications - WITH DESKTOP NOTIFICATIONS
+// ============================================================
+// HOÀN THÀNH / ĐỢI TÍ
+// Lưu trong collection jobDayOverrides (mỗi lần xuất hiện của job = 1 doc), nên chỉ ảnh hưởng đúng ngày đó:
+//   completed: true/false · completedAt · snoozeUntil (ISO, null = không hoãn)
+// ============================================================
+function jobNotificationTag(jobId, originDate) {
+    return `job-${jobId}-${originDate}`;
+}
+
+async function setJobOccurrenceCompleted(jobId, originDate, completed) {
+    if (!currentUser || !jobId || !originDate) return false;
+    const job = jobs.find(j => j.id === jobId);
+    try {
+        await setDoc(doc(db, 'jobDayOverrides', `${currentUser.uid}_${jobId}_${originDate}`), {
+            userId: currentUser.uid,
+            jobId,
+            occurrenceDate: originDate,
+            completed: !!completed,
+            completedAt: completed ? new Date().toISOString() : null,
+            snoozeUntil: null,           // đã xong (hoặc bỏ tích) thì không còn hoãn nữa
+            updatedAt: new Date().toISOString()
+        }, { merge: true });
+        closeJobNotification(jobId, originDate);
+        if (completed && job) {
+            showNotification('Đã hoàn thành', `"${job.title}" ✓`, false, 'success');
+        }
+        return true;
+    } catch (error) {
+        console.error('Lỗi cập nhật hoàn thành job:', error);
+        showNotification('Lỗi', 'Không thể cập nhật trạng thái hoàn thành.', false, 'danger');
+        return false;
+    }
+}
+
+async function snoozeJobOccurrence(jobId, originDate, minutes = SNOOZE_MINUTES) {
+    if (!currentUser || !jobId || !originDate) return false;
+    const job = jobs.find(j => j.id === jobId);
+    // Chỉ hoãn trong ngày hôm nay — không đẩy qua ngày mai
+    const now = new Date();
+    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 0);
+    let until = new Date(now.getTime() + minutes * 60000);
+    if (until > endOfDay && endOfDay > now) until = endOfDay;
+    try {
+        await setDoc(doc(db, 'jobDayOverrides', `${currentUser.uid}_${jobId}_${originDate}`), {
+            userId: currentUser.uid,
+            jobId,
+            occurrenceDate: originDate,
+            snoozeUntil: until.toISOString(),
+            updatedAt: new Date().toISOString()
+        }, { merge: true });
+        closeJobNotification(jobId, originDate);
+        const hh = String(until.getHours()).padStart(2, '0');
+        const mm = String(until.getMinutes()).padStart(2, '0');
+        showNotification('Đợi tí', `${job ? `"${job.title}" ` : ''}sẽ nhắc lại lúc ${hh}:${mm}.`, false, 'info');
+        return true;
+    } catch (error) {
+        console.error('Lỗi hoãn job:', error);
+        showNotification('Lỗi', 'Không thể hoãn job.', false, 'danger');
+        return false;
+    }
+}
+
+// Thông báo desktop cho job trong ngày (qua service worker, dự phòng Notification thường)
+async function showQuickJobDesktopNotification(title, body, refId) {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'default') {
+        try { await Notification.requestPermission(); } catch (e) { /* ignore */ }
+    }
+    if (Notification.permission !== 'granted') return;
+
+    const options = {
+        body,
+        icon: 'https://cdn-icons-png.flaticon.com/512/2972/2972185.png',
+        badge: 'https://cdn-icons-png.flaticon.com/512/2693/2693507.png',
+        tag: `quickjob-done-${refId}`,
+        requireInteraction: true,
+        silent: false,
+        data: { kind: 'quickjob', jobId: refId }
+    };
+    try {
+        const reg = await getSwRegistration();
+        if (reg) { await reg.showNotification(title, options); return; }
+    } catch (err) {
+        console.warn('showNotification (job trong ngày) lỗi, dùng thông báo thường:', err);
+    }
+    const n = new Notification(title, options);
+    n.onclick = (event) => {
+        event.preventDefault();
+        window.focus();
+        openQuickChatPanel();
+        n.close();
+    };
+}
+
+async function closeJobNotification(jobId, originDate) {
+    try {
+        const reg = await getSwRegistration();
+        if (!reg) return;
+        const list = await reg.getNotifications({ tag: jobNotificationTag(jobId, originDate) });
+        list.forEach(n => n.close());
+    } catch (e) { /* ignore */ }
+}
+
+// ---------------- Service worker (cần để thông báo có nút Hoàn thành / Đợi tí) ----------------
+let swRegistrationPromise = null;
+function getSwRegistration() {
+    if (!('serviceWorker' in navigator)) return Promise.resolve(null);
+    if (!swRegistrationPromise) {
+        swRegistrationPromise = navigator.serviceWorker.register('sw.js')
+            .then(() => navigator.serviceWorker.ready)
+            .catch(err => {
+                console.warn('Không đăng ký được service worker — thông báo sẽ không có nút bấm nhanh:', err);
+                return null;
+            });
+    }
+    return swRegistrationPromise;
+}
+
+// Nhận hành động từ thông báo (qua sw.js) hoặc từ URL khi app bị đóng lúc bấm nút
+function initNotificationActionBridge() {
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.addEventListener('message', (event) => {
+            const d = event.data;
+            if (d && d.type === 'job-notification-action') dispatchNotifAction(d);
+        });
+    }
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('jobAction')) {
+        pendingNotifAction = {
+            action: params.get('jobAction'),
+            jobId: params.get('jobId'),
+            originDate: params.get('originDate'),
+            kind: params.get('kind') || undefined
+        };
+        params.delete('jobAction'); params.delete('jobId'); params.delete('originDate'); params.delete('kind');
+        const rest = params.toString();
+        history.replaceState(null, '', window.location.pathname + (rest ? '?' + rest : '') + window.location.hash);
+    }
+}
+
+function dispatchNotifAction(d) {
+    if (!currentUser || !jobsLoadedOnce) {
+        pendingNotifAction = d;      // chờ đăng nhập + tải job xong rồi xử lý
+        return;
+    }
+    handleJobNotificationAction(d);
+}
+
+function flushPendingNotifAction() {
+    if (!pendingNotifAction || !currentUser || !jobsLoadedOnce) return;
+    const d = pendingNotifAction;
+    pendingNotifAction = null;
+    handleJobNotificationAction(d);
+}
+
+async function handleJobNotificationAction(d) {
+    const { action, jobId, originDate } = d;
+    if (d.kind === 'quickjob') {
+        // Bấm vào thông báo job trong ngày → mở khung chat
+        try { window.focus(); } catch (e) { /* ignore */ }
+        if (!quickChatPanelOpen) openQuickChatPanel();
+        return;
+    }
+    if (action === 'complete') {
+        await setJobOccurrenceCompleted(jobId, originDate, true);
+    } else if (action === 'snooze') {
+        await snoozeJobOccurrence(jobId, originDate);
+    } else {
+        // Bấm vào thân thông báo → mở job
+        try { window.focus(); } catch (e) { /* ignore */ }
+        const job = jobs.find(j => j.id === jobId);
+        if (job) openViewJobModal(job);
+    }
+}
+
+// ---------------- Kiểm tra & hiển thị nhắc nhở ----------------
 function checkNotifications() {
     const now = new Date();
     const lead = notifyLeadMinutes;
@@ -5324,11 +5681,17 @@ function checkNotifications() {
         // Xét hôm nay và ngày mai (job 00:10 nhắc trước 30 phút sẽ rơi vào hôm trước)
         for (let offset = 0; offset <= 1; offset++) {
             const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
-            const [hh, mm] = String(job.time).split(':').map(Number);
+            const entry = getScheduleEntryOnDate(job, day);
+            if (!entry) continue;
+
+            // Đã tích hoàn thành (khi bật chức năng) → không nhắc nữa
+            if (jobCompletionEnabled && entry.completed === true) continue;
+
+            const timeStr = entry.overrideTime || job.time;     // tôn trọng giờ đã đổi riêng cho ngày đó
+            const [hh, mm] = String(timeStr).split(':').map(Number);
             if (!Number.isFinite(hh) || !Number.isFinite(mm)) continue;
             const dueAt = new Date(day.getFullYear(), day.getMonth(), day.getDate(), hh, mm);
             if (dueAt.getTime() < now.getTime() - 120000) continue;
-            if (!isJobScheduledOnDate(job, day)) continue;
 
             const dateKey = localDateKey(day);
             const slots = [{ at: dueAt, kind: 'due' }];
@@ -5337,41 +5700,59 @@ function checkNotifications() {
             slots.forEach(({ at, kind }) => {
                 const elapsed = now.getTime() - at.getTime();
                 if (elapsed < 0 || elapsed >= 120000) return;   // chỉ nhắc trong 2 phút kể từ mốc
-                const key = `notified_${job.id}_${dateKey}_${job.time}_${kind}${kind === 'lead' ? lead : ''}`;
+                // Đã bấm "Đợi tí" qua mốc này → bỏ nhắc ở mốc này, sẽ nhắc lại đúng lúc hết thời gian chờ
+                if (entry.snoozeUntil && new Date(entry.snoozeUntil).getTime() > at.getTime()) return;
+                const key = `notified_${job.id}_${dateKey}_${timeStr}_${kind}${kind === 'lead' ? lead : ''}`;
                 if (localStorage.getItem(key)) return;
                 localStorage.setItem(key, 'true');
                 const message = kind === 'lead'
-                    ? `Còn ${lead} phút nữa (${job.time}): ${job.title}`
+                    ? `Còn ${lead} phút nữa (${timeStr}): ${job.title}`
                     : `Đã đến giờ thực hiện: ${job.title}`;
-                showNotification('🔔 Nhắc nhở Job', message, true);
-                showDesktopNotification(job);
+                showNotification('🔔 Nhắc nhở Job', message, false);
+                showDesktopNotification(job, { kind, originDate: entry.originDate, time: timeStr });
             });
         }
+    });
+
+    // Nhắc lại các job đã bấm "Đợi tí" khi hết thời gian chờ
+    jobDayOverridesList.forEach(o => {
+        if (!o.snoozeUntil) return;
+        if (jobCompletionEnabled && o.completed === true) return;
+        const at = new Date(o.snoozeUntil);
+        if (isNaN(at.getTime())) return;
+        const elapsed = now.getTime() - at.getTime();
+        if (elapsed < 0 || elapsed >= 120000) return;
+        const job = jobs.find(j => j.id === o.jobId);
+        if (!job || job.isPaused === true || job.isOutOfSchedule === true || job.enableNotification === false) return;
+        const key = `notified_snooze_${o.id}_${o.snoozeUntil}`;
+        if (localStorage.getItem(key)) return;
+        localStorage.setItem(key, 'true');
+        showNotification('⏳ Nhắc lại Job', `Hết thời gian chờ: ${job.title}`, false, 'warning');
+        showDesktopNotification(job, { kind: 'snooze', originDate: o.occurrenceDate, time: o.overrideTime || job.time });
     });
 }
 
 // Show Desktop Notification - Works across all apps
-function showDesktopNotification(job) {
+function showDesktopNotification(job, ctx = {}) {
     // Check if browser supports notifications
     if (!('Notification' in window)) {
         console.warn('Browser không hỗ trợ Desktop Notifications');
         return;
     }
-    
+
     // Check permission
     if (Notification.permission === 'granted') {
-        createNotification(job);
+        createNotification(job, ctx);
     } else if (Notification.permission !== 'denied') {
-        // Request permission
         Notification.requestPermission().then(permission => {
             if (permission === 'granted') {
-                createNotification(job);
+                createNotification(job, ctx);
             }
         });
     }
 }
 
-function createNotification(job) {
+async function createNotification(job, ctx = {}) {
     const typeLabels = {
         once: 'Once',
         daily: 'Daily',
@@ -5380,77 +5761,51 @@ function createNotification(job) {
         monthly: 'Monthly',
         custom: 'Ngoài lịch'
     };
-    
     const typeLabel = typeLabels[job.type] || job.type;
-    
-    // Create notification with options (removed actions - not supported by standard Notification API)
-    const notification = new Notification('🔔 Nhắc Nhở Job - Job Schedule Manager', {
-        body: `${job.title}\n⏰ ${job.time} - ${typeLabel}`,
+    const originDate = ctx.originDate || todayKey();
+    const timeText = ctx.time || job.time;
+    const heading = ctx.kind === 'snooze' ? `⏳ Nhắc lại: ${job.title}` : job.title;
+
+    // Nút trong thông báo: Hoàn thành (chỉ khi bật tích hoàn thành) + Đợi tí
+    const actions = [];
+    if (jobCompletionEnabled) actions.push({ action: 'complete', title: '✅ Hoàn thành' });
+    actions.push({ action: 'snooze', title: `⏳ Đợi tí (${SNOOZE_MINUTES}')` });
+
+    const title = '🔔 Nhắc Nhở Job - Job Schedule Manager';
+    const options = {
+        body: `${heading}\n⏰ ${timeText} - ${typeLabel}`,
         icon: 'https://cdn-icons-png.flaticon.com/512/2972/2972185.png',
         badge: 'https://cdn-icons-png.flaticon.com/512/2693/2693507.png',
-        tag: `job-${job.id}`, // Prevent duplicate notifications
-        requireInteraction: true, // Notification stays until user interacts
-        vibrate: [200, 100, 200], // Vibration pattern (if supported)
-        silent: false, // Play sound
-        data: {
-            jobId: job.id,
-            jobTitle: job.title,
-            jobTime: job.time
+        tag: jobNotificationTag(job.id, originDate),   // cùng job + ngày thì thay thông báo cũ
+        renotify: true,
+        requireInteraction: true,                      // giữ thông báo cho đến khi bấm
+        silent: false,
+        actions,
+        data: { jobId: job.id, originDate, kind: ctx.kind || 'due' }
+    };
+
+    // Ưu tiên service worker (mới có nút bấm)
+    try {
+        const reg = await getSwRegistration();
+        if (reg) {
+            await reg.showNotification(title, options);
+            return;
         }
-    });
-    
-    // Handle notification click
-    notification.onclick = function(event) {
-        event.preventDefault(); // Prevent default browser behavior
-        window.focus(); // Focus the window
-        
-        // Open the job modal
+    } catch (err) {
+        console.warn('showNotification qua service worker lỗi, dùng thông báo thường:', err);
+    }
+
+    // Dự phòng: thông báo thường (không có nút)
+    const { actions: _a, renotify: _r, ...basic } = options;
+    const notification = new Notification(title, basic);
+    notification.onclick = function (event) {
+        event.preventDefault();
+        window.focus();
         const clickedJob = jobs.find(j => j.id === job.id);
-        if (clickedJob) {
-            openViewJobModal(clickedJob);
-        }
-        
+        if (clickedJob) openViewJobModal(clickedJob);
         notification.close();
     };
-    
-    // Handle notification close
-    notification.onclose = function() {
-        console.log('Notification closed for job:', job.title);
-    };
-    
-    // Handle notification error
-    notification.onerror = function() {
-        console.error('Notification error for job:', job.title);
-    };
-    
-    // Auto-close after 30 seconds (optional)
-    setTimeout(() => {
-        if (notification) {
-            notification.close();
-        }
-    }, 30000);
-}
-
-// Handle notification actions (if browser supports)
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.addEventListener('notificationclick', function(event) {
-        event.notification.close();
-        
-        if (event.action === 'view') {
-            // Open the app and show job details
-            event.waitUntil(
-                clients.openWindow(window.location.href)
-            );
-        } else if (event.action === 'close') {
-            // Just close the notification
-            event.notification.close();
-        } else {
-            // Click on notification body
-            event.waitUntil(
-                clients.openWindow(window.location.href)
-            );
-        }
-    });
+    setTimeout(() => notification.close(), 30000);
 }
 
 
@@ -6617,6 +6972,16 @@ function rebuildDepartmentsList() {
     departmentsList = Array.from(map, ([id, name]) => ({ id, name }))
         .sort((x, y) => x.name.localeCompare(y.name, 'vi'));
     refreshDeptSelects();
+
+    if (quickJobsRaw.length) {
+        const before = quickJobsList.length;
+        rebuildQuickJobsList();
+        if (quickJobsList.length !== before) {
+            updateQuickChatBadge();
+            renderQuickChat();
+            renderNotifDropdown();
+        }
+    }
 }
 
 function listenDepartments() {
@@ -7274,8 +7639,12 @@ function buildScheduleEntries(rangeStart, rangeEnd, jobList) {
             const override = getOverrideFor(job.id, originKey);
             let overrideTime = null;
             let note = null;
+            let completed = false;
+            let snoozeUntil = null;
 
             if (override) {
+                completed = override.completed === true;
+                snoozeUntil = override.snoozeUntil || null;
                 if (override.overrideDate && override.overrideDate !== originKey) {
                     // Dời sang ngày khác → bỏ ở ngày cũ, thêm vào ngày mới
                     movedFrom = originKey;
@@ -7293,6 +7662,8 @@ function buildScheduleEntries(rangeStart, rangeEnd, jobList) {
                 movedFrom,       // nếu dời do override (màu hồng)
                 overrideTime,    // giờ đổi riêng cho ngày này
                 note,            // ghi chú riêng cho ngày này
+                completed,       // đã tích hoàn thành (chỉ có nghĩa khi bật chức năng trong Cài đặt)
+                snoozeUntil,     // "Đợi tí": ISO thời điểm nhắc lại (chỉ cho ngày này)
                 originDate: originKey
             });
         });
@@ -7301,10 +7672,16 @@ function buildScheduleEntries(rangeStart, rangeEnd, jobList) {
 }
 
 function isJobScheduledOnDate(job, date) {
+    return !!getScheduleEntryOnDate(job, date);
+}
+
+// Entry của job hiển thị ở ngày `date` (đã tính off / dời ngày / đổi giờ), hoặc null
+function getScheduleEntryOnDate(job, date) {
     const day = new Date(date);
     day.setHours(0, 0, 0, 0);
     const map = buildScheduleEntries(day, day, [job]);
-    return (map[localDateKey(day)] || []).length > 0;
+    const list = map[localDateKey(day)] || [];
+    return list.find(e => e.job.id === job.id) || null;
 }
 
 // ---------------- Form đăng ký lịch off ----------------

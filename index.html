@@ -1441,6 +1441,25 @@ Số thập phân dùng . hoặc ,"></textarea>
 
                 <section class="settings-section">
                     <div class="settings-section-head">
+                        <i class="bi bi-check2-square"></i>
+                        <div>
+                            <h6>Tích hoàn thành job</h6>
+                            <small>Tự bấm hoàn thành trên ô job trong lịch</small>
+                        </div>
+                    </div>
+                    <div class="form-check form-switch job-switch-card">
+                        <input class="form-check-input" type="checkbox" id="settingsCompletionToggle">
+                        <label class="form-check-label fw-bold" for="settingsCompletionToggle">Bật chức năng tích hoàn thành</label>
+                    </div>
+                    <div class="form-text">
+                        <strong>Bật:</strong> mỗi ô job có nút ✓ để tích hoàn thành, thông báo có thêm nút <em>Hoàn thành</em>. Job chưa tích sẽ được tô viền cam khi qua giờ.<br>
+                        <strong>Tắt:</strong> job mặc định được tính là hoàn thành khi qua giờ thực hiện.<br>
+                        Nút <em>Đợi tí</em> trong thông báo luôn có (nhắc lại sau 10 phút, chỉ hoãn trong ngày hôm đó).
+                    </div>
+                </section>
+
+                <section class="settings-section">
+                    <div class="settings-section-head">
                         <i class="bi bi-palette-fill"></i>
                         <div>
                             <h6>Chủ đề thanh Header</h6>
@@ -1566,7 +1585,8 @@ Số thập phân dùng . hoặc ,"></textarea>
                 <div class="ia-item">Tạm dừng job<span>Job tạm dừng không hiện trên lịch &amp; không nhắc</span></div>
                 <div class="ia-item">Kéo-thả đổi ngày<span>Chỉ ảnh hưởng ngày đó, giữ nguyên giờ</span></div>
                 <div class="ia-item">Nút ⚙️ kế giờ<span>Đổi giờ / dời ngày / ghi chú nhanh cho riêng ngày đó</span></div>
-                <div class="ia-item">Chuyển / Copy Job<span>Người nhận cần xác nhận</span></div>
+                <div class="ia-item">Tích hoàn thành ✓<span>Bật trong Cài đặt · bấm ✓ trên ô job · tắt thì qua giờ là mặc định hoàn thành</span></div>
+                <div class="ia-item">Chuyển / Copy Job<span>Chỉ gửi được cho người cùng bộ phận · người nhận cần xác nhận</span></div>
                 <div class="ia-item">Job ngoài lịch<span>Việc phát sinh, không lặp lại</span></div>
                 <div class="ia-item">Tìm kiếm job<span>Lọc theo tiêu đề / nội dung</span></div>
                 <div class="ia-item">Xuất PDF<span>Danh sách job đang hoạt động</span></div>
@@ -1583,7 +1603,7 @@ Số thập phân dùng . hoặc ,"></textarea>
                 </div>
             </div>
             <div class="ia-col-body">
-                <div class="ia-item">Báo job phát sinh<span>Kèm hạn chót tùy chọn</span></div>
+                <div class="ia-item">Báo job phát sinh<span>Kèm hạn chót tùy chọn · chỉ người cùng bộ phận thấy</span></div>
                 <div class="ia-item">Nhận job / Chỉ định người nhận<span>Người được chỉ định có thể nhận hoặc từ chối</span></div>
                 <div class="ia-item">Chuyển / Copy job trong ngày<span>Cần người nhận xác nhận</span></div>
                 <div class="ia-item">Cảnh báo quá hạn / trễ hạn<span>Tô đỏ khi trễ</span></div>
@@ -1641,6 +1661,7 @@ Số thập phân dùng . hoặc ,"></textarea>
                 <div class="ia-item">Chuông thông báo<span>Tổng hợp 30 ngày gần nhất + số chưa đọc</span></div>
                 <div class="ia-item">Chờ bạn xác nhận<span>Lời mời / chuyển-copy job bị lỡ — bấm "Xem lại"</span></div>
                 <div class="ia-item">Nhắc job trên desktop<span>Bật khi mở app lần đầu · nhắc trước N phút hoặc đúng giờ</span></div>
+                <div class="ia-item">Nút trong thông báo<span>Hoàn thành (khi bật tích hoàn thành) · Đợi tí = nhắc lại sau 10 phút, chỉ cho ngày hôm đó</span></div>
                 <div class="ia-item">Email buổi sáng -(Đang phát triển)<span>Tự gửi 6h–10h khi mở app · tóm tắt job hôm nay + link vào web</span></div>
             </div>
         </div>
