@@ -207,7 +207,8 @@ const TOPBAR_THEMES = [
     { id: 'tet',      name: 'Tết',       emoji: '🌸',  desc: 'Hoa đào, câu đối, đèn lồng đỏ' },
     { id: 'trungthu', name: 'Trung Thu', emoji: '🌕',  desc: 'Trăng rằm, đèn lồng trôi' },
     { id: 'noel',     name: 'Noel',      emoji: '🎄',  desc: 'Tuyết rơi, ông già Noel chạy ngang' },
-    { id: 'rain',     name: 'Mưa',       emoji: '🌧️', desc: 'Mưa rơi, mây đen, chớp' }
+    { id: 'rain',     name: 'Mưa',       emoji: '🌧️', desc: 'Mưa rơi, mây đen, chớp' },
+    { id: 'space',    name: 'Vũ trụ',    emoji: '🪐',  desc: 'Sao lấp lánh, hành tinh, tàu vũ trụ' }
 ];
 const TOPBAR_THEME_STORAGE_KEY = 'workpic-topbar-theme';
 let currentTopbarTheme = 'default';
@@ -219,8 +220,46 @@ const FX_CONFIG = {
     tet:      { glyphs: ['🌸', '🌸', '💮', '🌺'],            count: 26, size: [14, 24], dur: [9, 16] },
     trungthu: { glyphs: ['⭐', '✨', '🌟', '⭐'],            count: 28, size: [12, 22], dur: [8, 15] },
     noel:     { glyphs: ['❄\uFE0E', '❅', '❆', '•'],        count: 50, size: [10, 22], dur: [7, 14] },
-    rain:     { rain: true,                                   count: 80, dur: [0.7, 1.3] }
+    rain:     { rain: true,                                   count: 80, dur: [0.7, 1.3] },
+    space:    { galaxy: true,                                 count: 70, dur: [22, 40] }   // thiên hà xoắn ốc + sao rơi + sao băng
 };
+
+// Thiên hà xoắn ốc (SVG): 2 nhánh xoắn logarit, bụi sao rải dọc nhánh, lõi sáng ấm — xoay rất chậm
+function buildGalaxySvg() {
+    const rnd = (a, b) => a + Math.random() * (b - a);
+    const A0 = 5, B = 0.22, TMAX = 12.6;
+    let arms = '', dust = '';
+    for (let k = 0; k < 2; k++) {
+        const off = k * Math.PI;
+        let d = '';
+        for (let t = 0.3; t <= TMAX; t += 0.15) {
+            const r = A0 * Math.exp(B * t);
+            d += (d ? 'L' : 'M') + (r * Math.cos(t + off)).toFixed(1) + ' ' + (r * Math.sin(t + off)).toFixed(1);
+        }
+        arms += `<path d="${d}" class="gal-arm-wide" filter="url(#fxGalBlurWide)"/><path d="${d}" class="gal-arm" filter="url(#fxGalBlur)"/>`;
+        for (let i = 0; i < 150; i++) {
+            const t = rnd(0.6, TMAX);
+            const jitter = 1 + (Math.random() + Math.random() + Math.random() - 1.5) * 0.28;
+            const r = A0 * Math.exp(B * t) * jitter;
+            const col = ['#ffffff', '#cfe0ff', '#9db8ff'][Math.floor(Math.random() * 3)];
+            dust += `<circle cx="${(r * Math.cos(t + off)).toFixed(1)}" cy="${(r * Math.sin(t + off)).toFixed(1)}" r="${rnd(0.25, 0.95).toFixed(2)}" fill="${col}" opacity="${rnd(0.35, 1).toFixed(2)}"/>`;
+        }
+    }
+    for (let i = 0; i < 120; i++) {                     // sao lẻ quanh vầng hào quang
+        const a = rnd(0, Math.PI * 2), r = 105 * Math.sqrt(Math.random());
+        dust += `<circle cx="${(r * Math.cos(a)).toFixed(1)}" cy="${(r * Math.sin(a)).toFixed(1)}" r="${rnd(0.2, 0.6).toFixed(2)}" fill="#cfe0ff" opacity="${rnd(0.25, 0.8).toFixed(2)}"/>`;
+    }
+    return `<svg viewBox="-100 -100 200 200" aria-hidden="true">
+        <defs>
+            <radialGradient id="fxGalCore"><stop offset="0" stop-color="#fff6e0"/><stop offset=".3" stop-color="#f7c984" stop-opacity=".85"/><stop offset="1" stop-color="#f7c984" stop-opacity="0"/></radialGradient>
+            <filter id="fxGalBlurWide" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="5"/></filter>
+            <filter id="fxGalBlur" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1.4"/></filter>
+        </defs>
+        <circle r="62" fill="#3b5bb5" opacity=".18" filter="url(#fxGalBlurWide)"/>
+        ${arms}${dust}
+        <circle r="30" fill="url(#fxGalCore)"/>
+    </svg>`;
+}
 
 function renderFullscreenFx() {
     let layer = document.getElementById('fxFullscreen');
@@ -240,6 +279,21 @@ function renderFullscreenFx() {
 
     const rnd = (a, b) => a + Math.random() * (b - a);
     let html = '';
+    if (cfg.galaxy) {
+        html += `<div class="fx-galaxy-tilt">${buildGalaxySvg()}</div>`;
+        for (let i = 0; i < cfg.count; i++) {              // sao nhỏ rơi chậm, nhấp nháy
+            const s = rnd(1, 2.6).toFixed(1);
+            html += `<i class="fx-star" style="left:${rnd(0, 100).toFixed(1)}%;width:${s}px;height:${s}px;--sway:${rnd(-40, 40).toFixed(0)}px;` +
+                `animation-duration:${rnd(cfg.dur[0], cfg.dur[1]).toFixed(1)}s,${rnd(1.5, 4).toFixed(1)}s;` +
+                `animation-delay:${(-rnd(0, cfg.dur[1])).toFixed(1)}s,${(-rnd(0, 4)).toFixed(1)}s"></i>`;
+        }
+        for (let i = 0; i < 4; i++) {                      // sao băng thỉnh thoảng vụt qua
+            html += `<i class="fx-comet" style="left:${rnd(35, 100).toFixed(0)}%;top:${rnd(0, 40).toFixed(0)}%;` +
+                `animation-duration:${rnd(9, 16).toFixed(1)}s;animation-delay:${(-rnd(0, 14)).toFixed(1)}s"></i>`;
+        }
+        layer.innerHTML = html;
+        return;
+    }
     for (let i = 0; i < cfg.count; i++) {
         const dur = rnd(cfg.dur[0], cfg.dur[1]).toFixed(2);
         const delay = (-rnd(0, cfg.dur[1])).toFixed(2);      // delay âm: vào trang là đã rơi sẵn khắp màn hình

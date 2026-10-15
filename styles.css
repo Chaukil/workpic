@@ -6206,6 +6206,7 @@ body[data-topbar-theme="tet"]      .topbar .theme-deco-tet      { display: block
 body[data-topbar-theme="trungthu"] .topbar .theme-deco-trongthu { display: block; }
 body[data-topbar-theme="noel"]     .topbar .theme-deco-noel     { display: block; }
 body[data-topbar-theme="rain"]     .topbar .theme-deco-rain     { display: block; }
+body[data-topbar-theme="space"]    .topbar .theme-deco-space    { display: block; }
 
 /* ---------- NỀN: sáng/tối tách biệt cho từng theme ---------- */
 body.theme-light[data-topbar-theme="tet"] .topbar-sky .sky-day {
@@ -7328,3 +7329,170 @@ body.modal-open #fxFullscreen .fx-drop { animation-play-state: paused; }
     color: #fff;
     background: var(--grad-primary);
 }
+
+
+/* ============================================================
+   VŨ TRỤ — sao lấp lánh, tinh vân, hành tinh, tàu vũ trụ, UFO
+   ============================================================ */
+body.theme-light[data-topbar-theme="space"] .topbar-sky .sky-day {
+    background: linear-gradient(105deg, #ede9fe 0%, #c7d2fe 45%, #e9d5ff 100%);
+}
+body.theme-dark[data-topbar-theme="space"] .topbar-sky .sky-night {
+    background: linear-gradient(105deg, #020617 0%, #1e1b4b 48%, #3b0764 100%);
+}
+/* Dùng hành tinh riêng thay cho mặt trời / mặt trăng / mây của hệ thống */
+body[data-topbar-theme="space"] .topbar-sky .sky-body,
+body[data-topbar-theme="space"] .topbar-sky .sky-clouds { display: none !important; }
+
+.theme-deco-space { --sp-star: #6d28d9; }
+body.theme-dark .theme-deco-space { --sp-star: #ffffff; }
+
+.space-nebula {
+    position: absolute; inset: 0;
+    background:
+        radial-gradient(ellipse 260px 80px at 18% 62%, rgba(168, 85, 247, .38), transparent 70%),
+        radial-gradient(ellipse 320px 90px at 72% 28%, rgba(56, 189, 248, .28), transparent 70%),
+        radial-gradient(ellipse 200px 70px at 92% 80%, rgba(244, 114, 182, .26), transparent 70%);
+    animation: spaceNebula 9s ease-in-out infinite alternate;
+}
+body.theme-light .space-nebula { opacity: .7; }
+@keyframes spaceNebula {
+    from { opacity: .6; transform: scale(1); }
+    to   { opacity: 1;  transform: scale(1.06); }
+}
+
+.space-stars {
+    position: absolute; inset: 0;
+    background-image:
+        radial-gradient(1.6px 1.6px at 30px 18px,  var(--sp-star), transparent),
+        radial-gradient(1.2px 1.2px at 110px 60px, var(--sp-star), transparent),
+        radial-gradient(1.8px 1.8px at 190px 30px, var(--sp-star), transparent),
+        radial-gradient(1.2px 1.2px at 260px 70px, var(--sp-star), transparent),
+        radial-gradient(1.5px 1.5px at 320px 40px, var(--sp-star), transparent);
+    background-size: 340px 90px;
+    animation: spaceTwinkle 3.2s ease-in-out infinite alternate;
+}
+.space-stars.s2 {
+    background-size: 250px 70px;
+    background-position: 90px 30px;
+    animation-duration: 4.7s;
+    animation-delay: -1.6s;
+}
+@keyframes spaceTwinkle {
+    from { opacity: .3; }
+    to   { opacity: 1; }
+}
+
+.space-planet, .space-sat, .space-ufo, .space-rocket {
+    position: absolute; line-height: 1;
+    filter: drop-shadow(0 2px 4px rgba(76, 29, 149, .45));
+}
+.space-planet.p1 { top: 14%; left: 14%; font-size: 30px; animation: spaceFloat 7s ease-in-out infinite alternate; }
+.space-planet.p2 { top: 52%; left: 63%; font-size: 22px; animation: spaceFloat 9s ease-in-out infinite alternate -3s; }
+.space-sat       { top: 10%; left: 82%; font-size: 20px; animation: spaceSpin 12s linear infinite, spaceFloat 6s ease-in-out infinite alternate; }
+@keyframes spaceFloat {
+    from { transform: translateY(-4px) rotate(-6deg); }
+    to   { transform: translateY(5px)  rotate(6deg); }
+}
+@keyframes spaceSpin {
+    from { rotate: 0deg; }
+    to   { rotate: 360deg; }
+}
+
+/* 🚀 bay ngang qua; 🛸 lượn ngược chiều */
+.space-rocket {
+    top: 55%; left: 0; font-size: 22px;
+    animation: spaceRocket 16s linear infinite;
+}
+@keyframes spaceRocket {
+    0%   { transform: translate(-8vw, 10px) rotate(45deg); opacity: 0; }
+    4%   { opacity: 1; }
+    52%  { transform: translate(104vw, -18px) rotate(45deg); opacity: 1; }
+    53%, 100% { transform: translate(104vw, -18px) rotate(45deg); opacity: 0; }
+}
+.space-ufo {
+    top: 20%; right: 0; font-size: 22px;
+    animation: spaceUfo 22s ease-in-out infinite -9s;
+}
+@keyframes spaceUfo {
+    0%   { transform: translate(8vw, 0); opacity: 0; }
+    5%   { opacity: 1; }
+    25%  { transform: translate(-22vw, 12px); }
+    50%  { transform: translate(-50vw, -6px); }
+    75%  { transform: translate(-78vw, 12px); }
+    95%  { opacity: 1; }
+    100% { transform: translate(-108vw, 0); opacity: 0; }
+}
+@media (max-width: 576px) {
+    .space-ufo, .space-sat, .space-planet.p2 { display: none; }
+}
+
+/* Sao rơi toàn màn hình */
+#fxFullscreen[data-fx="space"] .fx-p { color: #c4b5fd; text-shadow: 0 0 6px rgba(167, 139, 250, .9); }
+body.theme-light #fxFullscreen[data-fx="space"] .fx-p { color: #7c3aed; text-shadow: 0 0 3px rgba(124, 58, 237, .45); }
+
+
+/* ============================================================
+   VŨ TRỤ — toàn màn hình: thiên hà xoắn ốc xoay chậm + sao rơi + sao băng
+   ============================================================ */
+#fxFullscreen[data-fx="space"] {
+    --galaxy-opacity: .5;            /* chỉnh số này nếu muốn thiên hà đậm / nhạt hơn */
+    --fx-star-c: #dbe7ff;
+    mix-blend-mode: screen;          /* chỉ cộng thêm ánh sáng lên trang, không che chữ */
+}
+body.theme-light #fxFullscreen[data-fx="space"] {
+    --galaxy-opacity: .32;
+    --fx-star-c: #4f46e5;
+    mix-blend-mode: multiply;
+}
+.fx-galaxy-tilt {
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 120vw; height: 120vw;
+    margin: -60vw 0 0 -60vw;
+    transform: rotate(-14deg) scaleY(.46);     /* nghiêng nghiêng như ảnh thiên hà */
+    opacity: var(--galaxy-opacity);
+}
+.fx-galaxy-tilt svg {
+    width: 100%; height: 100%;
+    will-change: transform;
+    animation: fxGalaxySpin 320s linear infinite;
+}
+@keyframes fxGalaxySpin { to { transform: rotate(360deg); } }
+.fx-galaxy-tilt .gal-arm-wide { fill: none; stroke: #5b7fe0; stroke-width: 11; stroke-linecap: round; opacity: .3; }
+.fx-galaxy-tilt .gal-arm      { fill: none; stroke: #8fb0ff; stroke-width: 2.6; stroke-linecap: round; opacity: .55; }
+body.theme-light .fx-galaxy-tilt .gal-arm-wide { stroke: #3f51b5; }
+body.theme-light .fx-galaxy-tilt .gal-arm      { stroke: #4338ca; }
+body.theme-light .fx-galaxy-tilt circle[fill="#ffffff"],
+body.theme-light .fx-galaxy-tilt circle[fill="#cfe0ff"] { fill: #4f46e5; }
+
+.fx-star {
+    position: absolute; top: -10px;
+    border-radius: 50%;
+    background: var(--fx-star-c);
+    box-shadow: 0 0 4px var(--fx-star-c);
+    will-change: transform, opacity;
+    animation-name: fxFall, fxTwinkle;
+    animation-timing-function: linear, ease-in-out;
+    animation-iteration-count: infinite, infinite;
+    animation-direction: normal, alternate;
+}
+@keyframes fxTwinkle { from { opacity: .15; } to { opacity: 1; } }
+
+.fx-comet {
+    position: absolute;
+    width: 110px; height: 2px;
+    border-radius: 2px;
+    background: linear-gradient(to right, var(--fx-star-c), transparent);
+    opacity: 0;
+    animation: fxComet linear infinite;
+}
+@keyframes fxComet {
+    0%   { opacity: 0; transform: translate(0, 0) rotate(-34deg); }
+    2%   { opacity: 1; }
+    9%   { opacity: 0; transform: translate(-45vw, 30vh) rotate(-34deg); }
+    100% { opacity: 0; transform: translate(-45vw, 30vh) rotate(-34deg); }
+}
+body.modal-open #fxFullscreen .fx-star,
+body.modal-open #fxFullscreen .fx-comet,
+body.modal-open #fxFullscreen .fx-galaxy-tilt svg { animation-play-state: paused; }
