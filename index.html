@@ -1407,7 +1407,7 @@ Số thập phân dùng . hoặc ,"></textarea>
 </div>
 
     <div class="modal fade" id="settingsModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header modern-header modern-header-primary">
                 <div class="modern-header-inner">
@@ -1467,6 +1467,29 @@ Số thập phân dùng . hoặc ,"></textarea>
                         </div>
                     </div>
                     <div class="theme-grid" id="themeGrid"></div>
+                    <div class="form-check form-switch job-switch-card mt-3">
+                        <input class="form-check-input" type="checkbox" id="settingsFxFullscreen">
+                        <label class="form-check-label fw-bold" for="settingsFxFullscreen">Hiệu ứng rơi toàn màn hình</label>
+                    </div>
+                    <div class="form-text">
+                        Tuyết (Noel), hoa đào (Tết), sao (Trung Thu), mưa (Mưa) sẽ rơi khắp trang.
+                        Tắt = chỉ rơi trong thanh Header. Chủ đề Mặc định không có hiệu ứng rơi.
+                    </div>
+                </section>
+
+                <section class="settings-section">
+                    <div class="settings-section-head">
+                        <i class="bi bi-feather"></i>
+                        <div>
+                            <h6>Số lượng cú</h6>
+                            <small>Cú đứng trên các nút của trang · tối đa 10 · chỉ hiện ở chế độ tối</small>
+                        </div>
+                    </div>
+                    <div class="owl-count-row">
+                        <input type="range" class="form-range" id="settingsOwlCount" min="0" max="10" step="1" value="1">
+                        <span class="owl-count-badge" id="settingsOwlCountValue">1</span>
+                    </div>
+                    <div class="form-text">Con đầu tiên đậu trên chữ "Lịch Làm Việc", các con thêm vào sẽ đậu trên nút Thêm Job, Layout, Xem, Xuất PDF... Bấm vào cú để "bắn".</div>
                 </section>
             </div>
             <div class="modal-footer">

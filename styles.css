@@ -7268,3 +7268,63 @@ body.theme-dark .eta-grid .col-total .sl-sub.sl-short { color: #fca5a5; }
     text-shadow: 0 1px 2px rgba(0,0,0,.25);
 }
 .schedule-item .snooze-tag i { font-size: .6rem; }
+
+
+/* ============================================================
+   HIỆU ỨNG RƠI TOÀN MÀN HÌNH + CÀI ĐẶT SỐ CÚ
+   ============================================================ */
+#fxFullscreen {
+    position: fixed;
+    inset: 0;
+    z-index: 1005;              /* trên topbar (1000), dưới cú (1010) và modal (1050) */
+    pointer-events: none;
+    overflow: hidden;
+}
+#fxFullscreen .fx-p {
+    position: absolute;
+    top: -40px;
+    line-height: 1;
+    user-select: none;
+    will-change: transform;
+    animation: fxFall linear infinite;
+}
+@keyframes fxFall {
+    from { transform: translate3d(0, -5vh, 0) rotate(0deg); }
+    to   { transform: translate3d(var(--sway, 0px), 110vh, 0) rotate(var(--rot, 0deg)); }
+}
+/* Tuyết: trắng ở nền tối, xanh nhạt ở nền sáng để còn nhìn thấy */
+#fxFullscreen[data-fx="noel"] .fx-p { color: #fff; text-shadow: 0 0 4px rgba(255,255,255,.6); }
+body.theme-light #fxFullscreen[data-fx="noel"] .fx-p { color: #8bbcf0; text-shadow: 0 0 2px rgba(60,110,180,.55); }
+
+#fxFullscreen .fx-drop {
+    position: absolute;
+    top: -40px;
+    width: 1.5px;
+    border-radius: 2px;
+    background: linear-gradient(to bottom, transparent, rgba(125,170,230,.9));
+    will-change: transform;
+    animation: fxRain linear infinite;
+}
+@keyframes fxRain {
+    from { transform: translate3d(0, -5vh, 0) rotate(12deg); }
+    to   { transform: translate3d(-24vh, 112vh, 0) rotate(12deg); }
+}
+body.modal-open #fxFullscreen .fx-p,
+body.modal-open #fxFullscreen .fx-drop { animation-play-state: paused; }
+
+.owl-count-row {
+    display: flex;
+    align-items: center;
+    gap: .8rem;
+}
+.owl-count-row .form-range { flex: 1; }
+.owl-count-badge {
+    min-width: 2.2rem;
+    text-align: center;
+    padding: .2rem .55rem;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: .85rem;
+    color: #fff;
+    background: var(--grad-primary);
+}

@@ -212,6 +212,56 @@ const TOPBAR_THEMES = [
 const TOPBAR_THEME_STORAGE_KEY = 'workpic-topbar-theme';
 let currentTopbarTheme = 'default';
 
+// Hiệu ứng rơi TOÀN MÀN HÌNH (tuỳ chọn trong Cài đặt). Tắt = chỉ rơi trong thanh Header như trước.
+const FX_FULLSCREEN_KEY = 'workpic-fx-fullscreen';
+let fxFullscreen = false;
+const FX_CONFIG = {
+    tet:      { glyphs: ['🌸', '🌸', '💮', '🌺'],            count: 26, size: [14, 24], dur: [9, 16] },
+    trungthu: { glyphs: ['⭐', '✨', '🌟', '⭐'],            count: 28, size: [12, 22], dur: [8, 15] },
+    noel:     { glyphs: ['❄\uFE0E', '❅', '❆', '•'],        count: 50, size: [10, 22], dur: [7, 14] },
+    rain:     { rain: true,                                   count: 80, dur: [0.7, 1.3] }
+};
+
+function renderFullscreenFx() {
+    let layer = document.getElementById('fxFullscreen');
+    const cfg = FX_CONFIG[currentTopbarTheme];
+    const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!fxFullscreen || !cfg || reduced) {
+        if (layer) layer.remove();
+        return;
+    }
+    if (!layer) {
+        layer = document.createElement('div');
+        layer.id = 'fxFullscreen';
+        layer.setAttribute('aria-hidden', 'true');
+        document.body.appendChild(layer);
+    }
+    layer.dataset.fx = currentTopbarTheme;
+
+    const rnd = (a, b) => a + Math.random() * (b - a);
+    let html = '';
+    for (let i = 0; i < cfg.count; i++) {
+        const dur = rnd(cfg.dur[0], cfg.dur[1]).toFixed(2);
+        const delay = (-rnd(0, cfg.dur[1])).toFixed(2);      // delay âm: vào trang là đã rơi sẵn khắp màn hình
+        if (cfg.rain) {
+            html += `<i class="fx-drop" style="left:${rnd(0, 118).toFixed(1)}%;height:${rnd(14, 30).toFixed(0)}px;` +
+                `animation-duration:${dur}s;animation-delay:${delay}s;opacity:${rnd(0.35, 0.8).toFixed(2)}"></i>`;
+        } else {
+            const g = cfg.glyphs[Math.floor(Math.random() * cfg.glyphs.length)];
+            html += `<span class="fx-p" style="left:${rnd(0, 100).toFixed(1)}%;font-size:${rnd(cfg.size[0], cfg.size[1]).toFixed(0)}px;` +
+                `--sway:${rnd(-90, 90).toFixed(0)}px;--rot:${rnd(-360, 360).toFixed(0)}deg;` +
+                `animation-duration:${dur}s;animation-delay:${delay}s;opacity:${rnd(0.55, 0.95).toFixed(2)}">${g}</span>`;
+        }
+    }
+    layer.innerHTML = html;
+}
+
+function setFxFullscreen(enabled) {
+    fxFullscreen = !!enabled;
+    try { localStorage.setItem(FX_FULLSCREEN_KEY, fxFullscreen ? '1' : '0'); } catch (e) { /* ignore */ }
+    renderFullscreenFx();
+}
+
 function getSavedTopbarTheme() {
     const saved = localStorage.getItem(TOPBAR_THEME_STORAGE_KEY);
     return TOPBAR_THEMES.some(t => t.id === saved) ? saved : 'default';
@@ -226,6 +276,7 @@ function applyTopbarTheme(themeId) {
     document.querySelectorAll('#themeGrid .theme-card').forEach(card => {
         card.classList.toggle('active', card.dataset.theme === themeId);
     });
+    renderFullscreenFx();
 }
 
 function renderThemeGrid() {
@@ -249,6 +300,14 @@ function openSettingsModal() {
     document.getElementById('settingsNotifyLead').value = String(notifyLeadMinutes);
     const completionToggle = document.getElementById('settingsCompletionToggle');
     if (completionToggle) completionToggle.checked = jobCompletionEnabled;
+    const fxToggle = document.getElementById('settingsFxFullscreen');
+    if (fxToggle) fxToggle.checked = fxFullscreen;
+    const owlRange = document.getElementById('settingsOwlCount');
+    if (owlRange) {
+        owlRange.max = String(OwlFx.maxCount);
+        owlRange.value = String(OwlFx.getCount());
+        document.getElementById('settingsOwlCountValue').textContent = owlRange.value;
+    }
     renderThemeGrid();
     settingsModal.show();
 }
@@ -266,6 +325,7 @@ function initTheme() {
     const savedTheme = localStorage.getItem('workpic-theme');
     const preferredTheme = savedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     applyTheme(preferredTheme);
+    try { fxFullscreen = localStorage.getItem(FX_FULLSCREEN_KEY) === '1'; } catch (e) { fxFullscreen = false; }
     applyTopbarTheme(getSavedTopbarTheme());
     enableSkyAnimation();
 }
@@ -1152,6 +1212,11 @@ window.addEventListener('pageshow', stripAutofillFromSearchInputs);
     document.getElementById('settingsBtn').addEventListener('click', openSettingsModal);
     document.getElementById('settingsNotifyLead').addEventListener('change', (e) => saveNotifyLead(e.target.value));
     document.getElementById('settingsCompletionToggle').addEventListener('change', (e) => saveJobCompletionEnabled(e.target.checked));
+    document.getElementById('settingsFxFullscreen').addEventListener('change', (e) => setFxFullscreen(e.target.checked));
+    document.getElementById('settingsOwlCount').addEventListener('input', (e) => {
+        const n = OwlFx.setCount(e.target.value);
+        document.getElementById('settingsOwlCountValue').textContent = String(n);
+    });
 
     document.getElementById('userProfileBtn').addEventListener('click', openUserProfileModal);
     document.getElementById('saveProfileBtn').addEventListener('click', saveUserProfile);
@@ -6281,10 +6346,9 @@ const OwlFx = (() => {
     const W = 56, H = 56, PERSP = 700;
     const OWL_SCALE = 0.7;
     const HUES = [0, -8, 8, -14, 14];
-    let layer = null, owl = null, parts = {};
-    let mode = 'none';                 // none | fly | settle | perch | shot | fall
-    let A = {};                        // dữ liệu animation hiện tại
-    let raf = 0, last = 0, phase = 0, spawnTimer = 0, spawnCount = 0, perchRange = null;
+    const MAX_OWLS = 10;
+    const OWL_COUNT_KEY = 'workpic-owl-count';
+    let layer = null, spawnCount = 0;   // dùng chung cho mọi con cú
 
     const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
     const lerp = (x, y, t) => x + (y - x) * t;
@@ -6351,8 +6415,15 @@ const OwlFx = (() => {
         layer = document.createElement('div');
         layer.id = 'owlLayer';
         document.body.appendChild(layer);
-        layer.addEventListener('click', (e) => { if (e.target.closest('.owl3d.perched')) shoot(); });
     }
+
+    function createOwl(perchFn, wantedFn) {
+        let owl = null, parts = {};
+        let mode = 'none';                 // none | fly | settle | perch | shot | fall
+        let A = {};                        // dữ liệu animation hiện tại
+        let raf = 0, last = 0, phase = 0, spawnTimer = 0;
+        const perchPoint = perchFn;
+        const wanted = wantedFn;
 
     function buildOwl() {
         const wrap = document.createElement('div');
@@ -6360,25 +6431,10 @@ const OwlFx = (() => {
         spawnCount += 1;
         owl = wrap.firstElementChild;
         layer.appendChild(owl);
+        owl.addEventListener('click', () => shoot());     // chỉ cú đang đậu (.perched) mới nhận click
         parts = { wl: owl.querySelector('.o-wl'), wr: owl.querySelector('.o-wr'), head: owl.querySelector('.o-head') };
         owl.style.opacity = '0';
     }
-
-    // Điểm đậu: ngay trên chữ "Lịch Làm Việc"
-    function perchPoint() {
-    const h6 = document.querySelector('#mainContent .modern-card-header-text h6');
-    if (!h6) return null;
-    if (!perchRange) perchRange = document.createRange();
-    perchRange.selectNodeContents(h6);
-    const r = perchRange.getBoundingClientRect();
-    if (!r.width || !r.height) return null;
-    const feetY = r.top + 5;
-    return {
-        x: r.left + Math.min(r.width, 120) / 2,
-        y: feetY - H * 0.46 * OWL_SCALE,             // ← nhân OWL_SCALE để chân vẫn chạm chữ
-        visible: feetY - H > 0 && feetY < window.innerHeight + H
-    };
-}
 
     function pose(p) {
     if (!owl) return;
@@ -6614,30 +6670,129 @@ const OwlFx = (() => {
     }
 }
 
-    function wanted() {
+
+        return {
+            spawn, despawn, scheduleSpawn,
+            state: () => ({ mode, spawnTimer, owl })
+        };
+    }
+
+    // ---------- quản lý nhiều con cú ----------
+    // Cú số 1: đậu trên chữ "Lịch Làm Việc". Cú thứ 2 trở đi: mỗi con đậu trên 1 nút có sẵn của trang.
+    const BUTTON_TARGETS = [
+        '#addJobBtn', '#layoutMenuBtn', '#viewDataBtn', '#exportPdfBtn',
+        '#toggleSidebarBtn', '#addOutOfScheduleBtn', '#quickChatToggleBtn',
+        '#themeToggleBtn', '#userProfileBtn', '#settingsBtn', '#notifBellBtn', '#guideBtn'
+    ];
+    const slots = [];
+    let count = 1;
+    let mainRange = null;
+
+    function mainPerch() {
+        const h6 = document.querySelector('#mainContent .modern-card-header-text h6');
+        if (!h6) return null;
+        if (!mainRange) mainRange = document.createRange();
+        mainRange.selectNodeContents(h6);
+        const r = mainRange.getBoundingClientRect();
+        if (!r.width || !r.height) return null;
+        const feetY = r.top + 5;
+        return {
+            x: r.left + Math.min(r.width, 120) / 2,
+            y: feetY - H * 0.46 * OWL_SCALE,
+            visible: feetY - H > 0 && feetY < window.innerHeight + H
+        };
+    }
+
+    function buttonPerch(el) {
+        if (!el || !el.isConnected) return null;
+        const r = el.getBoundingClientRect();
+        if (!r.width || !r.height) return null;
+        const feetY = r.top + 3;
+        const cx = r.left + r.width / 2;
+        return {
+            x: cx,
+            y: feetY - H * 0.46 * OWL_SCALE,
+            visible: feetY - H * OWL_SCALE > 0 && feetY < window.innerHeight + H && cx > 0 && cx < window.innerWidth
+        };
+    }
+
+    function pickTarget(slot) {
+        const used = new Set(slots.map(s => s.el).filter(Boolean));
+        for (const sel of BUTTON_TARGETS) {
+            const el = document.querySelector(sel);
+            if (!el || used.has(el)) continue;
+            const pt = buttonPerch(el);
+            if (pt && pt.visible) return el;
+        }
+        return null;
+    }
+
+    function baseWanted() {
         const auth = document.getElementById('authScreen');
         return document.body.classList.contains('theme-dark')
             && !!auth && auth.classList.contains('d-none')
-            && window.innerWidth > 576
-            && !!perchPoint();
+            && window.innerWidth > 576;
+    }
+
+    function ensureSlot(i) {
+        while (slots.length <= i) {
+            const idx = slots.length;
+            const slot = { i: idx, el: null, inst: null };
+            slot.perch = () => idx === 0 ? mainPerch() : buttonPerch(slot.el);
+            slot.wanted = () => baseWanted() && !!slot.perch();
+            slots.push(slot);
+        }
+        return slots[i];
+    }
+
+    function releaseSlot(slot) {
+        if (slot.inst) { slot.inst.despawn(); slot.inst = null; }
+        slot.el = null;
     }
 
     function sync() {
-        if (wanted()) {
-            if (mode === 'none' && !spawnTimer) scheduleSpawn(700);
-        } else if (mode !== 'none' || spawnTimer || owl) {
-            despawn();
+        for (let i = 0; i < Math.max(count, slots.length); i++) {
+            const slot = ensureSlot(i);
+            if (i >= count) { releaseSlot(slot); continue; }
+
+            if (i > 0) {
+                // Nút đang đậu biến mất (ẩn sidebar, đổi kích thước...) → bỏ, chọn nút khác
+                if (slot.el && !buttonPerch(slot.el)) releaseSlot(slot);
+                if (!slot.el && baseWanted()) slot.el = pickTarget(slot);
+            }
+
+            if (!slot.inst) slot.inst = createOwl(slot.perch, slot.wanted);
+            const st = slot.inst.state();
+            if (slot.wanted()) {
+                if (st.mode === 'none' && !st.spawnTimer) slot.inst.scheduleSpawn(700 + i * 450);
+            } else if (st.mode !== 'none' || st.spawnTimer || st.owl) {
+                slot.inst.despawn();
+            }
         }
     }
 
+    function setCount(n) {
+        const v = parseInt(n, 10);
+        count = Math.min(MAX_OWLS, Math.max(0, Number.isFinite(v) ? v : 1));
+        try { localStorage.setItem(OWL_COUNT_KEY, String(count)); } catch (e) { /* ignore */ }
+        sync();
+        return count;
+    }
+
+    function getCount() { return count; }
+
     function init() {
+        try {
+            const saved = parseInt(localStorage.getItem(OWL_COUNT_KEY), 10);
+            if (Number.isFinite(saved)) count = Math.min(MAX_OWLS, Math.max(0, saved));
+        } catch (e) { /* ignore */ }
         owlSyncHook = sync;
         setInterval(sync, 1200);              // theo dõi đăng nhập/đăng xuất, ẩn/hiện header, đổi kích thước
         window.addEventListener('resize', sync);
         sync();
     }
 
-    return { init, sync, markup: owlMarkup, ensureDefs };
+    return { init, sync, setCount, getCount, maxCount: MAX_OWLS, markup: owlMarkup, ensureDefs };
 })();
 
 // ============================================================
