@@ -7533,10 +7533,13 @@ body.fx-space-full[data-topbar-theme="space"] .theme-deco-space .space-nebula { 
 }
 
 /* Vũ trụ: lớp hiệu ứng nằm SAU toàn bộ nội dung (lịch, danh sách job...) — các ô job không bị che */
+/* Vũ trụ + Halloween + Tết: lớp hiệu ứng nằm SAU toàn bộ nội dung */
 #fxFullscreen[data-fx="space"],
 #fxFullscreen[data-fx="halloween"],
+#fxFullscreen[data-fx="tet"],
 body.theme-light #fxFullscreen[data-fx="space"],
-body.theme-light #fxFullscreen[data-fx="halloween"] {
+body.theme-light #fxFullscreen[data-fx="halloween"],
+body.theme-light #fxFullscreen[data-fx="tet"] {
     z-index: -1;
     mix-blend-mode: normal;
 }
@@ -7757,11 +7760,6 @@ body.modal-open .tt-lion-wrap *, body.modal-open .tt-bunny-wrap * { animation-pl
     to   { opacity: 1; transform: translateY(0); }
 }
 
-.fx-options-head {
-    display: flex; align-items: center; gap: 0.7rem;
-    padding-bottom: 0.7rem;
-    border-bottom: 1px dashed var(--border);
-}
 .fx-selected-emoji { font-size: 1.7rem; line-height: 1; flex: none; }
 .fx-options-info { display: flex; flex-direction: column; min-width: 0; }
 .fx-selected-name {
@@ -8126,4 +8124,594 @@ body.theme-light.fx-backdrop-on[data-topbar-theme="trungthu"] {
             rgba(253, 224, 71, 0.18) 0%,
             rgba(196, 181, 253, 0.12) 55%,
             rgba(237, 233, 254, 0.05) 100%) fixed;
+}
+.folder-open-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: .28rem;
+    padding: .1rem .55rem .1rem .4rem;
+    margin: 0 .12rem;
+    border-radius: 999px;
+    border: 1px solid rgba(59, 130, 246, .35);
+    background: linear-gradient(135deg, rgba(59, 130, 246, .10), rgba(139, 92, 246, .10));
+    color: #2563eb;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .78em;
+    font-weight: 600;
+    line-height: 1.35;
+    cursor: pointer;
+    max-width: 100%;
+    vertical-align: middle;
+    transition: background .15s ease, border-color .15s ease, color .15s ease, transform .1s ease;
+}
+.folder-open-btn span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 46ch;
+}
+.folder-open-btn i { font-size: .95em; flex: none; }
+.folder-open-btn:hover {
+    background: linear-gradient(135deg, rgba(59, 130, 246, .22), rgba(139, 92, 246, .22));
+    border-color: #3b82f6;
+}
+.folder-open-btn:active { transform: scale(.97); }
+
+/* Trạng thái sau khi copy thành công */
+.folder-open-btn.copied {
+    background: linear-gradient(135deg, rgba(34, 197, 94, .22), rgba(16, 185, 129, .22));
+    border-color: #16a34a;
+    color: #15803d;
+}
+.folder-open-btn.copy-failed {
+    background: linear-gradient(135deg, rgba(239, 68, 68, .18), rgba(220, 38, 38, .18));
+    border-color: #dc2626;
+    color: #b91c1c;
+}
+
+body.theme-dark .folder-open-btn {
+    border-color: rgba(147, 197, 253, .4);
+    background: linear-gradient(135deg, rgba(59, 130, 246, .18), rgba(139, 92, 246, .18));
+    color: #93c5fd;
+}
+body.theme-dark .folder-open-btn:hover {
+    background: linear-gradient(135deg, rgba(59, 130, 246, .32), rgba(139, 92, 246, .32));
+    border-color: #60a5fa;
+    color: #dbeafe;
+}
+body.theme-dark .folder-open-btn.copied {
+    background: linear-gradient(135deg, rgba(34, 197, 94, .28), rgba(16, 185, 129, .28));
+    border-color: #22c55e;
+    color: #86efac;
+}
+body.theme-dark .folder-open-btn.copy-failed {
+    background: linear-gradient(135deg, rgba(239, 68, 68, .25), rgba(220, 38, 38, .25));
+    border-color: #f87171;
+    color: #fca5a5;
+}
+
+/* ============================================================
+   SETTINGS MODAL — REDESIGN 2026
+   Đồng bộ với .job-form-section / .eta-input-block:
+   card bo tròn, icon gradient theo chủ đề, tiêu đề rõ, hover nhẹ.
+   ============================================================ */
+
+/* Modal rộng bằng các form khác */
+#settingsModal .modal-dialog {
+    width: min(96vw, 920px);
+    max-width: min(96vw, 920px);
+    max-height: 94vh;
+    margin-top: 3vh;
+    margin-bottom: 3vh;
+}
+#settingsModal .modal-content {
+    max-height: 94vh;
+    display: flex;
+    flex-direction: column;
+}
+#settingsModal .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 1.25rem 1.4rem;
+}
+@media (max-width: 768px) {
+    #settingsModal .modal-dialog { width: 98vw; max-width: 98vw; }
+}
+
+/* ---- Section cơ bản: card kính mờ, có viền gradient khi hover ---- */
+.settings-section {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.15rem 1.25rem 1.2rem;
+    margin-bottom: 1rem;
+    overflow: hidden;
+    transition: border-color .25s ease, box-shadow .25s ease, transform .25s ease;
+}
+.settings-section:last-child { margin-bottom: 0; }
+
+/* Lớp trang trí radial rất nhẹ ở góc phải */
+.settings-section::before {
+    content: '';
+    position: absolute;
+    top: -50%; right: -30%;
+    width: 260px; height: 260px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(139, 92, 246, .07), transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+}
+body.theme-dark .settings-section {
+    background: rgba(15, 23, 42, 0.5);
+    border-color: rgba(71, 85, 105, 0.5);
+}
+.settings-section:hover {
+    border-color: rgba(139, 92, 246, 0.35);
+    box-shadow: 0 10px 28px rgba(139, 92, 246, 0.08);
+}
+
+/* ---- Header: icon vuông bo tròn + tiêu đề + subtitle ---- */
+.settings-section-head {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    margin-bottom: 0.95rem;
+}
+.settings-section-head > i {
+    width: 44px;
+    height: 44px;
+    flex: none;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 1.15rem;
+    background: var(--grad-primary);
+    box-shadow: 0 6px 14px rgba(139, 92, 246, .28);
+    border: 1px solid rgba(255, 255, 255, .18);
+}
+
+/* Icon màu riêng cho từng section — dò theo thứ tự xuất hiện trong HTML */
+#settingsModal .settings-section:nth-of-type(1) .settings-section-head > i {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    box-shadow: 0 6px 14px rgba(99, 102, 241, .28);
+}
+#settingsModal .settings-section:nth-of-type(2) .settings-section-head > i {
+    background: linear-gradient(135deg, #10b981, #22c55e);
+    box-shadow: 0 6px 14px rgba(34, 197, 94, .28);
+}
+#settingsModal .settings-section:nth-of-type(3) .settings-section-head > i {
+    background: linear-gradient(135deg, #f59e0b, #ec4899);
+    box-shadow: 0 6px 14px rgba(236, 72, 153, .28);
+}
+#settingsModal .settings-section:nth-of-type(4) .settings-section-head > i {
+    background: linear-gradient(135deg, #0ea5e9, #6366f1);
+    box-shadow: 0 6px 14px rgba(14, 165, 233, .28);
+}
+
+.settings-section-head h6 {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.2;
+    letter-spacing: -0.005em;
+}
+.settings-section-head small {
+    display: block;
+    margin-top: 0.18rem;
+    font-size: 0.75rem;
+    color: var(--muted);
+    line-height: 1.35;
+    font-weight: 500;
+}
+
+/* ---- Form controls trong settings ---- */
+#settingsModal .form-select,
+#settingsModal .form-control {
+    border-radius: 11px;
+    border: 1px solid var(--border);
+    background: var(--surface-muted);
+    padding: 0.55rem 0.8rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: border-color .2s ease, background-color .2s ease, box-shadow .2s ease;
+}
+#settingsModal .form-select:focus,
+#settingsModal .form-control:focus {
+    border-color: rgba(139, 92, 246, 0.6);
+    background: var(--surface);
+    box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.12);
+    transform: none;
+}
+body.theme-dark #settingsModal .form-select,
+body.theme-dark #settingsModal .form-control {
+    background: rgba(30, 41, 59, 0.55);
+    border-color: rgba(71, 85, 105, 0.55);
+}
+
+/* ---- Switch dạng card (Tích hoàn thành / Hiệu ứng rơi toàn màn hình) ---- */
+#settingsModal .job-switch-card {
+    background: var(--surface-muted);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.7rem 0.9rem 0.7rem 2.9rem;
+    margin: 0;
+    transition: border-color .2s ease, background-color .2s ease;
+}
+#settingsModal .job-switch-card:hover {
+    border-color: rgba(139, 92, 246, 0.35);
+}
+#settingsModal .job-switch-card .form-check-input {
+    width: 2.4em;
+    height: 1.3em;
+    margin-left: -2.2rem;
+    margin-top: 0.05rem;
+    cursor: pointer;
+    background-color: rgba(148, 163, 184, 0.35);
+    border-color: transparent;
+}
+#settingsModal .job-switch-card .form-check-input:checked {
+    background-color: #6366f1;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23fff'/%3e%3c/svg%3e");
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.14);
+}
+#settingsModal .job-switch-card .form-check-label {
+    font-weight: 700;
+    font-size: 0.84rem;
+    color: var(--text);
+    cursor: pointer;
+}
+body.theme-dark #settingsModal .job-switch-card {
+    background: rgba(30, 41, 59, 0.4);
+    border-color: rgba(71, 85, 105, 0.55);
+}
+
+/* ---- Form-text: chữ nhỏ gọn, màu muted, line-height dễ đọc ---- */
+#settingsModal .form-text {
+    font-size: 0.75rem;
+    color: var(--muted);
+    line-height: 1.5;
+    margin-top: 0.55rem;
+}
+#settingsModal .form-text strong { color: var(--text); }
+#settingsModal .form-text em { font-style: italic; color: var(--text); }
+
+/* ============================================================
+   SETTINGS — Lưới chủ đề giãn đều full width (7 chủ đề = 7 cột)
+   ============================================================ */
+#settingsModal .theme-grid.theme-grid-compact {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));  /* 7 nút chia đều */
+    gap: 0.55rem;
+    width: 100%;
+}
+
+#settingsModal .theme-grid-compact .theme-card {
+    padding: 0.75rem 0.25rem 0.65rem;
+    border-radius: 13px;
+    border: 2px solid var(--border);
+    background: var(--surface-muted);
+    width: 100%;
+    min-width: 0;                 /* cho phép co lại trong grid */
+    transition: transform .18s cubic-bezier(.16, 1, .3, 1),
+                border-color .18s ease,
+                box-shadow .18s ease,
+                background-color .18s ease;
+}
+#settingsModal .theme-grid-compact .theme-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(139, 92, 246, 0.5);
+    box-shadow: 0 8px 20px rgba(139, 92, 246, 0.14);
+    background: var(--surface);
+}
+#settingsModal .theme-grid-compact .theme-card.active {
+    border-color: #8b5cf6;
+    background: linear-gradient(135deg, rgba(99, 102, 241, .08), rgba(139, 92, 246, .08));
+    box-shadow: 0 8px 22px rgba(139, 92, 246, 0.22);
+}
+#settingsModal .theme-grid-compact .theme-card-emoji {
+    font-size: 1.7rem;
+    filter: drop-shadow(0 2px 3px rgba(15, 23, 42, .15));
+}
+#settingsModal .theme-grid-compact .theme-card-name {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+#settingsModal .theme-grid-compact .theme-card-check {
+    font-size: 0.9rem;
+    top: 6px; right: 6px;
+    color: #8b5cf6;
+}
+
+/* Mobile hẹp: rớt về 4 cột rồi 3 cột để không bị chữ ép */
+@media (max-width: 720px) {
+    #settingsModal .theme-grid.theme-grid-compact {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+@media (max-width: 480px) {
+    #settingsModal .theme-grid.theme-grid-compact {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+/* ============================================================
+   THEME FX POPOVER — bảng chọn cường độ nổi cạnh card chủ đề
+   ============================================================ */
+.theme-fx-popover {
+    position: fixed;
+    z-index: 2100;                       /* trên modal bootstrap (1055) */
+    width: 330px;
+    max-width: calc(100vw - 24px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: 0 22px 56px rgba(15, 23, 42, .35),
+                0 0 0 1px rgba(139, 92, 246, .06);
+    padding: 0.95rem 1rem 1rem;
+    animation: tfxPop .18s cubic-bezier(.16, 1, .3, 1);
+}
+body.theme-dark .theme-fx-popover {
+    background: #111827;
+    border-color: #2c3a4d;
+}
+
+@keyframes tfxPop {
+    from { opacity: 0; transform: translateY(-4px) scale(.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.tfx-head {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding-bottom: 0.75rem;
+    margin-bottom: 0.8rem;
+    border-bottom: 1px dashed var(--border);
+}
+.tfx-emoji {
+    font-size: 1.6rem;
+    line-height: 1;
+    flex: none;
+    filter: drop-shadow(0 3px 4px rgba(15, 23, 42, .18));
+}
+.tfx-head-text { min-width: 0; }
+.tfx-name {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--text);
+    line-height: 1.2;
+}
+.tfx-desc {
+    font-size: 0.72rem;
+    color: var(--muted);
+    line-height: 1.35;
+    margin-top: 2px;
+}
+
+.tfx-section { margin-bottom: 0.85rem; }
+.tfx-section:last-child { margin-bottom: 0; }
+
+.tfx-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.5rem;
+}
+.tfx-label i { color: #8b5cf6; }
+
+.tfx-seg {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.35rem;
+}
+.tfx-seg button {
+    padding: 0.45rem 0.4rem;
+    border-radius: 9px;
+    border: 1.5px solid var(--border);
+    background: var(--surface-muted);
+    color: var(--text);
+    font-weight: 600;
+    font-size: 0.74rem;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: all .15s ease;
+}
+.tfx-seg button:hover:not(.active) { border-color: rgba(139, 92, 246, 0.5); }
+.tfx-seg button.active {
+    background: var(--grad-primary);
+    color: #fff;
+    border-color: transparent;
+    box-shadow: 0 3px 10px rgba(99, 102, 241, .35);
+}
+
+.tfx-hint {
+    font-size: 0.72rem;
+    color: var(--muted);
+    line-height: 1.45;
+    margin-top: 0.5rem;
+}
+
+.tfx-section-toggle {
+    padding-top: 0.7rem;
+    border-top: 1px dashed var(--border);
+}
+
+/* Switch kiểu iOS */
+.tfx-switch {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    cursor: pointer;
+    user-select: none;
+    margin: 0;
+    position: relative;
+}
+.tfx-switch input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+.tfx-switch-slider {
+    position: relative;
+    flex: none;
+    width: 38px;
+    height: 22px;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.4);
+    transition: background-color .2s ease;
+}
+.tfx-switch-slider::after {
+    content: '';
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, .18);
+    transition: transform .2s cubic-bezier(.16, 1, .3, 1);
+}
+.tfx-switch input:checked + .tfx-switch-slider {
+    background: #6366f1;
+}
+.tfx-switch input:checked + .tfx-switch-slider::after {
+    transform: translateX(16px);
+}
+.tfx-switch-label {
+    font-weight: 600;
+    font-size: 0.82rem;
+    color: var(--text);
+}
+.tfx-toggle-hint {
+    font-size: 0.7rem;
+    color: var(--muted);
+    margin-top: 0.35rem;
+    padding-left: 0.1rem;
+}
+
+/* Mobile: popover rộng gần full */
+@media (max-width: 480px) {
+    .theme-fx-popover {
+        width: calc(100vw - 16px);
+        padding: 0.85rem 0.85rem 0.9rem;
+    }
+    .tfx-seg button { font-size: 0.7rem; padding: 0.42rem 0.3rem; }
+}
+
+/* ============================================================
+   TẾT — Cây hoa đào lớn (backdrop sau nội dung)
+   ============================================================ */
+.tet-tree-scene {
+    position: absolute;
+    left: -8vw;
+    bottom: -3vh;
+    width: min(58vw, 720px);
+    height: auto;
+    pointer-events: none;
+    z-index: 1;
+}
+.tet-tree-scene svg {
+    width: 100%;
+    height: auto;
+    display: block;
+    overflow: visible;
+    filter: drop-shadow(0 0 55px rgba(255, 140, 180, .35));
+}
+body.theme-dark .tet-tree-scene svg {
+    filter: drop-shadow(0 0 70px rgba(255, 120, 170, .45))
+            drop-shadow(0 0 20px rgba(255, 180, 200, .25));
+}
+
+.tet-blossoms { transform-box: fill-box; transform-origin: 50% 100%; }
+.tet-featured {
+    transform-origin: center;
+    animation: tetBloomPulse 5s ease-in-out infinite alternate;
+}
+@keyframes tetBloomPulse {
+    from { opacity: .8; }
+    to   { opacity: 1; }
+}
+
+/* ============================================================
+   TẾT — nền + card kính mờ để cây & hoa rơi lộ ra sau
+   ============================================================ */
+body.theme-dark.fx-backdrop-on[data-topbar-theme="tet"] {
+    background: radial-gradient(ellipse at 30% 35%,
+        #3a0c1a 0%, #1a0208 55%, #0a0104 100%) fixed;
+}
+body.theme-light.fx-backdrop-on[data-topbar-theme="tet"] {
+    background: radial-gradient(ellipse at 30% 35%,
+        #ffe4e6 0%, #fecdd3 45%, #fef2f2 100%) fixed;
+}
+
+body.theme-dark.fx-backdrop-on[data-topbar-theme="tet"] .topbar {
+    background: rgba(20, 6, 14, .35) !important;
+    border-color: rgba(220, 130, 170, .18) !important;
+    backdrop-filter: blur(14px) saturate(1.15);
+    -webkit-backdrop-filter: blur(14px) saturate(1.15);
+}
+
+body.theme-dark.fx-backdrop-on[data-topbar-theme="tet"] .card {
+    background: rgba(20, 6, 14, .38);
+    backdrop-filter: blur(14px) saturate(1.15);
+    -webkit-backdrop-filter: blur(14px) saturate(1.15);
+    border-color: rgba(220, 130, 170, .18);
+}
+body.theme-dark.fx-backdrop-on[data-topbar-theme="tet"] .card-header {
+    background: linear-gradient(135deg, rgba(58, 12, 26, .55), rgba(20, 3, 10, .45)) !important;
+}
+body.theme-dark.fx-backdrop-on[data-topbar-theme="tet"] .card-body { background: transparent; }
+body.theme-dark.fx-backdrop-on[data-topbar-theme="tet"] .job-list-card .card-body { background: transparent; }
+
+body.theme-dark.fx-backdrop-on[data-topbar-theme="tet"] .schedule-table th {
+    background: linear-gradient(135deg, rgba(58, 12, 26, .6), rgba(30, 6, 20, .5)) !important;
+}
+body.theme-dark.fx-backdrop-on[data-topbar-theme="tet"] .schedule-table td {
+    background: rgba(20, 6, 14, .32);
+    border-color: rgba(200, 100, 140, .22);
+}
+body.theme-dark.fx-backdrop-on[data-topbar-theme="tet"] .schedule-table td:hover {
+    background-color: rgba(255, 255, 255, .05);
+}
+
+body.theme-light.fx-backdrop-on[data-topbar-theme="tet"] .topbar,
+body.theme-light.fx-backdrop-on[data-topbar-theme="tet"] .card {
+    background: rgba(255, 255, 255, .55);
+    backdrop-filter: blur(14px) saturate(1.1);
+    -webkit-backdrop-filter: blur(14px) saturate(1.1);
+    border-color: rgba(220, 130, 170, .25);
+}
+body.theme-light.fx-backdrop-on[data-topbar-theme="tet"] .schedule-table td {
+    background: rgba(255, 255, 255, .55);
+    border-color: rgba(255, 160, 190, .35);
+}
+body.theme-light.fx-backdrop-on[data-topbar-theme="tet"] .schedule-table td:hover {
+    background-color: rgba(255, 255, 255, .75);
+}
+/* Mobile: cây nhỏ lại cho khỏi che lịch */
+@media (max-width: 768px) {
+    .tet-tree-scene {
+        width: min(78vw, 480px);
+        left: -14vw;
+        bottom: -6vh;
+        opacity: .85;
+    }
 }
