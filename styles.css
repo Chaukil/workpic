@@ -8016,3 +8016,114 @@ body.modal-open .hl-spider-swing { animation-play-state: paused; }
     .hl-spider-body { width: 56px; height: 56px; }
     .hl-spider-thread { height: 32vh; }
 }
+
+/* ============================================================
+   LIGHT MODE + FX-BACKDROP-ON — cho thiên hà / trăng / trời
+   Halloween phía sau lộ ra ở chế độ sáng.
+   Song song với block dark mode (đã có sẵn), dùng tone sáng.
+   ============================================================ */
+
+/* ── 1) Nền trang: bỏ gradient trắng đục, dùng lớp mờ sáng ── */
+body.theme-light.fx-backdrop-on {
+    background:
+        radial-gradient(ellipse at 50% 42%,
+            rgba(237, 233, 254, 0.35) 0%,
+            rgba(199, 210, 254, 0.22) 55%,
+            rgba(233, 213, 255, 0.10) 100%) fixed;
+}
+
+/* ── 2) Topbar: kính mờ sáng ── */
+body.theme-light.fx-backdrop-on .topbar {
+    background: rgba(255, 255, 255, 0.42) !important;
+    border-color: rgba(139, 92, 246, 0.22) !important;
+    box-shadow: 0 14px 36px rgba(99, 102, 241, 0.10);
+    backdrop-filter: blur(14px) saturate(1.15);
+    -webkit-backdrop-filter: blur(14px) saturate(1.15);
+}
+
+/* ── 3) Cards: kính mờ sáng — thiên hà lộ qua ── */
+body.theme-light.fx-backdrop-on .card {
+    background: rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(14px) saturate(1.1);
+    -webkit-backdrop-filter: blur(14px) saturate(1.1);
+    border-color: rgba(139, 92, 246, 0.20);
+    box-shadow: 0 12px 32px rgba(99, 102, 241, 0.10);
+}
+
+/* Bỏ nền trắng đục mặc định của card-body */
+body.theme-light.fx-backdrop-on .card-body { background: transparent; }
+body.theme-light.fx-backdrop-on .job-list-card .card-body { background: transparent; }
+
+/* ── 4) Bảng lịch: ô ngày sáng mờ, chữ đọc rõ ── */
+body.theme-light.fx-backdrop-on .schedule-table th {
+    box-shadow: 0 4px 10px rgba(99, 102, 241, 0.22);
+}
+body.theme-light.fx-backdrop-on .schedule-table td {
+    background: rgba(255, 255, 255, 0.48);
+    border-color: rgba(139, 92, 246, 0.18);
+}
+body.theme-light.fx-backdrop-on .schedule-table td:hover {
+    background-color: rgba(255, 255, 255, 0.70);
+}
+body.theme-light.fx-backdrop-on .schedule-table td.today-cell {
+    background: rgba(99, 102, 241, 0.20);
+    border-color: rgba(99, 102, 241, 0.55);
+    box-shadow: inset 0 0 0 2px rgba(99, 102, 241, 0.55);
+}
+body.theme-light.fx-backdrop-on .schedule-table td.day-off-cell {
+    background: repeating-linear-gradient(135deg,
+        rgba(239, 68, 68, .05) 0 8px,
+        rgba(239, 68, 68, .13) 8px 16px);
+}
+body.theme-light.fx-backdrop-on .schedule-table .date-header {
+    color: #4c1d95;
+    border-bottom-color: rgba(139, 92, 246, 0.30);
+}
+
+/* ── 5) Job trong sidebar: trắng mờ ── */
+body.theme-light.fx-backdrop-on .job-item {
+    background: rgba(255, 255, 255, 0.62);
+    border-color: rgba(139, 92, 246, 0.16);
+}
+body.theme-light.fx-backdrop-on .job-item:hover {
+    background: rgba(255, 255, 255, 0.88);
+}
+
+/* ── 6) Job ngoài lịch (pill) ── */
+body.theme-light.fx-backdrop-on .out-of-schedule-card {
+    background: rgba(255, 255, 255, 0.62);
+}
+
+/* ── 7) Ô job trên lịch: giữ độ đậm nhẹ để dễ đọc chữ ── */
+body.theme-light.fx-backdrop-on .schedule-item { opacity: 0.96; }
+
+/* ── 8) Canvas: tăng opacity cho dễ thấy trên nền sáng ── */
+body.theme-light.fx-backdrop-on .fx-galaxy-canvas { opacity: .82; }
+body.theme-light.fx-backdrop-on .fx-three-canvas   { opacity: .85; }
+
+/* ── 9) Riêng VŨ TRỤ: đổi sang tone tím đậm để galaxy nổi bật ── */
+body.theme-light.fx-backdrop-on[data-topbar-theme="space"] {
+    background:
+        radial-gradient(ellipse at 50% 42%,
+            rgba(167, 139, 250, 0.24) 0%,
+            rgba(129, 140, 248, 0.16) 55%,
+            rgba(233, 213, 255, 0.08) 100%) fixed;
+}
+
+/* ── 10) Riêng HALLOWEEN (light): trời chuyển xám tím ── */
+body.theme-light.fx-backdrop-on[data-topbar-theme="halloween"] {
+    background:
+        radial-gradient(ellipse at 70% 22%,
+            rgba(196, 181, 253, 0.35) 0%,
+            rgba(167, 139, 250, 0.22) 55%,
+            rgba(237, 233, 254, 0.10) 100%) fixed;
+}
+
+/* ── 11) Riêng TRUNG THU (light): nền sáng vàng nhạt ── */
+body.theme-light.fx-backdrop-on[data-topbar-theme="trungthu"] {
+    background:
+        radial-gradient(ellipse at 75% 30%,
+            rgba(253, 224, 71, 0.18) 0%,
+            rgba(196, 181, 253, 0.12) 55%,
+            rgba(237, 233, 254, 0.05) 100%) fixed;
+}

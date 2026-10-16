@@ -2378,7 +2378,7 @@ function renderFullscreenFx() {
             if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); retract(); }
         });
     }
-    
+
     if (theme === 'noel' && lvl === 2) SnowPile.start(layer);                  // tuyết lớn: có đống tuyết
 
     ThreeFx.start(layer, theme, lvl).then(ok => {
@@ -8522,6 +8522,16 @@ const MASCOT_INFO = {
     halloween: { key: 'ghost',    bubble: 'Boo! 👻',               bulletClass: 'mascot-poof'   }
 };
 
+const MASCOT_MOVEMENT = {
+    default:   { entry: 'fly',     idle: 'owl' },
+    tet:       { entry: 'walk',    idle: 'cat' },
+    trungthu:  { entry: 'hop',     idle: 'rabbit' },
+    noel:      { entry: 'trot',    idle: 'reindeer' },
+    rain:      { entry: 'hop',     idle: 'frog' },
+    space:     { entry: 'descend', idle: 'alien' },
+    halloween: { entry: 'float',   idle: 'ghost' }
+};
+
 // Tên hiển thị của mascot theo từng chủ đề (dùng cho phần Cài đặt)
 const MASCOT_LABELS = {
     default:   { emoji: '🦉', singular: 'cú',                   plural: 'cú' },
@@ -8893,16 +8903,158 @@ const OwlFx = (() => {
 }
 
     // ---------- bay ----------
-    function startFly(E) {
-    const vw = window.innerWidth, vh = window.innerHeight;
-    A = {
-        t0: performance.now(), dur: 4300,
-        S:  { x: vw + 130, y: clamp(E.y - vh * 0.5, 50, Math.max(60, E.y - 140)) },
-        P1: { x: vw * 0.6, y: Math.max(24, E.y - vh * 0.65) },
-        roll: 0
-    };
-    mode = 'fly';
-}
+        // ---------- vào chỗ đậu: chọn kiểu theo theme ----------
+    function startEntry(E) {
+        const theme = currentTopbarTheme;
+        const move = (MASCOT_MOVEMENT[theme] || MASCOT_MOVEMENT.default).entry;
+        const now = performance.now();
+        const vw = window.innerWidth, vh = window.innerHeight;
+
+        if (move === 'walk' || move === 'trot') {
+            const fromLeft = Math.random() < 0.5;
+            A = {
+                t0: now,
+                dur: move === 'trot' ? 2600 : 3600,
+                S: { x: fromLeft ? -80 : vw + 80, y: E.y },
+                dir: fromLeft ? 1 : -1,
+                move
+            };
+            mode = 'walkin';
+        } else if (move === 'hop') {
+            const startX = E.x + (Math.random() < 0.5 ? -1 : 1) * (180 + Math.random() * 100);
+            A = { t0: now, dur: 3400, S: { x: startX, y: vh + 60 }, hops: 4, move };
+            mode = 'hopin';
+        } else if (move === 'descend') {
+            A = {
+                t0: now, dur: 1800,
+                S: { x: E.x + (Math.random() - 0.5) * 50, y: -100 },
+                move
+            };
+            mode = 'descend';
+        } else if (move === 'float') {
+            const fromLeft = Math.random() < 0.5;
+            A = {
+                t0: now, dur: 2400,
+                S: { x: E.x + (fromLeft ? -180 : 180), y: E.y + 30 },
+                move
+            };
+            mode = 'floatin';
+        } else {
+            // fly — cú: bay theo cung từ cạnh, vỗ cánh
+            A = {
+                t0: now, dur: 4300,
+                S:  { x: vw + 130, y: clamp(E.y - vh * 0.5, 50, Math.max(60, E.y - 140)) },
+                P1: { x: vw * 0.6, y: Math.max(24, E.y - vh * 0.65) },
+                roll: 0
+            };
+            mode = 'fly';
+        }
+    }
+
+        // ---------- ĐI BỘ / CHẠY NƯỚC KIỆU (mèo, tuần lộc) ----------
+    function stepWalkIn(now, dt) {
+        const E = perchPoint();
+        if (!E) { despawn(); return; }
+        const t = clamp((now - A.t0) / A.dur, 0, 1);
+        const ease = 1 - Math.pow(1 - t, 2);
+        const x = lerp(A.S.x, E.x, ease);
+        const y = E.y;
+
+        // nhịp chân: cú bước chậm hơn, tuần lộc nhanh hơn
+        const freq = A.move === 'trot' ? 14 : 8;
+        const stepPhase = Math.sin(t * Math.PI * freq);
+        const bob = Math.abs(stepPhase) * 2.6;
+
+        // tay vung theo bước, chân trước/sau xen kẽ
+        const swing = stepPhase * 14;
+
+        pose({
+            x, y: y - bob,
+            z: 0,
+            yaw: A.dir > 0 ? -10 : 10,
+            roll: stepPhase * 2.5,
+            pitch: 0,
+            wing: swing,
+            sweep: 0,
+            wscale: 1,
+            scale: lerp(0.75, 1.0, ease),
+            opacity: clamp(t / 0.05, 0, 1)
+        });
+        if (t >= 1) { mode = 'settle'; A = { t0: now }; }
+    }
+
+    // ---------- NHẢY TỪNG NHỊP (thỏ, ếch) ----------
+    function stepHopIn(now, dt) {
+        const E = perchPoint();
+        if (!E) { despawn(); return; }
+        const t = clamp((now - A.t0) / A.dur, 0, 1);
+        const hopT = (t * A.hops) % 1;                  // 0..1 trong 1 nhịp
+        const baseY = lerp(A.S.y, E.y, t);
+        const arc = Math.sin(hopT * Math.PI) * 26;      // vồng lên
+        const y = baseY - arc;
+        const x = lerp(A.S.x, E.x, t);
+
+        // squash & stretch
+        const squash = (hopT < 0.12 || hopT > 0.88) ? 0.86 : 1.10;
+
+        pose({
+            x, y,
+            z: 0,
+            pitch: -arc * 0.8,                          // nghiêng theo hướng nhảy
+            yaw: 0,
+            roll: 0,
+            wing: 0,
+            sweep: 0,
+            wscale: squash,
+            scale: lerp(0.7, 1.0, t),
+            opacity: 1
+        });
+        if (t >= 1) { mode = 'settle'; A = { t0: now }; }
+    }
+
+    // ---------- HẠ CÁNH TỪ TRÊN (alien) ----------
+    function stepDescend(now, dt) {
+        const E = perchPoint();
+        if (!E) { despawn(); return; }
+        const t = clamp((now - A.t0) / A.dur, 0, 1);
+        const ease = Math.pow(t, 1.4);
+        const x = lerp(A.S.x, E.x, Math.min(1, t * 1.3));
+        const y = lerp(A.S.y, E.y, ease);
+
+        pose({
+            x, y,
+            z: 0,
+            pitch: 0,
+            yaw: Math.sin(t * Math.PI * 3) * 8,
+            roll: Math.sin(t * Math.PI * 2) * 6,
+            wing: 0, sweep: 0, wscale: 1,
+            scale: lerp(0.5, 1.0, ease),
+            opacity: clamp(t / 0.08, 0, 1)
+        });
+        if (t >= 1) { mode = 'settle'; A = { t0: now }; }
+    }
+
+    // ---------- TRÔI VÀO MỜ ẢO (ma) ----------
+    function stepFloatIn(now, dt) {
+        const E = perchPoint();
+        if (!E) { despawn(); return; }
+        const t = clamp((now - A.t0) / A.dur, 0, 1);
+        const ease = 1 - Math.pow(1 - t, 3);
+        const x = lerp(A.S.x, E.x, ease);
+        const y = lerp(A.S.y, E.y, ease) - Math.sin(t * Math.PI * 2) * 8;
+
+        pose({
+            x, y,
+            z: 0,
+            pitch: Math.sin(t * Math.PI * 3) * 4,
+            yaw: Math.sin(t * Math.PI * 4) * 5,
+            roll: Math.sin(t * Math.PI * 3) * 6,
+            wing: 0, sweep: 0, wscale: 1,
+            scale: lerp(0.7, 1.0, ease),
+            opacity: clamp(t / 0.35, 0, 1)              // hiện từ từ, nửa trong suốt lúc mới hiện
+        });
+        if (t >= 1) { mode = 'settle'; A = { t0: now }; }
+    }
 
     function stepFly(now, dt) {
         const E = perchPoint();
@@ -8933,16 +9085,23 @@ const OwlFx = (() => {
         if (t >= 1) { mode = 'settle'; A = { t0: now, wing0: 58 + 70 * 0, phase0: phase }; }
     }
 
-    function stepSettle(now, dt) {
+        function stepSettle(now, dt) {
         const E = perchPoint();
         if (!E) { despawn(); return; }
+        const theme = currentTopbarTheme;
+        const isFlying = (MASCOT_MOVEMENT[theme] || MASCOT_MOVEMENT.default).entry === 'fly';
         const tt = clamp((now - A.t0) / 900, 0, 1);
         const e = 1 - Math.pow(1 - tt, 3);
-        phase += dt * Math.PI * 2 * lerp(3.0, 1.2, tt);
+        if (isFlying) phase += dt * Math.PI * 2 * lerp(3.0, 1.2, tt);
+
         pose({
-            x: E.x, y: E.y - 7 * Math.sin(Math.PI * tt) * (1 - tt),
-            pitch: lerp(8, 0, e), wing: (1 - e) * (74 + 30 * Math.sin(phase)), sweep: (1 - e) * 10,
-            wscale: lerp(1.55, 1, e), opacity: E.visible ? 1 : 0
+            x: E.x,
+            y: E.y - (isFlying ? 7 * Math.sin(Math.PI * tt) * (1 - tt) : 0),
+            pitch: isFlying ? lerp(8, 0, e) : 0,
+            wing: isFlying ? (1 - e) * (74 + 30 * Math.sin(phase)) : 0,
+            sweep: isFlying ? (1 - e) * 10 : 0,
+            wscale: isFlying ? lerp(1.55, 1, e) : 1,
+            opacity: E.visible ? 1 : 0
         });
         if (tt >= 1) {
             mode = 'perch'; A = { head: 0, headTo: 0, nextLook: now + 2500 };
@@ -8950,17 +9109,63 @@ const OwlFx = (() => {
         }
     }
 
-    function stepPerch(now, dt) {
+        // Hành vi đứng yên đặc trưng cho từng con vật
+    function themeIdle(now) {
+        const theme = currentTopbarTheme;
+        const idle = (MASCOT_MOVEMENT[theme] || MASCOT_MOVEMENT.default).idle;
+        const out = { headYaw: 0, headRoll: 0, bodyRoll: 0, bodyScale: 1, tailAngle: null };
+
+        if (idle === 'cat') {
+            // đuôi mèo ve vẩy
+            out.tailAngle = Math.sin(now / 380) * 16;
+        } else if (idle === 'rabbit') {
+            // tai thỏ giật nhẹ
+            out.headRoll = Math.sin(now / 700) * 2.5;
+        } else if (idle === 'reindeer') {
+            // đầu tuần lộc nghiêng nhẹ
+            out.headYaw = Math.sin(now / 1400) * 5;
+        } else if (idle === 'frog') {
+            // ếch phồng cổ
+            out.bodyScale = 1 + Math.sin(now / 1300) * 0.015;
+        } else if (idle === 'alien') {
+            // alien nghiêng đầu
+            out.headRoll = Math.sin(now / 1100) * 4;
+        } else if (idle === 'ghost') {
+            // ma đung đưa
+            out.bodyRoll = Math.sin(now / 1600) * 4;
+            out.bodyScale = 1 + Math.sin(now / 1000) * 0.02;
+        }
+        return out;
+    }
+
+        function stepPerch(now, dt) {
         const E = perchPoint();
         if (!E) { despawn(); return; }
         A.lastE = E;
-        if (now > A.nextLook) { A.headTo = (Math.random() < 0.5 ? -1 : 1) * (10 + Math.random() * 16); A.nextLook = now + 2200 + Math.random() * 5000; setTimeout(() => { A.headTo = 0; }, 1100); }
+        if (now > A.nextLook) {
+            A.headTo = (Math.random() < 0.5 ? -1 : 1) * (10 + Math.random() * 16);
+            A.nextLook = now + 2200 + Math.random() * 5000;
+            setTimeout(() => { A.headTo = 0; }, 1100);
+        }
         A.head = lerp(A.head, A.headTo, 0.07);
         const br = Math.sin(now / 900) * 0.012;
+        const ti = themeIdle(now);
+
         pose({
-            x: E.x, y: E.y, roll: Math.sin(now / 1800) * 0.9, scale: 1 + br,
-            headYaw: A.head, headRoll: A.head * 0.25, opacity: E.visible ? 1 : 0
+            x: E.x, y: E.y,
+            roll: ti.bodyRoll + Math.sin(now / 1800) * 0.9,
+            scale: (1 + br) * ti.bodyScale,
+            headYaw: A.head + ti.headYaw,
+            headRoll: A.head * 0.25 + ti.headRoll,
+            opacity: E.visible ? 1 : 0
         });
+
+        // đuôi mèo (nếu có) — ghi đè transform mặc định
+        if (parts.tail && ti.tailAngle !== null) {
+            parts.tail.style.transform = `translateZ(-14px) rotate(${ti.tailAngle}deg)`;
+            parts.tail.style.transformOrigin = '100% 70%';
+        }
+
         owl.style.pointerEvents = E.visible ? '' : 'none';
     }
 
@@ -9090,15 +9295,19 @@ function showMascotBubble(text) {
 }
 
     // ---------- vòng lặp & vòng đời ----------
-    function loop(now) {
+        function loop(now) {
         if (mode === 'none') { raf = 0; return; }
         raf = requestAnimationFrame(loop);
         const dt = Math.min(0.05, (now - (last || now)) / 1000);
         last = now;
-        if (mode === 'fly') stepFly(now, dt);
-        else if (mode === 'settle') stepSettle(now, dt);
-        else if (mode === 'perch') stepPerch(now, dt);
-        else if (mode === 'fall') stepFall(now, dt);
+        if      (mode === 'fly')      stepFly(now, dt);
+        else if (mode === 'walkin')   stepWalkIn(now, dt);
+        else if (mode === 'hopin')    stepHopIn(now, dt);
+        else if (mode === 'descend')  stepDescend(now, dt);
+        else if (mode === 'floatin')  stepFloatIn(now, dt);
+        else if (mode === 'settle')   stepSettle(now, dt);
+        else if (mode === 'perch')    stepPerch(now, dt);
+        else if (mode === 'fall')     stepFall(now, dt);
     }
 
     function startLoop() { if (!raf) { last = 0; raf = requestAnimationFrame(loop); } }
@@ -9108,17 +9317,17 @@ function showMascotBubble(text) {
         owl = null; mode = 'none';
     }
 
-    function spawn() {
+        function spawn() {
         if (mode !== 'none') return;
         const E = perchPoint();
         if (!E) return;
         ensureLayer();
         buildOwl();
-        if (reduced()) {                       // giảm chuyển động: đậu luôn, không bay
+        if (reduced()) {
             mode = 'perch'; A = { head: 0, headTo: 0, nextLook: Infinity };
             owl.classList.add('perched');
         } else {
-            startFly(E);
+            startEntry(E);                       // ← đổi từ startFly(E)
         }
         startLoop();
     }
@@ -9352,7 +9561,7 @@ const AuthOwl = (() => {
         loop();
     }
 
-    function fly(from, to) {
+        function fly(from, to) {
         const dur = 720;
         const dx = from.x - to.x, dy = from.y - to.y;
         flyAnim = el.animate(
@@ -9364,7 +9573,10 @@ const AuthOwl = (() => {
             { transform: `translateY(-30px) rotate(${dx > 0 ? -10 : 10}deg)`, offset: .45 },
             { transform: 'translateY(0) rotate(0deg)' }
         ], { duration: dur, easing: 'ease-in-out' });
-        flap(5, dur, 64);
+        // chỉ vỗ cánh khi mascot thực sự có cánh (cú, ma)
+        const theme = currentTopbarTheme;
+        const isFlying = (MASCOT_MOVEMENT[theme] || MASCOT_MOVEMENT.default).entry === 'fly';
+        if (isFlying) flap(5, dur, 64);
         startTrack(dur + 80);
     }
 
@@ -9450,7 +9662,9 @@ const AuthOwl = (() => {
                 { transform: `translate(${side * 6}px,-40px) rotate(${side * 6}deg)`, offset: .62 },
                 { transform: 'translate(0,0) rotate(0deg)' }
             ], { duration: 780, easing: 'cubic-bezier(.3,.7,.4,1)' });
-            flap(4, 640, 70);
+            const theme = currentTopbarTheme;
+            const isFlying = (MASCOT_MOVEMENT[theme] || MASCOT_MOVEMENT.default).entry === 'fly';
+            if (isFlying) flap(4, 640, 70);
         }
         say(QUIPS[Math.floor(Math.random() * QUIPS.length)], 1700);
     }
