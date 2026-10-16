@@ -203,12 +203,13 @@ function applyTheme(theme) {
 // TOPBAR THEME — trang trí riêng cho thanh header
 // ============================================================
 const TOPBAR_THEMES = [
-    { id: 'default',  name: 'Mặc định',  emoji: '☀️',  desc: 'Trời sáng/tối tự nhiên' },
-    { id: 'tet',      name: 'Tết',       emoji: '🌸',  desc: 'Hoa đào, câu đối, đèn lồng đỏ' },
-    { id: 'trungthu', name: 'Trung Thu', emoji: '🌕',  desc: 'Trăng rằm, đèn lồng trôi' },
-    { id: 'noel',     name: 'Noel',      emoji: '🎄',  desc: 'Tuyết rơi, ông già Noel chạy ngang' },
-    { id: 'rain',     name: 'Mưa',       emoji: '🌧️', desc: 'Mưa rơi, mây đen, chớp' },
-    { id: 'space',    name: 'Vũ trụ',    emoji: '🪐',  desc: 'Sao lấp lánh, hành tinh, tàu vũ trụ' }
+    { id: 'default',   name: 'Mặc định',  emoji: '☀️',  desc: 'Trời sáng/tối tự nhiên' },
+    { id: 'tet',       name: 'Tết',       emoji: '🌸',  desc: 'Hoa đào, câu đối, đèn lồng đỏ' },
+    { id: 'trungthu',  name: 'Trung Thu', emoji: '🌕',  desc: 'Trăng rằm, đèn lồng trôi' },
+    { id: 'noel',      name: 'Noel',      emoji: '🎄',  desc: 'Tuyết rơi, ông già Noel chạy ngang' },
+    { id: 'rain',      name: 'Mưa',       emoji: '🌧️', desc: 'Mưa rơi, mây đen, chớp' },
+    { id: 'space',     name: 'Vũ trụ',    emoji: '🪐',  desc: 'Sao lấp lánh, hành tinh, tàu vũ trụ' },
+    { id: 'halloween', name: 'Halloween', emoji: '🎃',  desc: 'Bí ngô, dơi, ma, mèo đen, sương mù' }
 ];
 const TOPBAR_THEME_STORAGE_KEY = 'workpic-topbar-theme';
 let currentTopbarTheme = 'default';
@@ -217,11 +218,12 @@ let currentTopbarTheme = 'default';
 const FX_FULLSCREEN_KEY = 'workpic-fx-fullscreen';
 let fxFullscreen = false;
 const FX_CONFIG = {
-    tet:      { glyphs: ['🌸', '🌸', '💮', '🌺'],            count: 26, size: [14, 24], dur: [9, 16] },
-    trungthu: { glyphs: ['⭐', '✨', '🌟', '⭐'],            count: 28, size: [12, 22], dur: [8, 15] },
-    noel:     { glyphs: ['❄\uFE0E', '❅', '❆', '•'],        count: 50, size: [10, 22], dur: [7, 14] },
-    rain:     { rain: true,                                   count: 80, dur: [0.7, 1.3] },
-    space:    { galaxy: true,                                 count: 24, dur: [22, 40] }   // thiên hà xoắn ốc + sao rơi + sao băng
+    tet:       { glyphs: ['🌸', '🌸', '💮', '🌺'],                count: 26, size: [14, 24], dur: [9, 16] },
+    trungthu:  { glyphs: ['⭐', '✨', '🌟', '⭐'],                count: 28, size: [12, 22], dur: [8, 15] },
+    noel:      { glyphs: ['❄\uFE0E', '❅', '❆', '•'],            count: 50, size: [10, 22], dur: [7, 14] },
+    rain:      { rain: true,                                       count: 80, dur: [0.7, 1.3] },
+    space:     { galaxy: true,                                     count: 24, dur: [22, 40] },
+    halloween: { glyphs: ['🎃', '👻', '🦇', '🕷️', '🕸️', '💀'],  count: 32, size: [14, 26], dur: [8, 15] }
 };
 
 // Thiên hà xoắn ốc (SVG): 2 nhánh xoắn logarit, bụi sao rải dọc nhánh, lõi sáng ấm — xoay rất chậm
@@ -721,10 +723,10 @@ const ThreeFx = (() => {
         const { THREE, lowEnd, pixel, lvl } = ctx;
         const N = lowEnd ? 48000 : 100000;
         const RAD = 6.2, BRANCHES = 2, SPIN = 1.25, RANDOMNESS = 0.55, RPOWER = 1.8;
-        const zoom = [1.4, 1.75, 2.15][lvl];           // thiên hà rất lớn, tràn cả màn hình
-        const gain = [1.0, 1.35, 1.7][lvl];
-        const spinSpeed = [0.018, 0.026, 0.045][lvl];
-        const parallax = [1, 1.2, 1.8][lvl];
+       const zoom       = [1.3, 1.75, 2.4][lvl];
+const gain       = [0.85, 1.35, 1.9][lvl];
+const spinSpeed  = [0.012, 0.026, 0.06][lvl];
+const parallax   = [0.7, 1.2, 2.2][lvl];
 
         const pos = new Float32Array(N * 3), col = new Float32Array(N * 3), scl = new Float32Array(N), ph = new Float32Array(N);
         const cInside = new THREE.Color('#ffd9a3'), cMid = new THREE.Color('#7f9cf5'), cOut = new THREE.Color('#3350b8');
@@ -796,7 +798,7 @@ const ThreeFx = (() => {
             gMat.needsUpdate = true;
             core.visible = !light; halo.visible = !light;
         });
-        starField(ctx, [900, 1500, 2300][lvl] * (lowEnd ? 0.5 : 1), 40, 1.0, gain);
+        starField(ctx, [500, 1500, 3000][lvl] * (lowEnd ? 0.5 : 1), 40, 1.0, gain);
 
         ctx.onFit.push((aspect) => tilt.scale.setScalar(Math.max(0.55, Math.min(1.15, aspect / 1.6)) * zoom));
         ctx.updaters.push((dt, t, s) => {
@@ -814,10 +816,10 @@ const ThreeFx = (() => {
         const snow = T.snow(THREE);
         // hạt bokeh xa/gần (các biến thể 4,5 nhiều hơn vì mềm); bông tinh thể chi tiết đi kèm
         const P = [
-            { dots: 320, dotSize: [2.4, 6.5], dotSpeed: [0.35, 0.9], flakes: 60, flakeSize: [9, 16], flakeSpeed: [0.3, 0.7], wind: 0.05, sway: 0.35 },
-            { dots: 700, dotSize: [3.0, 8.5], dotSpeed: [0.5, 1.4], flakes: 170, flakeSize: [11, 22], flakeSpeed: [0.4, 1.0], wind: 0.12, sway: 0.55 },
-            { dots: 1150, dotSize: [3.6, 11], dotSpeed: [0.8, 2.0], flakes: 380, flakeSize: [14, 30], flakeSpeed: [0.6, 1.5], wind: 0.3, sway: 0.9 }
-        ][lvl];
+    { dots: 180, dotSize: [2.0, 4.5], dotSpeed: [0.25, 0.7], flakes: 25,  flakeSize: [8, 14],  flakeSpeed: [0.25, 0.55], wind: 0.02, sway: 0.2 },
+    { dots: 700, dotSize: [3.0, 8.5], dotSpeed: [0.5, 1.4],  flakes: 170, flakeSize: [11, 22], flakeSpeed: [0.4, 1.0],   wind: 0.12, sway: 0.55 },
+    { dots: 1600,dotSize: [4.0, 12],  dotSpeed: [1.0, 2.4],  flakes: 550, flakeSize: [16, 36], flakeSpeed: [0.8, 2.0],   wind: 0.45, sway: 1.2 }
+][lvl];
         fallPoints(ctx, {
             count: cnt(P.dots), texture: snow, atlas: [3, 2], size: P.dotSize, speed: P.dotSpeed, z: [-12, 4],
             sway: P.sway, wind: P.wind, spin: 0.6, flip: 0, dir: 1, alpha: 0.85, colors: ['#ffffff', '#eaf3ff'],
@@ -833,10 +835,10 @@ const ThreeFx = (() => {
     function buildTet(ctx) {
         const { THREE, lvl, cnt } = ctx;
         const P = [
-            { blossom: 34, petal: 60, gift: 0, spark: 22, speed: [0.45, 1.0], wind: 0.15 },
-            { blossom: 80, petal: 140, gift: 10, spark: 60, speed: [0.55, 1.25], wind: 0.25 },
-            { blossom: 170, petal: 280, gift: 30, spark: 120, speed: [0.8, 1.9], wind: 0.5 }
-        ][lvl];
+    { blossom: 18,  petal: 25,  gift: 0,  spark: 8,   speed: [0.3, 0.7], wind: 0.08 },
+    { blossom: 80,  petal: 140, gift: 10, spark: 60,  speed: [0.55, 1.25], wind: 0.25 },
+    { blossom: 240, petal: 420, gift: 45, spark: 180, speed: [1.0, 2.4], wind: 0.75 }
+][lvl];
         fallPoints(ctx, {                                  // hoa đào / hoa mai nguyên bông, lật 3D
             count: cnt(P.blossom), texture: T.blossoms(THREE), atlas: [2, 1], size: [26, 56], speed: P.speed, z: [-9, 4],
             sway: 1.0, wind: P.wind, spin: 2.2, flip: 0.85, dir: 1, alpha: 1,
@@ -863,10 +865,10 @@ const ThreeFx = (() => {
     function buildTrungThu(ctx) {
         const { THREE, lvl, cnt } = ctx;
         const P = [
-            { lantern: 6, star: 22, bg: 250 },
-            { lantern: 14, star: 55, bg: 600 },
-            { lantern: 28, star: 120, bg: 950 }
-        ][lvl];
+    { lantern: 3,  star: 10,  bg: 150 },
+    { lantern: 14, star: 55,  bg: 600 },
+    { lantern: 40, star: 180, bg: 1300 }
+][lvl];
         starField(ctx, cnt(P.bg), 34, 0.9, 1.1);
         fallPoints(ctx, {                                  // đèn lồng bay lên
             count: cnt(P.lantern), texture: T.lantern(THREE), size: [40, 96], speed: [0.25, 0.6], z: [-9, 2],
@@ -886,10 +888,10 @@ const ThreeFx = (() => {
         const { cnt, lvl } = ctx;
         // 0: mưa nhỏ · 1: mưa lớn · 2: bão (gió giật xiên, mưa dày)
         const P = [
-            { count: 320, speed: [10, 15], len: [0.35, 0.7], slant: 0.1, alpha: 0.5 },
-            { count: 1100, speed: [16, 26], len: [0.6, 1.3], slant: 0.25, alpha: 0.7 },
-            { count: 2200, speed: [24, 38], len: [0.8, 1.9], slant: 0.62, alpha: 0.85 }
-        ][lvl];
+    { count: 150,  speed: [8, 12],  len: [0.3, 0.6], slant: 0.08, alpha: 0.4 },
+    { count: 1100, speed: [16, 26], len: [0.6, 1.3], slant: 0.25, alpha: 0.7 },
+    { count: 2800, speed: [28, 45], len: [1.0, 2.3], slant: 0.7,  alpha: 0.95 }
+][lvl];
         const mat = rainLines(ctx, {
             count: cnt(P.count), z: [-10, 4], speed: P.speed, len: P.len, slant: P.slant,
             color: '#a8c4f0', lightColor: '#3b4f7a', alpha: P.alpha
@@ -901,8 +903,522 @@ const ThreeFx = (() => {
         }
     }
 
-    const BUILDERS = { space: buildSpace, noel: buildNoel, tet: buildTet, trungthu: buildTrungThu, rain: buildRain };
+    // ============================================================
+// HALLOWEEN SCENE — trăng tròn + cây khô + bí ngô + dơi + lá rơi + sương mù
+// Bố cục tham khảo ảnh Halloween: trăng lớn sau, cây trái, bí ngô dưới, dơi bay
+// ============================================================
 
+// Cây khô trơ trụi — silhouette đen vẽ đệ quy, thân nêm + nhánh xương xẩu
+function drawDeadTreeSilhouette(g, S) {
+    g.clearRect(0, 0, S, S);
+    g.fillStyle = '#06060e';
+    g.strokeStyle = '#06060e';
+    g.lineCap = 'round';
+    g.lineJoin = 'round';
+
+    const trunkBaseX = S * 0.18;
+    const trunkBaseY = S * 1.02;
+    const trunkTopX  = S * 0.34;
+    const trunkTopY  = S * 0.42;
+
+    // Thân cây hình nêm
+    g.beginPath();
+    g.moveTo(trunkBaseX - S * 0.075, trunkBaseY);
+    g.quadraticCurveTo(trunkBaseX - S * 0.04, S * 0.7, trunkTopX - S * 0.018, trunkTopY);
+    g.lineTo(trunkTopX + S * 0.018, trunkTopY);
+    g.quadraticCurveTo(trunkBaseX + S * 0.02, S * 0.7, trunkBaseX + S * 0.07, trunkBaseY);
+    g.closePath();
+    g.fill();
+
+    // Rễ loe dưới chân
+    for (let i = 0; i < 5; i++) {
+        const dx = (Math.random() - 0.5) * S * 0.12;
+        const rx = trunkBaseX + dx;
+        g.lineWidth = S * 0.016;
+        g.beginPath();
+        g.moveTo(trunkBaseX, trunkBaseY - S * 0.06);
+        g.quadraticCurveTo(rx, trunkBaseY - S * 0.02, rx + (dx >= 0 ? S * 0.03 : -S * 0.03), trunkBaseY);
+        g.stroke();
+    }
+
+    // Nhánh đệ quy
+    function branch(x, y, angle, len, width, depth) {
+        if (depth <= 0 || len < 3) return;
+        const x2 = x + Math.cos(angle) * len;
+        const y2 = y + Math.sin(angle) * len;
+        g.lineWidth = width;
+        g.beginPath();
+        g.moveTo(x, y);
+        const mx = (x + x2) / 2 + (Math.random() - 0.5) * len * 0.28;
+        const my = (y + y2) / 2 + (Math.random() - 0.5) * len * 0.28;
+        g.quadraticCurveTo(mx, my, x2, y2);
+        g.stroke();
+
+        const n = depth >= 4 ? 2 : (Math.random() < 0.55 ? 2 : 3);
+        for (let i = 0; i < n; i++) {
+            const spread = 0.45 + Math.random() * 0.55;
+            const dir = i === 0 ? -1 : (i === 1 ? 1 : (Math.random() < 0.5 ? -1 : 1));
+            branch(x2, y2, angle + dir * spread, len * (0.6 + Math.random() * 0.15), width * 0.62, depth - 1);
+        }
+    }
+
+    // 5 nhánh chính toả ra từ ngọn
+    [-0.65, -0.3, 0.05, 0.5, 0.95].forEach(da => {
+        branch(trunkTopX, trunkTopY, -Math.PI / 2 + da, S * (0.2 + Math.random() * 0.08), S * 0.02, 5);
+    });
+    // Vài nhánh phụ mọc giữa thân
+    branch(trunkBaseX + S * 0.05, S * 0.68, -Math.PI / 2 + 0.9, S * 0.18, S * 0.018, 4);
+    branch(trunkBaseX - S * 0.02, S * 0.55, -Math.PI / 2 - 0.9, S * 0.15, S * 0.014, 3);
+}
+
+// Lâu đài Gothic silhouette — nhiều tháp nhọn, lỗ châu mai, cửa sổ sáng
+function drawCastleSilhouette(g, S) {
+    g.clearRect(0, 0, S, S);
+    g.fillStyle = '#050510';
+    g.strokeStyle = '#050510';
+    g.lineJoin = 'round';
+    g.lineCap = 'round';
+
+    const baseY = S * 0.95;
+    const cx = S * 0.5;
+
+    // Hàm vẽ 1 tháp: thân chữ nhật + mái nhọn + cờ + cửa sổ
+    function tower(x, y, w, h, roofH, hasFlag) {
+        // Thân
+        g.fillRect(x - w / 2, y - h, w, h);
+        // Mái nhọn
+        g.beginPath();
+        g.moveTo(x - w / 2 - w * 0.1, y - h);
+        g.lineTo(x, y - h - roofH);
+        g.lineTo(x + w / 2 + w * 0.1, y - h);
+        g.closePath();
+        g.fill();
+        // Cờ
+        if (hasFlag) {
+            g.lineWidth = S * 0.004;
+            g.beginPath();
+            g.moveTo(x, y - h - roofH);
+            g.lineTo(x, y - h - roofH - S * 0.045);
+            g.stroke();
+            g.fillStyle = '#050510';
+            g.beginPath();
+            g.moveTo(x, y - h - roofH - S * 0.045);
+            g.lineTo(x + S * 0.022, y - h - roofH - S * 0.033);
+            g.lineTo(x, y - h - roofH - S * 0.022);
+            g.closePath();
+            g.fill();
+        }
+        // Cửa sổ sáng (vàng cam)
+        const winCols = Math.max(1, Math.floor(w / (S * 0.02)));
+        const winRows = Math.max(2, Math.floor(h / (S * 0.045)));
+        for (let r = 0; r < winRows; r++) {
+            for (let c = 0; c < winCols; c++) {
+                if (Math.random() < 0.35) continue;   // vài cửa sổ tối
+                const wx = x - w / 2 + (w / winCols) * (c + 0.5);
+                const wy = y - h + (h / winRows) * (r + 0.5);
+                g.fillStyle = Math.random() < 0.75 ? '#ffb040' : '#ff8030';
+                g.beginPath();
+                g.arc(wx, wy, S * 0.0055, 0, Math.PI * 2);
+                g.fill();
+            }
+        }
+        g.fillStyle = '#050510';
+    }
+
+    // Tường thành nối các tháp
+    function wall(x1, x2, y, h) {
+        g.fillRect(x1, y - h, x2 - x1, h);
+        // Lỗ châu mai trên đỉnh
+        const merlonW = S * 0.012;
+        const merlonGap = S * 0.014;
+        let mx = x1 + S * 0.005;
+        while (mx < x2 - merlonW) {
+            g.fillRect(mx, y - h - S * 0.018, merlonW, S * 0.018);
+            mx += merlonW + merlonGap;
+        }
+    }
+
+    // Bố cục lâu đài: tháp chính giữa cao nhất + 4 tháp phụ + tường
+    // Tháp chính
+    tower(cx, baseY, S * 0.085, S * 0.42, S * 0.11, true);
+    // Tháp trái gần (thấp hơn)
+    tower(cx - S * 0.16, baseY, S * 0.06, S * 0.30, S * 0.085, false);
+    // Tháp phải gần
+    tower(cx + S * 0.16, baseY, S * 0.06, S * 0.32, S * 0.09, true);
+    // Tháp ngoài cùng trái (thấp)
+    tower(cx - S * 0.30, baseY, S * 0.05, S * 0.22, S * 0.07, false);
+    // Tháp ngoài cùng phải (trung bình)
+    tower(cx + S * 0.30, baseY, S * 0.055, S * 0.26, S * 0.075, false);
+    // Tháp phụ nhỏ sau lưng (tạo chiều sâu)
+    tower(cx - S * 0.08, baseY - S * 0.01, S * 0.04, S * 0.35, S * 0.075, false);
+    tower(cx + S * 0.07, baseY - S * 0.01, S * 0.045, S * 0.38, S * 0.08, false);
+
+    // Tường thành nối
+    wall(cx - S * 0.27, cx - S * 0.20, baseY, S * 0.16);
+    wall(cx - S * 0.13, cx - S * 0.05, baseY, S * 0.20);
+    wall(cx + S * 0.05, cx + S * 0.13, baseY, S * 0.20);
+    wall(cx + S * 0.19, cx + S * 0.27, baseY, S * 0.17);
+}
+
+// Dơi silhouette — 3 biến thể với kích thước cánh khác nhau
+function drawBatShape(g, S, variant) {
+    g.save();
+    g.translate(S / 2, S / 2);
+    g.fillStyle = '#06060e';
+    const scale = [0.82, 1.0, 1.15][variant % 3];
+    g.scale(scale, scale);
+    const W = S * 0.44, H = S * 0.18;
+
+    // Thân
+    g.beginPath(); g.ellipse(0, 0, W * 0.10, H * 1.1, 0, 0, Math.PI * 2); g.fill();
+
+    // Cánh trái — đường cong có vết lõm
+    g.beginPath();
+    g.moveTo(0, 0);
+    g.quadraticCurveTo(-W * 0.35, -H * 1.8, -W * 0.6, -H * 1.1);
+    g.quadraticCurveTo(-W * 0.95, -H * 0.7, -W, -H * 0.3);
+    g.quadraticCurveTo(-W * 0.85, -H * 0.05, -W * 0.72, H * 0.25);
+    g.quadraticCurveTo(-W * 0.5, H * 0.1, -W * 0.4, H * 0.45);
+    g.quadraticCurveTo(-W * 0.22, H * 0.15, 0, H * 0.35);
+    g.closePath(); g.fill();
+    // Cánh phải
+    g.beginPath();
+    g.moveTo(0, 0);
+    g.quadraticCurveTo(W * 0.35, -H * 1.8, W * 0.6, -H * 1.1);
+    g.quadraticCurveTo(W * 0.95, -H * 0.7, W, -H * 0.3);
+    g.quadraticCurveTo(W * 0.85, -H * 0.05, W * 0.72, H * 0.25);
+    g.quadraticCurveTo(W * 0.5, H * 0.1, W * 0.4, H * 0.45);
+    g.quadraticCurveTo(W * 0.22, H * 0.15, 0, H * 0.35);
+    g.closePath(); g.fill();
+
+    // 2 tai nhọn
+    g.beginPath(); g.moveTo(-W * 0.10, -H * 0.95); g.lineTo(-W * 0.06, -H * 1.7); g.lineTo(0, -H * 0.95); g.closePath(); g.fill();
+    g.beginPath(); g.moveTo(W * 0.10, -H * 0.95); g.lineTo(W * 0.06, -H * 1.7); g.lineTo(0, -H * 0.95); g.closePath(); g.fill();
+
+    g.restore();
+}
+
+// Lá mùa thu rụng — teardrop mũi nhọn có gân
+function drawAutumnLeaf(g, S, variant) {
+    g.save();
+    g.translate(S / 2, S / 2);
+    g.rotate(((variant * 53) % 360) * Math.PI / 180);
+    const colors = ['#e85d1c', '#d97706', '#b45309', '#f59e0b', '#dc2626', '#ea580c'];
+    g.fillStyle = colors[variant % colors.length];
+    const r = S * 0.36;
+
+    // Thân lá
+    g.beginPath();
+    g.moveTo(0, -r);
+    g.bezierCurveTo(r * 0.75, -r * 0.55, r * 0.7, r * 0.35, 0, r * 0.95);
+    g.bezierCurveTo(-r * 0.7, r * 0.35, -r * 0.75, -r * 0.55, 0, -r);
+    g.fill();
+
+    // Gân giữa
+    g.strokeStyle = 'rgba(60, 20, 0, 0.35)';
+    g.lineWidth = S * 0.018;
+    g.beginPath(); g.moveTo(0, -r * 0.85); g.lineTo(0, r * 0.85); g.stroke();
+
+    // Gân phụ
+    g.lineWidth = S * 0.012;
+    for (let i = -3; i <= 3; i++) {
+        if (i === 0) continue;
+        const y = i * r * 0.22;
+        g.beginPath();
+        g.moveTo(0, y); g.lineTo(r * 0.45, y + r * 0.18);
+        g.moveTo(0, y); g.lineTo(-r * 0.45, y + r * 0.18);
+        g.stroke();
+    }
+
+    // Cuống
+    g.fillStyle = '#3d1a03';
+    g.fillRect(-S * 0.012, r * 0.88, S * 0.024, r * 0.32);
+
+    g.restore();
+}
+
+// Bí ngô Jack-o'-lantern: thân bí cam có khía, cuống xanh, mắt/miệng sáng phát quang
+function drawPumpkinJack(g, S) {
+    g.clearRect(0, 0, S, S);
+    const cx = S * 0.5, cy = S * 0.58;
+    const rx = S * 0.32, ry = S * 0.26;
+
+    // Cuống xanh
+    g.save();
+    g.translate(cx, cy - ry * 0.95);
+    g.rotate(-0.18);
+    g.fillStyle = '#3f6212';
+    g.beginPath();
+    g.moveTo(-S * 0.018, 0);
+    g.quadraticCurveTo(-S * 0.04, -S * 0.09, S * 0.02, -S * 0.13);
+    g.quadraticCurveTo(S * 0.07, -S * 0.11, S * 0.045, -S * 0.02);
+    g.quadraticCurveTo(S * 0.03, S * 0.02, S * 0.018, 0);
+    g.closePath();
+    g.fill();
+    g.strokeStyle = '#1a2e05';
+    g.lineWidth = S * 0.004;
+    g.stroke();
+    g.restore();
+
+    // Thân bí: 6 múi (ellipse lệch nhau để trông có khía)
+    const ribs = 6;
+    for (let i = 0; i < ribs; i++) {
+        const t = i / (ribs - 1);           // 0..1
+        const off = (t - 0.5) * rx * 1.15;
+        const scaleY = 1 - Math.abs(t - 0.5) * 0.28;
+        const grad = g.createRadialGradient(cx + off - rx * 0.25, cy - ry * 0.4, rx * 0.1, cx + off, cy, rx);
+        grad.addColorStop(0, '#ffd08a');
+        grad.addColorStop(0.45, '#ff9f3a');
+        grad.addColorStop(1, '#c2410c');
+        g.fillStyle = grad;
+        g.beginPath();
+        g.ellipse(cx + off, cy, rx * 0.34, ry * scaleY, 0, 0, Math.PI * 2);
+        g.fill();
+        // vạch khía tối
+        g.strokeStyle = 'rgba(80, 25, 0, 0.35)';
+        g.lineWidth = S * 0.006;
+        g.stroke();
+    }
+
+    // Đường viền ngoài đậm hơn cho rõ silhouette
+    g.strokeStyle = 'rgba(60, 15, 0, 0.55)';
+    g.lineWidth = S * 0.009;
+    g.beginPath();
+    g.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    g.stroke();
+
+    // Mắt + mũi + miệng phát sáng
+    const eyeY = cy - ry * 0.22;
+    const eyeDX = rx * 0.42;
+    const eyeSize = S * 0.065;
+
+    // vẽ 1 mắt hình tam giác cong
+    function eye(ex) {
+        g.beginPath();
+        g.moveTo(ex - eyeSize, eyeY + eyeSize * 0.3);
+        g.quadraticCurveTo(ex, eyeY - eyeSize * 1.1, ex + eyeSize, eyeY + eyeSize * 0.3);
+        g.quadraticCurveTo(ex, eyeY + eyeSize * 0.6, ex - eyeSize, eyeY + eyeSize * 0.3);
+        g.closePath();
+    }
+
+    // Halo vàng
+    g.save();
+    g.shadowColor = 'rgba(255, 220, 100, 0.95)';
+    g.shadowBlur = S * 0.06;
+    g.fillStyle = '#fff2b0';
+    eye(cx - eyeDX); g.fill();
+    eye(cx + eyeDX); g.fill();
+
+    // Mũi tam giác
+    g.beginPath();
+    g.moveTo(cx, cy - S * 0.005);
+    g.lineTo(cx - S * 0.03, cy + S * 0.045);
+    g.lineTo(cx + S * 0.03, cy + S * 0.045);
+    g.closePath();
+    g.fill();
+
+    // Miệng cười răng cưa
+    const mouthY = cy + ry * 0.42;
+    const mouthW = rx * 0.72;
+    const toothH = S * 0.045;
+    g.beginPath();
+    g.moveTo(cx - mouthW / 2, mouthY);
+    const teeth = 5;
+    for (let i = 0; i < teeth; i++) {
+        const x1 = cx - mouthW / 2 + (i + 0.5) * (mouthW / teeth);
+        const x2 = cx - mouthW / 2 + (i + 1) * (mouthW / teeth);
+        g.lineTo(x1, mouthY + toothH * 0.95);
+        g.lineTo(x2, mouthY);
+    }
+    // cằm cong lên
+    g.quadraticCurveTo(cx, mouthY + toothH * 1.6, cx - mouthW / 2, mouthY);
+    g.closePath();
+    g.fill();
+    g.restore();
+}
+
+// Scene chính Halloween
+function buildHalloween(ctx) {
+    const { THREE, lvl, cnt } = ctx;
+
+    // ── Sao nền trời ──
+    starField(ctx, cnt([150, 400, 900][lvl]), 22, 0.65, 0.85);
+
+        // ── TRĂNG MÁU — nhỏ hơn, đưa cao hơn, có quầng hồng/tím ──
+    const moonTex = tex(THREE, 256, (g, S) => {
+        const c = S / 2, r = S * 0.24;
+        // Quầng hồng-tím đặc trưng
+        const halo = g.createRadialGradient(c, c, r * 0.7, c, c, S * 0.5);
+        halo.addColorStop(0, 'rgba(255, 160, 200, 0.55)');
+        halo.addColorStop(0.35, 'rgba(220, 100, 160, 0.28)');
+        halo.addColorStop(0.7, 'rgba(150, 70, 140, 0.10)');
+        halo.addColorStop(1, 'rgba(100, 40, 110, 0)');
+        g.fillStyle = halo; g.fillRect(0, 0, S, S);
+
+        // Đĩa trăng hồng nhạt
+        const disk = g.createRadialGradient(c * 0.82, c * 0.78, r * 0.1, c, c, r);
+        disk.addColorStop(0, '#ffe8f0');
+        disk.addColorStop(0.5, '#f8b8d0');
+        disk.addColorStop(0.85, '#e088a8');
+        disk.addColorStop(1, '#c06088');
+        g.fillStyle = disk;
+        g.beginPath(); g.arc(c, c, r, 0, Math.PI * 2); g.fill();
+
+        // Vài "biển" mờ hồng đậm
+        g.globalAlpha = 0.30;
+        g.fillStyle = '#a04868';
+        [[c * 0.88, c * 0.92, r * 0.15], [c * 1.08, c * 0.85, r * 0.10],
+         [c * 1.12, c * 1.12, r * 0.08], [c * 0.78, c * 1.14, r * 0.07],
+         [c * 1.02, c * 1.18, r * 0.05]].forEach(([x, y, cr]) => {
+            g.beginPath(); g.arc(x, y, cr, 0, Math.PI * 2); g.fill();
+        });
+        g.globalAlpha = 1;
+    });
+    const moonMat = new THREE.SpriteMaterial({
+        map: moonTex, transparent: true, depthWrite: false,
+        blending: THREE.AdditiveBlending, opacity: 1
+    });
+    const moon = new THREE.Sprite(moonMat);
+    const moonSize = [3.6, 4.8, 6.2][lvl];            // ← nhỏ hơn trước
+    moon.scale.set(moonSize, moonSize, 1);
+    moon.position.set(2.4, 4.8, -24);                    // ← cao hơn (Y: 4.8)
+    ctx.scene.add(moon);
+    ctx.own(moonTex, moonMat);
+    ctx.lightFns.push(light => { moonMat.opacity = light ? 0.35 : 1; });
+
+    // ── LÂU ĐÀI BÊN PHẢI ──
+    const castleTex = tex(THREE, 512, (g, S) => drawCastleSilhouette(g, S));
+    const castleMat = new THREE.MeshBasicMaterial({
+        map: castleTex, transparent: true, depthWrite: false, side: THREE.DoubleSide
+    });
+    const castle = new THREE.Mesh(new THREE.PlaneGeometry(9.5, 9.5), castleMat);
+    castle.position.set(6.2, -2.6, -12);                 // ← bên phải, hơi thấp
+    ctx.scene.add(castle);
+    ctx.own(castleTex, castleMat, castle.geometry);
+    ctx.lightFns.push(light => { castleMat.opacity = light ? 0.55 : 1; });
+
+    // Hào quang đỏ sẫm quanh lâu đài (như máu/đèn thắp)
+    const castleGlowTex = tex(THREE, 128, (g, S) => {
+        const gr = g.createRadialGradient(S/2, S/2, 0, S/2, S/2, S/2);
+        gr.addColorStop(0, 'rgba(255, 80, 120, 0.35)');
+        gr.addColorStop(0.5, 'rgba(200, 40, 90, 0.15)');
+        gr.addColorStop(1, 'rgba(150, 20, 60, 0)');
+        g.fillStyle = gr; g.fillRect(0, 0, S, S);
+    });
+    const castleGlowMat = new THREE.SpriteMaterial({
+        map: castleGlowTex, transparent: true, depthWrite: false,
+        blending: THREE.AdditiveBlending
+    });
+    const castleGlow = new THREE.Sprite(castleGlowMat);
+    castleGlow.scale.set(11, 11, 1);
+    castleGlow.position.set(6.2, -2.0, -12.5);
+    ctx.scene.add(castleGlow);
+    ctx.own(castleGlowTex, castleGlowMat);
+    ctx.lightFns.push(light => { castleGlowMat.opacity = light ? 0.4 : 1; });
+
+    // ── CÂY KHÔ bên trái ──
+    const treeTex = tex(THREE, 512, (g, S) => drawDeadTreeSilhouette(g, S));
+    const treeMat = new THREE.MeshBasicMaterial({
+        map: treeTex, transparent: true, depthWrite: false, side: THREE.DoubleSide
+    });
+    const tree = new THREE.Mesh(new THREE.PlaneGeometry(10, 11.5), treeMat);
+    tree.position.set(-7.2, -1.8, -14);
+    tree.rotation.z = 0.035;
+    ctx.scene.add(tree);
+    ctx.own(treeTex, treeMat, tree.geometry);
+    ctx.lightFns.push(light => { treeMat.opacity = light ? 0.55 : 1; });
+
+    // ── DƠI BAY 2 HƯỚNG ──
+    const batTex = atlasTex(THREE, 3, 1, 96, (g, S, i) => drawBatShape(g, S, i));
+
+    // Đàn dơi bay phải
+    fallPoints(ctx, {
+        count: cnt([5, 12, 22][lvl]),
+        texture: batTex, atlas: [3, 1],
+        size: [22, 42], speed: [0.7, 1.5],
+        z: [-9, -1],
+        sway: 0.4 + lvl * 0.15,
+        wind: 0.16 + lvl * 0.08,
+        spin: 0.2, flip: 0, dir: 0,          // dir=0 → không rơi, chỉ bay ngang
+        alpha: 1,
+        colors: ['#06060e'],
+        blend: THREE.NormalBlending
+    });
+    // Vài con bay ngược lại
+    fallPoints(ctx, {
+        count: cnt([3, 6, 12][lvl]),
+        texture: batTex, atlas: [3, 1],
+        size: [16, 30], speed: [0.6, 1.2],
+        z: [-8, -1.5],
+        sway: 0.35,
+        wind: -(0.13 + lvl * 0.06),
+        spin: 0.2, flip: 0, dir: 0,
+        alpha: 0.85,
+        colors: ['#0a0a18'],
+        blend: THREE.NormalBlending
+    });
+
+    // ── LÁ RỤNG MÙA THU ──
+    const leafTex = atlasTex(THREE, 3, 2, 96, (g, S, i) => drawAutumnLeaf(g, S, i));
+    fallPoints(ctx, {
+        count: cnt([25, 80, 170][lvl]),
+        texture: leafTex, atlas: [3, 2],
+        size: [16, 34], speed: [0.32, 0.85],
+        z: [-10, 2],
+        sway: 0.75 + lvl * 0.25,
+        wind: 0.09 + lvl * 0.07,
+        spin: 2.0 + lvl * 0.8, flip: 0.75, dir: 1,
+        alpha: 1,
+        colors: ['#ffffff', '#ffe2c0', '#ffc890'],
+        blend: THREE.NormalBlending,
+        lightMul: [0.85, 0.7, 0.6], lightBlend: THREE.NormalBlending
+    });
+
+    // ── SƯƠNG MÙ trôi ngang ──
+    const fogTex = tex(THREE, 256, (g, S) => {
+        const gr = g.createRadialGradient(S/2, S/2, 0, S/2, S/2, S/2);
+        gr.addColorStop(0, 'rgba(190, 210, 230, 0.32)');
+        gr.addColorStop(0.45, 'rgba(150, 180, 210, 0.15)');
+        gr.addColorStop(1, 'rgba(110, 150, 190, 0)');
+        g.fillStyle = gr; g.fillRect(0, 0, S, S);
+    });
+
+    const fogCount = 5 + lvl * 2;
+    const fogs = [];
+    for (let i = 0; i < fogCount; i++) {
+        const fogMat = new THREE.MeshBasicMaterial({
+            map: fogTex, transparent: true, depthWrite: false, blending: THREE.NormalBlending
+        });
+        const fog = new THREE.Mesh(new THREE.PlaneGeometry(15, 6.5), fogMat);
+        fog.position.set(
+            -12 + (i / fogCount) * 24 + (Math.random() - 0.5) * 3,
+            -3.2 - Math.random() * 0.7,
+            -8 + Math.random() * 3
+        );
+        fog.userData = { speed: 0.18 + Math.random() * 0.18, phase: Math.random() * Math.PI * 2 };
+        fog.userData.baseOpacity = 0.6 + Math.random() * 0.25;
+        ctx.scene.add(fog);
+        ctx.own(fogMat, fog.geometry);
+        fogs.push(fog);
+        ctx.lightFns.push(light => { fogMat.opacity = fog.userData.baseOpacity * (light ? 0.6 : 1); });
+    }
+    ctx.updaters.push((dt, t) => {
+        fogs.forEach(f => {
+            f.position.x += dt * f.userData.speed;
+            if (f.position.x > 13) f.position.x = -13;
+            f.position.y = -3.2 + Math.sin(t * 0.35 + f.userData.phase) * 0.28;
+        });
+    });
+
+    // ── Camera trôi nhẹ ──
+    ctx.updaters.push((dt, t) => {
+        ctx.camera.position.x = Math.sin(t * 0.07) * 0.18;
+        ctx.camera.position.y = Math.cos(t * 0.10) * 0.12;
+        ctx.camera.lookAt(0, 0, 0);
+    });
+}
+
+    const BUILDERS = { space: buildSpace, noel: buildNoel, tet: buildTet, trungthu: buildTrungThu, rain: buildRain, halloween: buildHalloween };
     // ---------------------------------------------------------- khung chung
     function build(THREE, layer, theme, lvl) {
         const lowEnd = (navigator.hardwareConcurrency || 4) <= 4 || window.innerWidth < 700;
@@ -1009,32 +1525,48 @@ const FX_LEVEL_KEY = 'workpic-fx-level-';
 const FX_LEVELS = ['gentle', 'normal', 'intense'];
 const FX_LEVEL_INFO = {
     noel: {
-        labels: ['Tuyết nhỏ', 'Tuyết vừa', 'Tuyết lớn'],
-        hints: ['Tuyết mịn rơi thưa, nhẹ nhàng.',
+        labels: ['Tuyết nhỏ', 'Tuyết vừa', 'Bão tuyết'],
+        hints: [
+            'Tuyết mịn rơi thưa, nhẹ nhàng.',
             'Tuyết rơi đều với nhiều dạng tinh thể.',
-            'Tuyết lớn, rơi dày và có gió. Đống tuyết tích dưới đáy màn hình — rê chuột vào để hiện cây cào và cào tuyết ra; cần khoảng 30 phút để tuyết dày lại.']
+            'Tuyết lớn, rơi dày và có gió. Đống tuyết tích dưới đáy màn hình — rê chuột vào để cào tuyết ra.'
+        ]
     },
     tet: {
         labels: ['Hoa rơi nhẹ', 'Hoa rơi nhiều', 'Mưa hoa'],
-        hints: ['Vài bông hoa đào, hoa mai rơi nhẹ.',
+        hints: [
+            'Vài bông hoa đào, hoa mai rơi nhẹ.',
             'Hoa đào, hoa mai, cánh hoa, lì xì và kim tuyến vàng rơi đều.',
-            'Mưa hoa dày đặc, có gió, nhiều lì xì và đồng tiền vàng.']
+            'Mưa hoa dày đặc, có gió, nhiều lì xì và đồng tiền vàng.'
+        ]
     },
     trungthu: {
-        labels: ['Nhẹ nhàng', 'Bình thường', 'Dữ dội'],
-        hints: ['Trăng rằm sáng với Chị Hằng, Chú Cuội dưới gốc đa, thỏ ngọc; vài đèn lồng bay lên.',
+        labels: ['Nhẹ nhàng', 'Bình thường', 'Rước đèn'],
+        hints: [
+            'Trăng rằm sáng với Chị Hằng, Chú Cuội, thỏ ngọc; vài đèn lồng bay lên.',
             'Thêm đoàn múa lân chạy dọc đáy màn hình, nhiều đèn lồng và sao rơi hơn.',
-            'Thêm thỏ trắng xách đèn chạy theo đoàn lân, rất nhiều đèn lồng và sao.']
+            'Thêm thỏ trắng xách đèn chạy theo đoàn lân, rất nhiều đèn lồng và sao.'
+        ]
     },
     rain: {
-        labels: ['Mưa nhỏ', 'Mưa lớn', 'Bão'],
+        labels: ['Mưa phùn', 'Mưa lớn', 'Bão'],
         hints: ['Mưa phùn thưa, nhẹ.', 'Mưa lớn xiên, có chớp xa.', 'Bão: mưa dày, gió giật xiên, trời tối sầm, sấm chớp liên tục.']
     },
     space: {
-        labels: ['Nhẹ nhàng', 'Bình thường', 'Dữ dội'],
-        hints: ['Thiên hà lớn quay chậm, ít sao băng.',
+        labels: ['Nhẹ nhàng', 'Bình thường', 'Bão thiên hà'],
+        hints: [
+            'Thiên hà lớn quay chậm, ít sao băng.',
             'Thiên hà rất lớn, sáng rõ phía sau lịch, sao băng thỉnh thoảng.',
-            'Thiên hà khổng lồ tràn màn hình, quay nhanh, nhiều sao băng.']
+            'Thiên hà khổng lồ tràn màn hình, quay nhanh, nhiều sao băng.'
+        ]
+    },
+    halloween: {
+        labels: ['Nhẹ nhàng', 'Bình thường', 'Đêm kinh hoàng'],
+        hints: [
+            'Vài quả bí ngô, dơi bay thưa, sương mù nhẹ.',
+            'Bí ngô, dơi, ma nhỏ, nhện treo rải rác; sương mù dày hơn.',
+            'Mưa bí ngô, dơi, đầu lâu, ma; sương mù phủ kín đáy màn hình.'
+        ]
     }
 };
 
@@ -1049,19 +1581,39 @@ function setFxLevelIndex(theme, i) {
 }
 
 function renderFxLevelControl() {
-    const wrap = document.getElementById('fxLevelWrap');
+    const wrap = document.getElementById('fxOptionsWrap');
     if (!wrap) return;
-    const info = FX_LEVEL_INFO[currentTopbarTheme];
-    wrap.classList.toggle('d-none', !info);
-    if (!info) return;
-    const idx = getFxLevelIndex(currentTopbarTheme);
-    wrap.querySelectorAll('#fxLevelSeg button').forEach((b, i) => {
+
+    const theme = currentTopbarTheme;
+    const cfg = FX_CONFIG[theme];
+    const info = FX_LEVEL_INFO[theme];
+    const themeObj = TOPBAR_THEMES.find(t => t.id === theme) || TOPBAR_THEMES[0];
+
+    // Chủ đề "Mặc định" không có hiệu ứng → ẩn toàn bộ vùng tùy chọn
+    if (!cfg || !info) {
+        wrap.classList.add('d-none');
+        return;
+    }
+    wrap.classList.remove('d-none');
+
+    const emojiEl = document.getElementById('fxSelectedEmoji');
+    const nameEl  = document.getElementById('fxSelectedName');
+    const descEl  = document.getElementById('fxSelectedDesc');
+    if (emojiEl) emojiEl.textContent = themeObj.emoji;
+    if (nameEl)  nameEl.textContent  = themeObj.name;
+    if (descEl)  descEl.textContent  = themeObj.desc;
+
+    const idx = getFxLevelIndex(theme);
+    document.querySelectorAll('#fxLevelSeg button').forEach((b, i) => {
         b.textContent = info.labels[i];
         b.classList.toggle('active', i === idx);
     });
+
     const hint = document.getElementById('fxLevelHint');
-    if (hint) hint.textContent = info.hints[idx] + (fxFullscreen ? '' : ' (Bật "Hiệu ứng rơi toàn màn hình" ở trên để áp dụng.)');
-    wrap.classList.toggle('fx-level-off', !fxFullscreen);
+    if (hint) {
+        hint.textContent = info.hints[idx] +
+            (fxFullscreen ? '' : ' (Bật "Hiệu ứng rơi toàn màn hình" ở trên để áp dụng.)');
+    }
 }
 
 // ============================================================
@@ -1381,7 +1933,7 @@ function renderBackdropScene(on) {
 function cssFxFallbackHtml(theme, cfg, lvl) {
     const rnd = (a, b) => a + Math.random() * (b - a);
     if (cfg.galaxy) return `<div class="fx-galaxy-tilt">${buildGalaxySvg()}</div>`;
-    const count = Math.round(cfg.count * [0.5, 1, 1.8][lvl]);
+    const count = Math.round(cfg.count * [0.3, 1, 2.4][lvl]);
     let html = '';
     for (let i = 0; i < count; i++) {
         const dur = rnd(cfg.dur[0], cfg.dur[1]) * (lvl === 2 ? 0.75 : 1);
@@ -1406,7 +1958,7 @@ function renderFullscreenFx() {
     const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const active = fxFullscreen && !!cfg && !reduced;
     const lvl = getFxLevelIndex(theme);
-    const backdrop = active && (!!cfg.galaxy || theme === 'trungthu');
+   const backdrop = active && (!!cfg.galaxy || theme === 'trungthu' || theme === 'halloween');
     document.body.classList.toggle('fx-space-full', active && !!cfg.galaxy);   // topbar hoà vào nền vũ trụ
     document.body.classList.toggle('fx-backdrop-on', backdrop);                // khung nội dung thành kính mờ để thấy nền phía sau
     ThreeFx.stop();                                                           // innerHTML bên dưới sẽ xoá canvas cũ
@@ -1474,10 +2026,17 @@ function applyTopbarTheme(themeId) {
     currentTopbarTheme = themeId;
     document.body.dataset.topbarTheme = themeId;
     try { localStorage.setItem(TOPBAR_THEME_STORAGE_KEY, themeId); } catch (e) { /* ignore */ }
-    // Cập nhật trạng thái active trên các thẻ chủ đề (nếu modal đang mở)
+
     document.querySelectorAll('#themeGrid .theme-card').forEach(card => {
         card.classList.toggle('active', card.dataset.theme === themeId);
     });
+
+    // Đổi chủ đề → tạo lại toàn bộ mascot (thân con vật thay đổi hẳn, không đeo phụ kiện)
+if (typeof OwlFx !== 'undefined' && OwlFx.rebuildAll) OwlFx.rebuildAll();
+if (typeof AuthOwl !== 'undefined' && AuthOwl.applyTheme) AuthOwl.applyTheme(themeId);
+
+    updateMascotSettingsLabel();      // ← THÊM DÒNG NÀY
+
     renderFxLevelControl();
     renderFullscreenFx();
 }
@@ -1486,20 +2045,23 @@ function renderThemeGrid() {
     const grid = document.getElementById('themeGrid');
     if (!grid) return;
     grid.innerHTML = TOPBAR_THEMES.map(t => `
-        <button type="button" class="theme-card ${t.id === currentTopbarTheme ? 'active' : ''}" data-theme="${t.id}">
+        <button type="button" class="theme-card ${t.id === currentTopbarTheme ? 'active' : ''}"
+                data-theme="${t.id}" title="${escapeHtml(t.name)} · ${escapeHtml(t.desc)}">
             <span class="theme-card-emoji">${t.emoji}</span>
             <span class="theme-card-name">${escapeHtml(t.name)}</span>
-            <span class="theme-card-desc">${escapeHtml(t.desc)}</span>
             <span class="theme-card-check"><i class="bi bi-check-circle-fill"></i></span>
         </button>
     `).join('');
     grid.querySelectorAll('.theme-card').forEach(btn => {
         btn.addEventListener('click', () => applyTopbarTheme(btn.dataset.theme));
     });
+    renderFxLevelControl();
 }
 
 function openSettingsModal() {
     if (!currentUser) return;
+    updateMascotSettingsLabel();
+
     document.getElementById('settingsNotifyLead').value = String(notifyLeadMinutes);
     const completionToggle = document.getElementById('settingsCompletionToggle');
     if (completionToggle) completionToggle.checked = jobCompletionEnabled;
@@ -1531,6 +2093,7 @@ function initTheme() {
     applyTheme(preferredTheme);
     try { fxFullscreen = localStorage.getItem(FX_FULLSCREEN_KEY) === '1'; } catch (e) { fxFullscreen = false; }
     applyTopbarTheme(getSavedTopbarTheme());
+    updateMascotSettingsLabel();
     enableSkyAnimation();
 }
 
@@ -2413,21 +2976,36 @@ window.addEventListener('pageshow', stripAutofillFromSearchInputs);
         }
     });
 
-    document.getElementById('settingsBtn').addEventListener('click', openSettingsModal);
-    document.getElementById('settingsNotifyLead').addEventListener('change', (e) => saveNotifyLead(e.target.value));
-    document.getElementById('settingsCompletionToggle').addEventListener('change', (e) => saveJobCompletionEnabled(e.target.checked));
-    document.getElementById('settingsFxFullscreen').addEventListener('change', (e) => setFxFullscreen(e.target.checked));
-    document.getElementById('fxLevelSeg').addEventListener('click', (e) => {
-        const btn = e.target.closest('button[data-i]');
-        if (!btn) return;
-        setFxLevelIndex(currentTopbarTheme, Number(btn.dataset.i));
-        renderFxLevelControl();
-        renderFullscreenFx();
-    });
-    document.getElementById('settingsOwlCount').addEventListener('input', (e) => {
-        const n = OwlFx.setCount(e.target.value);
-        document.getElementById('settingsOwlCountValue').textContent = String(n);
-    });
+            document.getElementById('settingsBtn').addEventListener('click', openSettingsModal);
+
+    const _snl = document.getElementById('settingsNotifyLead');
+    if (_snl) _snl.addEventListener('change', (e) => saveNotifyLead(e.target.value));
+
+    const _sct = document.getElementById('settingsCompletionToggle');
+    if (_sct) _sct.addEventListener('change', (e) => saveJobCompletionEnabled(e.target.checked));
+
+    const _sff = document.getElementById('settingsFxFullscreen');
+    if (_sff) _sff.addEventListener('change', (e) => setFxFullscreen(e.target.checked));
+
+    const _fls = document.getElementById('fxLevelSeg');
+    if (_fls) {
+        _fls.addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-i]');
+            if (!btn) return;
+            setFxLevelIndex(currentTopbarTheme, Number(btn.dataset.i));
+            renderFxLevelControl();
+            renderFullscreenFx();
+        });
+    }
+
+    const _soc = document.getElementById('settingsOwlCount');
+    if (_soc) {
+        _soc.addEventListener('input', (e) => {
+            const n = OwlFx.setCount(e.target.value);
+            const valEl = document.getElementById('settingsOwlCountValue');
+            if (valEl) valEl.textContent = String(n);
+        });
+    }
 
     document.getElementById('userProfileBtn').addEventListener('click', openUserProfileModal);
     document.getElementById('saveProfileBtn').addEventListener('click', saveUserProfile);
@@ -2450,6 +3028,13 @@ window.addEventListener('pageshow', stripAutofillFromSearchInputs);
         e.target.value = '';
     });
     
+    document.addEventListener('hide.bs.modal', (e) => {
+    const active = document.activeElement;
+    if (active && e.target.contains(active) && typeof active.blur === 'function') {
+        active.blur();
+    }
+}, true);
+
     // Transfer confirmation
     document.getElementById('transferAcceptBtn').addEventListener('click', acceptTransfer);
     document.getElementById('transferRejectBtn').addEventListener('click', rejectTransfer);
@@ -7546,6 +8131,287 @@ async function confirmPresenterAssignment() {
 }
 
 // ============================================================
+// MASCOT — mỗi chủ đề có con vật + phụ kiện riêng
+// ============================================================
+const MASCOT_INFO = {
+    default:   { key: 'owl',      bubble: 'Hụt rồi nhé! 🦉',       bulletClass: 'owl-bullet'    },
+    tet:       { key: 'cat',      bubble: 'Meo~ 🐱',               bulletClass: 'mascot-paw'    },
+    trungthu:  { key: 'rabbit',   bubble: 'Thỏ chạy! 🐰',          bulletClass: 'mascot-carrot' },
+    noel:      { key: 'reindeer', bubble: 'Húuuu 🦌',              bulletClass: 'mascot-snowball' },
+    rain:      { key: 'frog',     bubble: 'Ộp! 🐸',                bulletClass: 'mascot-tongue' },
+    space:     { key: 'alien',    bubble: 'Bíp bíp 👽',            bulletClass: 'mascot-laser'  },
+    halloween: { key: 'ghost',    bubble: 'Boo! 👻',               bulletClass: 'mascot-poof'   }
+};
+
+// Tên hiển thị của mascot theo từng chủ đề (dùng cho phần Cài đặt)
+const MASCOT_LABELS = {
+    default:   { emoji: '🦉', singular: 'cú',                   plural: 'cú' },
+    tet:       { emoji: '🐱', singular: 'mèo',                  plural: 'mèo' },
+    trungthu:  { emoji: '🐰', singular: 'thỏ ngọc',             plural: 'thỏ ngọc' },
+    noel:      { emoji: '🦌', singular: 'tuần lộc',             plural: 'tuần lộc' },
+    rain:      { emoji: '🐸', singular: 'ếch',                  plural: 'ếch' },
+    space:     { emoji: '👽', singular: 'người ngoài hành tinh', plural: 'người ngoài hành tinh' },
+    halloween: { emoji: '👻', singular: 'ma',                   plural: 'ma' }
+};
+
+// Cập nhật tiêu đề + mô tả section "Số lượng <mascot>" theo chủ đề hiện tại
+function updateMascotSettingsLabel() {
+    const label = MASCOT_LABELS[currentTopbarTheme] || MASCOT_LABELS.default;
+
+    const titleEl = document.getElementById('mascotCountTitle');
+    const subEl   = document.getElementById('mascotCountSub');
+    const hintEl  = document.getElementById('mascotCountHint');
+
+    if (titleEl) titleEl.textContent = `${label.emoji} Số lượng ${label.plural}`;
+    if (subEl)   subEl.textContent   = `${label.emoji} đứng trên các nút của trang · tối đa 10 · chỉ hiện ở chế độ tối`;
+    if (hintEl) {
+        hintEl.textContent =
+            `Con đầu tiên đậu trên chữ "Lịch Làm Việc", các con thêm vào sẽ đậu trên nút Thêm Job, ` +
+            `Layout, Xem, Xuất PDF... Bấm vào ${label.singular} để "bắn".`;
+    }
+}
+
+// ============================================================
+// MASCOT PARTS — mỗi chủ đề có HÌNH DẠNG RIÊNG (không đeo phụ kiện)
+// Cấu trúc mỗi con: tail · body · wl (tay trái) · wr (tay phải) · head
+// Các lớp o-wl / o-wr / o-head được pose() xoay/vỗ — nên tay & đầu
+// phải nằm trong viewBox 0 0 100 100, pivot 30%/70% (tay) và 50% 72% (đầu).
+// ============================================================
+function mascotPartsHtml(theme) {
+    switch (theme) {
+        // ---------- MÈO (Tết) ----------
+        case 'tet': return `
+            <svg class="o-part o-tail" viewBox="0 0 100 100">
+                <path d="M62 78 Q88 66 80 38 Q78 30 71 32 Q74 46 68 60 Q64 70 58 76 Z"
+                      fill="#f59e0b" stroke="#92400e" stroke-width="0.8"/>
+            </svg>
+            <svg class="o-part o-body" viewBox="0 0 100 100">
+                <ellipse cx="50" cy="68" rx="24" ry="28" fill="#f59e0b"/>
+                <ellipse cx="50" cy="74" rx="15" ry="20" fill="#fef3c7"/>
+                <path d="M40 62 q10 5 20 0 M38 70 q12 6 24 0 M39 78 q11 6 22 0"
+                      stroke="#c2710c" stroke-width="1.4" fill="none" opacity=".5" stroke-linecap="round"/>
+                <path d="M42 94 l-2 4 M42 94 l0 4.5 M42 94 l2 4 M58 94 l-2 4 M58 94 l0 4.5 M58 94 l2 4"
+                      stroke="#92400e" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <svg class="o-part o-wl" viewBox="0 0 100 100">
+                <ellipse cx="22" cy="72" rx="9" ry="14" fill="#f59e0b" stroke="#92400e" stroke-width="0.8"/>
+                <ellipse cx="22" cy="72" rx="5" ry="9" fill="#fef3c7"/>
+            </svg>
+            <svg class="o-part o-wr" viewBox="0 0 100 100">
+                <ellipse cx="78" cy="72" rx="9" ry="14" fill="#f59e0b" stroke="#92400e" stroke-width="0.8"/>
+                <ellipse cx="78" cy="72" rx="5" ry="9" fill="#fef3c7"/>
+            </svg>
+            <svg class="o-part o-head" viewBox="0 0 100 100">
+                <path d="M28 22 L22 -2 L42 18 Z" fill="#f59e0b" stroke="#92400e" stroke-width="0.8"/>
+                <path d="M72 22 L78 -2 L58 18 Z" fill="#f59e0b" stroke="#92400e" stroke-width="0.8"/>
+                <path d="M30 18 L27 4 L38 17 Z" fill="#fecaca"/>
+                <path d="M70 18 L73 4 L62 17 Z" fill="#fecaca"/>
+                <ellipse cx="50" cy="34" rx="28" ry="23" fill="#f59e0b" stroke="#92400e" stroke-width="0.8"/>
+                <ellipse cx="38" cy="34" rx="6" ry="7" fill="#fff"/>
+                <ellipse cx="62" cy="34" rx="6" ry="7" fill="#fff"/>
+                <ellipse cx="38" cy="34" rx="2.5" ry="5.5" fill="#111"/>
+                <ellipse cx="62" cy="34" rx="2.5" ry="5.5" fill="#111"/>
+                <ellipse class="o-lid" cx="38" cy="34" rx="6.3" ry="7.3" fill="#f59e0b"/>
+                <ellipse class="o-lid" cx="62" cy="34" rx="6.3" ry="7.3" fill="#f59e0b"/>
+                <path d="M48 44 L50 42 L52 44 L50 47 Z" fill="#ec4899"/>
+                <path d="M50 47 Q46 51 43 49 M50 47 Q54 51 57 49" stroke="#7f1d1d" stroke-width="1" fill="none"/>
+                <path d="M18 36 L30 38 M18 42 L30 42 M82 36 L70 38 M82 42 L70 42"
+                      stroke="#7f1d1d" stroke-width="0.7" opacity=".65" fill="none"/>
+            </svg>`;
+
+        // ---------- THỎ NGỌC (Trung Thu) ----------
+        case 'trungthu': return `
+            <svg class="o-part o-tail" viewBox="0 0 100 100">
+                <circle cx="68" cy="80" r="9" fill="#fff" stroke="#cbd5e1" stroke-width="0.8"/>
+            </svg>
+            <svg class="o-part o-body" viewBox="0 0 100 100">
+                <ellipse cx="50" cy="68" rx="24" ry="28" fill="#ffffff" stroke="#cbd5e1" stroke-width="0.8"/>
+                <ellipse cx="50" cy="72" rx="16" ry="22" fill="#fef9f0"/>
+                <path d="M42 94 l-2 4 M42 94 l0 4.5 M42 94 l2 4 M58 94 l-2 4 M58 94 l0 4.5 M58 94 l2 4"
+                      stroke="#fda4af" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <svg class="o-part o-wl" viewBox="0 0 100 100">
+                <ellipse cx="22" cy="72" rx="8" ry="13" fill="#fff" stroke="#cbd5e1" stroke-width="0.8"/>
+                <ellipse cx="22" cy="72" rx="4" ry="8" fill="#fef3c7"/>
+            </svg>
+            <svg class="o-part o-wr" viewBox="0 0 100 100">
+                <ellipse cx="78" cy="72" rx="8" ry="13" fill="#fff" stroke="#cbd5e1" stroke-width="0.8"/>
+                <ellipse cx="78" cy="72" rx="4" ry="8" fill="#fef3c7"/>
+            </svg>
+            <svg class="o-part o-head" viewBox="0 0 100 100">
+                <ellipse cx="34" cy="10" rx="7" ry="24" fill="#fff" stroke="#cbd5e1" stroke-width="0.8"/>
+                <ellipse cx="66" cy="10" rx="7" ry="24" fill="#fff" stroke="#cbd5e1" stroke-width="0.8"/>
+                <ellipse cx="34" cy="10" rx="3" ry="16" fill="#fbcfe8"/>
+                <ellipse cx="66" cy="10" rx="3" ry="16" fill="#fbcfe8"/>
+                <ellipse cx="50" cy="38" rx="26" ry="22" fill="#fff" stroke="#cbd5e1" stroke-width="0.8"/>
+                <circle cx="40" cy="38" r="5.5" fill="#fff" stroke="#cbd5e1" stroke-width="0.6"/>
+                <circle cx="60" cy="38" r="5.5" fill="#fff" stroke="#cbd5e1" stroke-width="0.6"/>
+                <circle cx="40" cy="38" r="3" fill="#c2185b"/>
+                <circle cx="60" cy="38" r="3" fill="#c2185b"/>
+                <circle cx="41" cy="36.6" r="1" fill="#fff"/>
+                <circle cx="61" cy="36.6" r="1" fill="#fff"/>
+                <ellipse class="o-lid" cx="40" cy="38" rx="5.8" ry="5.8" fill="#fff"/>
+                <ellipse class="o-lid" cx="60" cy="38" rx="5.8" ry="5.8" fill="#fff"/>
+                <ellipse cx="50" cy="47" rx="2.5" ry="2" fill="#ff8fb4"/>
+                <path d="M50 50 Q47 52 45 51 M50 50 Q53 52 55 51" stroke="#c2185b" stroke-width="1" fill="none"/>
+                <circle cx="30" cy="46" r="3" fill="#ffd6e2" opacity=".7"/>
+                <circle cx="70" cy="46" r="3" fill="#ffd6e2" opacity=".7"/>
+            </svg>`;
+
+        // ---------- TUẦN LỘC (Noel) ----------
+        case 'noel': return `
+            <svg class="o-part o-tail" viewBox="0 0 100 100">
+                <path d="M60 78 Q72 74 70 60 Q68 55 64 56 Q66 66 60 74 Z"
+                      fill="#a16207" stroke="#422006" stroke-width="0.8"/>
+            </svg>
+            <svg class="o-part o-body" viewBox="0 0 100 100">
+                <ellipse cx="50" cy="68" rx="24" ry="28" fill="#a16207"/>
+                <ellipse cx="50" cy="74" rx="15" ry="20" fill="#d6b48a"/>
+                <path d="M42 94 l-2 4 M42 94 l0 4.5 M42 94 l2 4 M58 94 l-2 4 M58 94 l0 4.5 M58 94 l2 4"
+                      stroke="#3f2d1f" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <svg class="o-part o-wl" viewBox="0 0 100 100">
+                <ellipse cx="22" cy="72" rx="8" ry="13" fill="#a16207" stroke="#422006" stroke-width="0.8"/>
+            </svg>
+            <svg class="o-part o-wr" viewBox="0 0 100 100">
+                <ellipse cx="78" cy="72" rx="8" ry="13" fill="#a16207" stroke="#422006" stroke-width="0.8"/>
+            </svg>
+            <svg class="o-part o-head" viewBox="0 0 100 100">
+                <g stroke="#6b4423" stroke-width="2.2" fill="none" stroke-linecap="round">
+                    <path d="M32 22 L26 0 M26 0 L20 -6 M26 0 L32 -6 M26 0 L24 -12"/>
+                    <path d="M68 22 L74 0 M74 0 L80 -6 M74 0 L68 -6 M74 0 L76 -12"/>
+                </g>
+                <ellipse cx="30" cy="26" rx="6" ry="9" fill="#a16207" transform="rotate(-25 30 26)" stroke="#422006" stroke-width="0.6"/>
+                <ellipse cx="70" cy="26" rx="6" ry="9" fill="#a16207" transform="rotate(25 70 26)" stroke="#422006" stroke-width="0.6"/>
+                <ellipse cx="50" cy="40" rx="26" ry="24" fill="#a16207" stroke="#422006" stroke-width="0.8"/>
+                <ellipse cx="50" cy="52" rx="14" ry="10" fill="#d6b48a"/>
+                <circle cx="38" cy="38" r="5" fill="#fff"/>
+                <circle cx="62" cy="38" r="5" fill="#fff"/>
+                <circle cx="38" cy="38" r="2.5" fill="#111"/>
+                <circle cx="62" cy="38" r="2.5" fill="#111"/>
+                <ellipse class="o-lid" cx="38" cy="38" rx="5.2" ry="5.2" fill="#a16207"/>
+                <ellipse class="o-lid" cx="62" cy="38" rx="5.2" ry="5.2" fill="#a16207"/>
+                <ellipse cx="50" cy="54" rx="4" ry="3.2" fill="#ef4444" stroke="#991b1b" stroke-width="0.6"/>
+                <circle cx="49" cy="53" r="1.2" fill="#fecaca" opacity=".9"/>
+            </svg>`;
+
+        // ---------- ẾCH (Mưa) ----------
+        case 'rain': return `
+            <svg class="o-part o-tail" viewBox="0 0 100 100"></svg>
+            <svg class="o-part o-body" viewBox="0 0 100 100">
+                <ellipse cx="50" cy="68" rx="26" ry="24" fill="#22c55e" stroke="#14532d" stroke-width="0.8"/>
+                <ellipse cx="50" cy="76" rx="18" ry="14" fill="#86efac"/>
+                <path d="M42 96 l-4 3 M42 96 l0 4 M42 96 l4 3 M58 96 l-4 3 M58 96 l0 4 M58 96 l4 3"
+                      stroke="#14532d" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            <svg class="o-part o-wl" viewBox="0 0 100 100">
+                <ellipse cx="20" cy="80" rx="10" ry="6" fill="#22c55e" stroke="#14532d" stroke-width="0.8"/>
+            </svg>
+            <svg class="o-part o-wr" viewBox="0 0 100 100">
+                <ellipse cx="80" cy="80" rx="10" ry="6" fill="#22c55e" stroke="#14532d" stroke-width="0.8"/>
+            </svg>
+            <svg class="o-part o-head" viewBox="0 0 100 100">
+                <circle cx="30" cy="20" r="12" fill="#22c55e" stroke="#14532d" stroke-width="0.8"/>
+                <circle cx="70" cy="20" r="12" fill="#22c55e" stroke="#14532d" stroke-width="0.8"/>
+                <circle cx="30" cy="20" r="7" fill="#fff"/>
+                <circle cx="70" cy="20" r="7" fill="#fff"/>
+                <circle cx="30" cy="20" r="3.5" fill="#111"/>
+                <circle cx="70" cy="20" r="3.5" fill="#111"/>
+                <circle cx="31" cy="18.5" r="1.2" fill="#fff"/>
+                <circle cx="71" cy="18.5" r="1.2" fill="#fff"/>
+                <ellipse class="o-lid" cx="30" cy="20" rx="12.2" ry="12.2" fill="#22c55e"/>
+                <ellipse class="o-lid" cx="70" cy="20" rx="12.2" ry="12.2" fill="#22c55e"/>
+                <ellipse cx="50" cy="42" rx="30" ry="20" fill="#22c55e" stroke="#14532d" stroke-width="0.8"/>
+                <path d="M30 46 Q50 62 70 46" stroke="#14532d" stroke-width="2" fill="none" stroke-linecap="round"/>
+                <circle cx="44" cy="34" r="1.2" fill="#14532d"/>
+                <circle cx="56" cy="34" r="1.2" fill="#14532d"/>
+                <circle cx="24" cy="42" r="3.5" fill="#fda4af" opacity=".6"/>
+                <circle cx="76" cy="42" r="3.5" fill="#fda4af" opacity=".6"/>
+            </svg>`;
+
+        // ---------- ALIEN (Vũ trụ) ----------
+        case 'space': return `
+            <svg class="o-part o-tail" viewBox="0 0 100 100"></svg>
+            <svg class="o-part o-body" viewBox="0 0 100 100">
+                <ellipse cx="50" cy="72" rx="18" ry="22" fill="#a3e635" stroke="#365314" stroke-width="0.8"/>
+                <path d="M36 82 Q50 88 64 82" stroke="#365314" stroke-width="1" fill="none"/>
+                <path d="M42 96 l-3 3 M42 96 l0 4 M42 96 l3 3 M58 96 l-3 3 M58 96 l0 4 M58 96 l3 3"
+                      stroke="#365314" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+            <svg class="o-part o-wl" viewBox="0 0 100 100">
+                <ellipse cx="24" cy="76" rx="6" ry="11" fill="#a3e635" stroke="#365314" stroke-width="0.8" transform="rotate(15 24 76)"/>
+            </svg>
+            <svg class="o-part o-wr" viewBox="0 0 100 100">
+                <ellipse cx="76" cy="76" rx="6" ry="11" fill="#a3e635" stroke="#365314" stroke-width="0.8" transform="rotate(-15 76 76)"/>
+            </svg>
+            <svg class="o-part o-head" viewBox="0 0 100 100">
+                <line x1="38" y1="20" x2="30" y2="-4" stroke="#a3e635" stroke-width="2.2" stroke-linecap="round"/>
+                <line x1="62" y1="20" x2="70" y2="-4" stroke="#a3e635" stroke-width="2.2" stroke-linecap="round"/>
+                <circle cx="30" cy="-4" r="3.5" fill="#fde047" stroke="#a16207" stroke-width="0.6"/>
+                <circle cx="70" cy="-4" r="3.5" fill="#fde047" stroke="#a16207" stroke-width="0.6"/>
+                <ellipse cx="50" cy="38" rx="30" ry="26" fill="#a3e635" stroke="#365314" stroke-width="0.8"/>
+                <ellipse cx="34" cy="34" rx="9" ry="12" fill="#111" transform="rotate(-8 34 34)"/>
+                <ellipse cx="66" cy="34" rx="9" ry="12" fill="#111" transform="rotate(8 66 34)"/>
+                <ellipse cx="31" cy="30" rx="2.5" ry="3.5" fill="#fff" opacity=".85"/>
+                <ellipse cx="63" cy="30" rx="2.5" ry="3.5" fill="#fff" opacity=".85"/>
+                <ellipse class="o-lid" cx="34" cy="34" rx="9.2" ry="12.2" fill="#a3e635" transform="rotate(-8 34 34)"/>
+                <ellipse class="o-lid" cx="66" cy="34" rx="9.2" ry="12.2" fill="#a3e635" transform="rotate(8 66 34)"/>
+                <path d="M44 52 Q50 56 56 52" stroke="#365314" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+            </svg>`;
+
+        // ---------- MA (Halloween) ----------
+        case 'halloween': return `
+            <svg class="o-part o-tail" viewBox="0 0 100 100"></svg>
+            <svg class="o-part o-body" viewBox="0 0 100 100">
+                <path d="M22 30 Q20 6 50 4 Q80 6 78 30 L80 78 Q78 88 72 80 Q66 90 60 82 Q54 92 48 82 Q42 90 36 80 Q30 88 24 78 Z"
+                      fill="#f1f5f9" stroke="#94a3b8" stroke-width="0.8"/>
+                <path d="M26 30 Q24 12 50 10" stroke="#cbd5e1" stroke-width="0.6" fill="none" opacity=".55"/>
+            </svg>
+            <svg class="o-part o-wl" viewBox="0 0 100 100">
+                <path d="M22 50 Q12 54 10 68 Q16 66 22 68 Z" fill="#f1f5f9" stroke="#94a3b8" stroke-width="0.8"/>
+            </svg>
+            <svg class="o-part o-wr" viewBox="0 0 100 100">
+                <path d="M78 50 Q88 54 90 68 Q84 66 78 68 Z" fill="#f1f5f9" stroke="#94a3b8" stroke-width="0.8"/>
+            </svg>
+            <svg class="o-part o-head" viewBox="0 0 100 100">
+                <ellipse cx="38" cy="36" rx="5" ry="8" fill="#0f172a"/>
+                <ellipse cx="62" cy="36" rx="5" ry="8" fill="#0f172a"/>
+                <ellipse class="o-lid" cx="38" cy="36" rx="5.2" ry="8.2" fill="#f1f5f9"/>
+                <ellipse class="o-lid" cx="62" cy="36" rx="5.2" ry="8.2" fill="#f1f5f9"/>
+                <ellipse cx="50" cy="52" rx="3" ry="4" fill="#0f172a"/>
+                <circle cx="26" cy="44" r="3.5" fill="#fbcfe8" opacity=".55"/>
+                <circle cx="74" cy="44" r="3.5" fill="#fbcfe8" opacity=".55"/>
+            </svg>`;
+
+        // ---------- MẶC ĐỊNH (CÚ) — giữ nguyên như cũ ----------
+        default: return `
+            <svg class="o-part o-tail" viewBox="0 0 100 100"><path d="M36 78 L32 101 L50 96 L68 101 L64 78 Z" fill="#5b4330" stroke="#3f2d1f" stroke-width=".8"/><path d="M42 82 L41 97 M50 82 L50 96 M58 82 L59 97" stroke="#7d6044" stroke-width="1" fill="none"/></svg>
+            <svg class="o-part o-body" viewBox="0 0 100 100">
+                <ellipse cx="50" cy="66" rx="25" ry="30" fill="url(#owlBodyG)"/>
+                <ellipse cx="50" cy="72" rx="16.5" ry="22" fill="url(#owlBellyG)"/>
+                <path d="M40 58 q10 6 20 0 M38 66 q12 7 24 0 M39 74 q11 7 22 0 M41 82 q9 6 18 0" stroke="#9c7f55" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".8"/>
+                <path d="M42 94 l-3 5 M42 94 l0 5.5 M42 94 l3 5 M58 94 l-3 5 M58 94 l0 5.5 M58 94 l3 5" stroke="#e5a52c" stroke-width="2.2" stroke-linecap="round"/>
+            </svg>
+            <svg class="o-part o-wl" viewBox="0 0 100 100"><g><path d="M31 48 C20 50 11 62 10 78 L9 90 Q10 97 15 92 L17 98 Q21 99 23 92 L26 99 Q31 98 31 90 L35 96 Q39 94 38 84 C40 72 39 58 36 49 Z" fill="url(#owlWingG)" stroke="#3f2d1f" stroke-width=".8"/><path d="M33 52 L16 88 M34 57 L24 93 M35 60 L31 91" stroke="#3f2d1f" stroke-width=".9" fill="none" opacity=".6" stroke-linecap="round"/><path d="M15 62 q4 4 8 0 M14 70 q4 4 8 0 M24 62 q4 4 8 0 M23 70 q4 4 8 0" stroke="#c9ad85" stroke-width="1.1" fill="none" opacity=".75" stroke-linecap="round"/></g></svg>
+            <svg class="o-part o-wr" viewBox="0 0 100 100"><g transform="translate(100,0) scale(-1,1)"><path d="M31 48 C20 50 11 62 10 78 L9 90 Q10 97 15 92 L17 98 Q21 99 23 92 L26 99 Q31 98 31 90 L35 96 Q39 94 38 84 C40 72 39 58 36 49 Z" fill="url(#owlWingG)" stroke="#3f2d1f" stroke-width=".8"/><path d="M33 52 L16 88 M34 57 L24 93 M35 60 L31 91" stroke="#3f2d1f" stroke-width=".9" fill="none" opacity=".6" stroke-linecap="round"/><path d="M15 62 q4 4 8 0 M14 70 q4 4 8 0 M24 62 q4 4 8 0 M23 70 q4 4 8 0" stroke="#c9ad85" stroke-width="1.1" fill="none" opacity=".75" stroke-linecap="round"/></g></svg>
+            <svg class="o-part o-head" viewBox="0 0 100 100">
+                <path d="M26 22 L22 3 L40 15 Z" fill="#6c5139"/><path d="M74 22 L78 3 L60 15 Z" fill="#6c5139"/>
+                <path d="M27 18 L25 8 L35 15 Z" fill="#a7865f"/><path d="M73 18 L75 8 L65 15 Z" fill="#a7865f"/>
+                <ellipse cx="50" cy="34" rx="29" ry="24" fill="url(#owlHeadG)"/>
+                <circle cx="37" cy="36" r="15" fill="url(#owlDiscG)" stroke="#7a5d40" stroke-width="1.2"/>
+                <circle cx="63" cy="36" r="15" fill="url(#owlDiscG)" stroke="#7a5d40" stroke-width="1.2"/>
+                <path d="M50 21 L45 34 M50 21 L55 34" stroke="#7a5d40" stroke-width="1.4" stroke-linecap="round"/>
+                <circle cx="37" cy="36" r="9" fill="url(#owlIrisG)"/><circle cx="63" cy="36" r="9" fill="url(#owlIrisG)"/>
+                <circle cx="37" cy="36" r="5" fill="#120d18"/><circle cx="63" cy="36" r="5" fill="#120d18"/>
+                <ellipse cx="34.5" cy="33.3" rx="2.1" ry="1.7" fill="#fff"/><ellipse cx="60.5" cy="33.3" rx="2.1" ry="1.7" fill="#fff"/>
+                <circle cx="39.5" cy="38.5" r=".9" fill="#fff" opacity=".7"/><circle cx="65.5" cy="38.5" r=".9" fill="#fff" opacity=".7"/>
+                <ellipse class="o-lid" cx="37" cy="36" rx="9.4" ry="9.4" fill="#9a7b5f"/><ellipse class="o-lid" cx="63" cy="36" rx="9.4" ry="9.4" fill="#9a7b5f"/>
+                <path d="M46 42 Q50 39.5 54 42 L50 53 Z" fill="url(#owlBeakG)" stroke="#a8630d" stroke-width=".6"/>
+            </svg>`;
+    }
+}
+
+// ============================================================
 // CÚ ĐÊM 3D (chỉ chế độ tối)
 // - Nằm trong lớp riêng #owlLayer (fixed, toàn màn hình) nên không bị cắt bởi card header.
 // - 3D thật bằng CSS: mỗi bộ phận (đuôi, thân, 2 cánh, đầu) là 1 lớp SVG ở độ sâu Z khác nhau,
@@ -7580,32 +8446,19 @@ const OwlFx = (() => {
         <path d="M33 52 L16 88 M34 57 L24 93 M35 60 L31 91" stroke="#3f2d1f" stroke-width=".9" fill="none" opacity=".6" stroke-linecap="round"/>
         <path d="M15 62 q4 4 8 0 M14 70 q4 4 8 0 M24 62 q4 4 8 0 M23 70 q4 4 8 0" stroke="#c9ad85" stroke-width="1.1" fill="none" opacity=".75" stroke-linecap="round"/>`;
 
-    function owlMarkup(hue) {
-        return `<div class="owl3d" style="--owl-hue:${hue}deg">
-            <svg class="o-part o-tail" viewBox="0 0 100 100"><path d="M36 78 L32 101 L50 96 L68 101 L64 78 Z" fill="#5b4330" stroke="#3f2d1f" stroke-width=".8"/><path d="M42 82 L41 97 M50 82 L50 96 M58 82 L59 97" stroke="#7d6044" stroke-width="1" fill="none"/></svg>
-            <svg class="o-part o-body" viewBox="0 0 100 100">
-                <ellipse cx="50" cy="66" rx="25" ry="30" fill="url(#owlBodyG)"/>
-                <ellipse cx="50" cy="72" rx="16.5" ry="22" fill="url(#owlBellyG)"/>
-                <path d="M40 58 q10 6 20 0 M38 66 q12 7 24 0 M39 74 q11 7 22 0 M41 82 q9 6 18 0" stroke="#9c7f55" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".8"/>
-                <path d="M42 94 l-3 5 M42 94 l0 5.5 M42 94 l3 5 M58 94 l-3 5 M58 94 l0 5.5 M58 94 l3 5" stroke="#e5a52c" stroke-width="2.2" stroke-linecap="round"/>
-            </svg>
-            <svg class="o-part o-wl" viewBox="0 0 100 100"><g>${WING}</g></svg>
-            <svg class="o-part o-wr" viewBox="0 0 100 100"><g transform="translate(100,0) scale(-1,1)">${WING}</g></svg>
-            <svg class="o-part o-head" viewBox="0 0 100 100">
-                <path d="M26 22 L22 3 L40 15 Z" fill="#6c5139"/><path d="M74 22 L78 3 L60 15 Z" fill="#6c5139"/>
-                <path d="M27 18 L25 8 L35 15 Z" fill="#a7865f"/><path d="M73 18 L75 8 L65 15 Z" fill="#a7865f"/>
-                <ellipse cx="50" cy="34" rx="29" ry="24" fill="url(#owlHeadG)"/>
-                <circle cx="37" cy="36" r="15" fill="url(#owlDiscG)" stroke="#7a5d40" stroke-width="1.2"/>
-                <circle cx="63" cy="36" r="15" fill="url(#owlDiscG)" stroke="#7a5d40" stroke-width="1.2"/>
-                <path d="M50 21 L45 34 M50 21 L55 34" stroke="#7a5d40" stroke-width="1.4" stroke-linecap="round"/>
-                <circle cx="37" cy="36" r="9" fill="url(#owlIrisG)"/><circle cx="63" cy="36" r="9" fill="url(#owlIrisG)"/>
-                <circle cx="37" cy="36" r="5" fill="#120d18"/><circle cx="63" cy="36" r="5" fill="#120d18"/>
-                <ellipse cx="34.5" cy="33.3" rx="2.1" ry="1.7" fill="#fff"/><ellipse cx="60.5" cy="33.3" rx="2.1" ry="1.7" fill="#fff"/>
-                <circle cx="39.5" cy="38.5" r=".9" fill="#fff" opacity=".7"/><circle cx="65.5" cy="38.5" r=".9" fill="#fff" opacity=".7"/>
-                <ellipse class="o-lid" cx="37" cy="36" rx="9.4" ry="9.4" fill="#9a7b5f"/><ellipse class="o-lid" cx="63" cy="36" rx="9.4" ry="9.4" fill="#9a7b5f"/>
-                <path d="M46 42 Q50 39.5 54 42 L50 53 Z" fill="url(#owlBeakG)" stroke="#a8630d" stroke-width=".6"/>
-            </svg>
+        function mascotMarkup(hue, theme = 'default') {
+        return `<div class="owl3d" data-mascot="${theme}" style="--owl-hue:${hue}deg">
+            ${mascotPartsHtml(theme)}
         </div>`;
+    }
+
+    function rebuildAll() {
+        // Đổi chủ đề → tạo lại từ đầu để thân/hình con vật thay đổi hẳn
+        slots.forEach(s => {
+            if (s.inst) { s.inst.despawn(); s.inst = null; }
+            s.el = null;
+        });
+        sync();
     }
 
     // Gradient của cú: MỘT bộ duy nhất ở <body>, dùng chung cho cú lịch làm việc và cú màn đăng nhập.
@@ -7637,10 +8490,10 @@ const OwlFx = (() => {
         const wanted = wantedFn;
 
     function buildOwl() {
-        const wrap = document.createElement('div');
-        wrap.innerHTML = owlMarkup(HUES[spawnCount % HUES.length]);
-        spawnCount += 1;
-        owl = wrap.firstElementChild;
+    const wrap = document.createElement('div');
+    wrap.innerHTML = mascotMarkup(HUES[spawnCount % HUES.length], currentTopbarTheme);
+    spawnCount += 1;
+    owl = wrap.firstElementChild;
         layer.appendChild(owl);
         owl.addEventListener('click', () => shoot());     // chỉ cú đang đậu (.perched) mới nhận click
         parts = { wl: owl.querySelector('.o-wl'), wr: owl.querySelector('.o-wr'), head: owl.querySelector('.o-head') };
@@ -7742,50 +8595,80 @@ const OwlFx = (() => {
     }
 
     function shoot() {
-        if (mode !== 'perch' || !A.lastE) return;
-        const E = A.lastE;
-        mode = 'shot';
-        owl.classList.remove('perched');
-        const vw = window.innerWidth, vh = window.innerHeight;
-        const ox = clamp(E.x - 320 + (Math.random() - 0.5) * 160, 24, vw - 24), oy = vh + 18;
-        const dx = E.x - ox, dy = E.y - oy, dist = Math.hypot(dx, dy), ang = Math.atan2(dy, dx) * 180 / Math.PI;
-        const flash = fx('owl-muzzle', ox, vh - 6);
-        flash.animate([{ opacity: 1, transform: `translate(${ox}px,${vh - 6}px) scale(.4)` }, { opacity: 0, transform: `translate(${ox}px,${vh - 6}px) scale(1.6)` }], { duration: 160 }).onfinish = () => flash.remove();
-        const b = fx('owl-bullet', ox, oy);
-        b.animate([
-            { transform: `translate(${ox}px,${oy}px) rotate(${ang}deg)` },
-            { transform: `translate(${E.x}px,${E.y}px) rotate(${ang}deg)` }
-        ], { duration: clamp(dist / 2.6, 160, 420), easing: 'linear', fill: 'forwards' }).onfinish = () => { b.remove(); impact(E); };
-    }
+    if (mode !== 'perch' || !A.lastE) return;
+    const E = A.lastE;
+    const theme = currentTopbarTheme;
+    const info = MASCOT_INFO[theme] || MASCOT_INFO.default;
+    mode = 'shot';
+    owl.classList.remove('perched');
+
+    // Bong bóng "nói" của con vật
+    showMascotBubble(info.bubble);
+
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const ox = clamp(E.x - 320 + (Math.random() - 0.5) * 160, 24, vw - 24), oy = vh + 18;
+    const dx = E.x - ox, dy = E.y - oy, dist = Math.hypot(dx, dy), ang = Math.atan2(dy, dx) * 180 / Math.PI;
+
+    const flash = fx('owl-muzzle', ox, vh - 6);
+    flash.animate([
+        { opacity: 1, transform: `translate(${ox}px,${vh - 6}px) scale(.4)` },
+        { opacity: 0, transform: `translate(${ox}px,${vh - 6}px) scale(1.6)` }
+    ], { duration: 160 }).onfinish = () => flash.remove();
+
+    const b = fx(info.bulletClass, ox, oy);
+    b.animate([
+        { transform: `translate(${ox}px,${oy}px) rotate(${ang}deg)` },
+        { transform: `translate(${E.x}px,${E.y}px) rotate(${ang}deg)` }
+    ], { duration: clamp(dist / 2.6, 160, 420), easing: 'linear', fill: 'forwards' })
+     .onfinish = () => { b.remove(); impact(E); };
+}
 
     function impact(E) {
-        if (!owl) return;
-        const ring = fx('owl-ring', E.x, E.y);
-        ring.animate([{ opacity: 1, transform: `translate(${E.x}px,${E.y}px) scale(1)` }, { opacity: 0, transform: `translate(${E.x}px,${E.y}px) scale(7)` }], { duration: 420, easing: 'ease-out' }).onfinish = () => ring.remove();
-        for (let i = 0; i < 16; i++) {
-            const fe = fx('owl-feather', E.x, E.y);
-            const vx = (Math.random() - 0.5) * 260, vy = -40 - Math.random() * 190, rot = (Math.random() - 0.5) * 900;
-            const dur = 900 + Math.random() * 800;
-            fe.animate([
-                { opacity: 1, transform: `translate(${E.x}px,${E.y}px) rotate(0deg)` },
-                { opacity: 1, offset: 0.4, transform: `translate(${E.x + vx * 0.7}px,${E.y + vy}px) rotate(${rot * 0.5}deg)` },
-                { opacity: 0, transform: `translate(${E.x + vx}px,${E.y + vy + 260 + Math.random() * 120}px) rotate(${rot}deg)` }
-            ], { duration: dur, easing: 'cubic-bezier(.3,.6,.5,1)' }).onfinish = () => fe.remove();
-        }
-            mode = 'fall';
-    A = {
-        t0: performance.now(),
-        x: E.x, y: E.y, z: 0,
-        vx: (Math.random() - 0.5) * 100,           // ngang nhẹ
-        vy: -80 - Math.random() * 60,              // hất lên nhẹ
-        roll: 0,
-        w:  (Math.random() < 0.5 ? -1 : 1) * (240 + Math.random() * 160),  // °/s
-        pitch: 0, wp: 50 + Math.random() * 40,
-        yaw: 0,    wy: (Math.random() - 0.5) * 80,
-        wingsOpen: 1                               // 1 = xoè (vừa trúng đạn)
-    };
+    if (!owl) return;
+    const theme = currentTopbarTheme;
+    const info = MASCOT_INFO[theme] || MASCOT_INFO.default;
+    const ring = fx('owl-ring', E.x, E.y);
+    ring.animate([
+        { opacity: 1, transform: `translate(${E.x}px,${E.y}px) scale(1)` },
+        { opacity: 0, transform: `translate(${E.x}px,${E.y}px) scale(7)` }
+    ], { duration: 420, easing: 'ease-out' }).onfinish = () => ring.remove();
+
+    // Đốm/hạt theo chủ đề
+    for (let i = 0; i < 16; i++) {
+        const fe = fx(`mascot-spark ${theme}`, E.x, E.y);
+        const vx = (Math.random() - 0.5) * 260, vy = -40 - Math.random() * 190, rot = (Math.random() - 0.5) * 900;
+        const dur = 900 + Math.random() * 800;
+        fe.animate([
+            { opacity: 1, transform: `translate(${E.x}px,${E.y}px) rotate(0deg) scale(1)` },
+            { opacity: 1, offset: 0.4, transform: `translate(${E.x + vx * 0.7}px,${E.y + vy}px) rotate(${rot * 0.5}deg) scale(1)` },
+            { opacity: 0, transform: `translate(${E.x + vx}px,${E.y + vy + 260 + Math.random() * 120}px) rotate(${rot}deg) scale(0.6)` }
+        ], { duration: dur, easing: 'cubic-bezier(.3,.6,.5,1)' }).onfinish = () => fe.remove();
     }
 
+    mode = 'fall';
+    A = { /* giữ nguyên như cũ */
+        t0: performance.now(), x: E.x, y: E.y, z: 0,
+        vx: (Math.random() - 0.5) * 100, vy: -80 - Math.random() * 60, roll: 0,
+        w: (Math.random() < 0.5 ? -1 : 1) * (240 + Math.random() * 160),
+        pitch: 0, wp: 50 + Math.random() * 40,
+        yaw: 0, wy: (Math.random() - 0.5) * 80,
+        wingsOpen: 1
+    };
+}
+
+function showMascotBubble(text) {
+    if (!text || !owl) return;
+    let bubble = owl.querySelector('.mascot-bubble');
+    if (!bubble) {
+        bubble = document.createElement('div');
+        bubble.className = 'mascot-bubble';
+        owl.appendChild(bubble);
+    }
+    bubble.textContent = text;
+    bubble.classList.add('show');
+    clearTimeout(bubble._hideT);
+    bubble._hideT = setTimeout(() => bubble.classList.remove('show'), 1600);
+}
     function stepFall(now, dt) {
     const tt = (now - A.t0) / 1000;
 
@@ -8003,7 +8886,7 @@ const OwlFx = (() => {
         sync();
     }
 
-    return { init, sync, setCount, getCount, maxCount: MAX_OWLS, markup: owlMarkup, ensureDefs };
+    return { init, sync, setCount, getCount, maxCount: MAX_OWLS, markup: mascotMarkup, ensureDefs, rebuildAll };
 })();
 
 // ============================================================
@@ -8032,7 +8915,8 @@ const AuthOwl = (() => {
         el.className = 'auth-owl';
         el.setAttribute('aria-hidden', 'true');
         OwlFx.ensureDefs();
-        el.innerHTML = `<div class="auth-owl-bubble"></div><div class="auth-owl-inner">${OwlFx.markup(0)}</div>`;
+        el.innerHTML = `<div class="auth-owl-bubble"></div>
+    <div class="auth-owl-inner">${OwlFx.markup(0, currentTopbarTheme)}</div>`;
         panel.appendChild(el);
         bubble = el.querySelector('.auth-owl-bubble');
         inner = el.querySelector('.auth-owl-inner');
@@ -8233,7 +9117,18 @@ const AuthOwl = (() => {
 
     function init() { if (ensure()) place(false, authMode); }
 
-    return { init, moveTo, updateLit, onEmailChange };
+    function applyTheme(themeId) {
+    if (!inner) return;
+    inner.innerHTML = OwlFx.markup(0, themeId);
+    owl = inner.querySelector('.owl3d');
+    parts = { wl: owl.querySelector('.o-wl'), wr: owl.querySelector('.o-wr'), head: owl.querySelector('.o-head') };
+    parts.wl.style.transform = 'translateZ(7px)';
+    parts.wr.style.transform = 'translateZ(7px)';
+    parts.head.style.transform = 'translateZ(12px)';
+    place(false, lastMode);
+}
+
+    return { init, moveTo, updateLit, onEmailChange, applyTheme };
 })();
 
 // ============================================================

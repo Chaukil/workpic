@@ -7534,9 +7534,23 @@ body.fx-space-full[data-topbar-theme="space"] .theme-deco-space .space-nebula { 
 
 /* Vũ trụ: lớp hiệu ứng nằm SAU toàn bộ nội dung (lịch, danh sách job...) — các ô job không bị che */
 #fxFullscreen[data-fx="space"],
-body.theme-light #fxFullscreen[data-fx="space"] {
+#fxFullscreen[data-fx="halloween"],
+body.theme-light #fxFullscreen[data-fx="space"],
+body.theme-light #fxFullscreen[data-fx="halloween"] {
     z-index: -1;
     mix-blend-mode: normal;
+}
+
+/* Nền toàn màn hình Halloween — trời đêm tím/xanh navy như ảnh tham khảo */
+body.theme-dark.fx-backdrop-on[data-topbar-theme="halloween"] {
+    background: radial-gradient(ellipse at 70% 22%, #241a38 0%, #130820 55%, #08030f 100%) fixed;
+}
+body.theme-light.fx-backdrop-on[data-topbar-theme="halloween"] {
+    background: radial-gradient(ellipse at 70% 22%, #c4b8d0 0%, #8a7a9a 60%, #5a4a6a 100%) fixed;
+}
+body.theme-dark.fx-backdrop-on[data-topbar-theme="halloween"] .topbar {
+    background: rgba(15, 8, 25, .45) !important;
+    border-color: rgba(180, 140, 200, .18) !important;
 }
 
 /* Để thiên hà lộ ra phía sau, các khung nội dung chuyển sang kính mờ (ô job vẫn đặc, rõ chữ) */
@@ -7709,3 +7723,224 @@ body.theme-light #fxBackdrop { display: none; }
 @keyframes ttSwing { from { transform: rotate(-14deg); } to { transform: rotate(14deg); } }
 body.modal-open .tt-lion-wrap, body.modal-open .tt-bunny-wrap,
 body.modal-open .tt-lion-wrap *, body.modal-open .tt-bunny-wrap * { animation-play-state: paused; }
+
+/* ============================================================
+   LƯỚI CHỦ ĐỀ GỌN + KHỐI TÙY CHỌN HIỆU ỨNG
+   ============================================================ */
+.theme-grid.theme-grid-compact {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 0.45rem;
+}
+.theme-grid-compact .theme-card {
+    padding: 0.65rem 0.35rem 0.55rem;
+    gap: 0.15rem;
+    border-radius: 12px;
+}
+.theme-grid-compact .theme-card-emoji { font-size: 1.5rem; }
+.theme-grid-compact .theme-card-name { font-size: 0.76rem; }
+.theme-grid-compact .theme-card-desc { display: none; }
+.theme-grid-compact .theme-card-check {
+    font-size: 0.85rem; top: 5px; right: 5px;
+}
+
+.fx-options-wrap {
+    margin-top: 1rem;
+    padding: 0.85rem 0.95rem;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--surface);
+    animation: fxOptionsIn .25s ease;
+}
+@keyframes fxOptionsIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.fx-options-head {
+    display: flex; align-items: center; gap: 0.7rem;
+    padding-bottom: 0.7rem;
+    border-bottom: 1px dashed var(--border);
+}
+.fx-selected-emoji { font-size: 1.7rem; line-height: 1; flex: none; }
+.fx-options-info { display: flex; flex-direction: column; min-width: 0; }
+.fx-selected-name {
+    font-weight: 700; font-size: 0.9rem; color: var(--text);
+}
+.fx-selected-desc {
+    font-size: 0.72rem; color: var(--muted); line-height: 1.35;
+}
+
+/* ============================================================
+   CHỦ ĐỀ HALLOWEEN
+   ============================================================ */
+body.theme-light[data-topbar-theme="halloween"] .topbar-sky .sky-day {
+    background: linear-gradient(105deg, #4c1d95 0%, #7c3aed 45%, #a855f7 100%);
+}
+body.theme-dark[data-topbar-theme="halloween"] .topbar-sky .sky-night {
+    background: linear-gradient(105deg, #0c0414 0%, #1e1b4b 48%, #4c1d95 100%);
+}
+body[data-topbar-theme="halloween"] .topbar-sky .sky-body { display: none !important; }
+body[data-topbar-theme="halloween"] .topbar-sky .sky-clouds { display: none !important; }
+
+.theme-deco-halloween { --hl-fg: #fde68a; }
+
+/* Trăng lưỡi liềm vàng */
+.hl-moon {
+    position: absolute; top: 8%; right: 6%;
+    width: 46px; height: 46px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 32%, #fff7d1 0%, #fde68a 55%, #f59e0b 100%);
+    -webkit-mask: radial-gradient(circle at 74% 30%, transparent 55%, #000 57%);
+            mask: radial-gradient(circle at 74% 30%, transparent 55%, #000 57%);
+    filter: drop-shadow(0 0 14px rgba(253, 224, 71, .6))
+            drop-shadow(0 0 40px rgba(251, 191, 36, .35));
+    z-index: 1;
+}
+
+/* Dơi bay */
+.hl-bat {
+    position: absolute; font-size: 20px;
+    color: #1e1b4b;
+    filter: drop-shadow(0 0 6px rgba(167, 139, 250, .85));
+    animation: hlBatFly 12s ease-in-out infinite;
+    z-index: 2;
+}
+.hl-bat.b1 { top: 20%; left: 30%; animation-delay: 0s; }
+.hl-bat.b2 { top: 40%; left: 55%; font-size: 16px; animation-delay: -4s; }
+.hl-bat.b3 { top: 18%; right: 20%; font-size: 22px; animation-delay: -8s; }
+@keyframes hlBatFly {
+    0%   { transform: translate(0, 0) rotate(-8deg); }
+    50%  { transform: translate(20px, -14px) rotate(8deg); }
+    100% { transform: translate(0, 0) rotate(-8deg); }
+}
+
+/* Ma nhỏ nhấp nhô */
+.hl-ghost {
+    position: absolute; bottom: 6px; left: 46%;
+    font-size: 26px;
+    filter: drop-shadow(0 0 12px rgba(226, 232, 240, .85));
+    animation: hlGhostBob 3.4s ease-in-out infinite;
+    z-index: 2;
+}
+@keyframes hlGhostBob {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50%      { transform: translateY(-8px) scale(1.05); }
+}
+
+/* Nhện treo */
+.hl-spider {
+    position: absolute; top: -4px; right: 42%;
+    font-size: 18px;
+    animation: hlSpiderDrop 5s ease-in-out infinite alternate;
+    transform-origin: 50% 0;
+    z-index: 2;
+}
+.hl-spider::before {
+    content: ''; position: absolute; top: -18px; left: 50%;
+    width: 1px; height: 20px; background: rgba(226, 232, 240, .6);
+}
+@keyframes hlSpiderDrop {
+    from { transform: translateY(0); }
+    to   { transform: translateY(14px); }
+}
+
+/* Sương mù dưới đáy */
+.hl-fog {
+    position: absolute; inset: auto 0 0 0; height: 40%;
+    background:
+        radial-gradient(ellipse 60% 100% at 20% 100%, rgba(168, 85, 247, .35), transparent 70%),
+        radial-gradient(ellipse 60% 100% at 70% 100%, rgba(99, 102, 241, .30), transparent 70%);
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* ============================================================
+   MASCOT — phụ kiện theo chủ đề (đè lên SVG cú)
+   ============================================================ */
+.owl3d .o-accessory {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    overflow: visible;
+    pointer-events: none;
+    transform: translateZ(12px);   /* đi cùng đầu */
+}
+body.theme-light .owl3d .o-accessory { filter: none; }
+
+.owl3d .o-part { filter: hue-rotate(var(--owl-hue, 0deg)); }
+
+/* Bong bóng "nói" cho mascot (dùng lại .auth-owl-bubble style) */
+.mascot-bubble {
+    position: absolute; left: 50%; bottom: calc(100% + 4px);
+    width: max-content; max-width: 180px;
+    padding: 5px 10px; border-radius: 12px;
+    background: #fffbe8; color: #3b2a14;
+    font-size: 11px; font-weight: 700; line-height: 1.3;
+    text-align: center;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, .35);
+    opacity: 0; transform: translateX(-50%) scale(.85);
+    transform-origin: 50% 100%;
+    transition: opacity .2s ease, transform .2s ease;
+    pointer-events: none;
+    z-index: 5;
+}
+.mascot-bubble::after {
+    content: ""; position: absolute; left: 50%; top: 100%; margin-left: -6px;
+    border: 6px solid transparent; border-top-color: #fffbe8;
+}
+.mascot-bubble.show { opacity: 1; transform: translateX(-50%) scale(1); }
+
+/* Đạn/chiêu thức theo chủ đề */
+.mascot-paw {
+    position: absolute; left: 0; top: 0; width: 22px; height: 22px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%, #fff, #f4c542 60%, #b45309 100%);
+    box-shadow: 0 0 8px 2px rgba(244, 197, 66, .8);
+}
+.mascot-carrot {
+    position: absolute; left: 0; top: 0; width: 30px; height: 6px;
+    border-radius: 4px 0 0 4px;
+    background: linear-gradient(90deg, #f97316, #fb923c, #86efac);
+    box-shadow: 0 0 6px rgba(249, 115, 22, .7);
+}
+.mascot-snowball {
+    position: absolute; left: 0; top: 0; width: 14px; height: 14px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fff, #cbd5e1 70%, #64748b 100%);
+    box-shadow: 0 0 8px 2px rgba(226, 232, 240, .8);
+}
+.mascot-laser {
+    position: absolute; left: 0; top: 0; width: 40px; height: 3px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, transparent, #4ade80 55%, #fff);
+    box-shadow: 0 0 10px 3px rgba(74, 222, 128, .9);
+    transform-origin: 100% 50%;
+}
+.mascot-tongue {
+    position: absolute; left: 0; top: 0; width: 44px; height: 4px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, transparent, #f472b6 55%, #ec4899);
+    box-shadow: 0 0 6px rgba(236, 72, 153, .7);
+    transform-origin: 100% 50%;
+}
+.mascot-poof {
+    position: absolute; left: -14px; top: -14px;
+    width: 28px; height: 28px; border-radius: 50%;
+    background: radial-gradient(circle, #fff 0%, #c4b5fd 45%, rgba(139, 92, 246, 0) 75%);
+}
+
+/* Hạt bụi/đốm màu theo chủ đề khi trúng đích */
+.mascot-spark {
+    position: absolute; width: 8px; height: 8px; border-radius: 50%;
+    pointer-events: none;
+}
+.mascot-spark.tet       { background: radial-gradient(circle, #fff, #f4c542); }
+.mascot-spark.trungthu  { background: radial-gradient(circle, #fff, #ffb3cf); }
+.mascot-spark.noel      { background: radial-gradient(circle, #fff, #cbd5e1); }
+.mascot-spark.rain      { background: radial-gradient(circle, #fff, #86efac); }
+.mascot-spark.space     { background: radial-gradient(circle, #fff, #4ade80); }
+.mascot-spark.halloween { background: radial-gradient(circle, #fff, #c4b5fd); }
+.mascot-spark.default   { background: radial-gradient(circle, #fff, #c3a47a); }
+
+@media (prefers-reduced-motion: reduce) {
+    .hl-bat, .hl-ghost, .hl-spider { animation: none; }
+}

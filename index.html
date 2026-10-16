@@ -140,6 +140,15 @@
     <span class="space-ufo">🛸</span>
     <span class="space-rocket">🚀</span>
 </div>
+<div class="theme-deco theme-deco-halloween">
+    <span class="hl-moon"></span>
+    <span class="hl-bat b1">🦇</span>
+    <span class="hl-bat b2">🦇</span>
+    <span class="hl-bat b3">🦇</span>
+    <span class="hl-ghost g1">👻</span>
+    <span class="hl-spider">🕷️</span>
+    <span class="hl-fog"></span>
+</div>
             </div>
             <div class="topbar-left">
                 <div class="topbar-logo">
@@ -1468,48 +1477,67 @@ Số thập phân dùng . hoặc ,"></textarea>
                     </div>
                 </section>
 
+                                <!-- ===== CHỦ ĐỀ TOPBAR ===== -->
                 <section class="settings-section">
                     <div class="settings-section-head">
                         <i class="bi bi-palette-fill"></i>
                         <div>
                             <h6>Chủ đề thanh Header</h6>
-                            <small>Trang trí riêng cho thanh trên cùng — không ảnh hưởng phần còn lại</small>
+                            <small>Chọn chủ đề để mở thêm tùy chọn cường độ hiệu ứng</small>
                         </div>
                     </div>
-                    <div class="theme-grid" id="themeGrid"></div>
-                    <div class="form-check form-switch job-switch-card mt-3">
-                        <input class="form-check-input" type="checkbox" id="settingsFxFullscreen">
-                        <label class="form-check-label fw-bold" for="settingsFxFullscreen">Hiệu ứng rơi toàn màn hình</label>
-                    </div>
-                    <div class="form-text">
-                        Tuyết (Noel), hoa đào (Tết), sao (Trung Thu), mưa (Mưa), sao băng (Vũ trụ) sẽ rơi khắp trang.
-                        Tắt = chỉ rơi trong thanh Header. Chủ đề Mặc định không có hiệu ứng rơi. Mọi hiệu ứng dùng đồ hoạ 3D (WebGL / Three.js, tải khi bật), máy không hỗ trợ sẽ tự dùng bản nhẹ. Vũ trụ: thiên hà nằm sau lịch và Header hoà cùng nền. Nặng hơn bản thường, máy yếu nên tắt.
-                    </div>
-                    <div class="fx-level-wrap mt-3 d-none" id="fxLevelWrap">
-                        <div class="fw-bold small mb-2"><i class="bi bi-sliders2"></i> Cường độ hiệu ứng</div>
-                        <div class="fx-level-seg" id="fxLevelSeg" role="group" aria-label="Cường độ hiệu ứng">
-                            <button type="button" data-i="0">Nhẹ nhàng</button>
-                            <button type="button" data-i="1">Bình thường</button>
-                            <button type="button" data-i="2">Dữ dội</button>
+
+                    <!-- Lưới chủ đề gọn -->
+                    <div class="theme-grid theme-grid-compact" id="themeGrid"></div>
+
+                    <!-- Khối tùy chọn chỉ hiện khi chủ đề có hiệu ứng -->
+                    <div class="fx-options-wrap d-none" id="fxOptionsWrap">
+                        <div class="fx-options-head">
+                            <span class="fx-selected-emoji" id="fxSelectedEmoji">☀️</span>
+                            <div class="fx-options-info">
+                                <span class="fx-selected-name" id="fxSelectedName">—</span>
+                                <span class="fx-selected-desc" id="fxSelectedDesc">—</span>
+                            </div>
                         </div>
-                        <div class="form-text" id="fxLevelHint"></div>
+
+                        <div class="form-check form-switch job-switch-card mt-3">
+                            <input class="form-check-input" type="checkbox" id="settingsFxFullscreen">
+                            <label class="form-check-label fw-bold" for="settingsFxFullscreen">
+                                Hiệu ứng rơi toàn màn hình
+                            </label>
+                        </div>
+                        <div class="form-text">
+                            Tắt = chỉ rơi trong thanh Header. Mọi hiệu ứng dùng WebGL/Three.js, máy yếu tự dùng bản CSS nhẹ.
+                        </div>
+
+                        <div class="fx-level-wrap mt-3" id="fxLevelWrap">
+                            <div class="fw-bold small mb-2">
+                                <i class="bi bi-sliders2"></i> Cường độ hiệu ứng
+                            </div>
+                            <div class="fx-level-seg" id="fxLevelSeg" role="group" aria-label="Cường độ hiệu ứng">
+                                <button type="button" data-i="0">Nhẹ nhàng</button>
+                                <button type="button" data-i="1">Bình thường</button>
+                                <button type="button" data-i="2">Bão</button>
+                            </div>
+                            <div class="form-text" id="fxLevelHint"></div>
+                        </div>
                     </div>
                 </section>
 
                 <section class="settings-section">
-                    <div class="settings-section-head">
-                        <i class="bi bi-feather"></i>
-                        <div>
-                            <h6>Số lượng cú</h6>
-                            <small>Cú đứng trên các nút của trang · tối đa 10 · chỉ hiện ở chế độ tối</small>
-                        </div>
-                    </div>
-                    <div class="owl-count-row">
-                        <input type="range" class="form-range" id="settingsOwlCount" min="0" max="10" step="1" value="1">
-                        <span class="owl-count-badge" id="settingsOwlCountValue">1</span>
-                    </div>
-                    <div class="form-text">Con đầu tiên đậu trên chữ "Lịch Làm Việc", các con thêm vào sẽ đậu trên nút Thêm Job, Layout, Xem, Xuất PDF... Bấm vào cú để "bắn".</div>
-                </section>
+    <div class="settings-section-head">
+        <i class="bi bi-feather"></i>
+        <div>
+            <h6 id="mascotCountTitle">🦉 Số lượng cú</h6>
+            <small id="mascotCountSub">Cú đứng trên các nút của trang · tối đa 10 · chỉ hiện ở chế độ tối</small>
+        </div>
+    </div>
+    <div class="owl-count-row">
+        <input type="range" class="form-range" id="settingsOwlCount" min="0" max="10" step="1" value="1">
+        <span class="owl-count-badge" id="settingsOwlCountValue">1</span>
+    </div>
+    <div class="form-text" id="mascotCountHint">Con đầu tiên đậu trên chữ "Lịch Làm Việc", các con thêm vào sẽ đậu trên nút Thêm Job, Layout, Xem, Xuất PDF... Bấm vào cú để "bắn".</div>
+</section>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-cancel" data-bs-dismiss="modal">Đóng</button>
