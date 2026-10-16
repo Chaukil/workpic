@@ -243,7 +243,15 @@ function buildGalaxySvg() {
             const t = rnd(0.6, TMAX);
             const jitter = 1 + (Math.random() + Math.random() + Math.random() - 1.5) * 0.28;
             const r = A0 * Math.exp(B * t) * jitter;
-            const col = ['#ffffff', '#cfe0ff', '#9db8ff'][Math.floor(Math.random() * 3)];
+            const normR = Math.min(1, r / 90);
+let col;
+if (normR < 0.15)      col = ['#fff8e0', '#ffd98a', '#ffc07a'][Math.floor(Math.random()*3)];
+else if (normR < 0.32) col = ['#ffb86b', '#ff9a7a', '#ff8fb0'][Math.floor(Math.random()*3)];
+else if (normR < 0.50) col = ['#ff8fb0', '#d989d9', '#c77dff'][Math.floor(Math.random()*3)];
+else if (normR < 0.68) col = ['#9b8bf0', '#6a92f0', '#87b5ff'][Math.floor(Math.random()*3)];
+else if (normR < 0.85) col = ['#6a92f0', '#4a72e0', '#3a55b8'][Math.floor(Math.random()*3)];
+else                   col = ['#4a72e0', '#3a55b8', '#8ee6ff'][Math.floor(Math.random()*3)];
+
             dust += `<circle cx="${(r * Math.cos(t + off)).toFixed(1)}" cy="${(r * Math.sin(t + off)).toFixed(1)}" r="${rnd(0.15, 0.5).toFixed(2)}" fill="${col}" opacity="${rnd(0.35, 1).toFixed(2)}"/>`;
         }
     }
@@ -686,14 +694,24 @@ const ThreeFx = (() => {
         const { THREE } = ctx;
         count = Math.max(1, Math.round(count));
         const sp = new Float32Array(count * 3), sc = new Float32Array(count * 3), ss = new Float32Array(count), sph = new Float32Array(count);
-        const cols = [new THREE.Color('#ffffff'), new THREE.Color('#cfe0ff'), new THREE.Color('#9db8ff'), new THREE.Color('#ffe2b8')];
-        for (let i = 0; i < count; i++) {
+        const cols = [
+    new THREE.Color('#ffffff'),   // trắng (phổ biến)
+    new THREE.Color('#cfe0ff'),   // xanh nhạt
+    new THREE.Color('#9db8ff'),   // xanh lam
+    new THREE.Color('#ffe2b8'),   // kem ấm
+    new THREE.Color('#ffb088'),   // cam-đỏ (red giant)
+    new THREE.Color('#ff9ec9'),   // hồng
+    new THREE.Color('#a8f0ff')    // xanh lơ (cyan)
+];        for (let i = 0; i < count; i++) {
             const z = -4 - Math.random() * 22;
             const dist = CAM_Z - z, halfH = dist * TAN;
             sp[i * 3] = (Math.random() * 2 - 1) * halfH * 2.6;
             sp[i * 3 + 1] = (Math.random() * 2 - 1) * halfH * 1.08;
             sp[i * 3 + 2] = z;
-            const cc = cols[Math.random() < 0.12 ? 3 : Math.floor(Math.random() * 3)];
+           const roll = Math.random();
+const cc = roll < 0.65
+    ? cols[Math.floor(Math.random() * 3)]         // trắng, xanh nhạt, xanh lam
+    : cols[3 + Math.floor(Math.random() * 4)];    // kem, cam-đỏ, hồng, cyan
             sc[i * 3] = cc.r; sc[i * 3 + 1] = cc.g; sc[i * 3 + 2] = cc.b;
             ss[i] = 0.3 + Math.pow(Math.random(), 2.5) * 0.9;
             sph[i] = Math.random();
@@ -720,96 +738,190 @@ const ThreeFx = (() => {
 
     // ---------------------------------------------------------- các chủ đề (ctx.lvl: 0 nhẹ · 1 vừa · 2 dữ dội)
     function buildSpace(ctx) {
-        const { THREE, lowEnd, pixel, lvl } = ctx;
-        const N = lowEnd ? 48000 : 100000;
-        const RAD = 6.2, BRANCHES = 2, SPIN = 1.25, RANDOMNESS = 0.55, RPOWER = 1.8;
-       const zoom       = [1.3, 1.75, 2.4][lvl];
-const gain       = [0.85, 1.35, 1.9][lvl];
-const spinSpeed  = [0.012, 0.026, 0.06][lvl];
-const parallax   = [0.7, 1.2, 2.2][lvl];
+    const { THREE, lowEnd, pixel, lvl } = ctx;
+    const N = lowEnd ? 48000 : 100000;
+    const RAD = 6.2, BRANCHES = 2, SPIN = 1.25, RANDOMNESS = 0.55, RPOWER = 1.8;
+    const zoom       = [1.3, 1.75, 2.4][lvl];
+    const gain       = [0.85, 1.35, 1.9][lvl];
+    const spinSpeed  = [0.012, 0.026, 0.06][lvl];
+    const parallax   = [0.7, 1.2, 2.2][lvl];
 
-        const pos = new Float32Array(N * 3), col = new Float32Array(N * 3), scl = new Float32Array(N), ph = new Float32Array(N);
-        const cInside = new THREE.Color('#ffd9a3'), cMid = new THREE.Color('#7f9cf5'), cOut = new THREE.Color('#3350b8');
-        const cCore = new THREE.Color('#fff0d2'), cPink = new THREE.Color('#ff9ec4'), tmp = new THREE.Color();
-        const bulgeN = Math.floor(N * 0.14);
-        for (let i = 0; i < N; i++) {
-            let x, y, z;
-            if (i < bulgeN) {
-                const r = Math.pow(Math.random(), 2.2) * RAD * 0.22;
-                const th = Math.random() * Math.PI * 2, ph2 = Math.acos(2 * Math.random() - 1);
-                x = r * Math.sin(ph2) * Math.cos(th);
-                y = r * Math.cos(ph2) * 0.55;
-                z = r * Math.sin(ph2) * Math.sin(th);
-                tmp.copy(cCore).lerp(cInside, Math.min(1, r / (RAD * 0.22)));
-                tmp.multiplyScalar(0.7);
-                scl[i] = 0.3 + Math.random() * 0.5;
+    const pos = new Float32Array(N * 3), col = new Float32Array(N * 3), scl = new Float32Array(N), ph = new Float32Array(N);
+
+    // ═══════════════════════════════════════════════════════════════
+    // BẢNG MÀU THIÊN HÀ — 6 dải chuyển tiếp như thiên hà thật:
+    //   lõi kem-vàng  →  cam  →  đào  →  hồng tinh vân  →  tím  →  xanh navy
+    // ═══════════════════════════════════════════════════════════════
+    const cCore    = new THREE.Color('#fff8e0');   // lõi trắng-kem
+    const cGold    = new THREE.Color('#ffd98a');   // vàng nắng
+    const cOrange  = new THREE.Color('#ffb86b');   // cam vàng (dust lane ấm)
+    const cPeach   = new THREE.Color('#ff9a7a');   // đào
+    const cPink    = new THREE.Color('#ff8fb0');   // hồng tinh vân
+    const cMagenta = new THREE.Color('#d989d9');   // hồng-tím
+    const cPurple  = new THREE.Color('#9b8bf0');   // tím xanh
+    const cBlue    = new THREE.Color('#6a92f0');   // xanh dương
+    const cBrightB = new THREE.Color('#4a72e0');   // xanh dương đậm
+    const cNavy    = new THREE.Color('#3a55b8');   // rìa xanh navy
+    const cCyan    = new THREE.Color('#8ee6ff');   // xanh lơ (cụm sao trẻ)
+    const cWhite   = new THREE.Color('#ffffff');   // sao trắng
+    const tmp = new THREE.Color();
+    const bulgeN = Math.floor(N * 0.14);
+
+    for (let i = 0; i < N; i++) {
+        let x, y, z;
+        if (i < bulgeN) {
+            // ══════ LÕI PHÌNH: kem → vàng → cam ══════
+            const r = Math.pow(Math.random(), 2.2) * RAD * 0.22;
+            const th = Math.random() * Math.PI * 2, ph2 = Math.acos(2 * Math.random() - 1);
+            x = r * Math.sin(ph2) * Math.cos(th);
+            y = r * Math.cos(ph2) * 0.55;
+            z = r * Math.sin(ph2) * Math.sin(th);
+            const t = Math.min(1, r / (RAD * 0.22));
+            tmp.copy(cCore).lerp(cGold, t * 0.85).lerp(cOrange, t * t * 0.45);
+            tmp.multiplyScalar(0.7);
+            scl[i] = 0.3 + Math.random() * 0.5;
+        } else {
+            // ══════ NHÁNH XOẮN ══════
+            const radius = Math.random() * RAD;
+            const spinA = radius * SPIN;
+            const branchA = ((i % BRANCHES) / BRANCHES) * Math.PI * 2;
+            const sx = Math.random() < 0.5 ? 1 : -1, sy = Math.random() < 0.5 ? 1 : -1, sz = Math.random() < 0.5 ? 1 : -1;
+            const rx = Math.pow(Math.random(), RPOWER) * sx * RANDOMNESS * radius * 0.7;
+            const ry = Math.pow(Math.random(), RPOWER) * sy * RANDOMNESS * radius * 0.14;
+            const rz = Math.pow(Math.random(), RPOWER) * sz * RANDOMNESS * radius * 0.7;
+            x = Math.cos(branchA + spinA) * radius + rx;
+            y = ry;
+            z = Math.sin(branchA + spinA) * radius + rz;
+
+            const t = radius / RAD;      // 0 = tâm · 1 = rìa
+            const rnd = Math.random();
+
+            // ─── Nền màu theo bán kính — 7 dải mịn ───
+            if (t < 0.10) {
+                tmp.copy(cGold).lerp(cOrange, t / 0.10);
+            } else if (t < 0.25) {
+                tmp.copy(cOrange).lerp(cPeach, (t - 0.10) / 0.15);
+            } else if (t < 0.42) {
+                tmp.copy(cPeach).lerp(cPink, (t - 0.25) / 0.17);
+            } else if (t < 0.58) {
+                tmp.copy(cPink).lerp(cMagenta, (t - 0.42) / 0.16);
+            } else if (t < 0.74) {
+                tmp.copy(cMagenta).lerp(cPurple, (t - 0.58) / 0.16);
+            } else if (t < 0.88) {
+                tmp.copy(cPurple).lerp(cBlue, (t - 0.74) / 0.14);
             } else {
-                const radius = Math.random() * RAD;
-                const spinA = radius * SPIN;
-                const branchA = ((i % BRANCHES) / BRANCHES) * Math.PI * 2;
-                const sx = Math.random() < 0.5 ? 1 : -1, sy = Math.random() < 0.5 ? 1 : -1, sz = Math.random() < 0.5 ? 1 : -1;
-                const rx = Math.pow(Math.random(), RPOWER) * sx * RANDOMNESS * radius * 0.7;
-                const ry = Math.pow(Math.random(), RPOWER) * sy * RANDOMNESS * radius * 0.14;
-                const rz = Math.pow(Math.random(), RPOWER) * sz * RANDOMNESS * radius * 0.7;
-                x = Math.cos(branchA + spinA) * radius + rx;
-                y = ry;
-                z = Math.sin(branchA + spinA) * radius + rz;
-                const t = radius / RAD;
-                if (t < 0.35) tmp.copy(cInside).lerp(cMid, t / 0.35);
-                else tmp.copy(cMid).lerp(cOut, (t - 0.35) / 0.65);
-                if (t > 0.3 && Math.random() < 0.03) tmp.copy(cPink);
-                scl[i] = (0.3 + Math.pow(Math.random(), 3) * 1.0) * (0.9 + t * 0.6);
+                tmp.copy(cBlue).lerp(cNavy, (t - 0.88) / 0.12);
             }
-            pos[i * 3] = x; pos[i * 3 + 1] = y; pos[i * 3 + 2] = z;
-            col[i * 3] = tmp.r; col[i * 3 + 1] = tmp.g; col[i * 3 + 2] = tmp.b;
-            ph[i] = Math.random();
+
+            // ─── Các "CỤM ĐẶC BIỆT" ngẫu nhiên (như ảnh thiên hà thật) ───
+            if (rnd < 0.05) {
+                // Cụm sao trẻ xanh lơ — OB association
+                tmp.copy(cBlue).lerp(cCyan, 0.5 + Math.random() * 0.5);
+            } else if (rnd < 0.09) {
+                // Vùng tinh vân hồng đậm — điểm nhấn ấn tượng
+                tmp.copy(cPink).lerp(cMagenta, Math.random() * 0.7);
+                tmp.multiplyScalar(1.15);
+            } else if (rnd < 0.12) {
+                // Sao trắng sáng — lấp lánh
+                tmp.copy(cWhite);
+            } else if (rnd < 0.145 && t > 0.35) {
+                // Vệt xanh dương sáng ở rìa (dải băng ngoài)
+                tmp.copy(cBrightB).lerp(cBlue, Math.random() * 0.5);
+            }
+
+            scl[i] = (0.3 + Math.pow(Math.random(), 3) * 1.0) * (0.9 + t * 0.6);
+            if (rnd >= 0.09 && rnd < 0.12) scl[i] *= 1.35;   // sao trắng & tinh vân to hơn chút
         }
-        const gGeo = new THREE.BufferGeometry();
-        gGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-        gGeo.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
-        gGeo.setAttribute('aScale', new THREE.BufferAttribute(scl, 1));
-        gGeo.setAttribute('aPhase', new THREE.BufferAttribute(ph, 1));
-        const gMat = pointMaterial(THREE, 34, 1.0, pixel, gain);
-        const galaxy = new THREE.Points(gGeo, gMat);
-        galaxy.frustumCulled = false;
-
-        const tilt = new THREE.Group();          // nghiêng như ảnh: ~63° so với hướng nhìn
-        tilt.rotation.x = 0.47;
-        tilt.rotation.z = -0.28;
-        tilt.add(galaxy);
-
-        const coreTex = T.glow(THREE, [[0, 'rgba(255,238,205,1)'], [0.25, 'rgba(255,196,120,.6)'], [1, 'rgba(255,170,90,0)']]);
-        const core = new THREE.Sprite(new THREE.SpriteMaterial({ map: coreTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.6 }));
-        core.scale.set(4.2, 4.2, 1);
-        tilt.add(core);
-        const haloTex = T.glow(THREE, [[0, 'rgba(110,140,255,.65)'], [0.5, 'rgba(60,90,220,.3)'], [1, 'rgba(40,60,200,0)']]);
-        const halo = new THREE.Mesh(
-            new THREE.PlaneGeometry(RAD * 2.8, RAD * 2.8),
-            new THREE.MeshBasicMaterial({ map: haloTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.5, side: THREE.DoubleSide })
-        );
-        halo.rotation.x = -Math.PI / 2;
-        tilt.add(halo);
-        ctx.scene.add(tilt);
-        ctx.own(gGeo, gMat, coreTex, haloTex, core.material, halo.geometry, halo.material);
-        ctx.timeMats.push(gMat);
-        ctx.lightFns.push(light => {
-            gMat.uniforms.uLight.value = light ? 1 : 0;
-            gMat.blending = light ? THREE.NormalBlending : THREE.AdditiveBlending;
-            gMat.needsUpdate = true;
-            core.visible = !light; halo.visible = !light;
-        });
-        starField(ctx, [500, 1500, 3000][lvl] * (lowEnd ? 0.5 : 1), 40, 1.0, gain);
-
-        ctx.onFit.push((aspect) => tilt.scale.setScalar(Math.max(0.55, Math.min(1.15, aspect / 1.6)) * zoom));
-        ctx.updaters.push((dt, t, s) => {
-            galaxy.rotation.y += dt * spinSpeed;
-            s.cx += (s.mx * 0.35 * parallax - s.cx) * 0.04;          // nghiêng nhẹ theo chuột
-            s.cy += (-s.my * 0.22 * parallax - s.cy) * 0.04;
-            ctx.camera.position.x = s.cx;
-            ctx.camera.position.y = s.cy;
-            ctx.camera.lookAt(0, 0, 0);
-        });
+        pos[i * 3] = x; pos[i * 3 + 1] = y; pos[i * 3 + 2] = z;
+        col[i * 3] = tmp.r; col[i * 3 + 1] = tmp.g; col[i * 3 + 2] = tmp.b;
+        ph[i] = Math.random();
     }
+
+    const gGeo = new THREE.BufferGeometry();
+    gGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    gGeo.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
+    gGeo.setAttribute('aScale', new THREE.BufferAttribute(scl, 1));
+    gGeo.setAttribute('aPhase', new THREE.BufferAttribute(ph, 1));
+    const gMat = pointMaterial(THREE, 34, 1.0, pixel, gain);
+    const galaxy = new THREE.Points(gGeo, gMat);
+    galaxy.frustumCulled = false;
+
+    const tilt = new THREE.Group();
+    tilt.rotation.x = 0.47;
+    tilt.rotation.z = -0.28;
+    tilt.add(galaxy);
+
+    // ═══ LÕI phát sáng: kem → vàng → cam ấm (thay vì chỉ trắng-kem) ═══
+    const coreTex = T.glow(THREE, [
+        [0,    'rgba(255,246,214,1)'],
+        [0.22, 'rgba(255,210,140,.75)'],
+        [0.55, 'rgba(255,160,90,.35)'],
+        [1,    'rgba(255,140,80,0)']
+    ]);
+    const core = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: coreTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.7
+    }));
+    core.scale.set(4.6, 4.6, 1);
+    tilt.add(core);
+
+    // ═══ HÀO QUANG: tím-hồng → xanh-tím → xanh dương (thay vì chỉ 1 màu xanh) ═══
+    const haloTex = T.glow(THREE, [
+        [0,    'rgba(200,160,255,.55)'],
+        [0.35, 'rgba(130,150,255,.38)'],
+        [0.7,  'rgba(70,110,230,.18)'],
+        [1,    'rgba(40,60,200,0)']
+    ]);
+    const halo = new THREE.Mesh(
+        new THREE.PlaneGeometry(RAD * 2.8, RAD * 2.8),
+        new THREE.MeshBasicMaterial({
+            map: haloTex, blending: THREE.AdditiveBlending, depthWrite: false,
+            transparent: true, opacity: 0.55, side: THREE.DoubleSide
+        })
+    );
+    halo.rotation.x = -Math.PI / 2;
+    tilt.add(halo);
+
+    // ═══ LỚP TINH VÂN HỒNG — lớp mới, đặc trưng của thiên hà xoắn ốc ═══
+    const nebulaTex = T.glow(THREE, [
+        [0,    'rgba(255,150,200,0)'],
+        [0.4,  'rgba(255,120,190,.22)'],
+        [0.7,  'rgba(200,100,220,.15)'],
+        [1,    'rgba(150,80,200,0)']
+    ]);
+    const nebula = new THREE.Mesh(
+        new THREE.PlaneGeometry(RAD * 2.1, RAD * 2.1),
+        new THREE.MeshBasicMaterial({
+            map: nebulaTex, blending: THREE.AdditiveBlending, depthWrite: false,
+            transparent: true, opacity: 0.5, side: THREE.DoubleSide
+        })
+    );
+    nebula.rotation.x = -Math.PI / 2;
+    tilt.add(nebula);
+
+    ctx.scene.add(tilt);
+    ctx.own(gGeo, gMat, coreTex, haloTex, nebulaTex,
+            core.material, halo.geometry, halo.material, nebula.geometry, nebula.material);
+    ctx.timeMats.push(gMat);
+    ctx.lightFns.push(light => {
+        gMat.uniforms.uLight.value = light ? 1 : 0;
+        gMat.blending = light ? THREE.NormalBlending : THREE.AdditiveBlending;
+        gMat.needsUpdate = true;
+        core.visible = !light; halo.visible = !light; nebula.visible = !light;
+    });
+    starField(ctx, [500, 1500, 3000][lvl] * (lowEnd ? 0.5 : 1), 40, 1.0, gain);
+
+    ctx.onFit.push((aspect) => tilt.scale.setScalar(Math.max(0.55, Math.min(1.15, aspect / 1.6)) * zoom));
+    ctx.updaters.push((dt, t, s) => {
+        galaxy.rotation.y += dt * spinSpeed;
+        halo.rotation.z   = (halo.rotation.z   || 0) + dt * spinSpeed * 0.4;   // hào quang xoay chậm
+        nebula.rotation.z = (nebula.rotation.z || 0) - dt * spinSpeed * 0.3;   // tinh vân ngược chiều
+        s.cx += (s.mx * 0.35 * parallax - s.cx) * 0.04;
+        s.cy += (-s.my * 0.22 * parallax - s.cy) * 0.04;
+        ctx.camera.position.x = s.cx;
+        ctx.camera.position.y = s.cy;
+        ctx.camera.lookAt(0, 0, 0);
+    });
+}
 
     function buildNoel(ctx) {
         const { THREE, lvl, cnt } = ctx;
