@@ -1483,7 +1483,16 @@ Số thập phân dùng . hoặc ,"></textarea>
                     </div>
                     <div class="form-text">
                         Tuyết (Noel), hoa đào (Tết), sao (Trung Thu), mưa (Mưa), sao băng (Vũ trụ) sẽ rơi khắp trang.
-                        Tắt = chỉ rơi trong thanh Header. Chủ đề Mặc định không có hiệu ứng rơi.
+                        Tắt = chỉ rơi trong thanh Header. Chủ đề Mặc định không có hiệu ứng rơi. Mọi hiệu ứng dùng đồ hoạ 3D (WebGL / Three.js, tải khi bật), máy không hỗ trợ sẽ tự dùng bản nhẹ. Vũ trụ: thiên hà nằm sau lịch và Header hoà cùng nền. Nặng hơn bản thường, máy yếu nên tắt.
+                    </div>
+                    <div class="fx-level-wrap mt-3 d-none" id="fxLevelWrap">
+                        <div class="fw-bold small mb-2"><i class="bi bi-sliders2"></i> Cường độ hiệu ứng</div>
+                        <div class="fx-level-seg" id="fxLevelSeg" role="group" aria-label="Cường độ hiệu ứng">
+                            <button type="button" data-i="0">Nhẹ nhàng</button>
+                            <button type="button" data-i="1">Bình thường</button>
+                            <button type="button" data-i="2">Dữ dội</button>
+                        </div>
+                        <div class="form-text" id="fxLevelHint"></div>
                     </div>
                 </section>
 
