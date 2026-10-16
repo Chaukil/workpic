@@ -1023,153 +1023,355 @@ const cc = roll < 0.65
 // Cây khô trơ trụi — silhouette đen vẽ đệ quy, thân nêm + nhánh xương xẩu
 function drawDeadTreeSilhouette(g, S) {
     g.clearRect(0, 0, S, S);
-    g.fillStyle = '#06060e';
-    g.strokeStyle = '#06060e';
+    const C_BARK  = '#04040c';
+    const C_BARK2 = '#0d0a1a';
+    const C_KNOT  = '#010106';
+
     g.lineCap = 'round';
     g.lineJoin = 'round';
 
-    const trunkBaseX = S * 0.18;
+    const trunkBaseX = S * 0.20;
     const trunkBaseY = S * 1.02;
-    const trunkTopX  = S * 0.34;
-    const trunkTopY  = S * 0.42;
+    const trunkTopX  = S * 0.36;
+    const trunkTopY  = S * 0.40;
 
-    // Thân cây hình nêm
+    // ── Thân cây — gradient ngang tạo khối 3D (sáng giữa, tối 2 bên) ──
+    const trunkGrad = g.createLinearGradient(trunkBaseX - S * 0.09, 0, trunkBaseX + S * 0.09, 0);
+    trunkGrad.addColorStop(0,    C_BARK);
+    trunkGrad.addColorStop(0.35, C_BARK2);
+    trunkGrad.addColorStop(0.55, '#151024');
+    trunkGrad.addColorStop(0.75, C_BARK2);
+    trunkGrad.addColorStop(1,    C_BARK);
+    g.fillStyle = trunkGrad;
     g.beginPath();
-    g.moveTo(trunkBaseX - S * 0.075, trunkBaseY);
-    g.quadraticCurveTo(trunkBaseX - S * 0.04, S * 0.7, trunkTopX - S * 0.018, trunkTopY);
-    g.lineTo(trunkTopX + S * 0.018, trunkTopY);
-    g.quadraticCurveTo(trunkBaseX + S * 0.02, S * 0.7, trunkBaseX + S * 0.07, trunkBaseY);
+    g.moveTo(trunkBaseX - S * 0.09, trunkBaseY);
+    g.bezierCurveTo(
+        trunkBaseX - S * 0.078, S * 0.78,
+        trunkBaseX - S * 0.032, S * 0.55,
+        trunkTopX - S * 0.028, trunkTopY
+    );
+    g.lineTo(trunkTopX + S * 0.028, trunkTopY);
+    g.bezierCurveTo(
+        trunkBaseX + S * 0.055, S * 0.55,
+        trunkBaseX + S * 0.072, S * 0.78,
+        trunkBaseX + S * 0.09, trunkBaseY
+    );
     g.closePath();
     g.fill();
 
-    // Rễ loe dưới chân
-    for (let i = 0; i < 5; i++) {
-        const dx = (Math.random() - 0.5) * S * 0.12;
-        const rx = trunkBaseX + dx;
-        g.lineWidth = S * 0.016;
+    // ── Vân gỗ — 8 đường dọc uốn lượn ──
+    g.strokeStyle = 'rgba(30, 22, 55, 0.7)';
+    g.lineWidth = S * 0.0022;
+    for (let i = 0; i < 9; i++) {
+        const t = (i - 4) / 4.5;
+        const startX = trunkBaseX + t * S * 0.075;
+        const endX   = trunkTopX  + t * S * 0.022;
+        const midX   = (startX + endX) / 2 + Math.sin(i * 1.9) * S * 0.009;
         g.beginPath();
-        g.moveTo(trunkBaseX, trunkBaseY - S * 0.06);
-        g.quadraticCurveTo(rx, trunkBaseY - S * 0.02, rx + (dx >= 0 ? S * 0.03 : -S * 0.03), trunkBaseY);
+        g.moveTo(startX, trunkBaseY - S * 0.005);
+        g.quadraticCurveTo(midX, S * 0.68, endX, trunkTopY + S * 0.005);
         g.stroke();
     }
 
-    // Nhánh đệ quy
+    // ── Rễ loe 9 cái, có khối ──
+    for (let i = 0; i < 9; i++) {
+        const t   = (i / 8 - 0.5) * 2;                   // -1..1
+        const rx  = trunkBaseX + t * S * 0.10;
+        const rw  = S * 0.020 * (1 - Math.abs(t) * 0.35);
+        const rdx = t > 0 ? S * 0.025 : -S * 0.025;
+        const rGrad = g.createLinearGradient(rx - rw, 0, rx + rw, 0);
+        rGrad.addColorStop(0, C_BARK);
+        rGrad.addColorStop(0.5, C_BARK2);
+        rGrad.addColorStop(1, C_BARK);
+        g.fillStyle = rGrad;
+        g.beginPath();
+        g.moveTo(trunkBaseX + t * S * 0.04 - rw * 0.5, trunkBaseY - S * 0.045);
+        g.quadraticCurveTo(rx, trunkBaseY - S * 0.008, rx + rdx, trunkBaseY);
+        g.lineTo(rx + rdx + rw * 0.25, trunkBaseY);
+        g.quadraticCurveTo(rx, trunkBaseY - S * 0.025, trunkBaseX + t * S * 0.04 + rw * 0.5, trunkBaseY - S * 0.045);
+        g.closePath();
+        g.fill();
+    }
+
+    // ── Hốc cây / mắt u sầu trên thân ──
+    g.fillStyle = C_KNOT;
+    [[trunkBaseX + S * 0.008, S * 0.72, S * 0.024, 0.25],
+     [trunkBaseX - S * 0.018, S * 0.56, S * 0.016, -0.4],
+     [trunkBaseX + S * 0.022, S * 0.63, S * 0.013, 0.5],
+     [trunkBaseX - S * 0.006, S * 0.83, S * 0.011, 0.2]].forEach(([kx, ky, kr, rot]) => {
+        g.beginPath();
+        g.ellipse(kx, ky, kr * 1.35, kr, rot, 0, Math.PI * 2);
+        g.fill();
+        // điểm sáng nhỏ bên trong hốc để có chiều sâu
+        g.fillStyle = 'rgba(60, 40, 90, 0.5)';
+        g.beginPath();
+        g.ellipse(kx - kr * 0.35, ky - kr * 0.25, kr * 0.4, kr * 0.28, rot, 0, Math.PI * 2);
+        g.fill();
+        g.fillStyle = C_KNOT;
+    });
+
+    // ── Nhánh đệ quy — có taper (dày gốc, nhọn ngọn) ──
     function branch(x, y, angle, len, width, depth) {
-        if (depth <= 0 || len < 3) return;
+        if (depth <= 0 || len < S * 0.007) return;
         const x2 = x + Math.cos(angle) * len;
         const y2 = y + Math.sin(angle) * len;
-        g.lineWidth = width;
+        const perp = angle + Math.PI / 2;
+        const w1 = width / 2, w2 = width / 3.5;
+        const px1 = Math.cos(perp) * w1, py1 = Math.sin(perp) * w1;
+        const px2 = Math.cos(perp) * w2, py2 = Math.sin(perp) * w2;
+        const mx = (x + x2) / 2 + (Math.random() - 0.5) * len * 0.22;
+        const my = (y + y2) / 2 + (Math.random() - 0.5) * len * 0.22;
+
+        g.fillStyle = depth >= 4 ? C_BARK2 : C_BARK;
         g.beginPath();
-        g.moveTo(x, y);
-        const mx = (x + x2) / 2 + (Math.random() - 0.5) * len * 0.28;
-        const my = (y + y2) / 2 + (Math.random() - 0.5) * len * 0.28;
-        g.quadraticCurveTo(mx, my, x2, y2);
-        g.stroke();
+        g.moveTo(x - px1, y - py1);
+        g.quadraticCurveTo(mx - px1 * 0.6, my - py1 * 0.6, x2 - px2, y2 - py2);
+        g.lineTo(x2 + px2, y2 + py2);
+        g.quadraticCurveTo(mx + px1 * 0.6, my + py1 * 0.6, x + px1, y + py1);
+        g.closePath();
+        g.fill();
 
         const n = depth >= 4 ? 2 : (Math.random() < 0.55 ? 2 : 3);
         for (let i = 0; i < n; i++) {
-            const spread = 0.45 + Math.random() * 0.55;
+            const spread = 0.40 + Math.random() * 0.65;
             const dir = i === 0 ? -1 : (i === 1 ? 1 : (Math.random() < 0.5 ? -1 : 1));
-            branch(x2, y2, angle + dir * spread, len * (0.6 + Math.random() * 0.15), width * 0.62, depth - 1);
+            branch(x2, y2, angle + dir * spread, len * (0.62 + Math.random() * 0.14), width * 0.64, depth - 1);
         }
     }
 
-    // 5 nhánh chính toả ra từ ngọn
-    [-0.65, -0.3, 0.05, 0.5, 0.95].forEach(da => {
-        branch(trunkTopX, trunkTopY, -Math.PI / 2 + da, S * (0.2 + Math.random() * 0.08), S * 0.02, 5);
+    // 5 nhánh chính toả ra + 3 nhánh phụ mọc chồi giữa thân
+    [-0.75, -0.38, 0.04, 0.48, 0.94].forEach(da => {
+        branch(trunkTopX, trunkTopY, -Math.PI / 2 + da, S * (0.22 + Math.random() * 0.09), S * 0.026, 6);
     });
-    // Vài nhánh phụ mọc giữa thân
-    branch(trunkBaseX + S * 0.05, S * 0.68, -Math.PI / 2 + 0.9, S * 0.18, S * 0.018, 4);
-    branch(trunkBaseX - S * 0.02, S * 0.55, -Math.PI / 2 - 0.9, S * 0.15, S * 0.014, 3);
+    branch(trunkBaseX + S * 0.045, S * 0.66, -Math.PI / 2 + 0.95, S * 0.21, S * 0.020, 5);
+    branch(trunkBaseX - S * 0.030, S * 0.52, -Math.PI / 2 - 0.90, S * 0.17, S * 0.016, 4);
+    branch(trunkBaseX + S * 0.028, S * 0.79, -Math.PI / 2 + 1.15, S * 0.15, S * 0.017, 4);
+
+    // ── Dây leo / rêu khô treo ──
+    g.strokeStyle = 'rgba(45, 65, 45, 0.55)';
+    g.lineWidth = S * 0.003;
+    for (let i = 0; i < 8; i++) {
+        const vx = trunkBaseX + (Math.random() - 0.5) * S * 0.16;
+        const vy = S * (0.42 + Math.random() * 0.38);
+        const vlen = S * (0.035 + Math.random() * 0.08);
+        g.beginPath();
+        g.moveTo(vx, vy);
+        g.quadraticCurveTo(vx + S * 0.009, vy + vlen * 0.5, vx - S * 0.005, vy + vlen);
+        g.stroke();
+    }
 }
 
 // Lâu đài Gothic silhouette — nhiều tháp nhọn, lỗ châu mai, cửa sổ sáng
 function drawCastleSilhouette(g, S) {
     g.clearRect(0, 0, S, S);
-    g.fillStyle = '#050510';
-    g.strokeStyle = '#050510';
     g.lineJoin = 'round';
     g.lineCap = 'round';
 
-    const baseY = S * 0.95;
-    const cx = S * 0.5;
+    const baseY = S * 0.98;
+    const cx    = S * 0.5;
+    const C_DARK = '#04040c';
+    const C_MID  = '#0c0a1a';
+    const C_HIGH = '#1a1430';
+    const C_WIN  = '#ffb040';
+    const C_WIN2 = '#ff7a20';
+    const C_WIN3 = '#ffd070';
 
-    // Hàm vẽ 1 tháp: thân chữ nhật + mái nhọn + cờ + cửa sổ
-    function tower(x, y, w, h, roofH, hasFlag) {
-        // Thân
-        g.fillRect(x - w / 2, y - h, w, h);
-        // Mái nhọn
+    // ── Mái nhọn + cờ ──
+    function spire(x, y, w, h, withFlag) {
+        const grad = g.createLinearGradient(x - w/2, 0, x + w/2, 0);
+        grad.addColorStop(0, C_DARK);
+        grad.addColorStop(0.5, C_MID);
+        grad.addColorStop(1, C_DARK);
+        g.fillStyle = grad;
         g.beginPath();
-        g.moveTo(x - w / 2 - w * 0.1, y - h);
-        g.lineTo(x, y - h - roofH);
-        g.lineTo(x + w / 2 + w * 0.1, y - h);
+        g.moveTo(x - w/2, y);
+        g.lineTo(x + w/2, y);
+        g.lineTo(x, y - h);
         g.closePath();
         g.fill();
-        // Cờ
-        if (hasFlag) {
-            g.lineWidth = S * 0.004;
+
+        // vân ngói
+        g.strokeStyle = 'rgba(40, 25, 70, 0.55)';
+        g.lineWidth = S * 0.0018;
+        for (let i = 1; i < 5; i++) {
+            const yy = y - h * (i / 5);
+            const half = (w / 2) * (1 - i / 5);
             g.beginPath();
-            g.moveTo(x, y - h - roofH);
-            g.lineTo(x, y - h - roofH - S * 0.045);
+            g.moveTo(x - half, yy);
+            g.lineTo(x + half, yy);
             g.stroke();
-            g.fillStyle = '#050510';
+        }
+
+        if (withFlag) {
+            g.strokeStyle = C_DARK;
+            g.lineWidth = S * 0.003;
+            const poleTop = y - h - S * 0.045;
             g.beginPath();
-            g.moveTo(x, y - h - roofH - S * 0.045);
-            g.lineTo(x + S * 0.022, y - h - roofH - S * 0.033);
-            g.lineTo(x, y - h - roofH - S * 0.022);
+            g.moveTo(x, y - h);
+            g.lineTo(x, poleTop);
+            g.stroke();
+            g.fillStyle = C_DARK;
+            g.beginPath();
+            g.moveTo(x, poleTop);
+            g.quadraticCurveTo(x + S*0.024, poleTop + S*0.006, x + S*0.032, poleTop + S*0.014);
+            g.lineTo(x + S*0.028, poleTop + S*0.026);
+            g.quadraticCurveTo(x + S*0.014, poleTop + S*0.020, x, poleTop + S*0.024);
             g.closePath();
             g.fill();
         }
-        // Cửa sổ sáng (vàng cam)
-        const winCols = Math.max(1, Math.floor(w / (S * 0.02)));
-        const winRows = Math.max(2, Math.floor(h / (S * 0.045)));
-        for (let r = 0; r < winRows; r++) {
-            for (let c = 0; c < winCols; c++) {
-                if (Math.random() < 0.35) continue;   // vài cửa sổ tối
-                const wx = x - w / 2 + (w / winCols) * (c + 0.5);
-                const wy = y - h + (h / winRows) * (r + 0.5);
-                g.fillStyle = Math.random() < 0.75 ? '#ffb040' : '#ff8030';
+    }
+
+    // ── Lỗ châu mai ──
+    function crenellations(x, y, width, height) {
+        const unit = S * 0.013;
+        const count = Math.max(2, Math.floor(width / (unit * 2)));
+        const u = width / (count * 2 - 1);
+        g.fillStyle = C_DARK;
+        for (let i = 0; i < count; i++) {
+            g.fillRect(x + i * u * 2, y - height, u, height);
+        }
+    }
+
+    // ── Tháp: thân + mái + cửa sổ ──
+    function tower(x, basePos, w, h, roofH, opts) {
+        opts = opts || {};
+        const topY = basePos - h;
+
+        // thân — gradient dọc tối->sáng tạo khối
+        const bodyGrad = g.createLinearGradient(0, topY, 0, basePos);
+        bodyGrad.addColorStop(0, C_MID);
+        bodyGrad.addColorStop(0.45, C_DARK);
+        bodyGrad.addColorStop(1, C_HIGH);
+        g.fillStyle = bodyGrad;
+        g.fillRect(x - w/2, topY, w, h);
+
+        // gạch đá
+        g.strokeStyle = 'rgba(35, 22, 60, 0.55)';
+        g.lineWidth = S * 0.0014;
+        for (let ly = topY + S * 0.018; ly < basePos - S * 0.008; ly += S * 0.020) {
+            g.beginPath();
+            g.moveTo(x - w/2, ly);
+            g.lineTo(x + w/2, ly);
+            g.stroke();
+        }
+
+        // lỗ châu mai
+        crenellations(x - w/2, topY, w, h * 0.065);
+
+        // mái
+        if (roofH > 0) spire(x, topY - h * 0.065, w * 1.22, roofH, opts.flag);
+
+        // cửa sổ vòm
+        const cols = Math.max(1, Math.floor(w / (S * 0.022)));
+        const rows = Math.max(2, Math.floor(h / (S * 0.045)));
+        const cellW = w / cols, cellH = h / rows;
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                if ((r + c) % 3 === 1 && Math.random() < 0.35) continue;
+                if (r === 0 && Math.random() < 0.35) continue;
+                if (r === rows - 1 && Math.random() < 0.45) continue;
+
+                const wx = x - w/2 + (c + 0.5) * cellW;
+                const wy = topY + (r + 0.55) * cellH;
+                const ww = S * 0.008, wh = S * 0.018;
+                const roll = Math.random();
+                const col = roll < 0.6 ? C_WIN : (roll < 0.85 ? C_WIN2 : C_WIN3);
+
+                // hào quang quanh cửa sổ
+                if (roll < 0.45) {
+                    const glow = g.createRadialGradient(wx, wy, 0, wx, wy, ww * 3.2);
+                    glow.addColorStop(0, 'rgba(255, 190, 90, 0.45)');
+                    glow.addColorStop(1, 'rgba(255, 110, 30, 0)');
+                    g.fillStyle = glow;
+                    g.beginPath();
+                    g.arc(wx, wy, ww * 3.2, 0, Math.PI * 2);
+                    g.fill();
+                }
+
+                g.fillStyle = col;
                 g.beginPath();
-                g.arc(wx, wy, S * 0.0055, 0, Math.PI * 2);
+                g.moveTo(wx - ww/2, wy + wh/2);
+                g.lineTo(wx - ww/2, wy - wh/2 + ww * 0.5);
+                g.arc(wx, wy - wh/2 + ww * 0.5, ww/2, Math.PI, 0);
+                g.lineTo(wx + ww/2, wy + wh/2);
+                g.closePath();
                 g.fill();
             }
         }
-        g.fillStyle = '#050510';
     }
 
-    // Tường thành nối các tháp
+    // ── Tường thành ──
     function wall(x1, x2, y, h) {
-        g.fillRect(x1, y - h, x2 - x1, h);
-        // Lỗ châu mai trên đỉnh
-        const merlonW = S * 0.012;
-        const merlonGap = S * 0.014;
-        let mx = x1 + S * 0.005;
-        while (mx < x2 - merlonW) {
-            g.fillRect(mx, y - h - S * 0.018, merlonW, S * 0.018);
-            mx += merlonW + merlonGap;
+        const w = x2 - x1;
+        const grad = g.createLinearGradient(0, y - h, 0, y);
+        grad.addColorStop(0, C_DARK);
+        grad.addColorStop(1, C_MID);
+        g.fillStyle = grad;
+        g.fillRect(x1, y - h, w, h);
+        g.strokeStyle = 'rgba(35, 22, 60, 0.5)';
+        g.lineWidth = S * 0.0014;
+        for (let ly = y - h + S * 0.018; ly < y - S * 0.008; ly += S * 0.020) {
+            g.beginPath();
+            g.moveTo(x1, ly);
+            g.lineTo(x2, ly);
+            g.stroke();
         }
+        crenellations(x1, y - h, w, h * 0.15);
     }
 
-    // Bố cục lâu đài: tháp chính giữa cao nhất + 4 tháp phụ + tường
-    // Tháp chính
-    tower(cx, baseY, S * 0.085, S * 0.42, S * 0.11, true);
-    // Tháp trái gần (thấp hơn)
-    tower(cx - S * 0.16, baseY, S * 0.06, S * 0.30, S * 0.085, false);
-    // Tháp phải gần
-    tower(cx + S * 0.16, baseY, S * 0.06, S * 0.32, S * 0.09, true);
-    // Tháp ngoài cùng trái (thấp)
-    tower(cx - S * 0.30, baseY, S * 0.05, S * 0.22, S * 0.07, false);
-    // Tháp ngoài cùng phải (trung bình)
-    tower(cx + S * 0.30, baseY, S * 0.055, S * 0.26, S * 0.075, false);
-    // Tháp phụ nhỏ sau lưng (tạo chiều sâu)
-    tower(cx - S * 0.08, baseY - S * 0.01, S * 0.04, S * 0.35, S * 0.075, false);
-    tower(cx + S * 0.07, baseY - S * 0.01, S * 0.045, S * 0.38, S * 0.08, false);
+    // ═══════════ VẼ TỪ XA ĐẾN GẦN ═══════════
+    // tháp rìa xa (mờ hơn)
+    g.globalAlpha = 0.55;
+    tower(cx - S * 0.40, baseY - S * 0.01, S * 0.045, S * 0.20, S * 0.065, { flag: false });
+    tower(cx + S * 0.41, baseY - S * 0.01, S * 0.048, S * 0.22, S * 0.070, { flag: false });
+    g.globalAlpha = 1;
 
-    // Tường thành nối
-    wall(cx - S * 0.27, cx - S * 0.20, baseY, S * 0.16);
-    wall(cx - S * 0.13, cx - S * 0.05, baseY, S * 0.20);
-    wall(cx + S * 0.05, cx + S * 0.13, baseY, S * 0.20);
-    wall(cx + S * 0.19, cx + S * 0.27, baseY, S * 0.17);
+    // tường sau
+    wall(cx - S * 0.38, cx - S * 0.30, baseY - S * 0.005, S * 0.13);
+    wall(cx + S * 0.29, cx + S * 0.39, baseY - S * 0.005, S * 0.13);
+
+    // tháp ngoài
+    tower(cx - S * 0.29, baseY - S * 0.005, S * 0.05, S * 0.24, S * 0.075, { flag: false });
+    tower(cx + S * 0.28, baseY - S * 0.005, S * 0.05, S * 0.26, S * 0.080, { flag: false });
+
+    // tháp phụ sau lưng chính (tạo chiều sâu)
+    tower(cx - S * 0.10, baseY - S * 0.01, S * 0.055, S * 0.38, S * 0.095, { flag: false });
+    tower(cx + S * 0.10, baseY - S * 0.01, S * 0.058, S * 0.40, S * 0.100, { flag: true });
+
+    // tường giữa
+    wall(cx - S * 0.22, cx - S * 0.14, baseY, S * 0.17);
+    wall(cx + S * 0.14, cx + S * 0.22, baseY, S * 0.17);
+
+    // tháp 2 bên (trung)
+    tower(cx - S * 0.17, baseY, S * 0.062, S * 0.32, S * 0.095, { flag: true });
+    tower(cx + S * 0.17, baseY, S * 0.062, S * 0.34, S * 0.100, { flag: false });
+
+    // ── THÁP CHÍNH (keep) — cao nhất, trước cùng ──
+    tower(cx, baseY, S * 0.095, S * 0.50, S * 0.14, { flag: true });
+
+    // tường ngoài trước
+    wall(cx - S * 0.28, cx - S * 0.21, baseY, S * 0.12);
+    wall(cx + S * 0.21, cx + S * 0.28, baseY, S * 0.12);
+
+    // ── Cổng vòm + ánh sáng ma mị ──
+    const gw = S * 0.05, gh = S * 0.078;
+    g.fillStyle = '#020208';
+    g.beginPath();
+    g.moveTo(cx - gw/2, baseY);
+    g.lineTo(cx - gw/2, baseY - gh + gw * 0.5);
+    g.arc(cx, baseY - gh + gw * 0.5, gw/2, Math.PI, 0);
+    g.lineTo(cx + gw/2, baseY);
+    g.closePath();
+    g.fill();
+
+    const gateGlow = g.createRadialGradient(cx, baseY - gh * 0.35, 0, cx, baseY - gh * 0.35, gw * 2);
+    gateGlow.addColorStop(0,    'rgba(255, 170, 80, 0.65)');
+    gateGlow.addColorStop(0.45, 'rgba(255, 100, 40, 0.22)');
+    gateGlow.addColorStop(1,    'rgba(255, 60, 20, 0)');
+    g.fillStyle = gateGlow;
+    g.beginPath();
+    g.arc(cx, baseY - gh * 0.35, gw * 2, 0, Math.PI * 2);
+    g.fill();
 }
 
 // Dơi silhouette — 3 biến thể với kích thước cánh khác nhau
@@ -2075,6 +2277,7 @@ function renderFullscreenFx() {
     document.body.classList.toggle('fx-backdrop-on', backdrop);                // khung nội dung thành kính mờ để thấy nền phía sau
     ThreeFx.stop();                                                           // innerHTML bên dưới sẽ xoá canvas cũ
     SnowPile.stop();
+    document.querySelectorAll('.hl-spider-rig').forEach(el => el.remove());
     renderBackdropScene(active && theme === 'trungthu');
     if (!active) {
         if (layer) layer.remove();
@@ -2112,6 +2315,70 @@ function renderFullscreenFx() {
     }
     layer.innerHTML = html;
 
+        // ═══════════════════════════════════════════════════════════
+    // NHỆN TREO — chỉ hiện ở chủ đề Halloween + mức "Đêm kinh hoàng"
+    // Click vào → nhện thu lên trên, sau 5 giây đu xuống lại ở vị trí mới
+    // Đặt ở body (không nằm trong layer) vì layer Halloween có z-index: -1
+    // ═══════════════════════════════════════════════════════════
+    if (theme === 'halloween' && lvl === 2) {
+        const spiderRig = document.createElement('div');
+        spiderRig.className = 'hl-spider-rig';
+        spiderRig.id = 'hlSpiderRig';
+        spiderRig.style.left = (14 + Math.random() * 72).toFixed(1) + '%';
+        spiderRig.innerHTML = `
+            <div class="hl-spider-swing">
+                <div class="hl-spider-thread"></div>
+                <div class="hl-spider-body" role="button" tabindex="0" aria-label="Nhện ma — bấm để thu lên">
+                    <svg viewBox="0 0 100 100" aria-hidden="true">
+                        <g fill="none" stroke="#0a0510" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M40 48 Q28 40 20 32 Q16 27 20 24"/>
+                            <path d="M38 52 Q24 50 16 44 Q10 40 14 36"/>
+                            <path d="M38 56 Q24 60 16 68 Q12 72 18 74"/>
+                            <path d="M40 60 Q30 68 26 78 Q24 83 30 84"/>
+                            <path d="M60 48 Q72 40 80 32 Q84 27 80 24"/>
+                            <path d="M62 52 Q76 50 84 44 Q90 40 86 36"/>
+                            <path d="M62 56 Q76 60 84 68 Q88 72 82 74"/>
+                            <path d="M60 60 Q70 68 74 78 Q76 83 70 84"/>
+                        </g>
+                        <ellipse cx="50" cy="62" rx="16" ry="13" fill="#0a0510"/>
+                        <ellipse cx="50" cy="62" rx="10" ry="8" fill="#16051f" opacity=".9"/>
+                        <path d="M50 55 L45 62 L50 62 L45 69 L50 69 L55 62 L50 62 L55 55 Z" fill="#ff2050" opacity=".75"/>
+                        <ellipse cx="50" cy="48" rx="11" ry="9" fill="#1a0a1f"/>
+                        <circle class="spider-eye" cx="44" cy="45" r="2.1" fill="#ff2020">
+                            <animate attributeName="opacity" values="1;0.35;1" dur="1.7s" repeatCount="indefinite"/>
+                        </circle>
+                        <circle class="spider-eye" cx="56" cy="45" r="2.1" fill="#ff2020">
+                            <animate attributeName="opacity" values="1;0.35;1" dur="1.7s" repeatCount="indefinite"/>
+                        </circle>
+                        <circle cx="47" cy="42" r="1.2" fill="#ff5050"/>
+                        <circle cx="53" cy="42" r="1.2" fill="#ff5050"/>
+                        <circle cx="41" cy="47" r="1.4" fill="#ff3030"/>
+                        <circle cx="59" cy="47" r="1.4" fill="#ff3030"/>
+                    </svg>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(spiderRig);
+
+        // Click handler: thu lên → 5s sau đu xuống lại
+        const body = spiderRig.querySelector('.hl-spider-body');
+        let descendTimer = null;
+        const retract = () => {
+            if (spiderRig.classList.contains('retracted')) return;
+            spiderRig.classList.add('retracted');
+            clearTimeout(descendTimer);
+            descendTimer = setTimeout(() => {
+                spiderRig.classList.remove('retracted');
+                // đổi vị trí ngẫu nhiên cho lần đu xuống kế tiếp
+                spiderRig.style.left = (14 + Math.random() * 72).toFixed(1) + '%';
+            }, 5000);
+        };
+        body.addEventListener('click', (e) => { e.stopPropagation(); retract(); });
+        body.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); retract(); }
+        });
+    }
+    
     if (theme === 'noel' && lvl === 2) SnowPile.start(layer);                  // tuyết lớn: có đống tuyết
 
     ThreeFx.start(layer, theme, lvl).then(ok => {

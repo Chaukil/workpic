@@ -7944,3 +7944,75 @@ body.theme-light .owl3d .o-accessory { filter: none; }
 @media (prefers-reduced-motion: reduce) {
     .hl-bat, .hl-ghost, .hl-spider { animation: none; }
 }
+
+/* ============================================================
+   HALLOWEEN — NHỆN TREO TƯƠNG TÁC
+   ============================================================ */
+.hl-spider-rig {
+    position: fixed;
+    top: 0;
+    z-index: 1007;                     /* trên fx layer (1005), dưới modal (1050) */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: none;              /* chỉ phần thân nhện mới click được */
+    transform-origin: top center;
+    transition: transform 0.75s cubic-bezier(0.55, 0.05, 0.35, 1);
+    will-change: transform;
+}
+.hl-spider-rig.retracted {
+    transform: translateY(-100vh);     /* kéo hẳn lên trên đỉnh màn hình */
+}
+.hl-spider-swing {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transform-origin: top center;
+    animation: hlSpiderSway 5.5s ease-in-out infinite alternate;
+}
+.hl-spider-rig.retracted .hl-spider-swing { animation-play-state: paused; }
+
+@keyframes hlSpiderSway {
+    from { transform: rotate(-3.5deg); }
+    to   { transform: rotate(3.5deg); }
+}
+
+.hl-spider-thread {
+    width: 1.5px;
+    height: 38vh;
+    background: linear-gradient(180deg,
+        rgba(220, 220, 240, 0.9) 0%,
+        rgba(180, 180, 200, 0.55) 55%,
+        rgba(140, 140, 160, 0.3) 100%);
+    box-shadow: 0 0 3px rgba(180, 180, 220, 0.4);
+}
+
+.hl-spider-body {
+    pointer-events: auto;
+    cursor: pointer;
+    width: 72px;
+    height: 72px;
+    margin-top: -6px;
+    filter: drop-shadow(0 0 8px rgba(120, 40, 160, 0.65))
+            drop-shadow(0 4px 8px rgba(0, 0, 0, 0.55));
+    transition: filter 0.25s ease, transform 0.25s ease;
+}
+.hl-spider-body:hover {
+    filter: drop-shadow(0 0 16px rgba(220, 60, 100, 0.95))
+            drop-shadow(0 4px 10px rgba(0, 0, 0, 0.65));
+    transform: scale(1.1);
+}
+.hl-spider-body:active { transform: scale(0.96); }
+.hl-spider-body svg { width: 100%; height: 100%; display: block; }
+
+/* Tạm dừng đung đưa khi mở modal */
+body.modal-open .hl-spider-swing { animation-play-state: paused; }
+
+@media (prefers-reduced-motion: reduce) {
+    .hl-spider-swing { animation: none; }
+    .hl-spider-rig   { transition-duration: 0.3s; }
+}
+@media (max-width: 576px) {
+    .hl-spider-body { width: 56px; height: 56px; }
+    .hl-spider-thread { height: 32vh; }
+}
