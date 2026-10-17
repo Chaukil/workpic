@@ -1,6 +1,6 @@
 // Firebase Configuration - Chỉ sử dụng Firestore
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, getDocs, onSnapshot, enableIndexedDbPersistence, query, where, writeBatch, arrayUnion, arrayRemove } 
+import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, getDocs, onSnapshot, enableIndexedDbPersistence, query, where, writeBatch, arrayUnion, arrayRemove }
     from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, EmailAuthProvider, reauthenticateWithCredential, updatePassword }
     from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -203,13 +203,13 @@ function applyTheme(theme) {
 // TOPBAR THEME — trang trí riêng cho thanh header
 // ============================================================
 const TOPBAR_THEMES = [
-    { id: 'default',   name: 'Mặc định',  emoji: '☀️',  desc: 'Trời sáng/tối tự nhiên' },
-    { id: 'tet',       name: 'Tết',       emoji: '🌸',  desc: 'Hoa đào, câu đối, đèn lồng đỏ' },
-    { id: 'trungthu',  name: 'Trung Thu', emoji: '🌕',  desc: 'Trăng rằm, đèn lồng trôi' },
-    { id: 'noel',      name: 'Noel',      emoji: '🎄',  desc: 'Tuyết rơi, ông già Noel chạy ngang' },
-    { id: 'rain',      name: 'Mưa',       emoji: '🌧️', desc: 'Mưa rơi, mây đen, chớp' },
-    { id: 'space',     name: 'Vũ trụ',    emoji: '🪐',  desc: 'Sao lấp lánh, hành tinh, tàu vũ trụ' },
-    { id: 'halloween', name: 'Halloween', emoji: '🎃',  desc: 'Bí ngô, dơi, ma, mèo đen, sương mù' }
+    { id: 'default', name: 'Mặc định', emoji: '☀️', desc: 'Trời sáng/tối tự nhiên' },
+    { id: 'tet', name: 'Tết', emoji: '🌸', desc: 'Hoa đào, câu đối, đèn lồng đỏ' },
+    { id: 'trungthu', name: 'Trung Thu', emoji: '🌕', desc: 'Trăng rằm, đèn lồng trôi' },
+    { id: 'noel', name: 'Noel', emoji: '🎄', desc: 'Tuyết rơi, ông già Noel chạy ngang' },
+    { id: 'rain', name: 'Mưa', emoji: '🌧️', desc: 'Mưa rơi, mây đen, chớp' },
+    { id: 'space', name: 'Vũ trụ', emoji: '🪐', desc: 'Sao lấp lánh, hành tinh, tàu vũ trụ' },
+    { id: 'halloween', name: 'Halloween', emoji: '🎃', desc: 'Bí ngô, dơi, ma, mèo đen, sương mù' }
 ];
 const TOPBAR_THEME_STORAGE_KEY = 'workpic-topbar-theme';
 let currentTopbarTheme = 'default';
@@ -218,12 +218,12 @@ let currentTopbarTheme = 'default';
 const FX_FULLSCREEN_KEY = 'workpic-fx-fullscreen';
 let fxFullscreen = false;
 const FX_CONFIG = {
-    tet:       { glyphs: ['🌸', '🌸', '💮', '🌺'],                count: 26, size: [14, 24], dur: [9, 16] },
-    trungthu:  { glyphs: ['⭐', '✨', '🌟', '⭐'],                count: 28, size: [12, 22], dur: [8, 15] },
-    noel:      { glyphs: ['❄\uFE0E', '❅', '❆', '•'],            count: 50, size: [10, 22], dur: [7, 14] },
-    rain:      { rain: true,                                       count: 80, dur: [0.7, 1.3] },
-    space:     { galaxy: true,                                     count: 24, dur: [22, 40] },
-    halloween: { glyphs: ['🎃', '👻', '🦇', '🕷️', '🕸️', '💀'],  count: 32, size: [14, 26], dur: [8, 15] }
+    tet: { glyphs: ['🌸', '🌸', '💮', '🌺'], count: 26, size: [14, 24], dur: [9, 16] },
+    trungthu: { glyphs: ['⭐', '✨', '🌟', '⭐'], count: 28, size: [12, 22], dur: [8, 15] },
+    noel: { glyphs: ['❄\uFE0E', '❅', '❆', '•'], count: 50, size: [10, 22], dur: [7, 14] },
+    rain: { rain: true, count: 80, dur: [0.7, 1.3] },
+    space: { galaxy: true, count: 24, dur: [22, 40] },
+    halloween: { glyphs: ['🎃', '👻', '🦇', '🕷️', '🕸️', '💀'], count: 32, size: [14, 26], dur: [8, 15] }
 };
 
 // Thiên hà xoắn ốc (SVG): 2 nhánh xoắn logarit, bụi sao rải dọc nhánh, lõi sáng ấm — xoay rất chậm
@@ -244,13 +244,13 @@ function buildGalaxySvg() {
             const jitter = 1 + (Math.random() + Math.random() + Math.random() - 1.5) * 0.28;
             const r = A0 * Math.exp(B * t) * jitter;
             const normR = Math.min(1, r / 90);
-let col;
-if (normR < 0.15)      col = ['#fff8e0', '#ffd98a', '#ffc07a'][Math.floor(Math.random()*3)];
-else if (normR < 0.32) col = ['#ffb86b', '#ff9a7a', '#ff8fb0'][Math.floor(Math.random()*3)];
-else if (normR < 0.50) col = ['#ff8fb0', '#d989d9', '#c77dff'][Math.floor(Math.random()*3)];
-else if (normR < 0.68) col = ['#9b8bf0', '#6a92f0', '#87b5ff'][Math.floor(Math.random()*3)];
-else if (normR < 0.85) col = ['#6a92f0', '#4a72e0', '#3a55b8'][Math.floor(Math.random()*3)];
-else                   col = ['#4a72e0', '#3a55b8', '#8ee6ff'][Math.floor(Math.random()*3)];
+            let col;
+            if (normR < 0.15) col = ['#fff8e0', '#ffd98a', '#ffc07a'][Math.floor(Math.random() * 3)];
+            else if (normR < 0.32) col = ['#ffb86b', '#ff9a7a', '#ff8fb0'][Math.floor(Math.random() * 3)];
+            else if (normR < 0.50) col = ['#ff8fb0', '#d989d9', '#c77dff'][Math.floor(Math.random() * 3)];
+            else if (normR < 0.68) col = ['#9b8bf0', '#6a92f0', '#87b5ff'][Math.floor(Math.random() * 3)];
+            else if (normR < 0.85) col = ['#6a92f0', '#4a72e0', '#3a55b8'][Math.floor(Math.random() * 3)];
+            else col = ['#4a72e0', '#3a55b8', '#8ee6ff'][Math.floor(Math.random() * 3)];
 
             dust += `<circle cx="${(r * Math.cos(t + off)).toFixed(1)}" cy="${(r * Math.sin(t + off)).toFixed(1)}" r="${rnd(0.15, 0.5).toFixed(2)}" fill="${col}" opacity="${rnd(0.35, 1).toFixed(2)}"/>`;
         }
@@ -611,21 +611,21 @@ const ThreeFx = (() => {
 
     // hạt rơi/bay có texture. o: {count, texture, atlas:[c,r], size:[a,b], speed:[a,b], z:[a,b], sway, wind, spin, flip, dir, alpha, colors[], blend, lightMul[], lightBlend}
     function fallPoints(ctx, o) {
-    const { THREE } = ctx;
-    const n = Math.max(1, Math.round(o.count));
-    const pos = new Float32Array(n * 3), rnd = new Float32Array(n * 4), col = new Float32Array(n * 3), tmp = new THREE.Color();
-    const xr = o.xRange || [-1, 1];               // ← giới hạn trục X (world space)
-    for (let i = 0; i < n; i++) {
-        pos[i * 3]     = R(xr[0], xr[1]);         // ← thay vì R(-1, 1)
-        pos[i * 3 + 1] = R(-1, 1);
-        pos[i * 3 + 2] = R(o.z[0], o.z[1]);
-        rnd[i * 4]     = Math.random();
-        rnd[i * 4 + 1] = R(o.speed[0], o.speed[1]);
-        rnd[i * 4 + 2] = R(o.size[0], o.size[1]);
-        rnd[i * 4 + 3] = Math.random();
-        tmp.set(o.colors[Math.floor(Math.random() * o.colors.length)]);
-        col[i * 3] = tmp.r; col[i * 3 + 1] = tmp.g; col[i * 3 + 2] = tmp.b;
-    }
+        const { THREE } = ctx;
+        const n = Math.max(1, Math.round(o.count));
+        const pos = new Float32Array(n * 3), rnd = new Float32Array(n * 4), col = new Float32Array(n * 3), tmp = new THREE.Color();
+        const xr = o.xRange || [-1, 1];               // ← giới hạn trục X (world space)
+        for (let i = 0; i < n; i++) {
+            pos[i * 3] = R(xr[0], xr[1]);         // ← thay vì R(-1, 1)
+            pos[i * 3 + 1] = R(-1, 1);
+            pos[i * 3 + 2] = R(o.z[0], o.z[1]);
+            rnd[i * 4] = Math.random();
+            rnd[i * 4 + 1] = R(o.speed[0], o.speed[1]);
+            rnd[i * 4 + 2] = R(o.size[0], o.size[1]);
+            rnd[i * 4 + 3] = Math.random();
+            tmp.set(o.colors[Math.floor(Math.random() * o.colors.length)]);
+            col[i * 3] = tmp.r; col[i * 3 + 1] = tmp.g; col[i * 3 + 2] = tmp.b;
+        }
         const geo = new THREE.BufferGeometry();
         geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
         geo.setAttribute('aRand', new THREE.BufferAttribute(rnd, 4));
@@ -701,23 +701,23 @@ const ThreeFx = (() => {
         count = Math.max(1, Math.round(count));
         const sp = new Float32Array(count * 3), sc = new Float32Array(count * 3), ss = new Float32Array(count), sph = new Float32Array(count);
         const cols = [
-    new THREE.Color('#ffffff'),   // trắng (phổ biến)
-    new THREE.Color('#cfe0ff'),   // xanh nhạt
-    new THREE.Color('#9db8ff'),   // xanh lam
-    new THREE.Color('#ffe2b8'),   // kem ấm
-    new THREE.Color('#ffb088'),   // cam-đỏ (red giant)
-    new THREE.Color('#ff9ec9'),   // hồng
-    new THREE.Color('#a8f0ff')    // xanh lơ (cyan)
-];        for (let i = 0; i < count; i++) {
+            new THREE.Color('#ffffff'),   // trắng (phổ biến)
+            new THREE.Color('#cfe0ff'),   // xanh nhạt
+            new THREE.Color('#9db8ff'),   // xanh lam
+            new THREE.Color('#ffe2b8'),   // kem ấm
+            new THREE.Color('#ffb088'),   // cam-đỏ (red giant)
+            new THREE.Color('#ff9ec9'),   // hồng
+            new THREE.Color('#a8f0ff')    // xanh lơ (cyan)
+        ]; for (let i = 0; i < count; i++) {
             const z = -4 - Math.random() * 22;
             const dist = CAM_Z - z, halfH = dist * TAN;
             sp[i * 3] = (Math.random() * 2 - 1) * halfH * 2.6;
             sp[i * 3 + 1] = (Math.random() * 2 - 1) * halfH * 1.08;
             sp[i * 3 + 2] = z;
-           const roll = Math.random();
-const cc = roll < 0.65
-    ? cols[Math.floor(Math.random() * 3)]         // trắng, xanh nhạt, xanh lam
-    : cols[3 + Math.floor(Math.random() * 4)];    // kem, cam-đỏ, hồng, cyan
+            const roll = Math.random();
+            const cc = roll < 0.65
+                ? cols[Math.floor(Math.random() * 3)]         // trắng, xanh nhạt, xanh lam
+                : cols[3 + Math.floor(Math.random() * 4)];    // kem, cam-đỏ, hồng, cyan
             sc[i * 3] = cc.r; sc[i * 3 + 1] = cc.g; sc[i * 3 + 2] = cc.b;
             ss[i] = 0.3 + Math.pow(Math.random(), 2.5) * 0.9;
             sph[i] = Math.random();
@@ -744,200 +744,200 @@ const cc = roll < 0.65
 
     // ---------------------------------------------------------- các chủ đề (ctx.lvl: 0 nhẹ · 1 vừa · 2 dữ dội)
     function buildSpace(ctx) {
-    const { THREE, lowEnd, pixel, lvl } = ctx;
-    const N = lowEnd ? 48000 : 100000;
-    const RAD = 6.2, BRANCHES = 2, SPIN = 1.25, RANDOMNESS = 0.55, RPOWER = 1.8;
-    const zoom       = [1.3, 1.75, 2.4][lvl];
-    const gain       = [0.85, 1.35, 1.9][lvl];
-    const spinSpeed  = [0.012, 0.026, 0.06][lvl];
-    const parallax   = [0.7, 1.2, 2.2][lvl];
+        const { THREE, lowEnd, pixel, lvl } = ctx;
+        const N = lowEnd ? 48000 : 100000;
+        const RAD = 6.2, BRANCHES = 2, SPIN = 1.25, RANDOMNESS = 0.55, RPOWER = 1.8;
+        const zoom = [1.3, 1.75, 2.4][lvl];
+        const gain = [0.85, 1.35, 1.9][lvl];
+        const spinSpeed = [0.012, 0.026, 0.06][lvl];
+        const parallax = [0.7, 1.2, 2.2][lvl];
 
-    const pos = new Float32Array(N * 3), col = new Float32Array(N * 3), scl = new Float32Array(N), ph = new Float32Array(N);
+        const pos = new Float32Array(N * 3), col = new Float32Array(N * 3), scl = new Float32Array(N), ph = new Float32Array(N);
 
-    // ═══════════════════════════════════════════════════════════════
-    // BẢNG MÀU THIÊN HÀ — 6 dải chuyển tiếp như thiên hà thật:
-    //   lõi kem-vàng  →  cam  →  đào  →  hồng tinh vân  →  tím  →  xanh navy
-    // ═══════════════════════════════════════════════════════════════
-    const cCore    = new THREE.Color('#fff8e0');   // lõi trắng-kem
-    const cGold    = new THREE.Color('#ffd98a');   // vàng nắng
-    const cOrange  = new THREE.Color('#ffb86b');   // cam vàng (dust lane ấm)
-    const cPeach   = new THREE.Color('#ff9a7a');   // đào
-    const cPink    = new THREE.Color('#ff8fb0');   // hồng tinh vân
-    const cMagenta = new THREE.Color('#d989d9');   // hồng-tím
-    const cPurple  = new THREE.Color('#9b8bf0');   // tím xanh
-    const cBlue    = new THREE.Color('#6a92f0');   // xanh dương
-    const cBrightB = new THREE.Color('#4a72e0');   // xanh dương đậm
-    const cNavy    = new THREE.Color('#3a55b8');   // rìa xanh navy
-    const cCyan    = new THREE.Color('#8ee6ff');   // xanh lơ (cụm sao trẻ)
-    const cWhite   = new THREE.Color('#ffffff');   // sao trắng
-    const tmp = new THREE.Color();
-    const bulgeN = Math.floor(N * 0.14);
+        // ═══════════════════════════════════════════════════════════════
+        // BẢNG MÀU THIÊN HÀ — 6 dải chuyển tiếp như thiên hà thật:
+        //   lõi kem-vàng  →  cam  →  đào  →  hồng tinh vân  →  tím  →  xanh navy
+        // ═══════════════════════════════════════════════════════════════
+        const cCore = new THREE.Color('#fff8e0');   // lõi trắng-kem
+        const cGold = new THREE.Color('#ffd98a');   // vàng nắng
+        const cOrange = new THREE.Color('#ffb86b');   // cam vàng (dust lane ấm)
+        const cPeach = new THREE.Color('#ff9a7a');   // đào
+        const cPink = new THREE.Color('#ff8fb0');   // hồng tinh vân
+        const cMagenta = new THREE.Color('#d989d9');   // hồng-tím
+        const cPurple = new THREE.Color('#9b8bf0');   // tím xanh
+        const cBlue = new THREE.Color('#6a92f0');   // xanh dương
+        const cBrightB = new THREE.Color('#4a72e0');   // xanh dương đậm
+        const cNavy = new THREE.Color('#3a55b8');   // rìa xanh navy
+        const cCyan = new THREE.Color('#8ee6ff');   // xanh lơ (cụm sao trẻ)
+        const cWhite = new THREE.Color('#ffffff');   // sao trắng
+        const tmp = new THREE.Color();
+        const bulgeN = Math.floor(N * 0.14);
 
-    for (let i = 0; i < N; i++) {
-        let x, y, z;
-        if (i < bulgeN) {
-            // ══════ LÕI PHÌNH: kem → vàng → cam ══════
-            const r = Math.pow(Math.random(), 2.2) * RAD * 0.22;
-            const th = Math.random() * Math.PI * 2, ph2 = Math.acos(2 * Math.random() - 1);
-            x = r * Math.sin(ph2) * Math.cos(th);
-            y = r * Math.cos(ph2) * 0.55;
-            z = r * Math.sin(ph2) * Math.sin(th);
-            const t = Math.min(1, r / (RAD * 0.22));
-            tmp.copy(cCore).lerp(cGold, t * 0.85).lerp(cOrange, t * t * 0.45);
-            tmp.multiplyScalar(0.7);
-            scl[i] = 0.3 + Math.random() * 0.5;
-        } else {
-            // ══════ NHÁNH XOẮN ══════
-            const radius = Math.random() * RAD;
-            const spinA = radius * SPIN;
-            const branchA = ((i % BRANCHES) / BRANCHES) * Math.PI * 2;
-            const sx = Math.random() < 0.5 ? 1 : -1, sy = Math.random() < 0.5 ? 1 : -1, sz = Math.random() < 0.5 ? 1 : -1;
-            const rx = Math.pow(Math.random(), RPOWER) * sx * RANDOMNESS * radius * 0.7;
-            const ry = Math.pow(Math.random(), RPOWER) * sy * RANDOMNESS * radius * 0.14;
-            const rz = Math.pow(Math.random(), RPOWER) * sz * RANDOMNESS * radius * 0.7;
-            x = Math.cos(branchA + spinA) * radius + rx;
-            y = ry;
-            z = Math.sin(branchA + spinA) * radius + rz;
-
-            const t = radius / RAD;      // 0 = tâm · 1 = rìa
-            const rnd = Math.random();
-
-            // ─── Nền màu theo bán kính — 7 dải mịn ───
-            if (t < 0.10) {
-                tmp.copy(cGold).lerp(cOrange, t / 0.10);
-            } else if (t < 0.25) {
-                tmp.copy(cOrange).lerp(cPeach, (t - 0.10) / 0.15);
-            } else if (t < 0.42) {
-                tmp.copy(cPeach).lerp(cPink, (t - 0.25) / 0.17);
-            } else if (t < 0.58) {
-                tmp.copy(cPink).lerp(cMagenta, (t - 0.42) / 0.16);
-            } else if (t < 0.74) {
-                tmp.copy(cMagenta).lerp(cPurple, (t - 0.58) / 0.16);
-            } else if (t < 0.88) {
-                tmp.copy(cPurple).lerp(cBlue, (t - 0.74) / 0.14);
+        for (let i = 0; i < N; i++) {
+            let x, y, z;
+            if (i < bulgeN) {
+                // ══════ LÕI PHÌNH: kem → vàng → cam ══════
+                const r = Math.pow(Math.random(), 2.2) * RAD * 0.22;
+                const th = Math.random() * Math.PI * 2, ph2 = Math.acos(2 * Math.random() - 1);
+                x = r * Math.sin(ph2) * Math.cos(th);
+                y = r * Math.cos(ph2) * 0.55;
+                z = r * Math.sin(ph2) * Math.sin(th);
+                const t = Math.min(1, r / (RAD * 0.22));
+                tmp.copy(cCore).lerp(cGold, t * 0.85).lerp(cOrange, t * t * 0.45);
+                tmp.multiplyScalar(0.7);
+                scl[i] = 0.3 + Math.random() * 0.5;
             } else {
-                tmp.copy(cBlue).lerp(cNavy, (t - 0.88) / 0.12);
-            }
+                // ══════ NHÁNH XOẮN ══════
+                const radius = Math.random() * RAD;
+                const spinA = radius * SPIN;
+                const branchA = ((i % BRANCHES) / BRANCHES) * Math.PI * 2;
+                const sx = Math.random() < 0.5 ? 1 : -1, sy = Math.random() < 0.5 ? 1 : -1, sz = Math.random() < 0.5 ? 1 : -1;
+                const rx = Math.pow(Math.random(), RPOWER) * sx * RANDOMNESS * radius * 0.7;
+                const ry = Math.pow(Math.random(), RPOWER) * sy * RANDOMNESS * radius * 0.14;
+                const rz = Math.pow(Math.random(), RPOWER) * sz * RANDOMNESS * radius * 0.7;
+                x = Math.cos(branchA + spinA) * radius + rx;
+                y = ry;
+                z = Math.sin(branchA + spinA) * radius + rz;
 
-            // ─── Các "CỤM ĐẶC BIỆT" ngẫu nhiên (như ảnh thiên hà thật) ───
-            if (rnd < 0.05) {
-                // Cụm sao trẻ xanh lơ — OB association
-                tmp.copy(cBlue).lerp(cCyan, 0.5 + Math.random() * 0.5);
-            } else if (rnd < 0.09) {
-                // Vùng tinh vân hồng đậm — điểm nhấn ấn tượng
-                tmp.copy(cPink).lerp(cMagenta, Math.random() * 0.7);
-                tmp.multiplyScalar(1.15);
-            } else if (rnd < 0.12) {
-                // Sao trắng sáng — lấp lánh
-                tmp.copy(cWhite);
-            } else if (rnd < 0.145 && t > 0.35) {
-                // Vệt xanh dương sáng ở rìa (dải băng ngoài)
-                tmp.copy(cBrightB).lerp(cBlue, Math.random() * 0.5);
-            }
+                const t = radius / RAD;      // 0 = tâm · 1 = rìa
+                const rnd = Math.random();
 
-            scl[i] = (0.3 + Math.pow(Math.random(), 3) * 1.0) * (0.9 + t * 0.6);
-            if (rnd >= 0.09 && rnd < 0.12) scl[i] *= 1.35;   // sao trắng & tinh vân to hơn chút
+                // ─── Nền màu theo bán kính — 7 dải mịn ───
+                if (t < 0.10) {
+                    tmp.copy(cGold).lerp(cOrange, t / 0.10);
+                } else if (t < 0.25) {
+                    tmp.copy(cOrange).lerp(cPeach, (t - 0.10) / 0.15);
+                } else if (t < 0.42) {
+                    tmp.copy(cPeach).lerp(cPink, (t - 0.25) / 0.17);
+                } else if (t < 0.58) {
+                    tmp.copy(cPink).lerp(cMagenta, (t - 0.42) / 0.16);
+                } else if (t < 0.74) {
+                    tmp.copy(cMagenta).lerp(cPurple, (t - 0.58) / 0.16);
+                } else if (t < 0.88) {
+                    tmp.copy(cPurple).lerp(cBlue, (t - 0.74) / 0.14);
+                } else {
+                    tmp.copy(cBlue).lerp(cNavy, (t - 0.88) / 0.12);
+                }
+
+                // ─── Các "CỤM ĐẶC BIỆT" ngẫu nhiên (như ảnh thiên hà thật) ───
+                if (rnd < 0.05) {
+                    // Cụm sao trẻ xanh lơ — OB association
+                    tmp.copy(cBlue).lerp(cCyan, 0.5 + Math.random() * 0.5);
+                } else if (rnd < 0.09) {
+                    // Vùng tinh vân hồng đậm — điểm nhấn ấn tượng
+                    tmp.copy(cPink).lerp(cMagenta, Math.random() * 0.7);
+                    tmp.multiplyScalar(1.15);
+                } else if (rnd < 0.12) {
+                    // Sao trắng sáng — lấp lánh
+                    tmp.copy(cWhite);
+                } else if (rnd < 0.145 && t > 0.35) {
+                    // Vệt xanh dương sáng ở rìa (dải băng ngoài)
+                    tmp.copy(cBrightB).lerp(cBlue, Math.random() * 0.5);
+                }
+
+                scl[i] = (0.3 + Math.pow(Math.random(), 3) * 1.0) * (0.9 + t * 0.6);
+                if (rnd >= 0.09 && rnd < 0.12) scl[i] *= 1.35;   // sao trắng & tinh vân to hơn chút
+            }
+            pos[i * 3] = x; pos[i * 3 + 1] = y; pos[i * 3 + 2] = z;
+            col[i * 3] = tmp.r; col[i * 3 + 1] = tmp.g; col[i * 3 + 2] = tmp.b;
+            ph[i] = Math.random();
         }
-        pos[i * 3] = x; pos[i * 3 + 1] = y; pos[i * 3 + 2] = z;
-        col[i * 3] = tmp.r; col[i * 3 + 1] = tmp.g; col[i * 3 + 2] = tmp.b;
-        ph[i] = Math.random();
-    }
 
-    const gGeo = new THREE.BufferGeometry();
-    gGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    gGeo.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
-    gGeo.setAttribute('aScale', new THREE.BufferAttribute(scl, 1));
-    gGeo.setAttribute('aPhase', new THREE.BufferAttribute(ph, 1));
-    const gMat = pointMaterial(THREE, 34, 1.0, pixel, gain);
-    const galaxy = new THREE.Points(gGeo, gMat);
-    galaxy.frustumCulled = false;
+        const gGeo = new THREE.BufferGeometry();
+        gGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        gGeo.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
+        gGeo.setAttribute('aScale', new THREE.BufferAttribute(scl, 1));
+        gGeo.setAttribute('aPhase', new THREE.BufferAttribute(ph, 1));
+        const gMat = pointMaterial(THREE, 34, 1.0, pixel, gain);
+        const galaxy = new THREE.Points(gGeo, gMat);
+        galaxy.frustumCulled = false;
 
-    const tilt = new THREE.Group();
-    tilt.rotation.x = 0.47;
-    tilt.rotation.z = -0.28;
-    tilt.add(galaxy);
+        const tilt = new THREE.Group();
+        tilt.rotation.x = 0.47;
+        tilt.rotation.z = -0.28;
+        tilt.add(galaxy);
 
-    // ═══ LÕI phát sáng: kem → vàng → cam ấm (thay vì chỉ trắng-kem) ═══
-    const coreTex = T.glow(THREE, [
-        [0,    'rgba(255,246,214,1)'],
-        [0.22, 'rgba(255,210,140,.75)'],
-        [0.55, 'rgba(255,160,90,.35)'],
-        [1,    'rgba(255,140,80,0)']
-    ]);
-    const core = new THREE.Sprite(new THREE.SpriteMaterial({
-        map: coreTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.7
-    }));
-    core.scale.set(4.6, 4.6, 1);
-    tilt.add(core);
+        // ═══ LÕI phát sáng: kem → vàng → cam ấm (thay vì chỉ trắng-kem) ═══
+        const coreTex = T.glow(THREE, [
+            [0, 'rgba(255,246,214,1)'],
+            [0.22, 'rgba(255,210,140,.75)'],
+            [0.55, 'rgba(255,160,90,.35)'],
+            [1, 'rgba(255,140,80,0)']
+        ]);
+        const core = new THREE.Sprite(new THREE.SpriteMaterial({
+            map: coreTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.7
+        }));
+        core.scale.set(4.6, 4.6, 1);
+        tilt.add(core);
 
-    // ═══ HÀO QUANG: tím-hồng → xanh-tím → xanh dương (thay vì chỉ 1 màu xanh) ═══
-    const haloTex = T.glow(THREE, [
-        [0,    'rgba(200,160,255,.55)'],
-        [0.35, 'rgba(130,150,255,.38)'],
-        [0.7,  'rgba(70,110,230,.18)'],
-        [1,    'rgba(40,60,200,0)']
-    ]);
-    const halo = new THREE.Mesh(
-        new THREE.PlaneGeometry(RAD * 2.8, RAD * 2.8),
-        new THREE.MeshBasicMaterial({
-            map: haloTex, blending: THREE.AdditiveBlending, depthWrite: false,
-            transparent: true, opacity: 0.55, side: THREE.DoubleSide
-        })
-    );
-    halo.rotation.x = -Math.PI / 2;
-    tilt.add(halo);
+        // ═══ HÀO QUANG: tím-hồng → xanh-tím → xanh dương (thay vì chỉ 1 màu xanh) ═══
+        const haloTex = T.glow(THREE, [
+            [0, 'rgba(200,160,255,.55)'],
+            [0.35, 'rgba(130,150,255,.38)'],
+            [0.7, 'rgba(70,110,230,.18)'],
+            [1, 'rgba(40,60,200,0)']
+        ]);
+        const halo = new THREE.Mesh(
+            new THREE.PlaneGeometry(RAD * 2.8, RAD * 2.8),
+            new THREE.MeshBasicMaterial({
+                map: haloTex, blending: THREE.AdditiveBlending, depthWrite: false,
+                transparent: true, opacity: 0.55, side: THREE.DoubleSide
+            })
+        );
+        halo.rotation.x = -Math.PI / 2;
+        tilt.add(halo);
 
-    // ═══ LỚP TINH VÂN HỒNG — lớp mới, đặc trưng của thiên hà xoắn ốc ═══
-    const nebulaTex = T.glow(THREE, [
-        [0,    'rgba(255,150,200,0)'],
-        [0.4,  'rgba(255,120,190,.22)'],
-        [0.7,  'rgba(200,100,220,.15)'],
-        [1,    'rgba(150,80,200,0)']
-    ]);
-    const nebula = new THREE.Mesh(
-        new THREE.PlaneGeometry(RAD * 2.1, RAD * 2.1),
-        new THREE.MeshBasicMaterial({
-            map: nebulaTex, blending: THREE.AdditiveBlending, depthWrite: false,
-            transparent: true, opacity: 0.5, side: THREE.DoubleSide
-        })
-    );
-    nebula.rotation.x = -Math.PI / 2;
-    tilt.add(nebula);
+        // ═══ LỚP TINH VÂN HỒNG — lớp mới, đặc trưng của thiên hà xoắn ốc ═══
+        const nebulaTex = T.glow(THREE, [
+            [0, 'rgba(255,150,200,0)'],
+            [0.4, 'rgba(255,120,190,.22)'],
+            [0.7, 'rgba(200,100,220,.15)'],
+            [1, 'rgba(150,80,200,0)']
+        ]);
+        const nebula = new THREE.Mesh(
+            new THREE.PlaneGeometry(RAD * 2.1, RAD * 2.1),
+            new THREE.MeshBasicMaterial({
+                map: nebulaTex, blending: THREE.AdditiveBlending, depthWrite: false,
+                transparent: true, opacity: 0.5, side: THREE.DoubleSide
+            })
+        );
+        nebula.rotation.x = -Math.PI / 2;
+        tilt.add(nebula);
 
-    ctx.scene.add(tilt);
-    ctx.own(gGeo, gMat, coreTex, haloTex, nebulaTex,
+        ctx.scene.add(tilt);
+        ctx.own(gGeo, gMat, coreTex, haloTex, nebulaTex,
             core.material, halo.geometry, halo.material, nebula.geometry, nebula.material);
-    ctx.timeMats.push(gMat);
-    ctx.lightFns.push(light => {
-        gMat.uniforms.uLight.value = light ? 1 : 0;
-        gMat.blending = light ? THREE.NormalBlending : THREE.AdditiveBlending;
-        gMat.needsUpdate = true;
-        core.visible = !light; halo.visible = !light; nebula.visible = !light;
-    });
-    starField(ctx, [500, 1500, 3000][lvl] * (lowEnd ? 0.5 : 1), 40, 1.0, gain);
+        ctx.timeMats.push(gMat);
+        ctx.lightFns.push(light => {
+            gMat.uniforms.uLight.value = light ? 1 : 0;
+            gMat.blending = light ? THREE.NormalBlending : THREE.AdditiveBlending;
+            gMat.needsUpdate = true;
+            core.visible = !light; halo.visible = !light; nebula.visible = !light;
+        });
+        starField(ctx, [500, 1500, 3000][lvl] * (lowEnd ? 0.5 : 1), 40, 1.0, gain);
 
-    ctx.onFit.push((aspect) => tilt.scale.setScalar(Math.max(0.55, Math.min(1.15, aspect / 1.6)) * zoom));
-    ctx.updaters.push((dt, t, s) => {
-        galaxy.rotation.y += dt * spinSpeed;
-        halo.rotation.z   = (halo.rotation.z   || 0) + dt * spinSpeed * 0.4;   // hào quang xoay chậm
-        nebula.rotation.z = (nebula.rotation.z || 0) - dt * spinSpeed * 0.3;   // tinh vân ngược chiều
-        s.cx += (s.mx * 0.35 * parallax - s.cx) * 0.04;
-        s.cy += (-s.my * 0.22 * parallax - s.cy) * 0.04;
-        ctx.camera.position.x = s.cx;
-        ctx.camera.position.y = s.cy;
-        ctx.camera.lookAt(0, 0, 0);
-    });
-}
+        ctx.onFit.push((aspect) => tilt.scale.setScalar(Math.max(0.55, Math.min(1.15, aspect / 1.6)) * zoom));
+        ctx.updaters.push((dt, t, s) => {
+            galaxy.rotation.y += dt * spinSpeed;
+            halo.rotation.z = (halo.rotation.z || 0) + dt * spinSpeed * 0.4;   // hào quang xoay chậm
+            nebula.rotation.z = (nebula.rotation.z || 0) - dt * spinSpeed * 0.3;   // tinh vân ngược chiều
+            s.cx += (s.mx * 0.35 * parallax - s.cx) * 0.04;
+            s.cy += (-s.my * 0.22 * parallax - s.cy) * 0.04;
+            ctx.camera.position.x = s.cx;
+            ctx.camera.position.y = s.cy;
+            ctx.camera.lookAt(0, 0, 0);
+        });
+    }
 
     function buildNoel(ctx) {
         const { THREE, lvl, cnt } = ctx;
         const snow = T.snow(THREE);
         // hạt bokeh xa/gần (các biến thể 4,5 nhiều hơn vì mềm); bông tinh thể chi tiết đi kèm
         const P = [
-    { dots: 180, dotSize: [2.0, 4.5], dotSpeed: [0.25, 0.7], flakes: 25,  flakeSize: [8, 14],  flakeSpeed: [0.25, 0.55], wind: 0.02, sway: 0.2 },
-    { dots: 700, dotSize: [3.0, 8.5], dotSpeed: [0.5, 1.4],  flakes: 170, flakeSize: [11, 22], flakeSpeed: [0.4, 1.0],   wind: 0.12, sway: 0.55 },
-    { dots: 1600,dotSize: [4.0, 12],  dotSpeed: [1.0, 2.4],  flakes: 550, flakeSize: [16, 36], flakeSpeed: [0.8, 2.0],   wind: 0.45, sway: 1.2 }
-][lvl];
+            { dots: 180, dotSize: [2.0, 4.5], dotSpeed: [0.25, 0.7], flakes: 25, flakeSize: [8, 14], flakeSpeed: [0.25, 0.55], wind: 0.02, sway: 0.2 },
+            { dots: 700, dotSize: [3.0, 8.5], dotSpeed: [0.5, 1.4], flakes: 170, flakeSize: [11, 22], flakeSpeed: [0.4, 1.0], wind: 0.12, sway: 0.55 },
+            { dots: 1600, dotSize: [4.0, 12], dotSpeed: [1.0, 2.4], flakes: 550, flakeSize: [16, 36], flakeSpeed: [0.8, 2.0], wind: 0.45, sway: 1.2 }
+        ][lvl];
         fallPoints(ctx, {
             count: cnt(P.dots), texture: snow, atlas: [3, 2], size: P.dotSize, speed: P.dotSpeed, z: [-12, 4],
             sway: P.sway, wind: P.wind, spin: 0.6, flip: 0, dir: 1, alpha: 0.85, colors: ['#ffffff', '#eaf3ff'],
@@ -951,61 +951,61 @@ const cc = roll < 0.65
     }
 
     function buildTet(ctx) {
-    const { THREE, lvl, cnt } = ctx;
-    const P = [
-        { blossom: 10,  petal: 12,  gift: 0,  spark: 8,   speed: [0.30, 0.70], wind: 0.05 },
-        { blossom: 40,  petal: 70,  gift: 10, spark: 60,  speed: [0.55, 1.25], wind: 0.15 },
-        { blossom: 120, petal: 200, gift: 45, spark: 180, speed: [1.00, 2.40], wind: 0.35 }
-    ][lvl];
+        const { THREE, lvl, cnt } = ctx;
+        const P = [
+            { blossom: 10, petal: 12, gift: 0, spark: 8, speed: [0.30, 0.70], wind: 0.05 },
+            { blossom: 40, petal: 70, gift: 10, spark: 60, speed: [0.55, 1.25], wind: 0.15 },
+            { blossom: 120, petal: 200, gift: 45, spark: 180, speed: [1.00, 2.40], wind: 0.35 }
+        ][lvl];
 
-    // Hoa đào / hoa mai nguyên bông — rơi từ tán cây bên trái
-    fallPoints(ctx, {
-        count: cnt(P.blossom),
-        texture: T.blossoms(THREE), atlas: [2, 1],
-        size: [26, 56], speed: P.speed, z: [-9, 4],
-        xRange: [-0.95, -0.30],                                  // ← neo vùng trái
-        sway: 1.0, wind: P.wind, spin: 2.2, flip: 0.85, dir: 1, alpha: 1,
-        colors: ['#ffffff'], blend: THREE.NormalBlending,
-        lightMul: [0.95, 0.92, 0.92], lightBlend: THREE.NormalBlending
-    });
+        // Hoa đào / hoa mai nguyên bông — rơi từ tán cây bên trái
+        fallPoints(ctx, {
+            count: cnt(P.blossom),
+            texture: T.blossoms(THREE), atlas: [2, 1],
+            size: [26, 56], speed: P.speed, z: [-9, 4],
+            xRange: [-0.95, -0.30],                                  // ← neo vùng trái
+            sway: 1.0, wind: P.wind, spin: 2.2, flip: 0.85, dir: 1, alpha: 1,
+            colors: ['#ffffff'], blend: THREE.NormalBlending,
+            lightMul: [0.95, 0.92, 0.92], lightBlend: THREE.NormalBlending
+        });
 
-    // Cánh hoa rời — cũng rơi từ tán cây
-    fallPoints(ctx, {
-        count: cnt(P.petal),
-        texture: T.petals(THREE), atlas: [2, 1],
-        size: [16, 36], speed: P.speed, z: [-10, 4],
-        xRange: [-1.00, -0.20],                                  // ← hơi rộng hơn để cánh bay xa
-        sway: 1.1, wind: P.wind * 1.2, spin: 2.8, flip: 1, dir: 1, alpha: 0.98,
-        colors: ['#ffffff', '#ffe3ec'], blend: THREE.NormalBlending,
-        lightMul: [0.95, 0.9, 0.9], lightBlend: THREE.NormalBlending
-    });
+        // Cánh hoa rời — cũng rơi từ tán cây
+        fallPoints(ctx, {
+            count: cnt(P.petal),
+            texture: T.petals(THREE), atlas: [2, 1],
+            size: [16, 36], speed: P.speed, z: [-10, 4],
+            xRange: [-1.00, -0.20],                                  // ← hơi rộng hơn để cánh bay xa
+            sway: 1.1, wind: P.wind * 1.2, spin: 2.8, flip: 1, dir: 1, alpha: 0.98,
+            colors: ['#ffffff', '#ffe3ec'], blend: THREE.NormalBlending,
+            lightMul: [0.95, 0.9, 0.9], lightBlend: THREE.NormalBlending
+        });
 
-    // Lì xì + đồng tiền vàng — giữ phân bố toàn màn hình (điểm nhấn)
-    if (P.gift > 0) fallPoints(ctx, {
-        count: cnt(P.gift), texture: T.gifts(THREE), atlas: [2, 1],
-        size: [22, 46], speed: [P.speed[0] * 0.9, P.speed[1] * 1.1], z: [-8, 3],
-        sway: 0.8, wind: P.wind, spin: 2.0, flip: 0.9, dir: 1, alpha: 1,
-        colors: ['#ffffff'], blend: THREE.NormalBlending,
-        lightMul: [0.95, 0.95, 0.95], lightBlend: THREE.NormalBlending
-    });
+        // Lì xì + đồng tiền vàng — giữ phân bố toàn màn hình (điểm nhấn)
+        if (P.gift > 0) fallPoints(ctx, {
+            count: cnt(P.gift), texture: T.gifts(THREE), atlas: [2, 1],
+            size: [22, 46], speed: [P.speed[0] * 0.9, P.speed[1] * 1.1], z: [-8, 3],
+            sway: 0.8, wind: P.wind, spin: 2.0, flip: 0.9, dir: 1, alpha: 1,
+            colors: ['#ffffff'], blend: THREE.NormalBlending,
+            lightMul: [0.95, 0.95, 0.95], lightBlend: THREE.NormalBlending
+        });
 
-    // Kim tuyến vàng — giữ toàn màn hình (như pháo hoa)
-    fallPoints(ctx, {
-        count: cnt(P.spark), texture: T.star4(THREE),
-        size: [8, 20], speed: [0.3, 0.9], z: [-8, 3],
-        sway: 0.4, wind: 0.1, spin: 0.8, flip: 0, dir: 1, alpha: 1,
-        colors: ['#ffd54f', '#ffe082', '#fff3c4'],
-        blend: THREE.AdditiveBlending, lightMul: [0.85, 0.55, 0.08], lightBlend: THREE.NormalBlending
-    });
-}
+        // Kim tuyến vàng — giữ toàn màn hình (như pháo hoa)
+        fallPoints(ctx, {
+            count: cnt(P.spark), texture: T.star4(THREE),
+            size: [8, 20], speed: [0.3, 0.9], z: [-8, 3],
+            sway: 0.4, wind: 0.1, spin: 0.8, flip: 0, dir: 1, alpha: 1,
+            colors: ['#ffd54f', '#ffe082', '#fff3c4'],
+            blend: THREE.AdditiveBlending, lightMul: [0.85, 0.55, 0.08], lightBlend: THREE.NormalBlending
+        });
+    }
 
     function buildTrungThu(ctx) {
         const { THREE, lvl, cnt } = ctx;
         const P = [
-    { lantern: 3,  star: 10,  bg: 150 },
-    { lantern: 14, star: 55,  bg: 600 },
-    { lantern: 40, star: 180, bg: 1300 }
-][lvl];
+            { lantern: 3, star: 10, bg: 150 },
+            { lantern: 14, star: 55, bg: 600 },
+            { lantern: 40, star: 180, bg: 1300 }
+        ][lvl];
         starField(ctx, cnt(P.bg), 34, 0.9, 1.1);
         fallPoints(ctx, {                                  // đèn lồng bay lên
             count: cnt(P.lantern), texture: T.lantern(THREE), size: [40, 96], speed: [0.25, 0.6], z: [-9, 2],
@@ -1025,10 +1025,10 @@ const cc = roll < 0.65
         const { cnt, lvl } = ctx;
         // 0: mưa nhỏ · 1: mưa lớn · 2: bão (gió giật xiên, mưa dày)
         const P = [
-    { count: 150,  speed: [8, 12],  len: [0.3, 0.6], slant: 0.08, alpha: 0.4 },
-    { count: 1100, speed: [16, 26], len: [0.6, 1.3], slant: 0.25, alpha: 0.7 },
-    { count: 2800, speed: [28, 45], len: [1.0, 2.3], slant: 0.7,  alpha: 0.95 }
-][lvl];
+            { count: 150, speed: [8, 12], len: [0.3, 0.6], slant: 0.08, alpha: 0.4 },
+            { count: 1100, speed: [16, 26], len: [0.6, 1.3], slant: 0.25, alpha: 0.7 },
+            { count: 2800, speed: [28, 45], len: [1.0, 2.3], slant: 0.7, alpha: 0.95 }
+        ][lvl];
         const mat = rainLines(ctx, {
             count: cnt(P.count), z: [-10, 4], speed: P.speed, len: P.len, slant: P.slant,
             color: '#a8c4f0', lightColor: '#3b4f7a', alpha: P.alpha
@@ -1041,721 +1041,721 @@ const cc = roll < 0.65
     }
 
     // ============================================================
-// HALLOWEEN SCENE — trăng tròn + cây khô + bí ngô + dơi + lá rơi + sương mù
-// Bố cục tham khảo ảnh Halloween: trăng lớn sau, cây trái, bí ngô dưới, dơi bay
-// ============================================================
+    // HALLOWEEN SCENE — trăng tròn + cây khô + bí ngô + dơi + lá rơi + sương mù
+    // Bố cục tham khảo ảnh Halloween: trăng lớn sau, cây trái, bí ngô dưới, dơi bay
+    // ============================================================
 
-// Cây khô trơ trụi — silhouette đen vẽ đệ quy, thân nêm + nhánh xương xẩu
-function drawDeadTreeSilhouette(g, S) {
-    g.clearRect(0, 0, S, S);
-    const C_BARK  = '#04040c';
-    const C_BARK2 = '#0d0a1a';
-    const C_KNOT  = '#010106';
+    // Cây khô trơ trụi — silhouette đen vẽ đệ quy, thân nêm + nhánh xương xẩu
+    function drawDeadTreeSilhouette(g, S) {
+        g.clearRect(0, 0, S, S);
+        const C_BARK = '#04040c';
+        const C_BARK2 = '#0d0a1a';
+        const C_KNOT = '#010106';
 
-    g.lineCap = 'round';
-    g.lineJoin = 'round';
+        g.lineCap = 'round';
+        g.lineJoin = 'round';
 
-    const trunkBaseX = S * 0.20;
-    const trunkBaseY = S * 1.02;
-    const trunkTopX  = S * 0.36;
-    const trunkTopY  = S * 0.40;
+        const trunkBaseX = S * 0.20;
+        const trunkBaseY = S * 1.02;
+        const trunkTopX = S * 0.36;
+        const trunkTopY = S * 0.40;
 
-    // ── Thân cây — gradient ngang tạo khối 3D (sáng giữa, tối 2 bên) ──
-    const trunkGrad = g.createLinearGradient(trunkBaseX - S * 0.09, 0, trunkBaseX + S * 0.09, 0);
-    trunkGrad.addColorStop(0,    C_BARK);
-    trunkGrad.addColorStop(0.35, C_BARK2);
-    trunkGrad.addColorStop(0.55, '#151024');
-    trunkGrad.addColorStop(0.75, C_BARK2);
-    trunkGrad.addColorStop(1,    C_BARK);
-    g.fillStyle = trunkGrad;
-    g.beginPath();
-    g.moveTo(trunkBaseX - S * 0.09, trunkBaseY);
-    g.bezierCurveTo(
-        trunkBaseX - S * 0.078, S * 0.78,
-        trunkBaseX - S * 0.032, S * 0.55,
-        trunkTopX - S * 0.028, trunkTopY
-    );
-    g.lineTo(trunkTopX + S * 0.028, trunkTopY);
-    g.bezierCurveTo(
-        trunkBaseX + S * 0.055, S * 0.55,
-        trunkBaseX + S * 0.072, S * 0.78,
-        trunkBaseX + S * 0.09, trunkBaseY
-    );
-    g.closePath();
-    g.fill();
-
-    // ── Vân gỗ — 8 đường dọc uốn lượn ──
-    g.strokeStyle = 'rgba(30, 22, 55, 0.7)';
-    g.lineWidth = S * 0.0022;
-    for (let i = 0; i < 9; i++) {
-        const t = (i - 4) / 4.5;
-        const startX = trunkBaseX + t * S * 0.075;
-        const endX   = trunkTopX  + t * S * 0.022;
-        const midX   = (startX + endX) / 2 + Math.sin(i * 1.9) * S * 0.009;
+        // ── Thân cây — gradient ngang tạo khối 3D (sáng giữa, tối 2 bên) ──
+        const trunkGrad = g.createLinearGradient(trunkBaseX - S * 0.09, 0, trunkBaseX + S * 0.09, 0);
+        trunkGrad.addColorStop(0, C_BARK);
+        trunkGrad.addColorStop(0.35, C_BARK2);
+        trunkGrad.addColorStop(0.55, '#151024');
+        trunkGrad.addColorStop(0.75, C_BARK2);
+        trunkGrad.addColorStop(1, C_BARK);
+        g.fillStyle = trunkGrad;
         g.beginPath();
-        g.moveTo(startX, trunkBaseY - S * 0.005);
-        g.quadraticCurveTo(midX, S * 0.68, endX, trunkTopY + S * 0.005);
-        g.stroke();
-    }
-
-    // ── Rễ loe 9 cái, có khối ──
-    for (let i = 0; i < 9; i++) {
-        const t   = (i / 8 - 0.5) * 2;                   // -1..1
-        const rx  = trunkBaseX + t * S * 0.10;
-        const rw  = S * 0.020 * (1 - Math.abs(t) * 0.35);
-        const rdx = t > 0 ? S * 0.025 : -S * 0.025;
-        const rGrad = g.createLinearGradient(rx - rw, 0, rx + rw, 0);
-        rGrad.addColorStop(0, C_BARK);
-        rGrad.addColorStop(0.5, C_BARK2);
-        rGrad.addColorStop(1, C_BARK);
-        g.fillStyle = rGrad;
-        g.beginPath();
-        g.moveTo(trunkBaseX + t * S * 0.04 - rw * 0.5, trunkBaseY - S * 0.045);
-        g.quadraticCurveTo(rx, trunkBaseY - S * 0.008, rx + rdx, trunkBaseY);
-        g.lineTo(rx + rdx + rw * 0.25, trunkBaseY);
-        g.quadraticCurveTo(rx, trunkBaseY - S * 0.025, trunkBaseX + t * S * 0.04 + rw * 0.5, trunkBaseY - S * 0.045);
-        g.closePath();
-        g.fill();
-    }
-
-    // ── Hốc cây / mắt u sầu trên thân ──
-    g.fillStyle = C_KNOT;
-    [[trunkBaseX + S * 0.008, S * 0.72, S * 0.024, 0.25],
-     [trunkBaseX - S * 0.018, S * 0.56, S * 0.016, -0.4],
-     [trunkBaseX + S * 0.022, S * 0.63, S * 0.013, 0.5],
-     [trunkBaseX - S * 0.006, S * 0.83, S * 0.011, 0.2]].forEach(([kx, ky, kr, rot]) => {
-        g.beginPath();
-        g.ellipse(kx, ky, kr * 1.35, kr, rot, 0, Math.PI * 2);
-        g.fill();
-        // điểm sáng nhỏ bên trong hốc để có chiều sâu
-        g.fillStyle = 'rgba(60, 40, 90, 0.5)';
-        g.beginPath();
-        g.ellipse(kx - kr * 0.35, ky - kr * 0.25, kr * 0.4, kr * 0.28, rot, 0, Math.PI * 2);
-        g.fill();
-        g.fillStyle = C_KNOT;
-    });
-
-    // ── Nhánh đệ quy — có taper (dày gốc, nhọn ngọn) ──
-    function branch(x, y, angle, len, width, depth) {
-        if (depth <= 0 || len < S * 0.007) return;
-        const x2 = x + Math.cos(angle) * len;
-        const y2 = y + Math.sin(angle) * len;
-        const perp = angle + Math.PI / 2;
-        const w1 = width / 2, w2 = width / 3.5;
-        const px1 = Math.cos(perp) * w1, py1 = Math.sin(perp) * w1;
-        const px2 = Math.cos(perp) * w2, py2 = Math.sin(perp) * w2;
-        const mx = (x + x2) / 2 + (Math.random() - 0.5) * len * 0.22;
-        const my = (y + y2) / 2 + (Math.random() - 0.5) * len * 0.22;
-
-        g.fillStyle = depth >= 4 ? C_BARK2 : C_BARK;
-        g.beginPath();
-        g.moveTo(x - px1, y - py1);
-        g.quadraticCurveTo(mx - px1 * 0.6, my - py1 * 0.6, x2 - px2, y2 - py2);
-        g.lineTo(x2 + px2, y2 + py2);
-        g.quadraticCurveTo(mx + px1 * 0.6, my + py1 * 0.6, x + px1, y + py1);
+        g.moveTo(trunkBaseX - S * 0.09, trunkBaseY);
+        g.bezierCurveTo(
+            trunkBaseX - S * 0.078, S * 0.78,
+            trunkBaseX - S * 0.032, S * 0.55,
+            trunkTopX - S * 0.028, trunkTopY
+        );
+        g.lineTo(trunkTopX + S * 0.028, trunkTopY);
+        g.bezierCurveTo(
+            trunkBaseX + S * 0.055, S * 0.55,
+            trunkBaseX + S * 0.072, S * 0.78,
+            trunkBaseX + S * 0.09, trunkBaseY
+        );
         g.closePath();
         g.fill();
 
-        const n = depth >= 4 ? 2 : (Math.random() < 0.55 ? 2 : 3);
-        for (let i = 0; i < n; i++) {
-            const spread = 0.40 + Math.random() * 0.65;
-            const dir = i === 0 ? -1 : (i === 1 ? 1 : (Math.random() < 0.5 ? -1 : 1));
-            branch(x2, y2, angle + dir * spread, len * (0.62 + Math.random() * 0.14), width * 0.64, depth - 1);
-        }
-    }
-
-    // 5 nhánh chính toả ra + 3 nhánh phụ mọc chồi giữa thân
-    [-0.75, -0.38, 0.04, 0.48, 0.94].forEach(da => {
-        branch(trunkTopX, trunkTopY, -Math.PI / 2 + da, S * (0.22 + Math.random() * 0.09), S * 0.026, 6);
-    });
-    branch(trunkBaseX + S * 0.045, S * 0.66, -Math.PI / 2 + 0.95, S * 0.21, S * 0.020, 5);
-    branch(trunkBaseX - S * 0.030, S * 0.52, -Math.PI / 2 - 0.90, S * 0.17, S * 0.016, 4);
-    branch(trunkBaseX + S * 0.028, S * 0.79, -Math.PI / 2 + 1.15, S * 0.15, S * 0.017, 4);
-
-    // ── Dây leo / rêu khô treo ──
-    g.strokeStyle = 'rgba(45, 65, 45, 0.55)';
-    g.lineWidth = S * 0.003;
-    for (let i = 0; i < 8; i++) {
-        const vx = trunkBaseX + (Math.random() - 0.5) * S * 0.16;
-        const vy = S * (0.42 + Math.random() * 0.38);
-        const vlen = S * (0.035 + Math.random() * 0.08);
-        g.beginPath();
-        g.moveTo(vx, vy);
-        g.quadraticCurveTo(vx + S * 0.009, vy + vlen * 0.5, vx - S * 0.005, vy + vlen);
-        g.stroke();
-    }
-}
-
-// Lâu đài Gothic silhouette — nhiều tháp nhọn, lỗ châu mai, cửa sổ sáng
-function drawCastleSilhouette(g, S) {
-    g.clearRect(0, 0, S, S);
-    g.lineJoin = 'round';
-    g.lineCap = 'round';
-
-    const baseY = S * 0.98;
-    const cx    = S * 0.5;
-    const C_DARK = '#04040c';
-    const C_MID  = '#0c0a1a';
-    const C_HIGH = '#1a1430';
-    const C_WIN  = '#ffb040';
-    const C_WIN2 = '#ff7a20';
-    const C_WIN3 = '#ffd070';
-
-    // ── Mái nhọn + cờ ──
-    function spire(x, y, w, h, withFlag) {
-        const grad = g.createLinearGradient(x - w/2, 0, x + w/2, 0);
-        grad.addColorStop(0, C_DARK);
-        grad.addColorStop(0.5, C_MID);
-        grad.addColorStop(1, C_DARK);
-        g.fillStyle = grad;
-        g.beginPath();
-        g.moveTo(x - w/2, y);
-        g.lineTo(x + w/2, y);
-        g.lineTo(x, y - h);
-        g.closePath();
-        g.fill();
-
-        // vân ngói
-        g.strokeStyle = 'rgba(40, 25, 70, 0.55)';
-        g.lineWidth = S * 0.0018;
-        for (let i = 1; i < 5; i++) {
-            const yy = y - h * (i / 5);
-            const half = (w / 2) * (1 - i / 5);
+        // ── Vân gỗ — 8 đường dọc uốn lượn ──
+        g.strokeStyle = 'rgba(30, 22, 55, 0.7)';
+        g.lineWidth = S * 0.0022;
+        for (let i = 0; i < 9; i++) {
+            const t = (i - 4) / 4.5;
+            const startX = trunkBaseX + t * S * 0.075;
+            const endX = trunkTopX + t * S * 0.022;
+            const midX = (startX + endX) / 2 + Math.sin(i * 1.9) * S * 0.009;
             g.beginPath();
-            g.moveTo(x - half, yy);
-            g.lineTo(x + half, yy);
+            g.moveTo(startX, trunkBaseY - S * 0.005);
+            g.quadraticCurveTo(midX, S * 0.68, endX, trunkTopY + S * 0.005);
             g.stroke();
         }
 
-        if (withFlag) {
-            g.strokeStyle = C_DARK;
-            g.lineWidth = S * 0.003;
-            const poleTop = y - h - S * 0.045;
+        // ── Rễ loe 9 cái, có khối ──
+        for (let i = 0; i < 9; i++) {
+            const t = (i / 8 - 0.5) * 2;                   // -1..1
+            const rx = trunkBaseX + t * S * 0.10;
+            const rw = S * 0.020 * (1 - Math.abs(t) * 0.35);
+            const rdx = t > 0 ? S * 0.025 : -S * 0.025;
+            const rGrad = g.createLinearGradient(rx - rw, 0, rx + rw, 0);
+            rGrad.addColorStop(0, C_BARK);
+            rGrad.addColorStop(0.5, C_BARK2);
+            rGrad.addColorStop(1, C_BARK);
+            g.fillStyle = rGrad;
             g.beginPath();
-            g.moveTo(x, y - h);
-            g.lineTo(x, poleTop);
-            g.stroke();
-            g.fillStyle = C_DARK;
-            g.beginPath();
-            g.moveTo(x, poleTop);
-            g.quadraticCurveTo(x + S*0.024, poleTop + S*0.006, x + S*0.032, poleTop + S*0.014);
-            g.lineTo(x + S*0.028, poleTop + S*0.026);
-            g.quadraticCurveTo(x + S*0.014, poleTop + S*0.020, x, poleTop + S*0.024);
+            g.moveTo(trunkBaseX + t * S * 0.04 - rw * 0.5, trunkBaseY - S * 0.045);
+            g.quadraticCurveTo(rx, trunkBaseY - S * 0.008, rx + rdx, trunkBaseY);
+            g.lineTo(rx + rdx + rw * 0.25, trunkBaseY);
+            g.quadraticCurveTo(rx, trunkBaseY - S * 0.025, trunkBaseX + t * S * 0.04 + rw * 0.5, trunkBaseY - S * 0.045);
             g.closePath();
             g.fill();
         }
-    }
 
-    // ── Lỗ châu mai ──
-    function crenellations(x, y, width, height) {
-        const unit = S * 0.013;
-        const count = Math.max(2, Math.floor(width / (unit * 2)));
-        const u = width / (count * 2 - 1);
-        g.fillStyle = C_DARK;
-        for (let i = 0; i < count; i++) {
-            g.fillRect(x + i * u * 2, y - height, u, height);
-        }
-    }
-
-    // ── Tháp: thân + mái + cửa sổ ──
-    function tower(x, basePos, w, h, roofH, opts) {
-        opts = opts || {};
-        const topY = basePos - h;
-
-        // thân — gradient dọc tối->sáng tạo khối
-        const bodyGrad = g.createLinearGradient(0, topY, 0, basePos);
-        bodyGrad.addColorStop(0, C_MID);
-        bodyGrad.addColorStop(0.45, C_DARK);
-        bodyGrad.addColorStop(1, C_HIGH);
-        g.fillStyle = bodyGrad;
-        g.fillRect(x - w/2, topY, w, h);
-
-        // gạch đá
-        g.strokeStyle = 'rgba(35, 22, 60, 0.55)';
-        g.lineWidth = S * 0.0014;
-        for (let ly = topY + S * 0.018; ly < basePos - S * 0.008; ly += S * 0.020) {
+        // ── Hốc cây / mắt u sầu trên thân ──
+        g.fillStyle = C_KNOT;
+        [[trunkBaseX + S * 0.008, S * 0.72, S * 0.024, 0.25],
+        [trunkBaseX - S * 0.018, S * 0.56, S * 0.016, -0.4],
+        [trunkBaseX + S * 0.022, S * 0.63, S * 0.013, 0.5],
+        [trunkBaseX - S * 0.006, S * 0.83, S * 0.011, 0.2]].forEach(([kx, ky, kr, rot]) => {
             g.beginPath();
-            g.moveTo(x - w/2, ly);
-            g.lineTo(x + w/2, ly);
+            g.ellipse(kx, ky, kr * 1.35, kr, rot, 0, Math.PI * 2);
+            g.fill();
+            // điểm sáng nhỏ bên trong hốc để có chiều sâu
+            g.fillStyle = 'rgba(60, 40, 90, 0.5)';
+            g.beginPath();
+            g.ellipse(kx - kr * 0.35, ky - kr * 0.25, kr * 0.4, kr * 0.28, rot, 0, Math.PI * 2);
+            g.fill();
+            g.fillStyle = C_KNOT;
+        });
+
+        // ── Nhánh đệ quy — có taper (dày gốc, nhọn ngọn) ──
+        function branch(x, y, angle, len, width, depth) {
+            if (depth <= 0 || len < S * 0.007) return;
+            const x2 = x + Math.cos(angle) * len;
+            const y2 = y + Math.sin(angle) * len;
+            const perp = angle + Math.PI / 2;
+            const w1 = width / 2, w2 = width / 3.5;
+            const px1 = Math.cos(perp) * w1, py1 = Math.sin(perp) * w1;
+            const px2 = Math.cos(perp) * w2, py2 = Math.sin(perp) * w2;
+            const mx = (x + x2) / 2 + (Math.random() - 0.5) * len * 0.22;
+            const my = (y + y2) / 2 + (Math.random() - 0.5) * len * 0.22;
+
+            g.fillStyle = depth >= 4 ? C_BARK2 : C_BARK;
+            g.beginPath();
+            g.moveTo(x - px1, y - py1);
+            g.quadraticCurveTo(mx - px1 * 0.6, my - py1 * 0.6, x2 - px2, y2 - py2);
+            g.lineTo(x2 + px2, y2 + py2);
+            g.quadraticCurveTo(mx + px1 * 0.6, my + py1 * 0.6, x + px1, y + py1);
+            g.closePath();
+            g.fill();
+
+            const n = depth >= 4 ? 2 : (Math.random() < 0.55 ? 2 : 3);
+            for (let i = 0; i < n; i++) {
+                const spread = 0.40 + Math.random() * 0.65;
+                const dir = i === 0 ? -1 : (i === 1 ? 1 : (Math.random() < 0.5 ? -1 : 1));
+                branch(x2, y2, angle + dir * spread, len * (0.62 + Math.random() * 0.14), width * 0.64, depth - 1);
+            }
+        }
+
+        // 5 nhánh chính toả ra + 3 nhánh phụ mọc chồi giữa thân
+        [-0.75, -0.38, 0.04, 0.48, 0.94].forEach(da => {
+            branch(trunkTopX, trunkTopY, -Math.PI / 2 + da, S * (0.22 + Math.random() * 0.09), S * 0.026, 6);
+        });
+        branch(trunkBaseX + S * 0.045, S * 0.66, -Math.PI / 2 + 0.95, S * 0.21, S * 0.020, 5);
+        branch(trunkBaseX - S * 0.030, S * 0.52, -Math.PI / 2 - 0.90, S * 0.17, S * 0.016, 4);
+        branch(trunkBaseX + S * 0.028, S * 0.79, -Math.PI / 2 + 1.15, S * 0.15, S * 0.017, 4);
+
+        // ── Dây leo / rêu khô treo ──
+        g.strokeStyle = 'rgba(45, 65, 45, 0.55)';
+        g.lineWidth = S * 0.003;
+        for (let i = 0; i < 8; i++) {
+            const vx = trunkBaseX + (Math.random() - 0.5) * S * 0.16;
+            const vy = S * (0.42 + Math.random() * 0.38);
+            const vlen = S * (0.035 + Math.random() * 0.08);
+            g.beginPath();
+            g.moveTo(vx, vy);
+            g.quadraticCurveTo(vx + S * 0.009, vy + vlen * 0.5, vx - S * 0.005, vy + vlen);
             g.stroke();
         }
+    }
 
-        // lỗ châu mai
-        crenellations(x - w/2, topY, w, h * 0.065);
+    // Lâu đài Gothic silhouette — nhiều tháp nhọn, lỗ châu mai, cửa sổ sáng
+    function drawCastleSilhouette(g, S) {
+        g.clearRect(0, 0, S, S);
+        g.lineJoin = 'round';
+        g.lineCap = 'round';
 
-        // mái
-        if (roofH > 0) spire(x, topY - h * 0.065, w * 1.22, roofH, opts.flag);
+        const baseY = S * 0.98;
+        const cx = S * 0.5;
+        const C_DARK = '#04040c';
+        const C_MID = '#0c0a1a';
+        const C_HIGH = '#1a1430';
+        const C_WIN = '#ffb040';
+        const C_WIN2 = '#ff7a20';
+        const C_WIN3 = '#ffd070';
 
-        // cửa sổ vòm
-        const cols = Math.max(1, Math.floor(w / (S * 0.022)));
-        const rows = Math.max(2, Math.floor(h / (S * 0.045)));
-        const cellW = w / cols, cellH = h / rows;
-        for (let r = 0; r < rows; r++) {
-            for (let c = 0; c < cols; c++) {
-                if ((r + c) % 3 === 1 && Math.random() < 0.35) continue;
-                if (r === 0 && Math.random() < 0.35) continue;
-                if (r === rows - 1 && Math.random() < 0.45) continue;
+        // ── Mái nhọn + cờ ──
+        function spire(x, y, w, h, withFlag) {
+            const grad = g.createLinearGradient(x - w / 2, 0, x + w / 2, 0);
+            grad.addColorStop(0, C_DARK);
+            grad.addColorStop(0.5, C_MID);
+            grad.addColorStop(1, C_DARK);
+            g.fillStyle = grad;
+            g.beginPath();
+            g.moveTo(x - w / 2, y);
+            g.lineTo(x + w / 2, y);
+            g.lineTo(x, y - h);
+            g.closePath();
+            g.fill();
 
-                const wx = x - w/2 + (c + 0.5) * cellW;
-                const wy = topY + (r + 0.55) * cellH;
-                const ww = S * 0.008, wh = S * 0.018;
-                const roll = Math.random();
-                const col = roll < 0.6 ? C_WIN : (roll < 0.85 ? C_WIN2 : C_WIN3);
-
-                // hào quang quanh cửa sổ
-                if (roll < 0.45) {
-                    const glow = g.createRadialGradient(wx, wy, 0, wx, wy, ww * 3.2);
-                    glow.addColorStop(0, 'rgba(255, 190, 90, 0.45)');
-                    glow.addColorStop(1, 'rgba(255, 110, 30, 0)');
-                    g.fillStyle = glow;
-                    g.beginPath();
-                    g.arc(wx, wy, ww * 3.2, 0, Math.PI * 2);
-                    g.fill();
-                }
-
-                g.fillStyle = col;
+            // vân ngói
+            g.strokeStyle = 'rgba(40, 25, 70, 0.55)';
+            g.lineWidth = S * 0.0018;
+            for (let i = 1; i < 5; i++) {
+                const yy = y - h * (i / 5);
+                const half = (w / 2) * (1 - i / 5);
                 g.beginPath();
-                g.moveTo(wx - ww/2, wy + wh/2);
-                g.lineTo(wx - ww/2, wy - wh/2 + ww * 0.5);
-                g.arc(wx, wy - wh/2 + ww * 0.5, ww/2, Math.PI, 0);
-                g.lineTo(wx + ww/2, wy + wh/2);
+                g.moveTo(x - half, yy);
+                g.lineTo(x + half, yy);
+                g.stroke();
+            }
+
+            if (withFlag) {
+                g.strokeStyle = C_DARK;
+                g.lineWidth = S * 0.003;
+                const poleTop = y - h - S * 0.045;
+                g.beginPath();
+                g.moveTo(x, y - h);
+                g.lineTo(x, poleTop);
+                g.stroke();
+                g.fillStyle = C_DARK;
+                g.beginPath();
+                g.moveTo(x, poleTop);
+                g.quadraticCurveTo(x + S * 0.024, poleTop + S * 0.006, x + S * 0.032, poleTop + S * 0.014);
+                g.lineTo(x + S * 0.028, poleTop + S * 0.026);
+                g.quadraticCurveTo(x + S * 0.014, poleTop + S * 0.020, x, poleTop + S * 0.024);
                 g.closePath();
                 g.fill();
             }
         }
+
+        // ── Lỗ châu mai ──
+        function crenellations(x, y, width, height) {
+            const unit = S * 0.013;
+            const count = Math.max(2, Math.floor(width / (unit * 2)));
+            const u = width / (count * 2 - 1);
+            g.fillStyle = C_DARK;
+            for (let i = 0; i < count; i++) {
+                g.fillRect(x + i * u * 2, y - height, u, height);
+            }
+        }
+
+        // ── Tháp: thân + mái + cửa sổ ──
+        function tower(x, basePos, w, h, roofH, opts) {
+            opts = opts || {};
+            const topY = basePos - h;
+
+            // thân — gradient dọc tối->sáng tạo khối
+            const bodyGrad = g.createLinearGradient(0, topY, 0, basePos);
+            bodyGrad.addColorStop(0, C_MID);
+            bodyGrad.addColorStop(0.45, C_DARK);
+            bodyGrad.addColorStop(1, C_HIGH);
+            g.fillStyle = bodyGrad;
+            g.fillRect(x - w / 2, topY, w, h);
+
+            // gạch đá
+            g.strokeStyle = 'rgba(35, 22, 60, 0.55)';
+            g.lineWidth = S * 0.0014;
+            for (let ly = topY + S * 0.018; ly < basePos - S * 0.008; ly += S * 0.020) {
+                g.beginPath();
+                g.moveTo(x - w / 2, ly);
+                g.lineTo(x + w / 2, ly);
+                g.stroke();
+            }
+
+            // lỗ châu mai
+            crenellations(x - w / 2, topY, w, h * 0.065);
+
+            // mái
+            if (roofH > 0) spire(x, topY - h * 0.065, w * 1.22, roofH, opts.flag);
+
+            // cửa sổ vòm
+            const cols = Math.max(1, Math.floor(w / (S * 0.022)));
+            const rows = Math.max(2, Math.floor(h / (S * 0.045)));
+            const cellW = w / cols, cellH = h / rows;
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    if ((r + c) % 3 === 1 && Math.random() < 0.35) continue;
+                    if (r === 0 && Math.random() < 0.35) continue;
+                    if (r === rows - 1 && Math.random() < 0.45) continue;
+
+                    const wx = x - w / 2 + (c + 0.5) * cellW;
+                    const wy = topY + (r + 0.55) * cellH;
+                    const ww = S * 0.008, wh = S * 0.018;
+                    const roll = Math.random();
+                    const col = roll < 0.6 ? C_WIN : (roll < 0.85 ? C_WIN2 : C_WIN3);
+
+                    // hào quang quanh cửa sổ
+                    if (roll < 0.45) {
+                        const glow = g.createRadialGradient(wx, wy, 0, wx, wy, ww * 3.2);
+                        glow.addColorStop(0, 'rgba(255, 190, 90, 0.45)');
+                        glow.addColorStop(1, 'rgba(255, 110, 30, 0)');
+                        g.fillStyle = glow;
+                        g.beginPath();
+                        g.arc(wx, wy, ww * 3.2, 0, Math.PI * 2);
+                        g.fill();
+                    }
+
+                    g.fillStyle = col;
+                    g.beginPath();
+                    g.moveTo(wx - ww / 2, wy + wh / 2);
+                    g.lineTo(wx - ww / 2, wy - wh / 2 + ww * 0.5);
+                    g.arc(wx, wy - wh / 2 + ww * 0.5, ww / 2, Math.PI, 0);
+                    g.lineTo(wx + ww / 2, wy + wh / 2);
+                    g.closePath();
+                    g.fill();
+                }
+            }
+        }
+
+        // ── Tường thành ──
+        function wall(x1, x2, y, h) {
+            const w = x2 - x1;
+            const grad = g.createLinearGradient(0, y - h, 0, y);
+            grad.addColorStop(0, C_DARK);
+            grad.addColorStop(1, C_MID);
+            g.fillStyle = grad;
+            g.fillRect(x1, y - h, w, h);
+            g.strokeStyle = 'rgba(35, 22, 60, 0.5)';
+            g.lineWidth = S * 0.0014;
+            for (let ly = y - h + S * 0.018; ly < y - S * 0.008; ly += S * 0.020) {
+                g.beginPath();
+                g.moveTo(x1, ly);
+                g.lineTo(x2, ly);
+                g.stroke();
+            }
+            crenellations(x1, y - h, w, h * 0.15);
+        }
+
+        // ═══════════ VẼ TỪ XA ĐẾN GẦN ═══════════
+        // tháp rìa xa (mờ hơn)
+        g.globalAlpha = 0.55;
+        tower(cx - S * 0.40, baseY - S * 0.01, S * 0.045, S * 0.20, S * 0.065, { flag: false });
+        tower(cx + S * 0.41, baseY - S * 0.01, S * 0.048, S * 0.22, S * 0.070, { flag: false });
+        g.globalAlpha = 1;
+
+        // tường sau
+        wall(cx - S * 0.38, cx - S * 0.30, baseY - S * 0.005, S * 0.13);
+        wall(cx + S * 0.29, cx + S * 0.39, baseY - S * 0.005, S * 0.13);
+
+        // tháp ngoài
+        tower(cx - S * 0.29, baseY - S * 0.005, S * 0.05, S * 0.24, S * 0.075, { flag: false });
+        tower(cx + S * 0.28, baseY - S * 0.005, S * 0.05, S * 0.26, S * 0.080, { flag: false });
+
+        // tháp phụ sau lưng chính (tạo chiều sâu)
+        tower(cx - S * 0.10, baseY - S * 0.01, S * 0.055, S * 0.38, S * 0.095, { flag: false });
+        tower(cx + S * 0.10, baseY - S * 0.01, S * 0.058, S * 0.40, S * 0.100, { flag: true });
+
+        // tường giữa
+        wall(cx - S * 0.22, cx - S * 0.14, baseY, S * 0.17);
+        wall(cx + S * 0.14, cx + S * 0.22, baseY, S * 0.17);
+
+        // tháp 2 bên (trung)
+        tower(cx - S * 0.17, baseY, S * 0.062, S * 0.32, S * 0.095, { flag: true });
+        tower(cx + S * 0.17, baseY, S * 0.062, S * 0.34, S * 0.100, { flag: false });
+
+        // ── THÁP CHÍNH (keep) — cao nhất, trước cùng ──
+        tower(cx, baseY, S * 0.095, S * 0.50, S * 0.14, { flag: true });
+
+        // tường ngoài trước
+        wall(cx - S * 0.28, cx - S * 0.21, baseY, S * 0.12);
+        wall(cx + S * 0.21, cx + S * 0.28, baseY, S * 0.12);
+
+        // ── Cổng vòm + ánh sáng ma mị ──
+        const gw = S * 0.05, gh = S * 0.078;
+        g.fillStyle = '#020208';
+        g.beginPath();
+        g.moveTo(cx - gw / 2, baseY);
+        g.lineTo(cx - gw / 2, baseY - gh + gw * 0.5);
+        g.arc(cx, baseY - gh + gw * 0.5, gw / 2, Math.PI, 0);
+        g.lineTo(cx + gw / 2, baseY);
+        g.closePath();
+        g.fill();
+
+        const gateGlow = g.createRadialGradient(cx, baseY - gh * 0.35, 0, cx, baseY - gh * 0.35, gw * 2);
+        gateGlow.addColorStop(0, 'rgba(255, 170, 80, 0.65)');
+        gateGlow.addColorStop(0.45, 'rgba(255, 100, 40, 0.22)');
+        gateGlow.addColorStop(1, 'rgba(255, 60, 20, 0)');
+        g.fillStyle = gateGlow;
+        g.beginPath();
+        g.arc(cx, baseY - gh * 0.35, gw * 2, 0, Math.PI * 2);
+        g.fill();
     }
 
-    // ── Tường thành ──
-    function wall(x1, x2, y, h) {
-        const w = x2 - x1;
-        const grad = g.createLinearGradient(0, y - h, 0, y);
-        grad.addColorStop(0, C_DARK);
-        grad.addColorStop(1, C_MID);
-        g.fillStyle = grad;
-        g.fillRect(x1, y - h, w, h);
-        g.strokeStyle = 'rgba(35, 22, 60, 0.5)';
-        g.lineWidth = S * 0.0014;
-        for (let ly = y - h + S * 0.018; ly < y - S * 0.008; ly += S * 0.020) {
+    // Dơi silhouette — 3 biến thể với kích thước cánh khác nhau
+    function drawBatShape(g, S, variant) {
+        g.save();
+        g.translate(S / 2, S / 2);
+        g.fillStyle = '#06060e';
+        const scale = [0.82, 1.0, 1.15][variant % 3];
+        g.scale(scale, scale);
+        const W = S * 0.44, H = S * 0.18;
+
+        // Thân
+        g.beginPath(); g.ellipse(0, 0, W * 0.10, H * 1.1, 0, 0, Math.PI * 2); g.fill();
+
+        // Cánh trái — đường cong có vết lõm
+        g.beginPath();
+        g.moveTo(0, 0);
+        g.quadraticCurveTo(-W * 0.35, -H * 1.8, -W * 0.6, -H * 1.1);
+        g.quadraticCurveTo(-W * 0.95, -H * 0.7, -W, -H * 0.3);
+        g.quadraticCurveTo(-W * 0.85, -H * 0.05, -W * 0.72, H * 0.25);
+        g.quadraticCurveTo(-W * 0.5, H * 0.1, -W * 0.4, H * 0.45);
+        g.quadraticCurveTo(-W * 0.22, H * 0.15, 0, H * 0.35);
+        g.closePath(); g.fill();
+        // Cánh phải
+        g.beginPath();
+        g.moveTo(0, 0);
+        g.quadraticCurveTo(W * 0.35, -H * 1.8, W * 0.6, -H * 1.1);
+        g.quadraticCurveTo(W * 0.95, -H * 0.7, W, -H * 0.3);
+        g.quadraticCurveTo(W * 0.85, -H * 0.05, W * 0.72, H * 0.25);
+        g.quadraticCurveTo(W * 0.5, H * 0.1, W * 0.4, H * 0.45);
+        g.quadraticCurveTo(W * 0.22, H * 0.15, 0, H * 0.35);
+        g.closePath(); g.fill();
+
+        // 2 tai nhọn
+        g.beginPath(); g.moveTo(-W * 0.10, -H * 0.95); g.lineTo(-W * 0.06, -H * 1.7); g.lineTo(0, -H * 0.95); g.closePath(); g.fill();
+        g.beginPath(); g.moveTo(W * 0.10, -H * 0.95); g.lineTo(W * 0.06, -H * 1.7); g.lineTo(0, -H * 0.95); g.closePath(); g.fill();
+
+        g.restore();
+    }
+
+    // Lá mùa thu rụng — teardrop mũi nhọn có gân
+    function drawAutumnLeaf(g, S, variant) {
+        g.save();
+        g.translate(S / 2, S / 2);
+        g.rotate(((variant * 53) % 360) * Math.PI / 180);
+        const colors = ['#e85d1c', '#d97706', '#b45309', '#f59e0b', '#dc2626', '#ea580c'];
+        g.fillStyle = colors[variant % colors.length];
+        const r = S * 0.36;
+
+        // Thân lá
+        g.beginPath();
+        g.moveTo(0, -r);
+        g.bezierCurveTo(r * 0.75, -r * 0.55, r * 0.7, r * 0.35, 0, r * 0.95);
+        g.bezierCurveTo(-r * 0.7, r * 0.35, -r * 0.75, -r * 0.55, 0, -r);
+        g.fill();
+
+        // Gân giữa
+        g.strokeStyle = 'rgba(60, 20, 0, 0.35)';
+        g.lineWidth = S * 0.018;
+        g.beginPath(); g.moveTo(0, -r * 0.85); g.lineTo(0, r * 0.85); g.stroke();
+
+        // Gân phụ
+        g.lineWidth = S * 0.012;
+        for (let i = -3; i <= 3; i++) {
+            if (i === 0) continue;
+            const y = i * r * 0.22;
             g.beginPath();
-            g.moveTo(x1, ly);
-            g.lineTo(x2, ly);
+            g.moveTo(0, y); g.lineTo(r * 0.45, y + r * 0.18);
+            g.moveTo(0, y); g.lineTo(-r * 0.45, y + r * 0.18);
             g.stroke();
         }
-        crenellations(x1, y - h, w, h * 0.15);
+
+        // Cuống
+        g.fillStyle = '#3d1a03';
+        g.fillRect(-S * 0.012, r * 0.88, S * 0.024, r * 0.32);
+
+        g.restore();
     }
 
-    // ═══════════ VẼ TỪ XA ĐẾN GẦN ═══════════
-    // tháp rìa xa (mờ hơn)
-    g.globalAlpha = 0.55;
-    tower(cx - S * 0.40, baseY - S * 0.01, S * 0.045, S * 0.20, S * 0.065, { flag: false });
-    tower(cx + S * 0.41, baseY - S * 0.01, S * 0.048, S * 0.22, S * 0.070, { flag: false });
-    g.globalAlpha = 1;
+    // Bí ngô Jack-o'-lantern: thân bí cam có khía, cuống xanh, mắt/miệng sáng phát quang
+    function drawPumpkinJack(g, S) {
+        g.clearRect(0, 0, S, S);
+        const cx = S * 0.5, cy = S * 0.58;
+        const rx = S * 0.32, ry = S * 0.26;
 
-    // tường sau
-    wall(cx - S * 0.38, cx - S * 0.30, baseY - S * 0.005, S * 0.13);
-    wall(cx + S * 0.29, cx + S * 0.39, baseY - S * 0.005, S * 0.13);
-
-    // tháp ngoài
-    tower(cx - S * 0.29, baseY - S * 0.005, S * 0.05, S * 0.24, S * 0.075, { flag: false });
-    tower(cx + S * 0.28, baseY - S * 0.005, S * 0.05, S * 0.26, S * 0.080, { flag: false });
-
-    // tháp phụ sau lưng chính (tạo chiều sâu)
-    tower(cx - S * 0.10, baseY - S * 0.01, S * 0.055, S * 0.38, S * 0.095, { flag: false });
-    tower(cx + S * 0.10, baseY - S * 0.01, S * 0.058, S * 0.40, S * 0.100, { flag: true });
-
-    // tường giữa
-    wall(cx - S * 0.22, cx - S * 0.14, baseY, S * 0.17);
-    wall(cx + S * 0.14, cx + S * 0.22, baseY, S * 0.17);
-
-    // tháp 2 bên (trung)
-    tower(cx - S * 0.17, baseY, S * 0.062, S * 0.32, S * 0.095, { flag: true });
-    tower(cx + S * 0.17, baseY, S * 0.062, S * 0.34, S * 0.100, { flag: false });
-
-    // ── THÁP CHÍNH (keep) — cao nhất, trước cùng ──
-    tower(cx, baseY, S * 0.095, S * 0.50, S * 0.14, { flag: true });
-
-    // tường ngoài trước
-    wall(cx - S * 0.28, cx - S * 0.21, baseY, S * 0.12);
-    wall(cx + S * 0.21, cx + S * 0.28, baseY, S * 0.12);
-
-    // ── Cổng vòm + ánh sáng ma mị ──
-    const gw = S * 0.05, gh = S * 0.078;
-    g.fillStyle = '#020208';
-    g.beginPath();
-    g.moveTo(cx - gw/2, baseY);
-    g.lineTo(cx - gw/2, baseY - gh + gw * 0.5);
-    g.arc(cx, baseY - gh + gw * 0.5, gw/2, Math.PI, 0);
-    g.lineTo(cx + gw/2, baseY);
-    g.closePath();
-    g.fill();
-
-    const gateGlow = g.createRadialGradient(cx, baseY - gh * 0.35, 0, cx, baseY - gh * 0.35, gw * 2);
-    gateGlow.addColorStop(0,    'rgba(255, 170, 80, 0.65)');
-    gateGlow.addColorStop(0.45, 'rgba(255, 100, 40, 0.22)');
-    gateGlow.addColorStop(1,    'rgba(255, 60, 20, 0)');
-    g.fillStyle = gateGlow;
-    g.beginPath();
-    g.arc(cx, baseY - gh * 0.35, gw * 2, 0, Math.PI * 2);
-    g.fill();
-}
-
-// Dơi silhouette — 3 biến thể với kích thước cánh khác nhau
-function drawBatShape(g, S, variant) {
-    g.save();
-    g.translate(S / 2, S / 2);
-    g.fillStyle = '#06060e';
-    const scale = [0.82, 1.0, 1.15][variant % 3];
-    g.scale(scale, scale);
-    const W = S * 0.44, H = S * 0.18;
-
-    // Thân
-    g.beginPath(); g.ellipse(0, 0, W * 0.10, H * 1.1, 0, 0, Math.PI * 2); g.fill();
-
-    // Cánh trái — đường cong có vết lõm
-    g.beginPath();
-    g.moveTo(0, 0);
-    g.quadraticCurveTo(-W * 0.35, -H * 1.8, -W * 0.6, -H * 1.1);
-    g.quadraticCurveTo(-W * 0.95, -H * 0.7, -W, -H * 0.3);
-    g.quadraticCurveTo(-W * 0.85, -H * 0.05, -W * 0.72, H * 0.25);
-    g.quadraticCurveTo(-W * 0.5, H * 0.1, -W * 0.4, H * 0.45);
-    g.quadraticCurveTo(-W * 0.22, H * 0.15, 0, H * 0.35);
-    g.closePath(); g.fill();
-    // Cánh phải
-    g.beginPath();
-    g.moveTo(0, 0);
-    g.quadraticCurveTo(W * 0.35, -H * 1.8, W * 0.6, -H * 1.1);
-    g.quadraticCurveTo(W * 0.95, -H * 0.7, W, -H * 0.3);
-    g.quadraticCurveTo(W * 0.85, -H * 0.05, W * 0.72, H * 0.25);
-    g.quadraticCurveTo(W * 0.5, H * 0.1, W * 0.4, H * 0.45);
-    g.quadraticCurveTo(W * 0.22, H * 0.15, 0, H * 0.35);
-    g.closePath(); g.fill();
-
-    // 2 tai nhọn
-    g.beginPath(); g.moveTo(-W * 0.10, -H * 0.95); g.lineTo(-W * 0.06, -H * 1.7); g.lineTo(0, -H * 0.95); g.closePath(); g.fill();
-    g.beginPath(); g.moveTo(W * 0.10, -H * 0.95); g.lineTo(W * 0.06, -H * 1.7); g.lineTo(0, -H * 0.95); g.closePath(); g.fill();
-
-    g.restore();
-}
-
-// Lá mùa thu rụng — teardrop mũi nhọn có gân
-function drawAutumnLeaf(g, S, variant) {
-    g.save();
-    g.translate(S / 2, S / 2);
-    g.rotate(((variant * 53) % 360) * Math.PI / 180);
-    const colors = ['#e85d1c', '#d97706', '#b45309', '#f59e0b', '#dc2626', '#ea580c'];
-    g.fillStyle = colors[variant % colors.length];
-    const r = S * 0.36;
-
-    // Thân lá
-    g.beginPath();
-    g.moveTo(0, -r);
-    g.bezierCurveTo(r * 0.75, -r * 0.55, r * 0.7, r * 0.35, 0, r * 0.95);
-    g.bezierCurveTo(-r * 0.7, r * 0.35, -r * 0.75, -r * 0.55, 0, -r);
-    g.fill();
-
-    // Gân giữa
-    g.strokeStyle = 'rgba(60, 20, 0, 0.35)';
-    g.lineWidth = S * 0.018;
-    g.beginPath(); g.moveTo(0, -r * 0.85); g.lineTo(0, r * 0.85); g.stroke();
-
-    // Gân phụ
-    g.lineWidth = S * 0.012;
-    for (let i = -3; i <= 3; i++) {
-        if (i === 0) continue;
-        const y = i * r * 0.22;
+        // Cuống xanh
+        g.save();
+        g.translate(cx, cy - ry * 0.95);
+        g.rotate(-0.18);
+        g.fillStyle = '#3f6212';
         g.beginPath();
-        g.moveTo(0, y); g.lineTo(r * 0.45, y + r * 0.18);
-        g.moveTo(0, y); g.lineTo(-r * 0.45, y + r * 0.18);
-        g.stroke();
-    }
-
-    // Cuống
-    g.fillStyle = '#3d1a03';
-    g.fillRect(-S * 0.012, r * 0.88, S * 0.024, r * 0.32);
-
-    g.restore();
-}
-
-// Bí ngô Jack-o'-lantern: thân bí cam có khía, cuống xanh, mắt/miệng sáng phát quang
-function drawPumpkinJack(g, S) {
-    g.clearRect(0, 0, S, S);
-    const cx = S * 0.5, cy = S * 0.58;
-    const rx = S * 0.32, ry = S * 0.26;
-
-    // Cuống xanh
-    g.save();
-    g.translate(cx, cy - ry * 0.95);
-    g.rotate(-0.18);
-    g.fillStyle = '#3f6212';
-    g.beginPath();
-    g.moveTo(-S * 0.018, 0);
-    g.quadraticCurveTo(-S * 0.04, -S * 0.09, S * 0.02, -S * 0.13);
-    g.quadraticCurveTo(S * 0.07, -S * 0.11, S * 0.045, -S * 0.02);
-    g.quadraticCurveTo(S * 0.03, S * 0.02, S * 0.018, 0);
-    g.closePath();
-    g.fill();
-    g.strokeStyle = '#1a2e05';
-    g.lineWidth = S * 0.004;
-    g.stroke();
-    g.restore();
-
-    // Thân bí: 6 múi (ellipse lệch nhau để trông có khía)
-    const ribs = 6;
-    for (let i = 0; i < ribs; i++) {
-        const t = i / (ribs - 1);           // 0..1
-        const off = (t - 0.5) * rx * 1.15;
-        const scaleY = 1 - Math.abs(t - 0.5) * 0.28;
-        const grad = g.createRadialGradient(cx + off - rx * 0.25, cy - ry * 0.4, rx * 0.1, cx + off, cy, rx);
-        grad.addColorStop(0, '#ffd08a');
-        grad.addColorStop(0.45, '#ff9f3a');
-        grad.addColorStop(1, '#c2410c');
-        g.fillStyle = grad;
-        g.beginPath();
-        g.ellipse(cx + off, cy, rx * 0.34, ry * scaleY, 0, 0, Math.PI * 2);
-        g.fill();
-        // vạch khía tối
-        g.strokeStyle = 'rgba(80, 25, 0, 0.35)';
-        g.lineWidth = S * 0.006;
-        g.stroke();
-    }
-
-    // Đường viền ngoài đậm hơn cho rõ silhouette
-    g.strokeStyle = 'rgba(60, 15, 0, 0.55)';
-    g.lineWidth = S * 0.009;
-    g.beginPath();
-    g.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-    g.stroke();
-
-    // Mắt + mũi + miệng phát sáng
-    const eyeY = cy - ry * 0.22;
-    const eyeDX = rx * 0.42;
-    const eyeSize = S * 0.065;
-
-    // vẽ 1 mắt hình tam giác cong
-    function eye(ex) {
-        g.beginPath();
-        g.moveTo(ex - eyeSize, eyeY + eyeSize * 0.3);
-        g.quadraticCurveTo(ex, eyeY - eyeSize * 1.1, ex + eyeSize, eyeY + eyeSize * 0.3);
-        g.quadraticCurveTo(ex, eyeY + eyeSize * 0.6, ex - eyeSize, eyeY + eyeSize * 0.3);
+        g.moveTo(-S * 0.018, 0);
+        g.quadraticCurveTo(-S * 0.04, -S * 0.09, S * 0.02, -S * 0.13);
+        g.quadraticCurveTo(S * 0.07, -S * 0.11, S * 0.045, -S * 0.02);
+        g.quadraticCurveTo(S * 0.03, S * 0.02, S * 0.018, 0);
         g.closePath();
+        g.fill();
+        g.strokeStyle = '#1a2e05';
+        g.lineWidth = S * 0.004;
+        g.stroke();
+        g.restore();
+
+        // Thân bí: 6 múi (ellipse lệch nhau để trông có khía)
+        const ribs = 6;
+        for (let i = 0; i < ribs; i++) {
+            const t = i / (ribs - 1);           // 0..1
+            const off = (t - 0.5) * rx * 1.15;
+            const scaleY = 1 - Math.abs(t - 0.5) * 0.28;
+            const grad = g.createRadialGradient(cx + off - rx * 0.25, cy - ry * 0.4, rx * 0.1, cx + off, cy, rx);
+            grad.addColorStop(0, '#ffd08a');
+            grad.addColorStop(0.45, '#ff9f3a');
+            grad.addColorStop(1, '#c2410c');
+            g.fillStyle = grad;
+            g.beginPath();
+            g.ellipse(cx + off, cy, rx * 0.34, ry * scaleY, 0, 0, Math.PI * 2);
+            g.fill();
+            // vạch khía tối
+            g.strokeStyle = 'rgba(80, 25, 0, 0.35)';
+            g.lineWidth = S * 0.006;
+            g.stroke();
+        }
+
+        // Đường viền ngoài đậm hơn cho rõ silhouette
+        g.strokeStyle = 'rgba(60, 15, 0, 0.55)';
+        g.lineWidth = S * 0.009;
+        g.beginPath();
+        g.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+        g.stroke();
+
+        // Mắt + mũi + miệng phát sáng
+        const eyeY = cy - ry * 0.22;
+        const eyeDX = rx * 0.42;
+        const eyeSize = S * 0.065;
+
+        // vẽ 1 mắt hình tam giác cong
+        function eye(ex) {
+            g.beginPath();
+            g.moveTo(ex - eyeSize, eyeY + eyeSize * 0.3);
+            g.quadraticCurveTo(ex, eyeY - eyeSize * 1.1, ex + eyeSize, eyeY + eyeSize * 0.3);
+            g.quadraticCurveTo(ex, eyeY + eyeSize * 0.6, ex - eyeSize, eyeY + eyeSize * 0.3);
+            g.closePath();
+        }
+
+        // Halo vàng
+        g.save();
+        g.shadowColor = 'rgba(255, 220, 100, 0.95)';
+        g.shadowBlur = S * 0.06;
+        g.fillStyle = '#fff2b0';
+        eye(cx - eyeDX); g.fill();
+        eye(cx + eyeDX); g.fill();
+
+        // Mũi tam giác
+        g.beginPath();
+        g.moveTo(cx, cy - S * 0.005);
+        g.lineTo(cx - S * 0.03, cy + S * 0.045);
+        g.lineTo(cx + S * 0.03, cy + S * 0.045);
+        g.closePath();
+        g.fill();
+
+        // Miệng cười răng cưa
+        const mouthY = cy + ry * 0.42;
+        const mouthW = rx * 0.72;
+        const toothH = S * 0.045;
+        g.beginPath();
+        g.moveTo(cx - mouthW / 2, mouthY);
+        const teeth = 5;
+        for (let i = 0; i < teeth; i++) {
+            const x1 = cx - mouthW / 2 + (i + 0.5) * (mouthW / teeth);
+            const x2 = cx - mouthW / 2 + (i + 1) * (mouthW / teeth);
+            g.lineTo(x1, mouthY + toothH * 0.95);
+            g.lineTo(x2, mouthY);
+        }
+        // cằm cong lên
+        g.quadraticCurveTo(cx, mouthY + toothH * 1.6, cx - mouthW / 2, mouthY);
+        g.closePath();
+        g.fill();
+        g.restore();
     }
 
-    // Halo vàng
-    g.save();
-    g.shadowColor = 'rgba(255, 220, 100, 0.95)';
-    g.shadowBlur = S * 0.06;
-    g.fillStyle = '#fff2b0';
-    eye(cx - eyeDX); g.fill();
-    eye(cx + eyeDX); g.fill();
+    // Scene chính Halloween
+    function buildHalloween(ctx) {
+        const { THREE, lvl, cnt } = ctx;
 
-    // Mũi tam giác
-    g.beginPath();
-    g.moveTo(cx, cy - S * 0.005);
-    g.lineTo(cx - S * 0.03, cy + S * 0.045);
-    g.lineTo(cx + S * 0.03, cy + S * 0.045);
-    g.closePath();
-    g.fill();
-
-    // Miệng cười răng cưa
-    const mouthY = cy + ry * 0.42;
-    const mouthW = rx * 0.72;
-    const toothH = S * 0.045;
-    g.beginPath();
-    g.moveTo(cx - mouthW / 2, mouthY);
-    const teeth = 5;
-    for (let i = 0; i < teeth; i++) {
-        const x1 = cx - mouthW / 2 + (i + 0.5) * (mouthW / teeth);
-        const x2 = cx - mouthW / 2 + (i + 1) * (mouthW / teeth);
-        g.lineTo(x1, mouthY + toothH * 0.95);
-        g.lineTo(x2, mouthY);
-    }
-    // cằm cong lên
-    g.quadraticCurveTo(cx, mouthY + toothH * 1.6, cx - mouthW / 2, mouthY);
-    g.closePath();
-    g.fill();
-    g.restore();
-}
-
-// Scene chính Halloween
-function buildHalloween(ctx) {
-    const { THREE, lvl, cnt } = ctx;
-
-    // ── Sao nền trời ──
-    starField(ctx, cnt([150, 400, 900][lvl]), 22, 0.65, 0.85);
+        // ── Sao nền trời ──
+        starField(ctx, cnt([150, 400, 900][lvl]), 22, 0.65, 0.85);
 
         // ── TRĂNG MÁU — nhỏ hơn, đưa cao hơn, có quầng hồng/tím ──
-    const moonTex = tex(THREE, 256, (g, S) => {
-        const c = S / 2, r = S * 0.24;
-        // Quầng hồng-tím đặc trưng
-        const halo = g.createRadialGradient(c, c, r * 0.7, c, c, S * 0.5);
-        halo.addColorStop(0, 'rgba(255, 160, 200, 0.55)');
-        halo.addColorStop(0.35, 'rgba(220, 100, 160, 0.28)');
-        halo.addColorStop(0.7, 'rgba(150, 70, 140, 0.10)');
-        halo.addColorStop(1, 'rgba(100, 40, 110, 0)');
-        g.fillStyle = halo; g.fillRect(0, 0, S, S);
+        const moonTex = tex(THREE, 256, (g, S) => {
+            const c = S / 2, r = S * 0.24;
+            // Quầng hồng-tím đặc trưng
+            const halo = g.createRadialGradient(c, c, r * 0.7, c, c, S * 0.5);
+            halo.addColorStop(0, 'rgba(255, 160, 200, 0.55)');
+            halo.addColorStop(0.35, 'rgba(220, 100, 160, 0.28)');
+            halo.addColorStop(0.7, 'rgba(150, 70, 140, 0.10)');
+            halo.addColorStop(1, 'rgba(100, 40, 110, 0)');
+            g.fillStyle = halo; g.fillRect(0, 0, S, S);
 
-        // Đĩa trăng hồng nhạt
-        const disk = g.createRadialGradient(c * 0.82, c * 0.78, r * 0.1, c, c, r);
-        disk.addColorStop(0, '#ffe8f0');
-        disk.addColorStop(0.5, '#f8b8d0');
-        disk.addColorStop(0.85, '#e088a8');
-        disk.addColorStop(1, '#c06088');
-        g.fillStyle = disk;
-        g.beginPath(); g.arc(c, c, r, 0, Math.PI * 2); g.fill();
+            // Đĩa trăng hồng nhạt
+            const disk = g.createRadialGradient(c * 0.82, c * 0.78, r * 0.1, c, c, r);
+            disk.addColorStop(0, '#ffe8f0');
+            disk.addColorStop(0.5, '#f8b8d0');
+            disk.addColorStop(0.85, '#e088a8');
+            disk.addColorStop(1, '#c06088');
+            g.fillStyle = disk;
+            g.beginPath(); g.arc(c, c, r, 0, Math.PI * 2); g.fill();
 
-        // Vài "biển" mờ hồng đậm
-        g.globalAlpha = 0.30;
-        g.fillStyle = '#a04868';
-        [[c * 0.88, c * 0.92, r * 0.15], [c * 1.08, c * 0.85, r * 0.10],
-         [c * 1.12, c * 1.12, r * 0.08], [c * 0.78, c * 1.14, r * 0.07],
-         [c * 1.02, c * 1.18, r * 0.05]].forEach(([x, y, cr]) => {
-            g.beginPath(); g.arc(x, y, cr, 0, Math.PI * 2); g.fill();
+            // Vài "biển" mờ hồng đậm
+            g.globalAlpha = 0.30;
+            g.fillStyle = '#a04868';
+            [[c * 0.88, c * 0.92, r * 0.15], [c * 1.08, c * 0.85, r * 0.10],
+            [c * 1.12, c * 1.12, r * 0.08], [c * 0.78, c * 1.14, r * 0.07],
+            [c * 1.02, c * 1.18, r * 0.05]].forEach(([x, y, cr]) => {
+                g.beginPath(); g.arc(x, y, cr, 0, Math.PI * 2); g.fill();
+            });
+            g.globalAlpha = 1;
         });
-        g.globalAlpha = 1;
-    });
-    const moonMat = new THREE.SpriteMaterial({
-        map: moonTex, transparent: true, depthWrite: false,
-        blending: THREE.AdditiveBlending, opacity: 1
-    });
-    const moon = new THREE.Sprite(moonMat);
-    const moonSize = [3.6, 4.8, 6.2][lvl];            // ← nhỏ hơn trước
-    moon.scale.set(moonSize, moonSize, 1);
-    moon.position.set(2.4, 4.8, -24);                    // ← cao hơn (Y: 4.8)
-    ctx.scene.add(moon);
-    ctx.own(moonTex, moonMat);
-    ctx.lightFns.push(light => { moonMat.opacity = light ? 0.35 : 1; });
-
-    // ── LÂU ĐÀI BÊN PHẢI ──
-    const castleTex = tex(THREE, 512, (g, S) => drawCastleSilhouette(g, S));
-    const castleMat = new THREE.MeshBasicMaterial({
-        map: castleTex, transparent: true, depthWrite: false, side: THREE.DoubleSide
-    });
-    const castle = new THREE.Mesh(new THREE.PlaneGeometry(9.5, 9.5), castleMat);
-    castle.position.set(6.2, -2.6, -12);                 // ← bên phải, hơi thấp
-    ctx.scene.add(castle);
-    ctx.own(castleTex, castleMat, castle.geometry);
-    ctx.lightFns.push(light => { castleMat.opacity = light ? 0.55 : 1; });
-
-    // Hào quang đỏ sẫm quanh lâu đài (như máu/đèn thắp)
-    const castleGlowTex = tex(THREE, 128, (g, S) => {
-        const gr = g.createRadialGradient(S/2, S/2, 0, S/2, S/2, S/2);
-        gr.addColorStop(0, 'rgba(255, 80, 120, 0.35)');
-        gr.addColorStop(0.5, 'rgba(200, 40, 90, 0.15)');
-        gr.addColorStop(1, 'rgba(150, 20, 60, 0)');
-        g.fillStyle = gr; g.fillRect(0, 0, S, S);
-    });
-    const castleGlowMat = new THREE.SpriteMaterial({
-        map: castleGlowTex, transparent: true, depthWrite: false,
-        blending: THREE.AdditiveBlending
-    });
-    const castleGlow = new THREE.Sprite(castleGlowMat);
-    castleGlow.scale.set(11, 11, 1);
-    castleGlow.position.set(6.2, -2.0, -12.5);
-    ctx.scene.add(castleGlow);
-    ctx.own(castleGlowTex, castleGlowMat);
-    ctx.lightFns.push(light => { castleGlowMat.opacity = light ? 0.4 : 1; });
-
-    // ── CÂY KHÔ bên trái ──
-    const treeTex = tex(THREE, 512, (g, S) => drawDeadTreeSilhouette(g, S));
-    const treeMat = new THREE.MeshBasicMaterial({
-        map: treeTex, transparent: true, depthWrite: false, side: THREE.DoubleSide
-    });
-    const tree = new THREE.Mesh(new THREE.PlaneGeometry(10, 11.5), treeMat);
-    tree.position.set(-7.2, -1.8, -14);
-    tree.rotation.z = 0.035;
-    ctx.scene.add(tree);
-    ctx.own(treeTex, treeMat, tree.geometry);
-    ctx.lightFns.push(light => { treeMat.opacity = light ? 0.55 : 1; });
-
-    // ── DƠI BAY 2 HƯỚNG ──
-    const batTex = atlasTex(THREE, 3, 1, 96, (g, S, i) => drawBatShape(g, S, i));
-
-    // Đàn dơi bay phải
-    fallPoints(ctx, {
-        count: cnt([5, 12, 22][lvl]),
-        texture: batTex, atlas: [3, 1],
-        size: [22, 42], speed: [0.7, 1.5],
-        z: [-9, -1],
-        sway: 0.4 + lvl * 0.15,
-        wind: 0.16 + lvl * 0.08,
-        spin: 0.2, flip: 0, dir: 0,          // dir=0 → không rơi, chỉ bay ngang
-        alpha: 1,
-        colors: ['#06060e'],
-        blend: THREE.NormalBlending
-    });
-    // Vài con bay ngược lại
-    fallPoints(ctx, {
-        count: cnt([3, 6, 12][lvl]),
-        texture: batTex, atlas: [3, 1],
-        size: [16, 30], speed: [0.6, 1.2],
-        z: [-8, -1.5],
-        sway: 0.35,
-        wind: -(0.13 + lvl * 0.06),
-        spin: 0.2, flip: 0, dir: 0,
-        alpha: 0.85,
-        colors: ['#0a0a18'],
-        blend: THREE.NormalBlending
-    });
-
-    // ── LÁ RỤNG MÙA THU ──
-    const leafTex = atlasTex(THREE, 3, 2, 96, (g, S, i) => drawAutumnLeaf(g, S, i));
-    fallPoints(ctx, {
-        count: cnt([25, 80, 170][lvl]),
-        texture: leafTex, atlas: [3, 2],
-        size: [16, 34], speed: [0.32, 0.85],
-        z: [-10, 2],
-        sway: 0.75 + lvl * 0.25,
-        wind: 0.09 + lvl * 0.07,
-        spin: 2.0 + lvl * 0.8, flip: 0.75, dir: 1,
-        alpha: 1,
-        colors: ['#ffffff', '#ffe2c0', '#ffc890'],
-        blend: THREE.NormalBlending,
-        lightMul: [0.85, 0.7, 0.6], lightBlend: THREE.NormalBlending
-    });
-
-    // ── SƯƠNG MÙ trôi ngang ──
-    const fogTex = tex(THREE, 256, (g, S) => {
-        const gr = g.createRadialGradient(S/2, S/2, 0, S/2, S/2, S/2);
-        gr.addColorStop(0, 'rgba(190, 210, 230, 0.32)');
-        gr.addColorStop(0.45, 'rgba(150, 180, 210, 0.15)');
-        gr.addColorStop(1, 'rgba(110, 150, 190, 0)');
-        g.fillStyle = gr; g.fillRect(0, 0, S, S);
-    });
-
-    const fogCount = 5 + lvl * 2;
-    const fogs = [];
-    for (let i = 0; i < fogCount; i++) {
-        const fogMat = new THREE.MeshBasicMaterial({
-            map: fogTex, transparent: true, depthWrite: false, blending: THREE.NormalBlending
+        const moonMat = new THREE.SpriteMaterial({
+            map: moonTex, transparent: true, depthWrite: false,
+            blending: THREE.AdditiveBlending, opacity: 1
         });
-        const fog = new THREE.Mesh(new THREE.PlaneGeometry(15, 6.5), fogMat);
-        fog.position.set(
-            -12 + (i / fogCount) * 24 + (Math.random() - 0.5) * 3,
-            -3.2 - Math.random() * 0.7,
-            -8 + Math.random() * 3
-        );
-        fog.userData = { speed: 0.18 + Math.random() * 0.18, phase: Math.random() * Math.PI * 2 };
-        fog.userData.baseOpacity = 0.6 + Math.random() * 0.25;
-        ctx.scene.add(fog);
-        ctx.own(fogMat, fog.geometry);
-        fogs.push(fog);
-        ctx.lightFns.push(light => { fogMat.opacity = fog.userData.baseOpacity * (light ? 0.6 : 1); });
+        const moon = new THREE.Sprite(moonMat);
+        const moonSize = [3.6, 4.8, 6.2][lvl];            // ← nhỏ hơn trước
+        moon.scale.set(moonSize, moonSize, 1);
+        moon.position.set(2.4, 4.8, -24);                    // ← cao hơn (Y: 4.8)
+        ctx.scene.add(moon);
+        ctx.own(moonTex, moonMat);
+        ctx.lightFns.push(light => { moonMat.opacity = light ? 0.35 : 1; });
+
+        // ── LÂU ĐÀI BÊN PHẢI ──
+        const castleTex = tex(THREE, 512, (g, S) => drawCastleSilhouette(g, S));
+        const castleMat = new THREE.MeshBasicMaterial({
+            map: castleTex, transparent: true, depthWrite: false, side: THREE.DoubleSide
+        });
+        const castle = new THREE.Mesh(new THREE.PlaneGeometry(9.5, 9.5), castleMat);
+        castle.position.set(6.2, -2.6, -12);                 // ← bên phải, hơi thấp
+        ctx.scene.add(castle);
+        ctx.own(castleTex, castleMat, castle.geometry);
+        ctx.lightFns.push(light => { castleMat.opacity = light ? 0.55 : 1; });
+
+        // Hào quang đỏ sẫm quanh lâu đài (như máu/đèn thắp)
+        const castleGlowTex = tex(THREE, 128, (g, S) => {
+            const gr = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+            gr.addColorStop(0, 'rgba(255, 80, 120, 0.35)');
+            gr.addColorStop(0.5, 'rgba(200, 40, 90, 0.15)');
+            gr.addColorStop(1, 'rgba(150, 20, 60, 0)');
+            g.fillStyle = gr; g.fillRect(0, 0, S, S);
+        });
+        const castleGlowMat = new THREE.SpriteMaterial({
+            map: castleGlowTex, transparent: true, depthWrite: false,
+            blending: THREE.AdditiveBlending
+        });
+        const castleGlow = new THREE.Sprite(castleGlowMat);
+        castleGlow.scale.set(11, 11, 1);
+        castleGlow.position.set(6.2, -2.0, -12.5);
+        ctx.scene.add(castleGlow);
+        ctx.own(castleGlowTex, castleGlowMat);
+        ctx.lightFns.push(light => { castleGlowMat.opacity = light ? 0.4 : 1; });
+
+        // ── CÂY KHÔ bên trái ──
+        const treeTex = tex(THREE, 512, (g, S) => drawDeadTreeSilhouette(g, S));
+        const treeMat = new THREE.MeshBasicMaterial({
+            map: treeTex, transparent: true, depthWrite: false, side: THREE.DoubleSide
+        });
+        const tree = new THREE.Mesh(new THREE.PlaneGeometry(10, 11.5), treeMat);
+        tree.position.set(-7.2, -1.8, -14);
+        tree.rotation.z = 0.035;
+        ctx.scene.add(tree);
+        ctx.own(treeTex, treeMat, tree.geometry);
+        ctx.lightFns.push(light => { treeMat.opacity = light ? 0.55 : 1; });
+
+        // ── DƠI BAY 2 HƯỚNG ──
+        const batTex = atlasTex(THREE, 3, 1, 96, (g, S, i) => drawBatShape(g, S, i));
+
+        // Đàn dơi bay phải
+        fallPoints(ctx, {
+            count: cnt([5, 12, 22][lvl]),
+            texture: batTex, atlas: [3, 1],
+            size: [22, 42], speed: [0.7, 1.5],
+            z: [-9, -1],
+            sway: 0.4 + lvl * 0.15,
+            wind: 0.16 + lvl * 0.08,
+            spin: 0.2, flip: 0, dir: 0,          // dir=0 → không rơi, chỉ bay ngang
+            alpha: 1,
+            colors: ['#06060e'],
+            blend: THREE.NormalBlending
+        });
+        // Vài con bay ngược lại
+        fallPoints(ctx, {
+            count: cnt([3, 6, 12][lvl]),
+            texture: batTex, atlas: [3, 1],
+            size: [16, 30], speed: [0.6, 1.2],
+            z: [-8, -1.5],
+            sway: 0.35,
+            wind: -(0.13 + lvl * 0.06),
+            spin: 0.2, flip: 0, dir: 0,
+            alpha: 0.85,
+            colors: ['#0a0a18'],
+            blend: THREE.NormalBlending
+        });
+
+        // ── LÁ RỤNG MÙA THU ──
+        const leafTex = atlasTex(THREE, 3, 2, 96, (g, S, i) => drawAutumnLeaf(g, S, i));
+        fallPoints(ctx, {
+            count: cnt([25, 80, 170][lvl]),
+            texture: leafTex, atlas: [3, 2],
+            size: [16, 34], speed: [0.32, 0.85],
+            z: [-10, 2],
+            sway: 0.75 + lvl * 0.25,
+            wind: 0.09 + lvl * 0.07,
+            spin: 2.0 + lvl * 0.8, flip: 0.75, dir: 1,
+            alpha: 1,
+            colors: ['#ffffff', '#ffe2c0', '#ffc890'],
+            blend: THREE.NormalBlending,
+            lightMul: [0.85, 0.7, 0.6], lightBlend: THREE.NormalBlending
+        });
+
+        // ── SƯƠNG MÙ trôi ngang ──
+        const fogTex = tex(THREE, 256, (g, S) => {
+            const gr = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+            gr.addColorStop(0, 'rgba(190, 210, 230, 0.32)');
+            gr.addColorStop(0.45, 'rgba(150, 180, 210, 0.15)');
+            gr.addColorStop(1, 'rgba(110, 150, 190, 0)');
+            g.fillStyle = gr; g.fillRect(0, 0, S, S);
+        });
+
+        const fogCount = 5 + lvl * 2;
+        const fogs = [];
+        for (let i = 0; i < fogCount; i++) {
+            const fogMat = new THREE.MeshBasicMaterial({
+                map: fogTex, transparent: true, depthWrite: false, blending: THREE.NormalBlending
+            });
+            const fog = new THREE.Mesh(new THREE.PlaneGeometry(15, 6.5), fogMat);
+            fog.position.set(
+                -12 + (i / fogCount) * 24 + (Math.random() - 0.5) * 3,
+                -3.2 - Math.random() * 0.7,
+                -8 + Math.random() * 3
+            );
+            fog.userData = { speed: 0.18 + Math.random() * 0.18, phase: Math.random() * Math.PI * 2 };
+            fog.userData.baseOpacity = 0.6 + Math.random() * 0.25;
+            ctx.scene.add(fog);
+            ctx.own(fogMat, fog.geometry);
+            fogs.push(fog);
+            ctx.lightFns.push(light => { fogMat.opacity = fog.userData.baseOpacity * (light ? 0.6 : 1); });
+        }
+        ctx.updaters.push((dt, t) => {
+            fogs.forEach(f => {
+                f.position.x += dt * f.userData.speed;
+                if (f.position.x > 13) f.position.x = -13;
+                f.position.y = -3.2 + Math.sin(t * 0.35 + f.userData.phase) * 0.28;
+            });
+        });
+
+        // ── Camera trôi nhẹ ──
+        ctx.updaters.push((dt, t) => {
+            ctx.camera.position.x = Math.sin(t * 0.07) * 0.18;
+            ctx.camera.position.y = Math.cos(t * 0.10) * 0.12;
+            ctx.camera.lookAt(0, 0, 0);
+        });
     }
-    ctx.updaters.push((dt, t) => {
-        fogs.forEach(f => {
-            f.position.x += dt * f.userData.speed;
-            if (f.position.x > 13) f.position.x = -13;
-            f.position.y = -3.2 + Math.sin(t * 0.35 + f.userData.phase) * 0.28;
-        });
-    });
-
-    // ── Camera trôi nhẹ ──
-    ctx.updaters.push((dt, t) => {
-        ctx.camera.position.x = Math.sin(t * 0.07) * 0.18;
-        ctx.camera.position.y = Math.cos(t * 0.10) * 0.12;
-        ctx.camera.lookAt(0, 0, 0);
-    });
-}
 
     const BUILDERS = { space: buildSpace, noel: buildNoel, tet: buildTet, trungthu: buildTrungThu, rain: buildRain, halloween: buildHalloween };
     // ---------------------------------------------------------- khung chung
@@ -1974,8 +1974,8 @@ function openThemeFxPopover(cardEl, themeId) {
             <div class="tfx-label"><i class="bi bi-sliders2"></i> Cường độ hiệu ứng</div>
             <div class="tfx-seg" id="tfxLevelSeg" role="group" aria-label="Cường độ hiệu ứng">
                 ${info.labels.map((lbl, i) =>
-                    `<button type="button" data-i="${i}" class="${i === idx ? 'active' : ''}">${escapeHtml(lbl)}</button>`
-                ).join('')}
+        `<button type="button" data-i="${i}" class="${i === idx ? 'active' : ''}">${escapeHtml(lbl)}</button>`
+    ).join('')}
             </div>
             <div class="tfx-hint" id="tfxLevelHint">${escapeHtml(info.hints[idx])}</div>
         </div>
@@ -2044,7 +2044,7 @@ function positionThemeFxPopover() {
     // Vẫn tràn → xuống dưới card
     if (left < 8) {
         left = Math.max(8, Math.min(vw - popRect.width - 8,
-                                   rect.left + rect.width / 2 - popRect.width / 2));
+            rect.left + rect.width / 2 - popRect.width / 2));
         top = rect.bottom + gap;
     }
 
@@ -2457,17 +2457,17 @@ function buildTetScene() {
     // ── Cụm hoa ──
     const clusters = [
         { cx: 240, cy: 130, r: 110 },
-        { cx: 130, cy: 210, r: 90  },
-        { cx: 370, cy: 200, r: 95  },
-        { cx: 60,  cy: 280, r: 75  },
-        { cx: 460, cy: 240, r: 80  },
-        { cx: 60,  cy: 380, r: 70  },
-        { cx: 460, cy: 370, r: 70  },
-        { cx: 40,  cy: 130, r: 60  },
-        { cx: 440, cy: 90,  r: 65  },
-        { cx: 260, cy: 60,  r: 70  },
-        { cx: 140, cy: 350, r: 60  },
-        { cx: 370, cy: 350, r: 60  },
+        { cx: 130, cy: 210, r: 90 },
+        { cx: 370, cy: 200, r: 95 },
+        { cx: 60, cy: 280, r: 75 },
+        { cx: 460, cy: 240, r: 80 },
+        { cx: 60, cy: 380, r: 70 },
+        { cx: 460, cy: 370, r: 70 },
+        { cx: 40, cy: 130, r: 60 },
+        { cx: 440, cy: 90, r: 65 },
+        { cx: 260, cy: 60, r: 70 },
+        { cx: 140, cy: 350, r: 60 },
+        { cx: 370, cy: 350, r: 60 },
     ];
 
     // Vẽ bông + nụ: 72% bông nở, 28% nụ
@@ -2475,7 +2475,7 @@ function buildTetScene() {
     clusters.forEach(c => {
         const count = Math.max(16, Math.floor(c.r * c.r / 62));   // giảm mật độ so với circle đơn
         for (let i = 0; i < count; i++) {
-            const ang  = rnd(0, Math.PI * 2);
+            const ang = rnd(0, Math.PI * 2);
             const dist = Math.pow(Math.random(), 0.55) * c.r;
             const x = c.cx + Math.cos(ang) * dist;
             const y = c.cy + Math.sin(ang) * dist;
@@ -2492,7 +2492,7 @@ function buildTetScene() {
     let leavesSvg = '';
     for (let i = 0; i < 45; i++) {
         const c = clusters[Math.floor(Math.random() * clusters.length)];
-        const ang  = rnd(0, Math.PI * 2);
+        const ang = rnd(0, Math.PI * 2);
         const dist = Math.pow(Math.random(), 0.6) * c.r;
         const x = c.cx + Math.cos(ang) * dist;
         const y = c.cy + Math.sin(ang) * dist;
@@ -2506,10 +2506,10 @@ function buildTetScene() {
         { x: 130, y: 200, s: 2.2 },
         { x: 240, y: 130, s: 2.6 },
         { x: 360, y: 210, s: 2.0 },
-        { x: 80,  y: 280, s: 2.4 },
+        { x: 80, y: 280, s: 2.4 },
         { x: 440, y: 240, s: 2.1 },
-        { x: 250, y: 70,  s: 2.8 },
-        { x: 40,  y: 130, s: 2.3 },
+        { x: 250, y: 70, s: 2.8 },
+        { x: 40, y: 130, s: 2.3 },
         { x: 460, y: 100, s: 2.0 },
     ];
     const featured = feats.map(p => {
@@ -2560,7 +2560,7 @@ function renderFullscreenFx() {
     const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const active = fxFullscreen && !!cfg && !reduced;
     const lvl = getFxLevelIndex(theme);
-   const backdrop = active && (!!cfg.galaxy || theme === 'trungthu' || theme === 'halloween' || theme === 'tet');
+    const backdrop = active && (!!cfg.galaxy || theme === 'trungthu' || theme === 'halloween' || theme === 'tet');
     document.body.classList.toggle('fx-space-full', active && !!cfg.galaxy);   // topbar hoà vào nền vũ trụ
     document.body.classList.toggle('fx-backdrop-on', backdrop);                // khung nội dung thành kính mờ để thấy nền phía sau
     ThreeFx.stop();                                                           // innerHTML bên dưới sẽ xoá canvas cũ
@@ -2603,7 +2603,7 @@ function renderFullscreenFx() {
     }
     layer.innerHTML = html;
 
-        // ═══════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════
     // NHỆN TREO — chỉ hiện ở chủ đề Halloween + mức "Đêm kinh hoàng"
     // Click vào → nhện thu lên trên, sau 5 giây đu xuống lại ở vị trí mới
     // Đặt ở body (không nằm trong layer) vì layer Halloween có z-index: -1
@@ -2678,7 +2678,7 @@ function renderFullscreenFx() {
 
 function setFxFullscreen(enabled) {
     fxFullscreen = !!enabled;
-    try { localStorage.setItem(FX_FULLSCREEN_KEY, fxFullscreen ? '1' : '0'); } catch (e) {}
+    try { localStorage.setItem(FX_FULLSCREEN_KEY, fxFullscreen ? '1' : '0'); } catch (e) { }
     // Đồng bộ toggle trong popover (nếu đang mở)
     const popToggle = document.getElementById('tfxFullscreenToggle');
     if (popToggle) popToggle.checked = fxFullscreen;
@@ -2694,7 +2694,7 @@ function applyTopbarTheme(themeId) {
     if (!TOPBAR_THEMES.some(t => t.id === themeId)) themeId = 'default';
     currentTopbarTheme = themeId;
     document.body.dataset.topbarTheme = themeId;
-    try { localStorage.setItem(TOPBAR_THEME_STORAGE_KEY, themeId); } catch (e) {}
+    try { localStorage.setItem(TOPBAR_THEME_STORAGE_KEY, themeId); } catch (e) { }
 
     document.querySelectorAll('#themeGrid .theme-card').forEach(card => {
         card.classList.toggle('active', card.dataset.theme === themeId);
@@ -2939,7 +2939,7 @@ function updateTorch() {
         const ir = input.getBoundingClientRect();
         // Chỉ đặt mask khi chuột ở gần input (tránh mask nhảy lung tung khi chuột xa)
         const inside = m.x >= ir.left - 60 && m.x <= ir.right + 60
-                    && m.y >= ir.top - 60 && m.y <= ir.bottom + 60;
+            && m.y >= ir.top - 60 && m.y <= ir.bottom + 60;
         if (inside) {
             reveal.style.setProperty('--mx', (m.x - ir.left) + 'px');
             reveal.style.setProperty('--my', (m.y - ir.top) + 'px');
@@ -3017,10 +3017,10 @@ function updatePwReveal() {
 
 async function handleAuthenticatedUser(user) {
     currentUser = user;
-    
+
     // Fetch user data from Firestore
     const userData = await getUserData(user.uid);
-    
+
     if (userData && userData.displayName) {
         // Store displayName in currentUser for easy access
         currentUser.displayName = userData.displayName;
@@ -3030,7 +3030,7 @@ async function handleAuthenticatedUser(user) {
         currentUser.displayName = user.displayName || user.email?.split('@')[0] || 'User';
         currentUser.avatar = null;
     }
-    
+
     // Bộ phận: user cũ chưa có field này => '' (chưa phân bộ phận), không gây lỗi
     currentUser.department = (userData && userData.department) || '';
     initDeptState();
@@ -3040,7 +3040,7 @@ async function handleAuthenticatedUser(user) {
         : localStorage.getItem(`notifyLead_${user.uid}`);
     notifyLeadMinutes = normalizeLeadMinutes(savedLead);
     loadJobCompletionSetting(user.uid, userData);
-    
+
     document.getElementById('authScreen').classList.add('d-none');
     updateUserProfileUI();
     initializeAuthenticatedApp();
@@ -3055,7 +3055,7 @@ async function getUserData(uid) {
         const usersRef = collection(db, 'users');
         const q = query(usersRef, where('uid', '==', uid));
         const snapshot = await getDocs(q);
-        
+
         if (!snapshot.empty) {
             const userDoc = snapshot.docs[0];
             return userDoc.data();
@@ -3200,13 +3200,13 @@ async function saveUserProfile() {
         showNotification('Thiếu thông tin', 'Vui lòng nhập tên hiển thị.', false, 'warning');
         return;
     }
-    
+
     try {
         // Update Firestore
         const usersRef = collection(db, 'users');
         const q = query(usersRef, where('uid', '==', currentUser.uid));
         const snapshot = await getDocs(q);
-        
+
         if (!snapshot.empty) {
             const userDoc = snapshot.docs[0];
             await updateDoc(doc(db, 'users', userDoc.id), {
@@ -3214,10 +3214,10 @@ async function saveUserProfile() {
                 updatedAt: new Date().toISOString()
             });
         }
-        
+
         // Update currentUser object
         currentUser.displayName = newDisplayName;
-        
+
         // Refresh UI
         updateUserProfileUI();
         showNotification('Thành công', 'Đã cập nhật tên hiển thị!', false, 'success');
@@ -3324,12 +3324,12 @@ function handleSignedOut() {
     currentUser = null;
     try {
         [userProfileModal, jobModal, viewJobModal, dayOffModal,
-         workHoursModal, salaryCalcModal, statisticsModal,
-         presenterSpinModal, guideModal, viewDataModal, checkDueModal,
-         transferConfirmModal, quickJobInviteModal, quickJobTransferConfirmModal,
-         migrateLegacyJobsModal
-        ].forEach(m => { try { m && m.hide(); } catch (_) {} });
-    } catch (_) {}
+            workHoursModal, salaryCalcModal, statisticsModal,
+            presenterSpinModal, guideModal, viewDataModal, checkDueModal,
+            transferConfirmModal, quickJobInviteModal, quickJobTransferConfirmModal,
+            migrateLegacyJobsModal
+        ].forEach(m => { try { m && m.hide(); } catch (_) { } });
+    } catch (_) { }
     document.body.classList.remove('modal-open');
     document.body.style.removeProperty('overflow');
     document.body.style.removeProperty('padding-right');
@@ -3338,7 +3338,7 @@ function handleSignedOut() {
     // ── Reset đèn pin + chuột để tránh state cũ dính lại ──
     authMouse = null;
     resetAuthPwUi();
-    try { updateTorch(); } catch (_) {}
+    try { updateTorch(); } catch (_) { }
     setTimeout(() => AuthOwl.moveTo(authMode), 80);   // màn đăng nhập hiện lại => đặt cú về đúng tab
 
     if (unsubscribeJobs) {
@@ -3434,20 +3434,20 @@ function initializeAuthenticatedApp() {
 }
 
 // Trong DOMContentLoaded event listener, THÊM CHECK NULL
-document.addEventListener('DOMContentLoaded', function() {
-    
-   jobModal = new bootstrap.Modal(document.getElementById('jobModal'), {
+document.addEventListener('DOMContentLoaded', function () {
+
+    jobModal = new bootstrap.Modal(document.getElementById('jobModal'), {
         backdrop: true,
         keyboard: true,
         focus: true
     });
-    
+
     viewJobModal = new bootstrap.Modal(document.getElementById('viewJobModal'), {
         backdrop: true,
         keyboard: true,
         focus: true
     });
-    
+
     userProfileModal = new bootstrap.Modal(document.getElementById('userProfileModal'), {
         backdrop: true,
         keyboard: true,
@@ -3485,8 +3485,8 @@ document.addEventListener('DOMContentLoaded', function() {
     initDepartmentUi();
     OwlFx.init();
     document.getElementById('salaryCalcBtn').addEventListener('click', openSalaryCalcModal);
-        // Ô nhập tiền → tự chèn dấu "." ngăn cách nghìn, giữ vị trí con trỏ
-        const MONEY_INPUT_IDS = ['salLCB'];
+    // Ô nhập tiền → tự chèn dấu "." ngăn cách nghìn, giữ vị trí con trỏ
+    const MONEY_INPUT_IDS = ['salLCB'];
     function handleMoneyInput(e) {
         const el = e.target;
         const cursorPos = el.selectionStart;
@@ -3506,39 +3506,39 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // === CHẶN AUTOFILL EMAIL/MẬT KHẨU VÀO Ô TÌM KIẾM ===
     function stripAutofillFromSearchInputs() {
-    const ids = ['searchJob', 'quickChatSearchInput', 'etaDirectSearch'];
-    ids.forEach(id => {
-        const el = document.getElementById(id);
-        if (!el) return;
+        const ids = ['searchJob', 'quickChatSearchInput', 'etaDirectSearch'];
+        ids.forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
 
-        const looksLikeCredential = v =>
-            /@/.test(v) ||                        // có @ → email
-            /password|mật khẩu|matkhau/i.test(v) // có chữ password
-        ;
+            const looksLikeCredential = v =>
+                /@/.test(v) ||                        // có @ → email
+                /password|mật khẩu|matkhau/i.test(v) // có chữ password
+                ;
 
-        const clean = () => {
-            if (looksLikeCredential(el.value)) {
-                el.value = '';
-                // nếu đang gõ filter, reset luôn kết quả đã lọc
-                if (id === 'searchJob' && typeof filteredJobs !== 'undefined' && typeof jobs !== 'undefined') {
-                    filteredJobs = jobs;
-                    if (typeof renderJobList === 'function') renderJobList();
+            const clean = () => {
+                if (looksLikeCredential(el.value)) {
+                    el.value = '';
+                    // nếu đang gõ filter, reset luôn kết quả đã lọc
+                    if (id === 'searchJob' && typeof filteredJobs !== 'undefined' && typeof jobs !== 'undefined') {
+                        filteredJobs = jobs;
+                        if (typeof renderJobList === 'function') renderJobList();
+                    }
+                    if (id === 'quickChatSearchInput' && typeof quickChatSearchText !== 'undefined') {
+                        quickChatSearchText = '';
+                        if (typeof renderQuickChat === 'function') renderQuickChat();
+                    }
                 }
-                if (id === 'quickChatSearchInput' && typeof quickChatSearchText !== 'undefined') {
-                    quickChatSearchText = '';
-                    if (typeof renderQuickChat === 'function') renderQuickChat();
-                }
-            }
-        };
+            };
 
-        // Chrome autofill xong mới bắn sự kiện, nên phải check nhiều mốc thời gian
-        clean();
-        setTimeout(clean, 120);
-        setTimeout(clean, 500);
-        setTimeout(clean, 1200);
-        el.addEventListener('animationstart', clean); // Chrome trigger autofill qua animation
-        el.addEventListener('change', clean);
-    });
+            // Chrome autofill xong mới bắn sự kiện, nên phải check nhiều mốc thời gian
+            clean();
+            setTimeout(clean, 120);
+            setTimeout(clean, 500);
+            setTimeout(clean, 1200);
+            el.addEventListener('animationstart', clean); // Chrome trigger autofill qua animation
+            el.addEventListener('change', clean);
+        });
     }
 
     document.addEventListener('DOMContentLoaded', stripAutofillFromSearchInputs);
@@ -3581,15 +3581,15 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('addOutOfScheduleBtn').addEventListener('click', () => openAddJobModal(true));
     document.getElementById('saveJobBtn').addEventListener('click', saveJob);
     document.getElementById('deleteJobBtn').addEventListener('click', deleteJob);
-    
+
     const textColorInput = document.getElementById('textColor');
     textColorInput.addEventListener('input', changeTextColor);
     textColorInput.addEventListener('change', changeTextColor);
-    
+
     const highlightColorInput = document.getElementById('highlightColor');
     highlightColorInput.addEventListener('input', applyHighlightColor);
     highlightColorInput.addEventListener('change', applyHighlightColor);
-    
+
     document.getElementById('searchJob').addEventListener('input', handleSearch);
     document.getElementById('isOutOfSchedule').addEventListener('change', toggleOutOfScheduleFields);
     document.getElementById('jobType').addEventListener('change', toggleDailyExcludeWrap);
@@ -3603,20 +3603,20 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('themeToggleBtn').addEventListener('click', () => {
         applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
     });
-    
+
     initAuthExtras();
     AuthOwl.init();
     document.getElementById('loginTab').addEventListener('click', () => setAuthMode('login'));
     document.getElementById('registerTab').addEventListener('click', () => setAuthMode('register'));
     document.getElementById('authForm').addEventListener('submit', handleAuthSubmit);
     document.getElementById('logoutBtn').addEventListener('click', async () => {
-    try {
-        // Ẩn modal trước để Bootstrap dọn backdrop + body.modal-open
-        userProfileModal.hide();
-        // Chờ Bootstrap chạy xong hiệu ứng đóng
-        await new Promise(r => setTimeout(r, 200));
-    } catch (e) { /* modal chưa init thì bỏ qua */ }
-    try { await signOut(auth); } catch (e) { console.error(e); }
+        try {
+            // Ẩn modal trước để Bootstrap dọn backdrop + body.modal-open
+            userProfileModal.hide();
+            // Chờ Bootstrap chạy xong hiệu ứng đóng
+            await new Promise(r => setTimeout(r, 200));
+        } catch (e) { /* modal chưa init thì bỏ qua */ }
+        try { await signOut(auth); } catch (e) { console.error(e); }
     });
     document.getElementById('confirmMigrateLegacyJobsBtn').addEventListener('click', migrateLegacyJobs);
     document.getElementById('viewDataBtn').addEventListener('click', openViewDataModal);
@@ -3641,7 +3641,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Live update badge số dòng khi dán dữ liệu
     document.getElementById('checkDueOldPaste').addEventListener('input', scheduleCheckDuePasteBadgeUpdate);
     document.getElementById('checkDueNewPaste').addEventListener('input', scheduleCheckDuePasteBadgeUpdate);
-    
+
     document.getElementById('confirmCancelBtn').addEventListener('click', hideConfirmModal);
     document.getElementById('confirmModal').addEventListener('click', (event) => {
         if (event.target.id === 'confirmModal') {
@@ -3659,7 +3659,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-            document.getElementById('settingsBtn').addEventListener('click', openSettingsModal);
+    document.getElementById('settingsBtn').addEventListener('click', openSettingsModal);
 
     const _snl = document.getElementById('settingsNotifyLead');
     if (_snl) _snl.addEventListener('change', (e) => saveNotifyLead(e.target.value));
@@ -3682,11 +3682,11 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('changePasswordBtn').addEventListener('click', handleChangePassword);
     document.getElementById('confirmChangePasswordBtn').addEventListener('click', confirmChangePassword);
     document.getElementById('confirmCurrentPassword').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); confirmChangePassword(); }
+        if (e.key === 'Enter') { e.preventDefault(); confirmChangePassword(); }
     });
     document.getElementById('userProfileModal').addEventListener('hidden.bs.modal', () => {
-    document.getElementById('profileNewPassword').value = '';
-    document.getElementById('changePasswordError').textContent = '';
+        document.getElementById('profileNewPassword').value = '';
+        document.getElementById('changePasswordError').textContent = '';
     });
     document.getElementById('changeAvatarBtn').addEventListener('click', () => {
         document.getElementById('avatarFileInput').click();
@@ -3697,12 +3697,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         e.target.value = '';
     });
-    
+
     document.addEventListener('hide.bs.modal', (e) => {
-    const active = document.activeElement;
-    if (active && e.target.contains(active) && typeof active.blur === 'function') {
-        active.blur();
-    }
+        const active = document.activeElement;
+        if (active && e.target.contains(active) && typeof active.blur === 'function') {
+            active.blur();
+        }
     }, true);
 
     // Transfer confirmation
@@ -3743,24 +3743,24 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     document.addEventListener('click', (e) => {
-    const btn = e.target.closest('.folder-open-btn');
-    if (!btn) return;
-    e.preventDefault();
-    e.stopPropagation();
+        const btn = e.target.closest('.folder-open-btn');
+        if (!btn) return;
+        e.preventDefault();
+        e.stopPropagation();
 
-    const path = btn.dataset.path;
-    if (!path) return;
+        const path = btn.dataset.path;
+        if (!path) return;
 
-    if (!isFolderHandlerInstalled()) {
-        // Chưa cài → hiện modal hướng dẫn
-        openFolderInstallModal(path);
-        return;
-    }
+        if (!isFolderHandlerInstalled()) {
+            // Chưa cài → hiện modal hướng dẫn
+            openFolderInstallModal(path);
+            return;
+        }
 
-    // Đã cài → mở protocol
-    openFolderViaProtocol(path);
-});
-    
+        // Đã cài → mở protocol
+        openFolderViaProtocol(path);
+    });
+
     initNotificationActionBridge();
     initTheme();
     loadSidebarState();
@@ -3774,7 +3774,7 @@ function requestNotificationPermission() {
                 console.log('📢 Notification permission:', permission);
                 if (permission === 'granted') {
                     showNotification('Thông báo đã bật', 'Bạn sẽ nhận được thông báo desktop khi đến giờ làm job!');
-                    
+
                 } else if (permission === 'denied') {
                     console.warn('⚠️ Người dùng từ chối thông báo desktop');
                 }
@@ -3822,7 +3822,7 @@ function toggleOutOfScheduleFields() {
 }
 
 // Format text in editor
-window.formatText = function(command) {
+window.formatText = function (command) {
     document.execCommand(command, false, null);
     document.getElementById('jobDescription').focus();
 };
@@ -3847,14 +3847,14 @@ function changeTextColor() {
     editor.focus();
 }
 
-window.applyHighlightColor = function() {
+window.applyHighlightColor = function () {
     const color = document.getElementById('highlightColor').value;
     document.execCommand('hiliteColor', false, color);
     document.getElementById('jobDescription').focus();
 };
 
 // Xóa màu nền đã tô cho phần văn bản đang bôi đen (hoặc toàn bộ nếu không chọn gì)
-window.removeHighlightColor = function() {
+window.removeHighlightColor = function () {
     const editor = document.getElementById('jobDescription');
     editor.focus();
     const selection = window.getSelection();
@@ -3869,7 +3869,7 @@ window.removeHighlightColor = function() {
     editor.focus();
 };
 
-window.insertTable = function() {
+window.insertTable = function () {
     const editor = document.getElementById('jobDescription');
     const selection = window.getSelection();
     const selectedText = selection && selection.rangeCount > 0 ? selection.toString().trim() : '';
@@ -3904,9 +3904,9 @@ window.insertTable = function() {
     const tableHtml = `
         <table style="border-collapse: collapse; width: auto; margin: 0.5rem 0; table-layout: auto;">
             ${rows.map(row => {
-                const safeCells = parseCells(row);
-                return `<tr>${safeCells.map(cell => `<td style="border: 1px solid #dee2e6; padding: 0.25rem 0.5rem; white-space: nowrap; font-size: 0.95em;">${cell}</td>`).join('')}</tr>`;
-            }).join('')}
+        const safeCells = parseCells(row);
+        return `<tr>${safeCells.map(cell => `<td style="border: 1px solid #dee2e6; padding: 0.25rem 0.5rem; white-space: nowrap; font-size: 0.95em;">${cell}</td>`).join('')}</tr>`;
+    }).join('')}
         </table>
     `;
 
@@ -3932,16 +3932,16 @@ function toggleSunday(e) {
 // Handle Search
 function handleSearch(e) {
     const searchTerm = e.target.value.toLowerCase().trim();
-    
+
     if (searchTerm === '') {
         filteredJobs = jobs;
     } else {
-        filteredJobs = jobs.filter(job => 
+        filteredJobs = jobs.filter(job =>
             job.title.toLowerCase().includes(searchTerm) ||
             (job.description && job.description.toLowerCase().includes(searchTerm))
         );
     }
-    
+
     renderJobList();
 }
 
@@ -3957,7 +3957,7 @@ async function exportToPDF() {
         if (weekdayDifference !== 0) return weekdayDifference;
         return String(firstJob.time || '').localeCompare(String(secondJob.time || ''));
     });
-    
+
     if (activeJobs.length === 0) {
         alert('📋 Không có job đang hoạt động để xuất PDF!');
         return;
@@ -3999,13 +3999,13 @@ async function exportToPDF() {
         pdf.setTextColor(255, 255, 255);
         pdf.setFont('helvetica', 'bold');
         pdf.text('DANH SACH JOB', pageWidth / 2, 20, { align: 'center' });
-        
+
         // Subtitle
         pdf.setFontSize(12);
         pdf.setFont('helvetica', 'normal');
         const today = new Date();
         pdf.text(`Ngay xuat: ${formatDateVN(today)}`, pageWidth / 2, 30, { align: 'center' });
-        
+
         // Total jobs (ACTIVE ONLY)
         pdf.setFontSize(10);
         pdf.text(`Tong so: ${activeJobs.length} jobs dang hoat dong`, pageWidth / 2, 38, { align: 'center' });
@@ -4017,18 +4017,18 @@ async function exportToPDF() {
         const headerHeight = 12;
         pdf.setFillColor(headerColor[0], headerColor[1], headerColor[2]);
         pdf.rect(margin, yPos, contentWidth, headerHeight, 'F');
-        
+
         pdf.setFontSize(11);
         pdf.setTextColor(255, 255, 255);
         pdf.setFont('helvetica', 'bold');
-        
+
         const colWidths = {
             stt: 15,
             title: 85,
             type: 40,
             time: 30
         };
-        
+
         pdf.text('STT', margin + 5, yPos + 8);
         pdf.text('Tieu de', margin + colWidths.stt + 5, yPos + 8);
         pdf.text('Loai Job', margin + colWidths.stt + colWidths.title + 5, yPos + 8);
@@ -4039,7 +4039,7 @@ async function exportToPDF() {
         // Table content (ONLY ACTIVE JOBS)
         pdf.setFont('helvetica', 'normal');
         const rowHeight = 10;
-        
+
         // Type colors
         const typeColors = {
             daily: [255, 107, 107],
@@ -4069,18 +4069,18 @@ async function exportToPDF() {
             pdf.setTextColor(textColor[0], textColor[1], textColor[2]);
             pdf.setFontSize(10);
             pdf.text((index + 1).toString(), margin + 5, yPos + 5);
-            
+
             // Title (with truncation)
             let title = job.title;
             if (title.length > 45) {
                 title = title.substring(0, 42) + '...';
             }
             pdf.text(title, margin + colWidths.stt + 5, yPos + 5);
-            
+
             // Job type with color badge
             const typeColor = typeColors[job.type] || [150, 150, 150];
             const typeX = margin + colWidths.stt + colWidths.title + 5;
-            
+
             // Type badge background
             pdf.setFillColor(typeColor[0], typeColor[1], typeColor[2]);
             const typeLabels = {
@@ -4092,13 +4092,13 @@ async function exportToPDF() {
             const typeLabel = typeLabels[job.type] || job.type;
             const badgeWidth = pdf.getTextWidth(typeLabel) + 6;
             pdf.roundedRect(typeX, yPos + 1, badgeWidth, 6, 2, 2, 'F');
-            
+
             // Type text
             pdf.setTextColor(255, 255, 255);
             pdf.setFontSize(9);
             pdf.setFont('helvetica', 'bold');
             pdf.text(typeLabel, typeX + 3, yPos + 5);
-            
+
             // Time
             pdf.setFont('helvetica', 'normal');
             pdf.setTextColor(textColor[0], textColor[1], textColor[2]);
@@ -4113,12 +4113,12 @@ async function exportToPDF() {
         const pageCount = pdf.internal.getNumberOfPages();
         for (let i = 1; i <= pageCount; i++) {
             pdf.setPage(i);
-            
+
             // Footer line
             pdf.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
             pdf.setLineWidth(0.5);
             pdf.line(margin, pageHeight - 20, pageWidth - margin, pageHeight - 20);
-            
+
             // Footer text
             pdf.setFontSize(9);
             pdf.setTextColor(120, 120, 120);
@@ -4129,7 +4129,7 @@ async function exportToPDF() {
                 pageHeight - 12,
                 { align: 'center' }
             );
-            
+
             // Generated by
             pdf.setFontSize(8);
             pdf.text(
@@ -4141,7 +4141,7 @@ async function exportToPDF() {
         }
 
         // Save PDF
-        const fileName = `Job_Schedule_${today.getFullYear()}-${(today.getMonth()+1).toString().padStart(2,'0')}-${today.getDate().toString().padStart(2,'0')}.pdf`;
+        const fileName = `Job_Schedule_${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}.pdf`;
         pdf.save(fileName);
 
         // Reset button
@@ -4152,7 +4152,7 @@ async function exportToPDF() {
     } catch (error) {
         console.error('Lỗi khi xuất PDF:', error);
         alert('❌ Có lỗi xảy ra khi xuất PDF: ' + error.message);
-        
+
         const exportBtn = document.getElementById('exportPdfBtn');
         exportBtn.innerHTML = '<i class="bi bi-file-earmark-pdf-fill"></i> <span>Xuất PDF</span>';
         exportBtn.disabled = false;
@@ -4174,16 +4174,16 @@ async function testFirestoreConnection() {
         if (!currentUser) return false;
         const testCollection = query(collection(db, 'jobs'), where('ownerId', '==', currentUser.uid));
         const snapshot = await getDocs(testCollection);
-        
+
         firestoreConnected = true;
         //console.log(`📊 Số lượng jobs hiện tại: ${snapshot.size}`);
-        
+
         //showNotification('Kết nối thành công', `Đã kết nối với Firestore. Tìm thấy ${snapshot.size} jobs.`);
         return true;
     } catch (error) {
         firestoreConnected = false;
         console.error('❌ Lỗi kết nối Firestore:', error);
-        
+
         if (error.code === 'permission-denied') {
             alert(`❌ LỖI FIRESTORE PERMISSIONS!\n\nVui lòng cập nhật Security Rules trong Firebase Console.`);
         }
@@ -4198,11 +4198,11 @@ function loadJobs() {
         console.warn('⚠️ Chưa kết nối Firestore');
         return;
     }
-    
+
     const jobsCollection = query(collection(db, 'jobs'), where('ownerId', '==', currentUser.uid));
-    
+
     if (unsubscribeJobs) unsubscribeJobs();
-    unsubscribeJobs = onSnapshot(jobsCollection, 
+    unsubscribeJobs = onSnapshot(jobsCollection,
         (snapshot) => {
             jobs = [];
             snapshot.forEach((doc) => {
@@ -4212,21 +4212,21 @@ function loadJobs() {
                 };
                 if (!job.ownerId || job.ownerId === currentUser.uid) jobs.push(job);
             });
-            
+
             // Sắp xếp theo ngày tạo
             jobs.sort((a, b) => {
                 const dateA = new Date(a.createdAt || 0);
                 const dateB = new Date(b.createdAt || 0);
                 return dateB - dateA;
             });
-            
+
             filteredJobs = jobs;
             renderJobList();
             renderSchedule();
             renderOutOfScheduleJobs();
             jobsLoadedOnce = true;
             flushPendingNotifAction();
-        }, 
+        },
         (error) => {
             console.error('❌ Lỗi khi lắng nghe Firestore:', error);
             showNotification('Lỗi', 'Không thể tải dữ liệu từ Firestore!');
@@ -4252,11 +4252,11 @@ function getJobOccurrences(job, startDate, endDate) {
     }
 
     let currentDate = new Date(jobStartDate);
-    
+
     // Đảm bảo không bắt đầu trước ngày start
     if (currentDate < start) {
         currentDate = new Date(start);
-        
+
         // Điều chỉnh currentDate để khớp với pattern của job
         if (job.type === 'weekly') {
             const jobDay = jobStartDate.getDay();
@@ -4265,7 +4265,7 @@ function getJobOccurrences(job, startDate, endDate) {
             currentDate.setDate(currentDate.getDate() + (diff >= 0 ? diff : 7 + diff));
         }
     }
-    
+
     while (currentDate <= end) {
         if (currentDate >= jobStartDate) {
             // Check if workOnSunday is false and current day is Sunday (0)
@@ -4279,7 +4279,7 @@ function getJobOccurrences(job, startDate, endDate) {
                 occurrences.push(new Date(currentDate));
             }
         }
-        
+
         // Tính ngày tiếp theo dựa trên loại job
         switch (job.type) {
             case 'daily':
@@ -4298,7 +4298,7 @@ function getJobOccurrences(job, startDate, endDate) {
                 return occurrences;
         }
     }
-    
+
     return occurrences;
 }
 
@@ -4306,12 +4306,12 @@ function getJobOccurrences(job, startDate, endDate) {
 function renderJobList() {
     const jobListContainer = document.getElementById('jobList');
     jobListContainer.innerHTML = '';
-    
+
     if (filteredJobs.length === 0) {
         jobListContainer.innerHTML = '<div class="empty-state"><i class="bi bi-inbox"></i><br>Không tìm thấy job nào</div>';
         return;
     }
-    
+
     filteredJobs.forEach(job => {
         if (job.type === 'once') return;
         const jobItem = document.createElement('div');
@@ -4331,13 +4331,13 @@ function renderJobList() {
                 </button>
             </div>
         `;
-        
+
         // Edit button
         jobItem.querySelector('.btn-edit').addEventListener('click', (e) => {
             e.stopPropagation();
             openEditJobModal(job);
         });
-        
+
         jobListContainer.appendChild(jobItem);
     });
 }
@@ -4374,7 +4374,7 @@ async function toggleOutOfScheduleJob(job) {
             isPaused: !job.isPaused,
             updatedAt: new Date().toISOString()
         });
-        showNotification(job.isPaused ? 'Đã bật lại job' : 'Đã dừng job', job.isPaused ? `Job "${job.title}" đã được bật lại.` : `Job "${job.title}" đã được dừng.` , false, job.isPaused ? 'success' : 'warning');
+        showNotification(job.isPaused ? 'Đã bật lại job' : 'Đã dừng job', job.isPaused ? `Job "${job.title}" đã được bật lại.` : `Job "${job.title}" đã được dừng.`, false, job.isPaused ? 'success' : 'warning');
     } catch (error) {
         console.error('❌ Lỗi khi đổi trạng thái job ngoài lịch:', error);
         showNotification('Lỗi', 'Không thể đổi trạng thái job.', false, 'danger');
@@ -4385,39 +4385,39 @@ async function toggleOutOfScheduleJob(job) {
 function renderSchedule() {
     const scheduleBody = document.getElementById('scheduleBody');
     const scheduleHeader = document.getElementById('scheduleHeader');
-    
+
     scheduleBody.innerHTML = '';
     scheduleHeader.innerHTML = '';
-    
+
     // Tính khoảng thời gian: Hôm nay - 2 tuần sau
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     // Get current time for comparison (giờ:phút hiện tại)
     const now = new Date();
     const currentHours = now.getHours();
     const currentMinutes = now.getMinutes();
-    
+
     // Bắt đầu từ thứ 2 tuần này
     const startDate = new Date(today);
     const startDay = startDate.getDay();
     const diffToMonday = startDay === 0 ? -6 : 1 - startDay;
     startDate.setDate(startDate.getDate() + diffToMonday);
-    
+
     // 2 tuần
     const totalWeeks = 2;
-    
+
     // Tạo header dựa trên showSunday
-    const daysOfWeek = showSunday 
+    const daysOfWeek = showSunday
         ? ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']
         : ['T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
-    
+
     daysOfWeek.forEach(day => {
         const th = document.createElement('th');
         th.textContent = day;
         scheduleHeader.appendChild(th);
     });
-    
+
     // Only include active (non-paused) jobs that belong to the fixed schedule
     const activeJobs = jobs.filter(job => job.isPaused !== true && job.isOutOfSchedule !== true);
 
@@ -4426,29 +4426,29 @@ function renderSchedule() {
     rangeEnd.setDate(rangeEnd.getDate() + (totalWeeks * 7) - 1);
     const jobsByDate = buildScheduleEntries(startDate, rangeEnd, activeJobs);
     const myOffMap = getMyOffMap();
-    
+
     // Render các tuần
     const daysToShow = showSunday ? 7 : 6;
-    
+
     for (let week = 0; week < totalWeeks; week++) {
         const row = document.createElement('tr');
-        
+
         for (let day = 0; day < daysToShow; day++) {
             const currentDate = new Date(startDate);
             currentDate.setDate(startDate.getDate() + (week * 7) + day);
-            
+
             const cell = document.createElement('td');
             const dateStr = localDateKey(currentDate);
-            
+
             // Normalize dates for comparison (set to midnight)
             const cellDate = new Date(currentDate);
             cellDate.setHours(0, 0, 0, 0);
-            
+
             const todayDate = new Date(today);
             todayDate.setHours(0, 0, 0, 0);
-            
+
             const offDoc = myOffMap[dateStr] || null;
-            
+
             // Ngày off: tô sọc đỏ; ngày thường: highlight hôm nay
             if (offDoc) {
                 cell.classList.add('day-off-cell');
@@ -4456,28 +4456,28 @@ function renderSchedule() {
             if (cellDate.getTime() === todayDate.getTime()) {
                 cell.classList.add('today-cell');
             }
-            
+
             // Date header
             const dateHeader = document.createElement('div');
             dateHeader.className = 'date-header text-muted small';
             // MỚI — luôn theo bộ phận của chính mình, không phụ thuộc bộ lọc trong modal
-                const whDoc = scheduleWorkHoursMap[dateStr] || null;
-const myDeptId = (currentUser && currentUser.department) || '';
-const myDeptLabel = myDeptId ? escapeHtml(getDeptName(myDeptId)) : '';
-const badges = [];
-if (whDoc) {
-    if (isValidWhNumber(whDoc.motion)) {
-        badges.push(`<span class="wh-badge wh-m" title="Giờ Motion${myDeptLabel ? ' · ' + myDeptLabel : ''}">M-${formatWorkHours(whDoc.motion)}h</span>`);
-    }
-    if (isValidWhNumber(whDoc.station)) {
-        badges.push(`<span class="wh-badge wh-s" title="Giờ Station${myDeptLabel ? ' · ' + myDeptLabel : ''}">S-${formatWorkHours(whDoc.station)}h</span>`);
-    }
-}
-const whBadge = badges.length ? `<span class="wh-badges">${badges.join('')}</span>` : '';
+            const whDoc = scheduleWorkHoursMap[dateStr] || null;
+            const myDeptId = (currentUser && currentUser.department) || '';
+            const myDeptLabel = myDeptId ? escapeHtml(getDeptName(myDeptId)) : '';
+            const badges = [];
+            if (whDoc) {
+                if (isValidWhNumber(whDoc.motion)) {
+                    badges.push(`<span class="wh-badge wh-m" title="Giờ Motion${myDeptLabel ? ' · ' + myDeptLabel : ''}">M-${formatWorkHours(whDoc.motion)}h</span>`);
+                }
+                if (isValidWhNumber(whDoc.station)) {
+                    badges.push(`<span class="wh-badge wh-s" title="Giờ Station${myDeptLabel ? ' · ' + myDeptLabel : ''}">S-${formatWorkHours(whDoc.station)}h</span>`);
+                }
+            }
+            const whBadge = badges.length ? `<span class="wh-badges">${badges.join('')}</span>` : '';
             dateHeader.innerHTML = `<span class="date-header-left"><i class="bi bi-calendar-day"></i> ${formatDateShort(currentDate)}${offDoc ? '<span class="day-off-badge">OFF</span>' : ''}</span>${whBadge}`;
             cell.appendChild(dateHeader);
 
-                        // ===== KÉO-THẢ: ô ngày nhận drop =====
+            // ===== KÉO-THẢ: ô ngày nhận drop =====
             cell.addEventListener('dragover', (e) => {
                 e.preventDefault();
                 e.dataTransfer.dropEffect = 'move';
@@ -4507,10 +4507,10 @@ const whBadge = badges.length ? `<span class="wh-badges">${badges.join('')}</spa
                 offNote.innerHTML = `<i class="bi bi-calendar-x-fill"></i> ${escapeHtml(offDoc.reason || 'Nghỉ')}`;
                 cell.appendChild(offNote);
             }
-            
+
             // Add jobs for this date - SORTED BY TIME
             let dayJobs = jobsByDate[dateStr] || [];
-            
+
             // Sort jobs by time (HH:MM)
             dayJobs.sort((a, b) => {
                 // Job dời từ ngày off sang luôn nằm cuối ngày
@@ -4520,7 +4520,7 @@ const whBadge = badges.length ? `<span class="wh-badges">${badges.join('')}</spa
                 const timeB = b.job.time || '00:00';
                 return timeA.localeCompare(timeB);
             });
-            
+
             if (dayJobs.length === 0 && offDoc) {
                 // Ngày off và không có job dời sang: không cần hiện dấu '-'
             } else if (dayJobs.length === 0) {
@@ -4532,80 +4532,80 @@ const whBadge = badges.length ? `<span class="wh-badges">${badges.join('')}</spa
                 cell.appendChild(emptyMsg);
             } else {
                 dayJobs.forEach(entry => {
-    const job = entry.job;
-    let timeClass = 'future';
+                    const job = entry.job;
+                    let timeClass = 'future';
 
-    // "Đợi tí": job được hoãn tới snoozeUntil (chỉ áp dụng cho ngày hôm đó)
-    const snoozeDateObj = entry.snoozeUntil ? new Date(entry.snoozeUntil) : null;
-    const snoozeActive = !!(snoozeDateObj && !isNaN(snoozeDateObj.getTime()) && snoozeDateObj.getTime() > Date.now());
+                    // "Đợi tí": job được hoãn tới snoozeUntil (chỉ áp dụng cho ngày hôm đó)
+                    const snoozeDateObj = entry.snoozeUntil ? new Date(entry.snoozeUntil) : null;
+                    const snoozeActive = !!(snoozeDateObj && !isNaN(snoozeDateObj.getTime()) && snoozeDateObj.getTime() > Date.now());
 
-    if (cellDate < todayDate) {
-        timeClass = 'past';
-    } else if (cellDate.getTime() === todayDate.getTime()) {
-        const [jobHours, jobMinutes] = String(entry.overrideTime || job.time).split(':').map(Number);
-        if (jobHours < currentHours ||
-            (jobHours === currentHours && jobMinutes < currentMinutes)) {
-            timeClass = snoozeActive ? 'today' : 'past';
-        } else {
-            timeClass = 'today';
-        }
-    } else {
-        timeClass = 'future';
-    }
+                    if (cellDate < todayDate) {
+                        timeClass = 'past';
+                    } else if (cellDate.getTime() === todayDate.getTime()) {
+                        const [jobHours, jobMinutes] = String(entry.overrideTime || job.time).split(':').map(Number);
+                        if (jobHours < currentHours ||
+                            (jobHours === currentHours && jobMinutes < currentMinutes)) {
+                            timeClass = snoozeActive ? 'today' : 'past';
+                        } else {
+                            timeClass = 'today';
+                        }
+                    } else {
+                        timeClass = 'future';
+                    }
 
-    const displayTime = entry.overrideTime || job.time;
-    const isShifted = !!entry.shiftedFrom;
-    const isMoved = !!entry.movedFrom;
-    const isPresenter = job.isPresenterJob === true;
-    const hasOverride = !!(entry.overrideTime || entry.note || entry.movedFrom);
+                    const displayTime = entry.overrideTime || job.time;
+                    const isShifted = !!entry.shiftedFrom;
+                    const isMoved = !!entry.movedFrom;
+                    const isPresenter = job.isPresenterJob === true;
+                    const hasOverride = !!(entry.overrideTime || entry.note || entry.movedFrom);
 
-    const extraClasses = [];
-    if (isShifted || isMoved) extraClasses.push('shifted');
-    if (isPresenter) extraClasses.push('presenter');
+                    const extraClasses = [];
+                    if (isShifted || isMoved) extraClasses.push('shifted');
+                    if (isPresenter) extraClasses.push('presenter');
 
-    // Chế độ tích hoàn thành (bật trong Cài đặt) — chỉ áp dụng từ ngày bật trở đi
-    const tickMode = jobCompletionEnabled && dateStr >= jobCompletionSince;
-    const isCompleted = tickMode && entry.completed === true;
-    if (isCompleted) extraClasses.push('completed');
-    else if (tickMode && timeClass === 'past') extraClasses.push('pending-done');
+                    // Chế độ tích hoàn thành (bật trong Cài đặt) — chỉ áp dụng từ ngày bật trở đi
+                    const tickMode = jobCompletionEnabled && dateStr >= jobCompletionSince;
+                    const isCompleted = tickMode && entry.completed === true;
+                    if (isCompleted) extraClasses.push('completed');
+                    else if (tickMode && timeClass === 'past') extraClasses.push('pending-done');
 
-    const scheduleItem = document.createElement('div');
-    scheduleItem.className = `schedule-item ${job.type} ${timeClass} ${extraClasses.join(' ')}`.trim();
+                    const scheduleItem = document.createElement('div');
+                    scheduleItem.className = `schedule-item ${job.type} ${timeClass} ${extraClasses.join(' ')}`.trim();
 
-    const timeHtml = entry.overrideTime
-        ? `<small class="schedule-time-override"><i class="bi bi-clock-fill"></i> ${displayTime} <em>(đổi)</em></small>`
-        : `<small><i class="bi bi-clock-fill"></i> ${displayTime}</small>`;
+                    const timeHtml = entry.overrideTime
+                        ? `<small class="schedule-time-override"><i class="bi bi-clock-fill"></i> ${displayTime} <em>(đổi)</em></small>`
+                        : `<small><i class="bi bi-clock-fill"></i> ${displayTime}</small>`;
 
-    let originTagHtml = '';
-    if (isShifted) {
-        originTagHtml = `<small class="shifted-tag" title="Job của ngày ${formatDateShortDMY(entry.shiftedFrom)} (bạn off) được dời lên trước"><i class="bi bi-arrow-return-left"></i> dời từ ${formatDateShortDMY(entry.shiftedFrom)}</small>`;
-    } else if (isMoved) {
-        originTagHtml = `<small class="shifted-tag" title="Job được dời từ ngày ${formatDateShortDMY(entry.movedFrom)}"><i class="bi bi-arrow-right"></i> dời từ ${formatDateShortDMY(entry.movedFrom)}</small>`;
-    }
+                    let originTagHtml = '';
+                    if (isShifted) {
+                        originTagHtml = `<small class="shifted-tag" title="Job của ngày ${formatDateShortDMY(entry.shiftedFrom)} (bạn off) được dời lên trước"><i class="bi bi-arrow-return-left"></i> dời từ ${formatDateShortDMY(entry.shiftedFrom)}</small>`;
+                    } else if (isMoved) {
+                        originTagHtml = `<small class="shifted-tag" title="Job được dời từ ngày ${formatDateShortDMY(entry.movedFrom)}"><i class="bi bi-arrow-right"></i> dời từ ${formatDateShortDMY(entry.movedFrom)}</small>`;
+                    }
 
-    let doneBtnHtml = '';
-    if (tickMode) {
-        doneBtnHtml = `<button type="button" class="schedule-done-btn ${isCompleted ? 'is-done' : ''}"
+                    let doneBtnHtml = '';
+                    if (tickMode) {
+                        doneBtnHtml = `<button type="button" class="schedule-done-btn ${isCompleted ? 'is-done' : ''}"
                     title="${isCompleted ? 'Đã hoàn thành — bấm để bỏ tích' : 'Đánh dấu đã hoàn thành'}"
                     aria-pressed="${isCompleted ? 'true' : 'false'}"
                     data-job-id="${job.id}"
                     data-origin-date="${entry.originDate}">
                     <i class="bi bi-check-lg"></i>
                 </button>`;
-    } else if (timeClass === 'past') {
-        // Không bật tích hoàn thành: qua giờ thực hiện = mặc định đã hoàn thành
-        doneBtnHtml = `<span class="schedule-auto-done" title="Đã qua giờ thực hiện — mặc định hoàn thành"><i class="bi bi-check2-all"></i></span>`;
-    }
+                    } else if (timeClass === 'past') {
+                        // Không bật tích hoàn thành: qua giờ thực hiện = mặc định đã hoàn thành
+                        doneBtnHtml = `<span class="schedule-auto-done" title="Đã qua giờ thực hiện — mặc định hoàn thành"><i class="bi bi-check2-all"></i></span>`;
+                    }
 
-    const snoozeTagHtml = snoozeActive
-        ? `<small class="snooze-tag" title="Đã bấm Đợi tí — chỉ hoãn trong ngày hôm nay"><i class="bi bi-hourglass-split"></i> hoãn đến ${String(snoozeDateObj.getHours()).padStart(2, '0')}:${String(snoozeDateObj.getMinutes()).padStart(2, '0')}</small>`
-        : '';
+                    const snoozeTagHtml = snoozeActive
+                        ? `<small class="snooze-tag" title="Đã bấm Đợi tí — chỉ hoãn trong ngày hôm nay"><i class="bi bi-hourglass-split"></i> hoãn đến ${String(snoozeDateObj.getHours()).padStart(2, '0')}:${String(snoozeDateObj.getMinutes()).padStart(2, '0')}</small>`
+                        : '';
 
-    const noteHtml = entry.note
-        ? `<span class="schedule-note" title="${escapeHtml(entry.note)}"><i class="bi bi-sticky-fill"></i> ${escapeHtml(entry.note.length > 40 ? entry.note.substring(0, 40) + '…' : entry.note)}</span>`
-        : '';
+                    const noteHtml = entry.note
+                        ? `<span class="schedule-note" title="${escapeHtml(entry.note)}"><i class="bi bi-sticky-fill"></i> ${escapeHtml(entry.note.length > 40 ? entry.note.substring(0, 40) + '…' : entry.note)}</span>`
+                        : '';
 
-    scheduleItem.innerHTML = `
+                    scheduleItem.innerHTML = `
         <h6 title="${job.title}">
             <i class="bi bi-clipboard-check"></i> ${job.title}
         </h6>
@@ -4626,53 +4626,53 @@ const whBadge = badges.length ? `<span class="wh-badges">${badges.join('')}</spa
         ${noteHtml}
     `;
 
-        // ===== KÉO-THẢ: cho phép kéo item =====
-    scheduleItem.setAttribute('draggable', 'true');
-    scheduleItem.addEventListener('dragstart', (e) => {
-        e.stopPropagation();
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', JSON.stringify({
-            jobId: job.id,
-            originDate: entry.originDate,
-            jobTitle: job.title
-        }));
-        scheduleItem.classList.add('dragging');
-    });
-    scheduleItem.addEventListener('dragend', () => {
-        scheduleItem.classList.remove('dragging');
-        document.querySelectorAll('.schedule-table td.drag-over').forEach(td => td.classList.remove('drag-over'));
-    });
-    // ===== HẾT KÉO-THẢ =====
+                    // ===== KÉO-THẢ: cho phép kéo item =====
+                    scheduleItem.setAttribute('draggable', 'true');
+                    scheduleItem.addEventListener('dragstart', (e) => {
+                        e.stopPropagation();
+                        e.dataTransfer.effectAllowed = 'move';
+                        e.dataTransfer.setData('text/plain', JSON.stringify({
+                            jobId: job.id,
+                            originDate: entry.originDate,
+                            jobTitle: job.title
+                        }));
+                        scheduleItem.classList.add('dragging');
+                    });
+                    scheduleItem.addEventListener('dragend', () => {
+                        scheduleItem.classList.remove('dragging');
+                        document.querySelectorAll('.schedule-table td.drag-over').forEach(td => td.classList.remove('drag-over'));
+                    });
+                    // ===== HẾT KÉO-THẢ =====
 
-    // Click vào nội dung item → mở xem job đầy đủ (không mở override nữa)
-    scheduleItem.addEventListener('click', (e) => {
-        if (e.target.closest('.schedule-override-btn, .schedule-done-btn')) return;
-        openViewJobModal(job);
-    });
+                    // Click vào nội dung item → mở xem job đầy đủ (không mở override nữa)
+                    scheduleItem.addEventListener('click', (e) => {
+                        if (e.target.closest('.schedule-override-btn, .schedule-done-btn')) return;
+                        openViewJobModal(job);
+                    });
 
-    // Nút tích hoàn thành (chỉ có khi bật trong Cài đặt)
-    const doneBtn = scheduleItem.querySelector('.schedule-done-btn');
-    if (doneBtn) {
-        doneBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            setJobOccurrenceCompleted(job.id, entry.originDate, !isCompleted);
-        });
-        doneBtn.addEventListener('dragstart', (e) => e.preventDefault());
-    }
+                    // Nút tích hoàn thành (chỉ có khi bật trong Cài đặt)
+                    const doneBtn = scheduleItem.querySelector('.schedule-done-btn');
+                    if (doneBtn) {
+                        doneBtn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            setJobOccurrenceCompleted(job.id, entry.originDate, !isCompleted);
+                        });
+                        doneBtn.addEventListener('dragstart', (e) => e.preventDefault());
+                    }
 
-    // Nút tùy chỉnh kế giờ → mở popover
-    scheduleItem.querySelector('.schedule-override-btn').addEventListener('click', (e) => {
-        e.stopPropagation();
-        openDayOverridePopover(job, entry.originDate, e.currentTarget);
-    });
+                    // Nút tùy chỉnh kế giờ → mở popover
+                    scheduleItem.querySelector('.schedule-override-btn').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        openDayOverridePopover(job, entry.originDate, e.currentTarget);
+                    });
 
-    cell.appendChild(scheduleItem);
-});
+                    cell.appendChild(scheduleItem);
+                });
             }
-            
+
             row.appendChild(cell);
         }
-        
+
         scheduleBody.appendChild(row);
     }
 }
@@ -4688,7 +4688,7 @@ async function moveJobToDate(jobId, originDate, targetDate) {
     const docId = `${currentUser.uid}_${jobId}_${originDate}`;
     const existing = getOverrideFor(jobId, originDate);
 
-        // ----- Trường hợp 1: kéo về CHÍNH ngày gốc -----
+    // ----- Trường hợp 1: kéo về CHÍNH ngày gốc -----
     // → chỉ xóa overrideDate (giữ nguyên overrideTime/note nếu có)
     if (originDate === targetDate) {
         if (!existing) return;   // chưa có override → không làm gì
@@ -4905,7 +4905,7 @@ function updateTransferMode() {
     const modeCopy = document.getElementById('transferModeCopy');
     const btnText = document.getElementById('transferJobBtnText');
     const btn = document.getElementById('transferJobBtn');
-    
+
     if (modeTransfer && modeTransfer.checked) {
         currentTransferMode = 'transfer';
         btnText.textContent = 'Chuyển';
@@ -4919,13 +4919,13 @@ function updateTransferMode() {
     }
 }
 
-window.toggleTransferSection = function() {
+window.toggleTransferSection = function () {
     const section = document.getElementById('transferSection');
     const btn = document.getElementById('toggleTransferSectionBtn');
-    
+
     if (section) {
         const isVisible = section.classList.contains('show');
-        
+
         if (isVisible) {
             section.classList.remove('show');
             btn.innerHTML = '<i class="bi bi-arrow-left-right"></i> Chuyển/Copy Job';
@@ -4940,12 +4940,12 @@ window.toggleTransferSection = function() {
 function openViewJobModal(job) {
     currentViewingJobId = job.id;
     currentTransferMode = 'transfer';
-    
+
     document.getElementById('viewModalTitle').innerHTML = `
         <i class="bi bi-eye-fill"></i> ${job.title}
         ${job.isPaused ? '<span class="paused-indicator"><i class="bi bi-pause-circle-fill"></i> Đang tạm dừng</span>' : ''}
     `;
-    
+
     const modalBody = document.getElementById('viewModalBody');
     modalBody.innerHTML = `
         <div class="mb-3">
@@ -5027,22 +5027,22 @@ function openViewJobModal(job) {
             </div>
         </div>
     `;
-    
+
     // Show toggle button
     const toggleBtn = document.getElementById('toggleTransferSectionBtn');
     toggleBtn.style.display = 'inline-block';
-    
+
     // Add event listeners
     toggleBtn.onclick = toggleTransferSection;
-    
+
     const transferBtn = document.getElementById('transferJobBtn');
     const transferModeTransfer = document.getElementById('transferModeTransfer');
     const transferModeCopy = document.getElementById('transferModeCopy');
-    
+
     if (transferBtn) transferBtn.addEventListener('click', transferJob);
     if (transferModeTransfer) transferModeTransfer.addEventListener('change', updateTransferMode);
     if (transferModeCopy) transferModeCopy.addEventListener('change', updateTransferMode);
-    
+
     const descEl = modalBody.querySelector('.view-job-content');
     if (descEl) enhanceFolderLinks(descEl);
 
@@ -5053,13 +5053,13 @@ function openViewJobModal(job) {
 document.getElementById('viewJobModal').addEventListener('hidden.bs.modal', function () {
     const section = document.getElementById('transferSection');
     const btn = document.getElementById('toggleTransferSectionBtn');
-    
+
     if (section) section.classList.remove('show');
     if (btn) {
         btn.innerHTML = '<i class="bi bi-arrow-left-right"></i> Chuyển/Copy Job';
         btn.style.display = 'none';
     }
-    
+
     currentViewingJobId = null;
 });
 
@@ -5556,9 +5556,9 @@ function compareFGMO(oldRows, newRows) {
         const key = row.FG_MO;
         if (!key) return;
         dict.set(key, {
-            dueKey:     row.FG_DUE_KEY     || '',
+            dueKey: row.FG_DUE_KEY || '',
             dueDisplay: row.FG_DUE_DISPLAY || '',
-            line:       extractLineCode(row.FG_JOBNO)
+            line: extractLineCode(row.FG_JOBNO)
         });
     });
 
@@ -5568,12 +5568,12 @@ function compareFGMO(oldRows, newRows) {
         if (!key || !dict.has(key)) return;
 
         const oldDueKey = row.FG_DUE_KEY || '';
-        const oldLine   = extractLineCode(row.FG_JOBNO);
-        const target    = dict.get(key);
+        const oldLine = extractLineCode(row.FG_JOBNO);
+        const target = dict.get(key);
 
         // So sánh theo KEY (YYYY-MM-DD) → 2 định dạng khác nhau của cùng 1 ngày = KHÔNG đổi
-        const resJob = (oldLine   === target.line     || !target.line)     ? '-' : target.line;
-        const resDue = (oldDueKey === target.dueKey   || !target.dueKey)   ? '-' : target.dueDisplay;
+        const resJob = (oldLine === target.line || !target.line) ? '-' : target.line;
+        const resDue = (oldDueKey === target.dueKey || !target.dueKey) ? '-' : target.dueDisplay;
 
         if (!(resJob === '-' && resDue === '-')) {
             results.push({ FG_MO: key, FG_JOBNO: resJob, FG_DUE: resDue });
@@ -5673,11 +5673,11 @@ function renderCheckDueResult() {
                     <tr>
                         <td>${escapeHtml(row.FG_MO)}</td>
                         <td>${row.FG_JOBNO !== '-'
-                            ? `<span class="check-due-diff">${escapeHtml(row.FG_JOBNO)}</span>`
-                            : '<span class="check-due-same">-</span>'}</td>
+            ? `<span class="check-due-diff">${escapeHtml(row.FG_JOBNO)}</span>`
+            : '<span class="check-due-same">-</span>'}</td>
                         <td>${row.FG_DUE !== '-'
-                            ? `<span class="check-due-diff">${escapeHtml(row.FG_DUE)}</span>`
-                            : '<span class="check-due-same">-</span>'}</td>
+            ? `<span class="check-due-diff">${escapeHtml(row.FG_DUE)}</span>`
+            : '<span class="check-due-same">-</span>'}</td>
                     </tr>`).join('')}
             </tbody>
         </table>`;
@@ -5808,17 +5808,17 @@ async function transferJob() {
     const jobId = currentViewingJobId || currentEditingJobId;
     const targetUid = document.getElementById('transferUserSelect').value;
     const job = jobs.find(item => item.id === jobId);
-    
+
     if (!jobId || !targetUid || !job) {
         showNotification('Thiếu thông tin', 'Hãy chọn user nhận job trước.', false, 'warning');
         return;
     }
     if (!assertSameDeptTarget(targetUid)) return;
-    
+
     const mode = currentTransferMode; // 'transfer' hoặc 'copy'
     const actionText = mode === 'transfer' ? 'chuyển' : 'copy';
     const actionTextPast = mode === 'transfer' ? 'chuyển' : 'sao chép';
-    
+
     try {
         // Tạo transfer request
         await addDoc(collection(db, 'transferRequests'), {
@@ -5843,17 +5843,17 @@ async function transferJob() {
             status: 'pending',
             timestamp: new Date().toISOString()
         });
-        
+
         showNotification(
-            'Đã gửi yêu cầu', 
-            `Đã gửi yêu cầu ${actionText} job "${job.title}" đến user. Vui lòng chờ xác nhận.`, 
-            false, 
+            'Đã gửi yêu cầu',
+            `Đã gửi yêu cầu ${actionText} job "${job.title}" đến user. Vui lòng chờ xác nhận.`,
+            false,
             'success'
         );
-        
+
         viewJobModal.hide();
         currentViewingJobId = null;
-        
+
     } catch (error) {
         console.error(`Lỗi gửi yêu cầu ${actionText} job:`, error);
         showNotification('Lỗi', `Không thể gửi yêu cầu ${actionText} job.`, false, 'danger');
@@ -5900,10 +5900,10 @@ function listenTransferRequests() {
 function showTransferConfirmModal(requestId, request) {
     const mode = request.mode || 'transfer';
     const actionText = mode === 'transfer' ? 'chuyển' : 'copy';
-    const modeIcon = mode === 'transfer' 
-        ? '<i class="bi bi-arrow-right-circle-fill text-primary"></i>' 
+    const modeIcon = mode === 'transfer'
+        ? '<i class="bi bi-arrow-right-circle-fill text-primary"></i>'
         : '<i class="bi bi-copy text-success"></i>';
-    
+
     document.getElementById('transferConfirmMessage').innerHTML = `
         ${modeIcon}
         <strong>${request.fromName || request.fromEmail}</strong> muốn <strong>${actionText}</strong> job 
@@ -5911,26 +5911,26 @@ function showTransferConfirmModal(requestId, request) {
         <small class="text-muted">Gửi lúc: ${new Date(request.timestamp).toLocaleString('vi-VN')}</small>
         ${mode === 'copy' ? '<br><small class="text-info"><i class="bi bi-info-circle"></i> Lưu ý: Đây là bản copy, job gốc vẫn ở người gửi.</small>' : ''}
     `;
-    
+
     pendingTransferRequestId = requestId;
     pendingTransferRequestData = request;
-    
+
     transferConfirmModal.show();
 }
 
 async function acceptTransfer() {
     if (!pendingTransferRequestId || !pendingTransferRequestData) return;
-    
+
     const mode = pendingTransferRequestData.mode || 'transfer';
     const actionText = mode === 'transfer' ? 'chuyển' : 'copy';
-    
+
     try {
         // Cập nhật trạng thái request
         await updateDoc(doc(db, 'transferRequests', pendingTransferRequestId), {
             status: 'accepted',
             respondedAt: new Date().toISOString()
         });
-        
+
         if (mode === 'transfer') {
             // CHUYỂN: Update ownerId của job gốc
             const jobRef = doc(db, 'jobs', pendingTransferRequestData.jobId);
@@ -5966,9 +5966,9 @@ async function acceptTransfer() {
                     timestamp: new Date().toISOString()
                 }]
             };
-            
+
             await addDoc(collection(db, 'jobs'), newJobData);
-            
+
             // Gửi notification cho người copy rằng đã thành công
             await addDoc(collection(db, 'notifications'), {
                 userId: pendingTransferRequestData.fromUid,
@@ -5979,18 +5979,18 @@ async function acceptTransfer() {
                 read: false
             });
         }
-        
+
         showNotification(
-            'Đã nhận job', 
-            `Bạn đã nhận ${mode === 'transfer' ? '' : 'bản copy của '}job "${pendingTransferRequestData.jobTitle}"!`, 
-            false, 
+            'Đã nhận job',
+            `Bạn đã nhận ${mode === 'transfer' ? '' : 'bản copy của '}job "${pendingTransferRequestData.jobTitle}"!`,
+            false,
             'success'
         );
-        
+
         transferConfirmModal.hide();
         pendingTransferRequestId = null;
         pendingTransferRequestData = null;
-        
+
     } catch (error) {
         console.error('Lỗi nhận job:', error);
         showNotification('Lỗi', 'Không thể nhận job.', false, 'danger');
@@ -5999,17 +5999,17 @@ async function acceptTransfer() {
 
 async function rejectTransfer() {
     if (!pendingTransferRequestId || !pendingTransferRequestData) return;
-    
+
     const mode = pendingTransferRequestData.mode || 'transfer';
     const actionText = mode === 'transfer' ? 'chuyển' : 'copy';
-    
+
     try {
         // Cập nhật trạng thái request
         await updateDoc(doc(db, 'transferRequests', pendingTransferRequestId), {
             status: 'rejected',
             respondedAt: new Date().toISOString()
         });
-        
+
         // Gửi thông báo cho người gửi
         await addDoc(collection(db, 'notifications'), {
             userId: pendingTransferRequestData.fromUid,
@@ -6019,18 +6019,18 @@ async function rejectTransfer() {
             timestamp: new Date().toISOString(),
             read: false
         });
-        
+
         showNotification(
-            'Đã từ chối', 
-            `Bạn đã từ chối ${actionText} job "${pendingTransferRequestData.jobTitle}".`, 
-            false, 
+            'Đã từ chối',
+            `Bạn đã từ chối ${actionText} job "${pendingTransferRequestData.jobTitle}".`,
+            false,
             'warning'
         );
-        
+
         transferConfirmModal.hide();
         pendingTransferRequestId = null;
         pendingTransferRequestData = null;
-        
+
     } catch (error) {
         console.error('Lỗi từ chối job:', error);
         showNotification('Lỗi', 'Không thể từ chối job.', false, 'danger');
@@ -6309,12 +6309,12 @@ function openAddJobModal(isOutOfSchedule = false) {
     document.getElementById('jobForm').reset();
     document.getElementById('jobDescription').innerHTML = '';
 
-        const durInput = document.getElementById('jobDuration');
+    const durInput = document.getElementById('jobDuration');
     if (durInput) durInput.value = '';
 
     document.getElementById('deleteJobBtn').style.display = 'none';
     document.getElementById('pauseJobBtn').style.display = 'none'; // NEW
-    
+
     const now = new Date();
     document.getElementById('jobDate').value = now.toISOString().split('T')[0];
     document.getElementById('jobTime').value = now.toTimeString().slice(0, 5);
@@ -6331,7 +6331,7 @@ function openAddJobModal(isOutOfSchedule = false) {
 function openEditJobModal(job) {
     currentEditingJobId = job.id;
     currentJobIsPaused = job.isPaused === true;
-    
+
     document.getElementById('modalTitle').innerHTML = '<i class="bi bi-pencil-fill"></i> Chỉnh Sửa Job';
     document.getElementById('jobTitle').value = job.title;
     document.getElementById('jobType').value = job.type;
@@ -6339,24 +6339,24 @@ function openEditJobModal(job) {
     document.getElementById('jobTime').value = job.time;
     document.getElementById('jobDescription').innerHTML = job.description || '';
 
-        const durInput = document.getElementById('jobDuration');
+    const durInput = document.getElementById('jobDuration');
     if (durInput) durInput.value = job.duration || '';
-    
+
     const notificationToggle = document.getElementById('enableNotification');
     if (notificationToggle) {
         notificationToggle.checked = job.enableNotification !== false;
     }
-    
+
     document.getElementById('workOnSunday').checked = job.workOnSunday !== false;
     document.getElementById('isOutOfSchedule').checked = job.isOutOfSchedule === true;
     setExcludedWeekdaysInForm(job.excludedWeekdays);
     document.getElementById('deleteJobBtn').style.display = 'block';
-    
+
     // Update pause button
     const pauseBtn = document.getElementById('pauseJobBtn');
     const pauseBtnText = document.getElementById('pauseJobBtnText');
     pauseBtn.style.display = 'block';
-    
+
     if (currentJobIsPaused) {
         pauseBtn.classList.add('active');
         pauseBtnText.textContent = 'Bật lại';
@@ -6366,7 +6366,7 @@ function openEditJobModal(job) {
         pauseBtnText.textContent = 'Tạm dừng';
         pauseBtn.querySelector('i').className = 'bi bi-pause-circle-fill';
     }
-    
+
     toggleOutOfScheduleFields();
     toggleDailyExcludeWrap();
     jobModal.show();
@@ -6374,10 +6374,10 @@ function openEditJobModal(job) {
 
 function togglePauseJob() {
     currentJobIsPaused = !currentJobIsPaused;
-    
+
     const pauseBtn = document.getElementById('pauseJobBtn');
     const pauseBtnText = document.getElementById('pauseJobBtnText');
-    
+
     if (currentJobIsPaused) {
         pauseBtn.classList.add('active');
         pauseBtnText.textContent = 'Bật lại';
@@ -6402,10 +6402,10 @@ async function saveJob() {
     const isPaused = currentJobIsPaused; // Lấy từ state thay vì checkbox
     const isOutOfSchedule = document.getElementById('isOutOfSchedule').checked;
 
-        const durationInput = document.getElementById('jobDuration');
+    const durationInput = document.getElementById('jobDuration');
     const durationRaw = durationInput ? parseInt(durationInput.value, 10) : NaN;
     const duration = Number.isFinite(durationRaw) && durationRaw > 0 ? durationRaw : DEFAULT_JOB_DURATION;
-    
+
     if (!title) {
         showNotification('Thiếu thông tin', 'Vui lòng nhập tiêu đề job.', false, 'warning');
         return;
@@ -6420,12 +6420,12 @@ async function saveJob() {
         showNotification('Thiếu thông tin', 'Vui lòng điền đầy đủ thông tin bắt buộc.', false, 'warning');
         return;
     }
-    
+
     if (!firestoreConnected) {
         showNotification('Chưa kết nối', 'Hiện tại chưa kết nối được Firestore. Vui lòng thử lại sau.', false, 'danger');
         return;
     }
-    
+
     const jobData = {
         title,
         type: effectiveType,
@@ -6441,13 +6441,13 @@ async function saveJob() {
         updatedAt: new Date().toISOString(),
         ownerId: currentUser.uid
     };
-    
+
     try {
         const saveBtn = document.getElementById('saveJobBtn');
         const originalHTML = saveBtn.innerHTML;
         saveBtn.innerHTML = '<span class="loading"></span> Đang lưu...';
         saveBtn.disabled = true;
-        
+
         if (currentEditingJobId) {
             const jobRef = doc(db, 'jobs', currentEditingJobId);
             delete jobData.ownerId;
@@ -6460,14 +6460,14 @@ async function saveJob() {
             console.log('✅ Job mới đã được thêm:', docRef.id);
             showNotification('Thành công', `Job "${title}" đã được thêm!`);
         }
-        
+
         saveBtn.innerHTML = originalHTML;
         saveBtn.disabled = false;
         jobModal.hide();
     } catch (error) {
         console.error('❌ Lỗi khi lưu job:', error);
         showNotification('Lỗi', 'Có lỗi xảy ra khi lưu job. Vui lòng thử lại.', false, 'danger');
-        
+
         const saveBtn = document.getElementById('saveJobBtn');
         saveBtn.innerHTML = '<i class="bi bi-check-circle-fill"></i> Lưu Job';
         saveBtn.disabled = false;
@@ -6974,8 +6974,8 @@ function renderQuickJobBubble(job) {
         <div class="quick-chat-bubble ${isOwn ? 'own' : ''} status-${status} ${isOverdue ? 'overdue' : ''} ${deadlinePassed ? 'deadline-passed' : ''}" data-job-id="${job.id}">
             <div class="quick-chat-bubble-head">
                  ${getUserAvatarUrl(job.createdBy)
-                    ? `<img class="quick-chat-avatar" src="${getUserAvatarUrl(job.createdBy)}" alt="">`
-                    : `<div class="quick-chat-avatar">${getInitials(job.createdByName)}</div>`}
+            ? `<img class="quick-chat-avatar" src="${getUserAvatarUrl(job.createdBy)}" alt="">`
+            : `<div class="quick-chat-avatar">${getInitials(job.createdByName)}</div>`}
                 <span class="quick-chat-author">${escapeHtml(job.createdByName || 'Ẩn danh')}</span>
                 <span class="quick-chat-time">${timeAgoVN(job.createdAt)}${editedTagHtml}</span>
                 ${ownerToolsHtml}
@@ -7496,7 +7496,7 @@ function listenUsersAvatars() {
         if (currentUser && usersInfoCache[currentUser.uid]
             && (usersInfoCache[currentUser.uid].department || '') !== (currentUser.department || '')) {
             currentUser.department = usersInfoCache[currentUser.uid].department || '';   // đổi từ thiết bị khác
-             rebuildScheduleWorkHoursMap();   // ← THÊM
+            rebuildScheduleWorkHoursMap();   // ← THÊM
             renderSchedule();
         }
         rebuildDepartmentsList();
@@ -7775,8 +7775,8 @@ function initQuickChatUi() {
 
     // ===== Nút mở rộng bộ lọc =====
     const filterToggle = document.getElementById('quickChatFilterToggle');
-    const filterExtra  = document.getElementById('quickChatFilterExtra');
-    const filterBadge  = document.getElementById('quickChatFilterBadge');
+    const filterExtra = document.getElementById('quickChatFilterExtra');
+    const filterBadge = document.getElementById('quickChatFilterBadge');
 
     function updateQuickChatFilterBadge() {
         let count = 0;
@@ -7807,7 +7807,7 @@ function initQuickChatUi() {
     }
     updateQuickChatFilterBadge();
     // ==============================
-    
+
     if (tabAll) tabAll.addEventListener('click', () => setQuickChatTab('all'));
     if (tabMine) tabMine.addEventListener('click', () => setQuickChatTab('mine'));
     if (guideBtn) guideBtn.addEventListener('click', () => guideModal.show());
@@ -8012,10 +8012,10 @@ function initLayoutDropdown() {
 // Delete Job
 async function deleteJob() {
     if (!currentEditingJobId) return;
-    
+
     const jobToDelete = jobs.find(j => j.id === currentEditingJobId);
     const jobTitle = jobToDelete ? jobToDelete.title : 'job này';
-    
+
     showConfirmDialog({
         title: 'Xác nhận xóa',
         message: `Bạn có chắc chắn muốn xóa job "${jobTitle}"?`,
@@ -8027,19 +8027,19 @@ async function deleteJob() {
                 const originalHTML = deleteBtn.innerHTML;
                 deleteBtn.innerHTML = '<span class="loading"></span> Đang xóa...';
                 deleteBtn.disabled = true;
-                
+
                 const jobRef = doc(db, 'jobs', currentEditingJobId);
                 await deleteDoc(jobRef);
                 console.log('✅ Job đã được xóa:', currentEditingJobId);
                 showNotification('Đã xóa', `Job "${jobTitle}" đã được xóa!`, false, 'success');
-                
+
                 deleteBtn.innerHTML = originalHTML;
                 deleteBtn.disabled = false;
                 jobModal.hide();
             } catch (error) {
                 console.error('❌ Lỗi khi xóa job:', error);
                 showNotification('Lỗi', 'Có lỗi xảy ra khi xóa job. Vui lòng thử lại.', false, 'danger');
-                
+
                 const deleteBtn = document.getElementById('deleteJobBtn');
                 deleteBtn.innerHTML = '<i class="bi bi-trash-fill"></i> Xóa Job';
                 deleteBtn.disabled = false;
@@ -8053,9 +8053,9 @@ function toggleSidebar() {
     const sidebar = document.getElementById('sidebar');
     const mainContent = document.getElementById('mainContent');
     const toggleBtn = document.getElementById('toggleSidebarBtn');
-    
+
     sidebarVisible = !sidebarVisible;
-    
+
     if (sidebarVisible) {
         // Show sidebar
         sidebar.classList.remove('hidden');
@@ -8071,7 +8071,7 @@ function toggleSidebar() {
         toggleBtn.innerHTML = '<i class="bi bi-layout-sidebar-inset-reverse"></i>';
         toggleBtn.title = 'Hiện Sidebar';
     }
-    
+
     // Add animation effect
     toggleBtn.style.animation = 'none';
     setTimeout(() => {
@@ -8125,7 +8125,7 @@ function hideConfirmModal() {
 // Show Notification
 function showNotification(title, message, isSystemNotification = false, type = 'info') {
     const container = document.getElementById('notificationContainer');
-    
+
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
 
@@ -8147,29 +8147,29 @@ function showNotification(title, message, isSystemNotification = false, type = '
         </div>
         <button class="notification-close" aria-label="Đóng thông báo">&times;</button>
     `;
-    
+
     const closeBtn = notification.querySelector('.notification-close');
     closeBtn.addEventListener('click', () => {
         notification.style.animation = 'fadeOut 0.3s ease';
         setTimeout(() => notification.remove(), 300);
     });
-    
+
     container.appendChild(notification);
-    
+
     setTimeout(() => {
         if (notification.parentElement) {
             notification.style.animation = 'fadeOut 0.3s ease';
             setTimeout(() => notification.remove(), 300);
         }
     }, 5000);
-    
+
     if (isSystemNotification && 'Notification' in window && Notification.permission === 'granted') {
         new Notification(title, {
             body: message,
             icon: 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="#6366f1"/><path d="M32 14a12 12 0 0 0-12 12v8l-4 6h32l-4-6v-8a12 12 0 0 0-12-12zm-5 30a5 5 0 0 0 10 0z" fill="#fff"/></svg>')
         });
     }
-    
+
 }
 
 function rebuildScheduleWorkHoursMap() {
@@ -8716,7 +8716,7 @@ function renderSpinUsersList() {
         return;
     }
 
-        listEl.innerHTML = spinCandidates.map((user, idx) => {
+    listEl.innerHTML = spinCandidates.map((user, idx) => {
         const isExcluded = spinExcludedUids.has(user.uid);
         const color = SPIN_WHEEL_COLORS[idx % SPIN_WHEEL_COLORS.length];
         const tickets = getSpinTicketCount(user.uid);
@@ -8792,7 +8792,7 @@ function renderSpinWheel() {
     svg.setAttribute('data-rotation', '0');
     void svg.offsetWidth;            // force reflow
     svg.style.transition = '';
-    
+
     const active = getSpinActiveCandidates();
     const cx = 150, cy = 150, r = 148;
 
@@ -8999,34 +8999,34 @@ async function confirmPresenterAssignment() {
 // MASCOT — mỗi chủ đề có con vật + phụ kiện riêng
 // ============================================================
 const MASCOT_INFO = {
-    default:   { key: 'owl',      bubble: 'Hụt rồi nhé! 🦉',       bulletClass: 'owl-bullet'    },
-    tet:       { key: 'cat',      bubble: 'Meo~ 🐱',               bulletClass: 'mascot-paw'    },
-    trungthu:  { key: 'rabbit',   bubble: 'Thỏ chạy! 🐰',          bulletClass: 'mascot-carrot' },
-    noel:      { key: 'reindeer', bubble: 'Húuuu 🦌',              bulletClass: 'mascot-snowball' },
-    rain:      { key: 'frog',     bubble: 'Ộp! 🐸',                bulletClass: 'mascot-tongue' },
-    space:     { key: 'alien',    bubble: 'Bíp bíp 👽',            bulletClass: 'mascot-laser'  },
-    halloween: { key: 'ghost',    bubble: 'Boo! 👻',               bulletClass: 'mascot-poof'   }
+    default: { key: 'owl', bubble: 'Hụt rồi nhé! 🦉', bulletClass: 'owl-bullet' },
+    tet: { key: 'cat', bubble: 'Meo~ 🐱', bulletClass: 'mascot-paw' },
+    trungthu: { key: 'rabbit', bubble: 'Thỏ chạy! 🐰', bulletClass: 'mascot-carrot' },
+    noel: { key: 'reindeer', bubble: 'Húuuu 🦌', bulletClass: 'mascot-snowball' },
+    rain: { key: 'frog', bubble: 'Ộp! 🐸', bulletClass: 'mascot-tongue' },
+    space: { key: 'alien', bubble: 'Bíp bíp 👽', bulletClass: 'mascot-laser' },
+    halloween: { key: 'ghost', bubble: 'Boo! 👻', bulletClass: 'mascot-poof' }
 };
 
 const MASCOT_MOVEMENT = {
-    default:   { entry: 'fly',     idle: 'owl' },
-    tet:       { entry: 'walk',    idle: 'cat' },
-    trungthu:  { entry: 'hop',     idle: 'rabbit' },   // hop từ cạnh (không phải từ dưới)
-    noel:      { entry: 'trot',    idle: 'reindeer' },
-    rain:      { entry: 'hop',     idle: 'frog' },
-    space:     { entry: 'descend', idle: 'alien' },
-    halloween: { entry: 'float',   idle: 'ghost' }
+    default: { entry: 'fly', idle: 'owl' },
+    tet: { entry: 'walk', idle: 'cat' },
+    trungthu: { entry: 'hop', idle: 'rabbit' },   // hop từ cạnh (không phải từ dưới)
+    noel: { entry: 'trot', idle: 'reindeer' },
+    rain: { entry: 'hop', idle: 'frog' },
+    space: { entry: 'descend', idle: 'alien' },
+    halloween: { entry: 'float', idle: 'ghost' }
 };
 
 // Tên hiển thị của mascot theo từng chủ đề (dùng cho phần Cài đặt)
 const MASCOT_LABELS = {
-    default:   { emoji: '🦉', singular: 'cú',                   plural: 'cú' },
-    tet:       { emoji: '🐱', singular: 'mèo',                  plural: 'mèo' },
-    trungthu:  { emoji: '🐰', singular: 'thỏ ngọc',             plural: 'thỏ ngọc' },
-    noel:      { emoji: '🦌', singular: 'tuần lộc',             plural: 'tuần lộc' },
-    rain:      { emoji: '🐸', singular: 'ếch',                  plural: 'ếch' },
-    space:     { emoji: '👽', singular: 'người ngoài hành tinh', plural: 'người ngoài hành tinh' },
-    halloween: { emoji: '👻', singular: 'ma',                   plural: 'ma' }
+    default: { emoji: '🦉', singular: 'cú', plural: 'cú' },
+    tet: { emoji: '🐱', singular: 'mèo', plural: 'mèo' },
+    trungthu: { emoji: '🐰', singular: 'thỏ ngọc', plural: 'thỏ ngọc' },
+    noel: { emoji: '🦌', singular: 'tuần lộc', plural: 'tuần lộc' },
+    rain: { emoji: '🐸', singular: 'ếch', plural: 'ếch' },
+    space: { emoji: '👽', singular: 'người ngoài hành tinh', plural: 'người ngoài hành tinh' },
+    halloween: { emoji: '👻', singular: 'ma', plural: 'ma' }
 };
 
 // Cập nhật tiêu đề + mô tả section "Số lượng <mascot>" theo chủ đề hiện tại
@@ -9034,11 +9034,11 @@ function updateMascotSettingsLabel() {
     const label = MASCOT_LABELS[currentTopbarTheme] || MASCOT_LABELS.default;
 
     const titleEl = document.getElementById('mascotCountTitle');
-    const subEl   = document.getElementById('mascotCountSub');
-    const hintEl  = document.getElementById('mascotCountHint');
+    const subEl = document.getElementById('mascotCountSub');
+    const hintEl = document.getElementById('mascotCountHint');
 
     if (titleEl) titleEl.textContent = `${label.emoji} Số lượng ${label.plural}`;
-    if (subEl)   subEl.textContent   = `${label.emoji} đứng trên các nút của trang · tối đa 10 · chỉ hiện ở chế độ tối`;
+    if (subEl) subEl.textContent = `${label.emoji} đứng trên các nút của trang · tối đa 10 · chỉ hiện ở chế độ tối`;
     if (hintEl) {
         hintEl.textContent =
             `Con đầu tiên đậu trên chữ "Lịch Làm Việc", các con thêm vào sẽ đậu trên nút Thêm Job, ` +
@@ -9331,7 +9331,7 @@ const OwlFx = (() => {
 
     const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
     const lerp = (x, y, t) => x + (y - x) * t;
-    const bez = (p0, p1, p2, p3, u) => { const k = 1 - u; return k*k*k*p0 + 3*k*k*u*p1 + 3*k*u*u*p2 + u*u*u*p3; };
+    const bez = (p0, p1, p2, p3, u) => { const k = 1 - u; return k * k * k * p0 + 3 * k * k * u * p1 + 3 * k * u * u * p2 + u * u * u * p3; };
     const reduced = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     const DEFS = `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
@@ -9348,7 +9348,7 @@ const OwlFx = (() => {
         <path d="M33 52 L16 88 M34 57 L24 93 M35 60 L31 91" stroke="#3f2d1f" stroke-width=".9" fill="none" opacity=".6" stroke-linecap="round"/>
         <path d="M15 62 q4 4 8 0 M14 70 q4 4 8 0 M24 62 q4 4 8 0 M23 70 q4 4 8 0" stroke="#c9ad85" stroke-width="1.1" fill="none" opacity=".75" stroke-linecap="round"/>`;
 
-        function mascotMarkup(hue, theme = 'default') {
+    function mascotMarkup(hue, theme = 'default') {
         return `<div class="owl3d" data-mascot="${theme}" style="--owl-hue:${hue}deg">
             ${mascotPartsHtml(theme)}
         </div>`;
@@ -9391,606 +9391,606 @@ const OwlFx = (() => {
         const perchPoint = perchFn;
         const wanted = wantedFn;
 
-    function buildOwl() {
-    const wrap = document.createElement('div');
-    wrap.innerHTML = mascotMarkup(HUES[spawnCount % HUES.length], currentTopbarTheme);
-    spawnCount += 1;
-    owl = wrap.firstElementChild;
-        layer.appendChild(owl);
-        owl.addEventListener('click', () => onClickMascot());     // chỉ cú đang đậu (.perched) mới nhận click
-        parts = { wl: owl.querySelector('.o-wl'), wr: owl.querySelector('.o-wr'), head: owl.querySelector('.o-head') };
-        owl.style.opacity = '0';
-    }
-
-    function pose(p) {
-    if (!owl) return;
-    const s = (p.scale == null ? 1 : p.scale) * OWL_SCALE;      // ← nhân thêm OWL_SCALE
-    owl.style.opacity = p.opacity == null ? 1 : p.opacity;
-    owl.style.transform =
-        `translate3d(${p.x - W / 2}px,${p.y - H / 2}px,0) perspective(${PERSP}px) translateZ(${p.z || 0}px) ` +
-        `rotateX(${p.pitch || 0}deg) rotateY(${p.yaw || 0}deg) rotateZ(${p.roll || 0}deg) scale(${s})`;
-    const th = p.wing || 0, sw = p.sweep || 0, ws = p.wscale || 1;
-    parts.wl.style.transform = `translateZ(7px) rotateY(${-sw}deg) rotateZ(${th}deg) scale(1,${ws})`;
-    parts.wr.style.transform = `translateZ(7px) rotateY(${sw}deg) rotateZ(${-th}deg) scale(1,${ws})`;
-    parts.head.style.transform = `translateZ(12px) translateY(${p.headDy || 0}px) rotateY(${p.headYaw || 0}deg) rotateZ(${p.headRoll || 0}deg)`;
-}
-
-    // ---------- bay ----------
-        // ---------- vào chỗ đậu: chọn kiểu theo theme ----------
-    function startEntry(E) {
-        const theme = currentTopbarTheme;
-        const move = (MASCOT_MOVEMENT[theme] || MASCOT_MOVEMENT.default).entry;
-        const now = performance.now();
-        const vw = window.innerWidth, vh = window.innerHeight;
-
-        if (move === 'walk' || move === 'trot') {
-            const fromLeft = Math.random() < 0.5;
-            A = {
-                t0: now,
-                dur: move === 'trot' ? 2600 : 3600,
-                S: { x: fromLeft ? -80 : vw + 80, y: E.y },
-                dir: fromLeft ? 1 : -1,
-                move
-            };
-            mode = 'walkin';
-        } else if (move === 'hop') {
-    const fromLeft = Math.random() < 0.5;
-    A = {
-        t0: now,
-        dur: 3600,
-        S: { x: fromLeft ? -70 : window.innerWidth + 70, y: E.y + 90 },
-        dir: fromLeft ? 1 : -1,
-        move
-    };
-    mode = 'hopin';
-} else if (move === 'descend') {
-            A = {
-                t0: now, dur: 1800,
-                S: { x: E.x + (Math.random() - 0.5) * 50, y: -100 },
-                move
-            };
-            mode = 'descend';
-        } else if (move === 'float') {
-            const fromLeft = Math.random() < 0.5;
-            A = {
-                t0: now, dur: 2400,
-                S: { x: E.x + (fromLeft ? -180 : 180), y: E.y + 30 },
-                move
-            };
-            mode = 'floatin';
-        } else {
-            // fly — cú: bay theo cung từ cạnh, vỗ cánh
-            A = {
-                t0: now, dur: 4300,
-                S:  { x: vw + 130, y: clamp(E.y - vh * 0.5, 50, Math.max(60, E.y - 140)) },
-                P1: { x: vw * 0.6, y: Math.max(24, E.y - vh * 0.65) },
-                roll: 0
-            };
-            mode = 'fly';
+        function buildOwl() {
+            const wrap = document.createElement('div');
+            wrap.innerHTML = mascotMarkup(HUES[spawnCount % HUES.length], currentTopbarTheme);
+            spawnCount += 1;
+            owl = wrap.firstElementChild;
+            layer.appendChild(owl);
+            owl.addEventListener('click', () => onClickMascot());     // chỉ cú đang đậu (.perched) mới nhận click
+            parts = { wl: owl.querySelector('.o-wl'), wr: owl.querySelector('.o-wr'), head: owl.querySelector('.o-head') };
+            owl.style.opacity = '0';
         }
-    }
+
+        function pose(p) {
+            if (!owl) return;
+            const s = (p.scale == null ? 1 : p.scale) * OWL_SCALE;      // ← nhân thêm OWL_SCALE
+            owl.style.opacity = p.opacity == null ? 1 : p.opacity;
+            owl.style.transform =
+                `translate3d(${p.x - W / 2}px,${p.y - H / 2}px,0) perspective(${PERSP}px) translateZ(${p.z || 0}px) ` +
+                `rotateX(${p.pitch || 0}deg) rotateY(${p.yaw || 0}deg) rotateZ(${p.roll || 0}deg) scale(${s})`;
+            const th = p.wing || 0, sw = p.sweep || 0, ws = p.wscale || 1;
+            parts.wl.style.transform = `translateZ(7px) rotateY(${-sw}deg) rotateZ(${th}deg) scale(1,${ws})`;
+            parts.wr.style.transform = `translateZ(7px) rotateY(${sw}deg) rotateZ(${-th}deg) scale(1,${ws})`;
+            parts.head.style.transform = `translateZ(12px) translateY(${p.headDy || 0}px) rotateY(${p.headYaw || 0}deg) rotateZ(${p.headRoll || 0}deg)`;
+        }
+
+        // ---------- bay ----------
+        // ---------- vào chỗ đậu: chọn kiểu theo theme ----------
+        function startEntry(E) {
+            const theme = currentTopbarTheme;
+            const move = (MASCOT_MOVEMENT[theme] || MASCOT_MOVEMENT.default).entry;
+            const now = performance.now();
+            const vw = window.innerWidth, vh = window.innerHeight;
+
+            if (move === 'walk' || move === 'trot') {
+                const fromLeft = Math.random() < 0.5;
+                A = {
+                    t0: now,
+                    dur: move === 'trot' ? 2600 : 3600,
+                    S: { x: fromLeft ? -80 : vw + 80, y: E.y },
+                    dir: fromLeft ? 1 : -1,
+                    move
+                };
+                mode = 'walkin';
+            } else if (move === 'hop') {
+                const fromLeft = Math.random() < 0.5;
+                A = {
+                    t0: now,
+                    dur: 3600,
+                    S: { x: fromLeft ? -70 : window.innerWidth + 70, y: E.y + 90 },
+                    dir: fromLeft ? 1 : -1,
+                    move
+                };
+                mode = 'hopin';
+            } else if (move === 'descend') {
+                A = {
+                    t0: now, dur: 1800,
+                    S: { x: E.x + (Math.random() - 0.5) * 50, y: -100 },
+                    move
+                };
+                mode = 'descend';
+            } else if (move === 'float') {
+                const fromLeft = Math.random() < 0.5;
+                A = {
+                    t0: now, dur: 2400,
+                    S: { x: E.x + (fromLeft ? -180 : 180), y: E.y + 30 },
+                    move
+                };
+                mode = 'floatin';
+            } else {
+                // fly — cú: bay theo cung từ cạnh, vỗ cánh
+                A = {
+                    t0: now, dur: 4300,
+                    S: { x: vw + 130, y: clamp(E.y - vh * 0.5, 50, Math.max(60, E.y - 140)) },
+                    P1: { x: vw * 0.6, y: Math.max(24, E.y - vh * 0.65) },
+                    roll: 0
+                };
+                mode = 'fly';
+            }
+        }
 
         // ---------- ĐI BỘ / CHẠY NƯỚC KIỆU (mèo, tuần lộc) ----------
-    function stepWalkIn(now, dt) {
-        const E = perchPoint();
-        if (!E) { despawn(); return; }
-        const t = clamp((now - A.t0) / A.dur, 0, 1);
-        const ease = 1 - Math.pow(1 - t, 2);
-        const x = lerp(A.S.x, E.x, ease);
-        const y = E.y;
+        function stepWalkIn(now, dt) {
+            const E = perchPoint();
+            if (!E) { despawn(); return; }
+            const t = clamp((now - A.t0) / A.dur, 0, 1);
+            const ease = 1 - Math.pow(1 - t, 2);
+            const x = lerp(A.S.x, E.x, ease);
+            const y = E.y;
 
-        // nhịp chân: cú bước chậm hơn, tuần lộc nhanh hơn
-        const freq = A.move === 'trot' ? 14 : 8;
-        const stepPhase = Math.sin(t * Math.PI * freq);
-        const bob = Math.abs(stepPhase) * 2.6;
+            // nhịp chân: cú bước chậm hơn, tuần lộc nhanh hơn
+            const freq = A.move === 'trot' ? 14 : 8;
+            const stepPhase = Math.sin(t * Math.PI * freq);
+            const bob = Math.abs(stepPhase) * 2.6;
 
-        // tay vung theo bước, chân trước/sau xen kẽ
-        const swing = stepPhase * 14;
+            // tay vung theo bước, chân trước/sau xen kẽ
+            const swing = stepPhase * 14;
 
-        pose({
-            x, y: y - bob,
-            z: 0,
-            yaw: A.dir > 0 ? -10 : 10,
-            roll: stepPhase * 2.5,
-            pitch: 0,
-            wing: swing,
-            sweep: 0,
-            wscale: 1,
-            scale: lerp(0.75, 1.0, ease),
-            opacity: clamp(t / 0.05, 0, 1)
-        });
-        if (t >= 1) { mode = 'settle'; A = { t0: now }; }
-    }
+            pose({
+                x, y: y - bob,
+                z: 0,
+                yaw: A.dir > 0 ? -10 : 10,
+                roll: stepPhase * 2.5,
+                pitch: 0,
+                wing: swing,
+                sweep: 0,
+                wscale: 1,
+                scale: lerp(0.75, 1.0, ease),
+                opacity: clamp(t / 0.05, 0, 1)
+            });
+            if (t >= 1) { mode = 'settle'; A = { t0: now }; }
+        }
 
-    // ---------- NHẢY TỪNG NHỊP (thỏ, ếch) ----------
-    function stepHopIn(now, dt) {
-    const E = perchPoint();
-    if (!E) { despawn(); return; }
-    const t = clamp((now - A.t0) / A.dur, 0, 1);
-    const ease = 1 - Math.pow(1 - t, 2);
+        // ---------- NHẢY TỪNG NHỊP (thỏ, ếch) ----------
+        function stepHopIn(now, dt) {
+            const E = perchPoint();
+            if (!E) { despawn(); return; }
+            const t = clamp((now - A.t0) / A.dur, 0, 1);
+            const ease = 1 - Math.pow(1 - t, 2);
 
-    const x = lerp(A.S.x, E.x, ease);
-    // Cong theo bậc thang: mỗi 1/5 quãng đường là 1 cú nhảy cao 50px
-    const hopT = (t * 5) % 1;
-    const arc = Math.sin(hopT * Math.PI) * 50 * (1 - ease * 0.4);   // arc nhỏ dần khi gần đích
-    const baseY = lerp(A.S.y, E.y, ease);
-    const y = baseY - arc;
+            const x = lerp(A.S.x, E.x, ease);
+            // Cong theo bậc thang: mỗi 1/5 quãng đường là 1 cú nhảy cao 50px
+            const hopT = (t * 5) % 1;
+            const arc = Math.sin(hopT * Math.PI) * 50 * (1 - ease * 0.4);   // arc nhỏ dần khi gần đích
+            const baseY = lerp(A.S.y, E.y, ease);
+            const y = baseY - arc;
 
-    // squash khi tiếp đất (hopT gần 0 hoặc 1), stretch khi đang bay lên
-    const squash = (hopT < 0.12 || hopT > 0.88) ? 0.82 : 1.12;
+            // squash khi tiếp đất (hopT gần 0 hoặc 1), stretch khi đang bay lên
+            const squash = (hopT < 0.12 || hopT > 0.88) ? 0.82 : 1.12;
 
-    pose({
-        x, y,
-        pitch: -arc * 0.5,
-        yaw: A.dir > 0 ? -14 : 14,
-        roll: A.dir > 0 ? -4 : 4,
-        wing: 0, sweep: 0,
-        wscale: squash,
-        scale: lerp(0.7, 1.0, ease),
-        opacity: clamp(t / 0.06, 0, 1)
-    });
-    if (t >= 1) { mode = 'settle'; A = { t0: now }; }
-}
+            pose({
+                x, y,
+                pitch: -arc * 0.5,
+                yaw: A.dir > 0 ? -14 : 14,
+                roll: A.dir > 0 ? -4 : 4,
+                wing: 0, sweep: 0,
+                wscale: squash,
+                scale: lerp(0.7, 1.0, ease),
+                opacity: clamp(t / 0.06, 0, 1)
+            });
+            if (t >= 1) { mode = 'settle'; A = { t0: now }; }
+        }
 
-    // ---------- HẠ CÁNH TỪ TRÊN (alien) ----------
-    function stepDescend(now, dt) {
-        const E = perchPoint();
-        if (!E) { despawn(); return; }
-        const t = clamp((now - A.t0) / A.dur, 0, 1);
-        const ease = Math.pow(t, 1.4);
-        const x = lerp(A.S.x, E.x, Math.min(1, t * 1.3));
-        const y = lerp(A.S.y, E.y, ease);
+        // ---------- HẠ CÁNH TỪ TRÊN (alien) ----------
+        function stepDescend(now, dt) {
+            const E = perchPoint();
+            if (!E) { despawn(); return; }
+            const t = clamp((now - A.t0) / A.dur, 0, 1);
+            const ease = Math.pow(t, 1.4);
+            const x = lerp(A.S.x, E.x, Math.min(1, t * 1.3));
+            const y = lerp(A.S.y, E.y, ease);
 
-        pose({
-            x, y,
-            z: 0,
-            pitch: 0,
-            yaw: Math.sin(t * Math.PI * 3) * 8,
-            roll: Math.sin(t * Math.PI * 2) * 6,
-            wing: 0, sweep: 0, wscale: 1,
-            scale: lerp(0.5, 1.0, ease),
-            opacity: clamp(t / 0.08, 0, 1)
-        });
-        if (t >= 1) { mode = 'settle'; A = { t0: now }; }
-    }
+            pose({
+                x, y,
+                z: 0,
+                pitch: 0,
+                yaw: Math.sin(t * Math.PI * 3) * 8,
+                roll: Math.sin(t * Math.PI * 2) * 6,
+                wing: 0, sweep: 0, wscale: 1,
+                scale: lerp(0.5, 1.0, ease),
+                opacity: clamp(t / 0.08, 0, 1)
+            });
+            if (t >= 1) { mode = 'settle'; A = { t0: now }; }
+        }
 
-    // ---------- TRÔI VÀO MỜ ẢO (ma) ----------
-    function stepFloatIn(now, dt) {
-        const E = perchPoint();
-        if (!E) { despawn(); return; }
-        const t = clamp((now - A.t0) / A.dur, 0, 1);
-        const ease = 1 - Math.pow(1 - t, 3);
-        const x = lerp(A.S.x, E.x, ease);
-        const y = lerp(A.S.y, E.y, ease) - Math.sin(t * Math.PI * 2) * 8;
+        // ---------- TRÔI VÀO MỜ ẢO (ma) ----------
+        function stepFloatIn(now, dt) {
+            const E = perchPoint();
+            if (!E) { despawn(); return; }
+            const t = clamp((now - A.t0) / A.dur, 0, 1);
+            const ease = 1 - Math.pow(1 - t, 3);
+            const x = lerp(A.S.x, E.x, ease);
+            const y = lerp(A.S.y, E.y, ease) - Math.sin(t * Math.PI * 2) * 8;
 
-        pose({
-            x, y,
-            z: 0,
-            pitch: Math.sin(t * Math.PI * 3) * 4,
-            yaw: Math.sin(t * Math.PI * 4) * 5,
-            roll: Math.sin(t * Math.PI * 3) * 6,
-            wing: 0, sweep: 0, wscale: 1,
-            scale: lerp(0.7, 1.0, ease),
-            opacity: clamp(t / 0.35, 0, 1)              // hiện từ từ, nửa trong suốt lúc mới hiện
-        });
-        if (t >= 1) { mode = 'settle'; A = { t0: now }; }
-    }
+            pose({
+                x, y,
+                z: 0,
+                pitch: Math.sin(t * Math.PI * 3) * 4,
+                yaw: Math.sin(t * Math.PI * 4) * 5,
+                roll: Math.sin(t * Math.PI * 3) * 6,
+                wing: 0, sweep: 0, wscale: 1,
+                scale: lerp(0.7, 1.0, ease),
+                opacity: clamp(t / 0.35, 0, 1)              // hiện từ từ, nửa trong suốt lúc mới hiện
+            });
+            if (t >= 1) { mode = 'settle'; A = { t0: now }; }
+        }
 
-    function stepFly(now, dt) {
-        const E = perchPoint();
-        if (!E) { despawn(); return; }
-        const t = clamp((now - A.t0) / A.dur, 0, 1);
-        const u = 1 - Math.pow(1 - t, 1.9);                         // chậm dần khi tới nơi
-        const P2 = { x: E.x + 340, y: E.y - 150 };
-        const x = bez(A.S.x, A.P1.x, P2.x, E.x, u), y = bez(A.S.y, A.P1.y, P2.y, E.y, u);
-        const u2 = Math.min(1, u + 0.02);
-        const vxn = clamp((bez(A.S.x, A.P1.x, P2.x, E.x, u2) - x) / 0.02 / 1400, -1, 1);
-        const flare = Math.sin(Math.PI * clamp((t - 0.72) / 0.28, 0, 1));   // ngửa người hãm đà
-        phase += dt * Math.PI * 2 * lerp(6.2, 3.0, t);
-        const f = Math.sin(phase);
-        A.roll = lerp(A.roll, vxn * 16, 0.08);
-        pose({
-    x, y: y - Math.cos(phase) * 5,
-    z: -260 * Math.pow(1 - u, 1.5),                 // nhẹ thôi, chủ yếu dùng scale
-    roll: A.roll + 3 * Math.sin(phase * 0.5),
-    yaw: vxn * 26,
-    pitch: flare * 22 - (1 - t) * 8,
-    wing: 58 + 24 * flare + (46 + 14 * flare) * f,
-    sweep: 16 * Math.cos(phase),
-    wscale: 1.55,
-    headDy: Math.cos(phase) * 1.5,
-    opacity: clamp(t / 0.08, 0, 1),
-    scale: lerp(0.30, 1.0, u)                       // ← 0.30 xa → 1.0 khi đáp
-});
-        if (t >= 1) { mode = 'settle'; A = { t0: now, wing0: 58 + 70 * 0, phase0: phase }; }
-    }
+        function stepFly(now, dt) {
+            const E = perchPoint();
+            if (!E) { despawn(); return; }
+            const t = clamp((now - A.t0) / A.dur, 0, 1);
+            const u = 1 - Math.pow(1 - t, 1.9);                         // chậm dần khi tới nơi
+            const P2 = { x: E.x + 340, y: E.y - 150 };
+            const x = bez(A.S.x, A.P1.x, P2.x, E.x, u), y = bez(A.S.y, A.P1.y, P2.y, E.y, u);
+            const u2 = Math.min(1, u + 0.02);
+            const vxn = clamp((bez(A.S.x, A.P1.x, P2.x, E.x, u2) - x) / 0.02 / 1400, -1, 1);
+            const flare = Math.sin(Math.PI * clamp((t - 0.72) / 0.28, 0, 1));   // ngửa người hãm đà
+            phase += dt * Math.PI * 2 * lerp(6.2, 3.0, t);
+            const f = Math.sin(phase);
+            A.roll = lerp(A.roll, vxn * 16, 0.08);
+            pose({
+                x, y: y - Math.cos(phase) * 5,
+                z: -260 * Math.pow(1 - u, 1.5),                 // nhẹ thôi, chủ yếu dùng scale
+                roll: A.roll + 3 * Math.sin(phase * 0.5),
+                yaw: vxn * 26,
+                pitch: flare * 22 - (1 - t) * 8,
+                wing: 58 + 24 * flare + (46 + 14 * flare) * f,
+                sweep: 16 * Math.cos(phase),
+                wscale: 1.55,
+                headDy: Math.cos(phase) * 1.5,
+                opacity: clamp(t / 0.08, 0, 1),
+                scale: lerp(0.30, 1.0, u)                       // ← 0.30 xa → 1.0 khi đáp
+            });
+            if (t >= 1) { mode = 'settle'; A = { t0: now, wing0: 58 + 70 * 0, phase0: phase }; }
+        }
 
         function stepSettle(now, dt) {
-        const E = perchPoint();
-        if (!E) { despawn(); return; }
-        const theme = currentTopbarTheme;
-        const isFlying = (MASCOT_MOVEMENT[theme] || MASCOT_MOVEMENT.default).entry === 'fly';
-        const tt = clamp((now - A.t0) / 900, 0, 1);
-        const e = 1 - Math.pow(1 - tt, 3);
-        if (isFlying) phase += dt * Math.PI * 2 * lerp(3.0, 1.2, tt);
+            const E = perchPoint();
+            if (!E) { despawn(); return; }
+            const theme = currentTopbarTheme;
+            const isFlying = (MASCOT_MOVEMENT[theme] || MASCOT_MOVEMENT.default).entry === 'fly';
+            const tt = clamp((now - A.t0) / 900, 0, 1);
+            const e = 1 - Math.pow(1 - tt, 3);
+            if (isFlying) phase += dt * Math.PI * 2 * lerp(3.0, 1.2, tt);
 
-        pose({
-            x: E.x,
-            y: E.y - (isFlying ? 7 * Math.sin(Math.PI * tt) * (1 - tt) : 0),
-            pitch: isFlying ? lerp(8, 0, e) : 0,
-            wing: isFlying ? (1 - e) * (74 + 30 * Math.sin(phase)) : 0,
-            sweep: isFlying ? (1 - e) * 10 : 0,
-            wscale: isFlying ? lerp(1.55, 1, e) : 1,
-            opacity: E.visible ? 1 : 0
-        });
-        if (tt >= 1) {
-            mode = 'perch'; A = { head: 0, headTo: 0, nextLook: now + 2500 };
-            owl.classList.add('perched');
+            pose({
+                x: E.x,
+                y: E.y - (isFlying ? 7 * Math.sin(Math.PI * tt) * (1 - tt) : 0),
+                pitch: isFlying ? lerp(8, 0, e) : 0,
+                wing: isFlying ? (1 - e) * (74 + 30 * Math.sin(phase)) : 0,
+                sweep: isFlying ? (1 - e) * 10 : 0,
+                wscale: isFlying ? lerp(1.55, 1, e) : 1,
+                opacity: E.visible ? 1 : 0
+            });
+            if (tt >= 1) {
+                mode = 'perch'; A = { head: 0, headTo: 0, nextLook: now + 2500 };
+                owl.classList.add('perched');
+            }
         }
-    }
 
         // Hành vi đứng yên đặc trưng cho từng con vật
-    function themeIdle(now) {
-        const theme = currentTopbarTheme;
-        const idle = (MASCOT_MOVEMENT[theme] || MASCOT_MOVEMENT.default).idle;
-        const out = { headYaw: 0, headRoll: 0, bodyRoll: 0, bodyScale: 1, tailAngle: null };
+        function themeIdle(now) {
+            const theme = currentTopbarTheme;
+            const idle = (MASCOT_MOVEMENT[theme] || MASCOT_MOVEMENT.default).idle;
+            const out = { headYaw: 0, headRoll: 0, bodyRoll: 0, bodyScale: 1, tailAngle: null };
 
-        if (idle === 'frog') {
-    // ếch thở bằng cách phồng cổ nhẹ
-    out.bodyScale = 1 + Math.sin(now / 1500) * 0.02;
-    out.headDy = Math.sin(now / 900) * 0.6;
-} else if (idle === 'rabbit') {
-    // tai thỏ khẽ giật
-    out.headRoll = Math.sin(now / 700) * 3;
-    out.headDy = Math.abs(Math.sin(now / 1700)) * 1.2;
-} else if (idle === 'alien') {
-    // alien đưa tay lên trời
-    out.headYaw = Math.sin(now / 1300) * 6;
-    out.bodyRoll = Math.sin(now / 1800) * 1.5;
-} else if (idle === 'reindeer') {
-    // tuần lộc nghiêng đầu ngửi cỏ
-    out.headYaw = Math.sin(now / 1600) * 6;
-    out.headRoll = Math.sin(now / 1100) * 2;
-} else if (idle === 'ghost') {
-    // ma đung đưa
-    out.bodyRoll = Math.sin(now / 1600) * 4;
-    out.bodyScale = 1 + Math.sin(now / 1000) * 0.02;
-} else if (idle === 'cat') {
-    // mèo vẫy đuôi, đôi khi ngó quanh
-    out.tailAngle = Math.sin(now / 380) * 16;
-}
-        return out;
-    }
+            if (idle === 'frog') {
+                // ếch thở bằng cách phồng cổ nhẹ
+                out.bodyScale = 1 + Math.sin(now / 1500) * 0.02;
+                out.headDy = Math.sin(now / 900) * 0.6;
+            } else if (idle === 'rabbit') {
+                // tai thỏ khẽ giật
+                out.headRoll = Math.sin(now / 700) * 3;
+                out.headDy = Math.abs(Math.sin(now / 1700)) * 1.2;
+            } else if (idle === 'alien') {
+                // alien đưa tay lên trời
+                out.headYaw = Math.sin(now / 1300) * 6;
+                out.bodyRoll = Math.sin(now / 1800) * 1.5;
+            } else if (idle === 'reindeer') {
+                // tuần lộc nghiêng đầu ngửi cỏ
+                out.headYaw = Math.sin(now / 1600) * 6;
+                out.headRoll = Math.sin(now / 1100) * 2;
+            } else if (idle === 'ghost') {
+                // ma đung đưa
+                out.bodyRoll = Math.sin(now / 1600) * 4;
+                out.bodyScale = 1 + Math.sin(now / 1000) * 0.02;
+            } else if (idle === 'cat') {
+                // mèo vẫy đuôi, đôi khi ngó quanh
+                out.tailAngle = Math.sin(now / 380) * 16;
+            }
+            return out;
+        }
 
         function stepPerch(now, dt) {
-        const E = perchPoint();
-        if (!E) { despawn(); return; }
-        A.lastE = E;
-        if (now > A.nextLook) {
-            A.headTo = (Math.random() < 0.5 ? -1 : 1) * (10 + Math.random() * 16);
-            A.nextLook = now + 2200 + Math.random() * 5000;
-            setTimeout(() => { A.headTo = 0; }, 1100);
+            const E = perchPoint();
+            if (!E) { despawn(); return; }
+            A.lastE = E;
+            if (now > A.nextLook) {
+                A.headTo = (Math.random() < 0.5 ? -1 : 1) * (10 + Math.random() * 16);
+                A.nextLook = now + 2200 + Math.random() * 5000;
+                setTimeout(() => { A.headTo = 0; }, 1100);
+            }
+            A.head = lerp(A.head, A.headTo, 0.07);
+            const br = Math.sin(now / 900) * 0.012;
+            const ti = themeIdle(now);
+
+            pose({
+                x: E.x, y: E.y,
+                roll: ti.bodyRoll + Math.sin(now / 1800) * 0.9,
+                scale: (1 + br) * ti.bodyScale,
+                headYaw: A.head + ti.headYaw,
+                headRoll: A.head * 0.25 + ti.headRoll,
+                opacity: E.visible ? 1 : 0
+            });
+
+            // đuôi mèo (nếu có) — ghi đè transform mặc định
+            if (parts.tail && ti.tailAngle !== null) {
+                parts.tail.style.transform = `translateZ(-14px) rotate(${ti.tailAngle}deg)`;
+                parts.tail.style.transformOrigin = '100% 70%';
+            }
+
+            owl.style.pointerEvents = E.visible ? '' : 'none';
         }
-        A.head = lerp(A.head, A.headTo, 0.07);
-        const br = Math.sin(now / 900) * 0.012;
-        const ti = themeIdle(now);
 
-        pose({
-            x: E.x, y: E.y,
-            roll: ti.bodyRoll + Math.sin(now / 1800) * 0.9,
-            scale: (1 + br) * ti.bodyScale,
-            headYaw: A.head + ti.headYaw,
-            headRoll: A.head * 0.25 + ti.headRoll,
-            opacity: E.visible ? 1 : 0
-        });
-
-        // đuôi mèo (nếu có) — ghi đè transform mặc định
-        if (parts.tail && ti.tailAngle !== null) {
-            parts.tail.style.transform = `translateZ(-14px) rotate(${ti.tailAngle}deg)`;
-            parts.tail.style.transformOrigin = '100% 70%';
+        // ---------- bị bắn & rơi ----------
+        function fx(cls, x, y) {
+            const el = document.createElement('i');
+            el.className = cls;
+            layer.appendChild(el);
+            el.style.transform = `translate(${x}px,${y}px)`;
+            return el;
         }
 
-        owl.style.pointerEvents = E.visible ? '' : 'none';
-    }
+        // ─────────────────────────────────────────────────────────
+        // Dispatcher: mỗi con vật có kiểu "chọc" riêng
+        //   Cú / mèo / thỏ / tuần lộc / alien / rabbit: bắn (giữ shoot cũ)
+        //   Ếch: nhảy lên tại chỗ rồi tiếp đất
+        //   Ma: hù — rung lắc, phình to rồi tan biến
+        // ─────────────────────────────────────────────────────────
+        function onClickMascot() {
+            if (mode !== 'perch' || !A.lastE) return;
+            const theme = currentTopbarTheme;
+            if (theme === 'halloween') return doScare();
+            if (theme === 'rain') return doFrogJump();
+            return shoot();
+        }
 
-    // ---------- bị bắn & rơi ----------
-    function fx(cls, x, y) {
-        const el = document.createElement('i');
-        el.className = cls;
-        layer.appendChild(el);
-        el.style.transform = `translate(${x}px,${y}px)`;
-        return el;
-    }
+        // ── ẾCH: nhảy lên tại chỗ ──
+        function doFrogJump() {
+            if (mode !== 'perch' || !A.lastE) return;
+            const E = A.lastE;
+            const info = MASCOT_INFO.rain;
+            mode = 'frogjump';
+            owl.classList.remove('perched');
+            showMascotBubble(info.bubble);
+            A = { t0: performance.now(), E, jumpH: 110 + Math.random() * 30 };
+        }
 
-    // ─────────────────────────────────────────────────────────
-// Dispatcher: mỗi con vật có kiểu "chọc" riêng
-//   Cú / mèo / thỏ / tuần lộc / alien / rabbit: bắn (giữ shoot cũ)
-//   Ếch: nhảy lên tại chỗ rồi tiếp đất
-//   Ma: hù — rung lắc, phình to rồi tan biến
-// ─────────────────────────────────────────────────────────
-function onClickMascot() {
-    if (mode !== 'perch' || !A.lastE) return;
-    const theme = currentTopbarTheme;
-    if (theme === 'halloween') return doScare();
-    if (theme === 'rain')      return doFrogJump();
-    return shoot();
-}
+        function stepFrogJump(now) {
+            const E = A.E;
+            if (!E) { mode = 'settle'; A = { t0: now }; return; }
+            const t = clamp((now - A.t0) / 950, 0, 1);
 
-// ── ẾCH: nhảy lên tại chỗ ──
-function doFrogJump() {
-    if (mode !== 'perch' || !A.lastE) return;
-    const E = A.lastE;
-    const info = MASCOT_INFO.rain;
-    mode = 'frogjump';
-    owl.classList.remove('perched');
-    showMascotBubble(info.bubble);
-    A = { t0: performance.now(), E, jumpH: 110 + Math.random() * 30 };
-}
+            if (t >= 1) {
+                mode = 'perch';
+                owl.classList.add('perched');
+                A = { head: 0, headTo: 0, nextLook: now + 2400 };
+                return;
+            }
 
-function stepFrogJump(now) {
-    const E = A.E;
-    if (!E) { mode = 'settle'; A = { t0: now }; return; }
-    const t = clamp((now - A.t0) / 950, 0, 1);
+            // Parabol: lên nhanh, xuống nhanh, đỉnh ở t = 0.5
+            const lift = Math.sin(t * Math.PI);
+            const y = E.y - lift * A.jumpH;
 
-    if (t >= 1) {
-        mode = 'perch';
-        owl.classList.add('perched');
-        A = { head: 0, headTo: 0, nextLook: now + 2400 };
-        return;
-    }
+            // Squash & stretch: nhún khi tiếp đất, căng khi bay lên
+            let sx = 1, sy = 1;
+            if (t < 0.15) { sy = 1.15; sx = 0.88; }              // căng khi bật lên
+            else if (t > 0.85) { sy = 0.82; sx = 1.15; }         // nhún khi tiếp đất
 
-    // Parabol: lên nhanh, xuống nhanh, đỉnh ở t = 0.5
-    const lift = Math.sin(t * Math.PI);
-    const y = E.y - lift * A.jumpH;
+            pose({
+                x: E.x,
+                y,
+                pitch: -lift * 22,
+                scale: 1,
+                wscale: sy,
+                headRoll: lift * 4,
+                opacity: 1
+            });
+            // scale ngang (sx) áp vào toàn bộ owl
+            if (owl) {
+                const s = OWL_SCALE * sx;
+                owl.style.transform = owl.style.transform.replace(/scale\([^)]+\)$/, `scale(${s})`);
+            }
+        }
 
-    // Squash & stretch: nhún khi tiếp đất, căng khi bay lên
-    let sx = 1, sy = 1;
-    if (t < 0.15) { sy = 1.15; sx = 0.88; }              // căng khi bật lên
-    else if (t > 0.85) { sy = 0.82; sx = 1.15; }         // nhún khi tiếp đất
+        // ── MA: hù — rung lắc, phình to, tan biến ──
+        function doScare() {
+            if (mode !== 'perch' || !A.lastE) return;
+            const E = A.lastE;
+            const info = MASCOT_INFO.halloween;
+            mode = 'scare';
+            owl.classList.remove('perched');
+            showMascotBubble(info.bubble);
 
-    pose({
-        x: E.x,
-        y,
-        pitch: -lift * 22,
-        scale: 1,
-        wscale: sy,
-        headRoll: lift * 4,
-        opacity: 1
-    });
-    // scale ngang (sx) áp vào toàn bộ owl
-    if (owl) {
-        const s = OWL_SCALE * sx;
-        owl.style.transform = owl.style.transform.replace(/scale\([^)]+\)$/, `scale(${s})`);
-    }
-}
+            // Bùng nổ hạt sợ hãi quanh thân
+            for (let i = 0; i < 26; i++) {
+                const fe = fx('mascot-spark halloween', E.x, E.y);
+                const ang = (i / 26) * Math.PI * 2 + Math.random() * 0.4;
+                const dist = 70 + Math.random() * 90;
+                const vx = Math.cos(ang) * dist;
+                const vy = Math.sin(ang) * dist;
+                fe.animate([
+                    { opacity: 0, transform: `translate(${E.x}px,${E.y}px) scale(.3)` },
+                    { opacity: 1, offset: .25, transform: `translate(${E.x + vx * .55}px,${E.y + vy * .55}px) scale(1.5)` },
+                    { opacity: 0, transform: `translate(${E.x + vx}px,${E.y + vy}px) scale(.25)` }
+                ], { duration: 900 + Math.random() * 500, easing: 'cubic-bezier(.3,.6,.5,1)' }).onfinish = () => fe.remove();
+            }
 
-// ── MA: hù — rung lắc, phình to, tan biến ──
-function doScare() {
-    if (mode !== 'perch' || !A.lastE) return;
-    const E = A.lastE;
-    const info = MASCOT_INFO.halloween;
-    mode = 'scare';
-    owl.classList.remove('perched');
-    showMascotBubble(info.bubble);
+            A = { t0: performance.now(), E, dur: 1300 };
+        }
 
-    // Bùng nổ hạt sợ hãi quanh thân
-    for (let i = 0; i < 26; i++) {
-        const fe = fx('mascot-spark halloween', E.x, E.y);
-        const ang = (i / 26) * Math.PI * 2 + Math.random() * 0.4;
-        const dist = 70 + Math.random() * 90;
-        const vx = Math.cos(ang) * dist;
-        const vy = Math.sin(ang) * dist;
-        fe.animate([
-            { opacity: 0, transform: `translate(${E.x}px,${E.y}px) scale(.3)` },
-            { opacity: 1, offset: .25, transform: `translate(${E.x + vx * .55}px,${E.y + vy * .55}px) scale(1.5)` },
-            { opacity: 0, transform: `translate(${E.x + vx}px,${E.y + vy}px) scale(.25)` }
-        ], { duration: 900 + Math.random() * 500, easing: 'cubic-bezier(.3,.6,.5,1)' }).onfinish = () => fe.remove();
-    }
+        function stepScare(now) {
+            const E = A.E;
+            if (!E) { removeOwl(); scheduleSpawn(1800); return; }
+            const t = clamp((now - A.t0) / A.dur, 0, 1);
 
-    A = { t0: performance.now(), E, dur: 1300 };
-}
+            // Rung biên độ giảm dần, phình to, mờ dần
+            const shakeAmp = (1 - t) * 9;
+            const dx = Math.sin(t * 60) * shakeAmp;
+            const dy = Math.cos(t * 47) * shakeAmp * 0.6;
+            const scale = 1 + t * 0.85;
+            const opacity = t < 0.7 ? 1 : 1 - (t - 0.7) / 0.3;
 
-function stepScare(now) {
-    const E = A.E;
-    if (!E) { removeOwl(); scheduleSpawn(1800); return; }
-    const t = clamp((now - A.t0) / A.dur, 0, 1);
+            pose({
+                x: E.x + dx,
+                y: E.y + dy,
+                roll: dx * 1.6,
+                scale,
+                opacity
+            });
 
-    // Rung biên độ giảm dần, phình to, mờ dần
-    const shakeAmp = (1 - t) * 9;
-    const dx = Math.sin(t * 60) * shakeAmp;
-    const dy = Math.cos(t * 47) * shakeAmp * 0.6;
-    const scale = 1 + t * 0.85;
-    const opacity = t < 0.7 ? 1 : 1 - (t - 0.7) / 0.3;
+            if (t >= 1) {
+                removeOwl();
+                scheduleSpawn(1800);
+            }
+        }
 
-    pose({
-        x: E.x + dx,
-        y: E.y + dy,
-        roll: dx * 1.6,
-        scale,
-        opacity
-    });
+        function shoot() {
+            if (mode !== 'perch' || !A.lastE) return;
+            const E = A.lastE;
+            const theme = currentTopbarTheme;
+            const info = MASCOT_INFO[theme] || MASCOT_INFO.default;
+            mode = 'shot';
+            owl.classList.remove('perched');
 
-    if (t >= 1) {
-        removeOwl();
-        scheduleSpawn(1800);
-    }
-}
+            // Bong bóng "nói" của con vật
+            showMascotBubble(info.bubble);
 
-    function shoot() {
-    if (mode !== 'perch' || !A.lastE) return;
-    const E = A.lastE;
-    const theme = currentTopbarTheme;
-    const info = MASCOT_INFO[theme] || MASCOT_INFO.default;
-    mode = 'shot';
-    owl.classList.remove('perched');
+            const vw = window.innerWidth, vh = window.innerHeight;
+            const ox = clamp(E.x - 320 + (Math.random() - 0.5) * 160, 24, vw - 24), oy = vh + 18;
+            const dx = E.x - ox, dy = E.y - oy, dist = Math.hypot(dx, dy), ang = Math.atan2(dy, dx) * 180 / Math.PI;
 
-    // Bong bóng "nói" của con vật
-    showMascotBubble(info.bubble);
+            const flash = fx('owl-muzzle', ox, vh - 6);
+            flash.animate([
+                { opacity: 1, transform: `translate(${ox}px,${vh - 6}px) scale(.4)` },
+                { opacity: 0, transform: `translate(${ox}px,${vh - 6}px) scale(1.6)` }
+            ], { duration: 160 }).onfinish = () => flash.remove();
 
-    const vw = window.innerWidth, vh = window.innerHeight;
-    const ox = clamp(E.x - 320 + (Math.random() - 0.5) * 160, 24, vw - 24), oy = vh + 18;
-    const dx = E.x - ox, dy = E.y - oy, dist = Math.hypot(dx, dy), ang = Math.atan2(dy, dx) * 180 / Math.PI;
+            const b = fx(info.bulletClass, ox, oy);
+            b.animate([
+                { transform: `translate(${ox}px,${oy}px) rotate(${ang}deg)` },
+                { transform: `translate(${E.x}px,${E.y}px) rotate(${ang}deg)` }
+            ], { duration: clamp(dist / 2.6, 160, 420), easing: 'linear', fill: 'forwards' })
+                .onfinish = () => { b.remove(); impact(E); };
+        }
 
-    const flash = fx('owl-muzzle', ox, vh - 6);
-    flash.animate([
-        { opacity: 1, transform: `translate(${ox}px,${vh - 6}px) scale(.4)` },
-        { opacity: 0, transform: `translate(${ox}px,${vh - 6}px) scale(1.6)` }
-    ], { duration: 160 }).onfinish = () => flash.remove();
+        function impact(E) {
+            if (!owl) return;
+            const theme = currentTopbarTheme;
+            const info = MASCOT_INFO[theme] || MASCOT_INFO.default;
+            const ring = fx('owl-ring', E.x, E.y);
+            ring.animate([
+                { opacity: 1, transform: `translate(${E.x}px,${E.y}px) scale(1)` },
+                { opacity: 0, transform: `translate(${E.x}px,${E.y}px) scale(7)` }
+            ], { duration: 420, easing: 'ease-out' }).onfinish = () => ring.remove();
 
-    const b = fx(info.bulletClass, ox, oy);
-    b.animate([
-        { transform: `translate(${ox}px,${oy}px) rotate(${ang}deg)` },
-        { transform: `translate(${E.x}px,${E.y}px) rotate(${ang}deg)` }
-    ], { duration: clamp(dist / 2.6, 160, 420), easing: 'linear', fill: 'forwards' })
-     .onfinish = () => { b.remove(); impact(E); };
-}
+            // Đốm/hạt theo chủ đề
+            for (let i = 0; i < 16; i++) {
+                const fe = fx(`mascot-spark ${theme}`, E.x, E.y);
+                const vx = (Math.random() - 0.5) * 260, vy = -40 - Math.random() * 190, rot = (Math.random() - 0.5) * 900;
+                const dur = 900 + Math.random() * 800;
+                fe.animate([
+                    { opacity: 1, transform: `translate(${E.x}px,${E.y}px) rotate(0deg) scale(1)` },
+                    { opacity: 1, offset: 0.4, transform: `translate(${E.x + vx * 0.7}px,${E.y + vy}px) rotate(${rot * 0.5}deg) scale(1)` },
+                    { opacity: 0, transform: `translate(${E.x + vx}px,${E.y + vy + 260 + Math.random() * 120}px) rotate(${rot}deg) scale(0.6)` }
+                ], { duration: dur, easing: 'cubic-bezier(.3,.6,.5,1)' }).onfinish = () => fe.remove();
+            }
 
-    function impact(E) {
-    if (!owl) return;
-    const theme = currentTopbarTheme;
-    const info = MASCOT_INFO[theme] || MASCOT_INFO.default;
-    const ring = fx('owl-ring', E.x, E.y);
-    ring.animate([
-        { opacity: 1, transform: `translate(${E.x}px,${E.y}px) scale(1)` },
-        { opacity: 0, transform: `translate(${E.x}px,${E.y}px) scale(7)` }
-    ], { duration: 420, easing: 'ease-out' }).onfinish = () => ring.remove();
+            mode = 'fall';
+            A = { /* giữ nguyên như cũ */
+                t0: performance.now(), x: E.x, y: E.y, z: 0,
+                vx: (Math.random() - 0.5) * 100, vy: -80 - Math.random() * 60, roll: 0,
+                w: (Math.random() < 0.5 ? -1 : 1) * (240 + Math.random() * 160),
+                pitch: 0, wp: 50 + Math.random() * 40,
+                yaw: 0, wy: (Math.random() - 0.5) * 80,
+                wingsOpen: 1
+            };
+        }
 
-    // Đốm/hạt theo chủ đề
-    for (let i = 0; i < 16; i++) {
-        const fe = fx(`mascot-spark ${theme}`, E.x, E.y);
-        const vx = (Math.random() - 0.5) * 260, vy = -40 - Math.random() * 190, rot = (Math.random() - 0.5) * 900;
-        const dur = 900 + Math.random() * 800;
-        fe.animate([
-            { opacity: 1, transform: `translate(${E.x}px,${E.y}px) rotate(0deg) scale(1)` },
-            { opacity: 1, offset: 0.4, transform: `translate(${E.x + vx * 0.7}px,${E.y + vy}px) rotate(${rot * 0.5}deg) scale(1)` },
-            { opacity: 0, transform: `translate(${E.x + vx}px,${E.y + vy + 260 + Math.random() * 120}px) rotate(${rot}deg) scale(0.6)` }
-        ], { duration: dur, easing: 'cubic-bezier(.3,.6,.5,1)' }).onfinish = () => fe.remove();
-    }
+        function showMascotBubble(text) {
+            if (!text || !owl) return;
+            let bubble = owl.querySelector('.mascot-bubble');
+            if (!bubble) {
+                bubble = document.createElement('div');
+                bubble.className = 'mascot-bubble';
+                owl.appendChild(bubble);
+            }
+            bubble.textContent = text;
+            bubble.classList.add('show');
+            clearTimeout(bubble._hideT);
+            bubble._hideT = setTimeout(() => bubble.classList.remove('show'), 1600);
+        }
+        function stepFall(now, dt) {
+            const tt = (now - A.t0) / 1000;
 
-    mode = 'fall';
-    A = { /* giữ nguyên như cũ */
-        t0: performance.now(), x: E.x, y: E.y, z: 0,
-        vx: (Math.random() - 0.5) * 100, vy: -80 - Math.random() * 60, roll: 0,
-        w: (Math.random() < 0.5 ? -1 : 1) * (240 + Math.random() * 160),
-        pitch: 0, wp: 50 + Math.random() * 40,
-        yaw: 0, wy: (Math.random() - 0.5) * 80,
-        wingsOpen: 1
-    };
-}
+            // ── Vật lý ──
+            A.vy += 1500 * dt;                             // trọng lực
+            A.vx *= Math.max(0, 1 - 0.8 * dt);             // cản không khí ngang
+            A.x += A.vx * dt;
+            A.y += A.vy * dt;
 
-function showMascotBubble(text) {
-    if (!text || !owl) return;
-    let bubble = owl.querySelector('.mascot-bubble');
-    if (!bubble) {
-        bubble = document.createElement('div');
-        bubble.className = 'mascot-bubble';
-        owl.appendChild(bubble);
-    }
-    bubble.textContent = text;
-    bubble.classList.add('show');
-    clearTimeout(bubble._hideT);
-    bubble._hideT = setTimeout(() => bubble.classList.remove('show'), 1600);
-}
-    function stepFall(now, dt) {
-    const tt = (now - A.t0) / 1000;
+            // ── Xoay có quán tính (angular drag) ──
+            const drag = Math.max(0, 1 - 0.25 * dt);
+            A.w *= drag;
+            A.wp *= drag;
+            A.wy *= drag;
+            A.roll += A.w * dt;
+            A.pitch += A.wp * dt;
+            A.yaw += A.wy * dt;
 
-    // ── Vật lý ──
-    A.vy += 1500 * dt;                             // trọng lực
-    A.vx *= Math.max(0, 1 - 0.8 * dt);             // cản không khí ngang
-    A.x += A.vx * dt;
-    A.y += A.vy * dt;
+            // ── Cánh co vào nhanh trong ~0.35s đầu ──
+            A.wingsOpen = Math.max(0, A.wingsOpen - dt * 3);
 
-    // ── Xoay có quán tính (angular drag) ──
-    const drag = Math.max(0, 1 - 0.25 * dt);
-    A.w  *= drag;
-    A.wp *= drag;
-    A.wy *= drag;
-    A.roll  += A.w  * dt;
-    A.pitch += A.wp * dt;
-    A.yaw   += A.wy * dt;
+            // ── Nhỏ dần khi rơi xa camera ──
+            const fallScale = Math.max(0.30, 1 - tt * 0.30);
 
-    // ── Cánh co vào nhanh trong ~0.35s đầu ──
-    A.wingsOpen = Math.max(0, A.wingsOpen - dt * 3);
+            pose({
+                x: A.x, y: A.y, z: 0,
+                roll: A.roll, pitch: A.pitch, yaw: A.yaw,
+                wing: 18 + A.wingsOpen * 55,             // lúc đầu xoè, sau co xuống
+                sweep: A.wingsOpen * 14,
+                wscale: 1 + A.wingsOpen * 0.35,
+                headYaw: 0,
+                scale: fallScale,
+                opacity: 1
+            });
 
-    // ── Nhỏ dần khi rơi xa camera ──
-    const fallScale = Math.max(0.30, 1 - tt * 0.30);
+            if (A.y > window.innerHeight + H * 2 || tt > 3.5) {
+                removeOwl();
+                scheduleSpawn(1600);
+            }
+        }
 
-    pose({
-        x: A.x, y: A.y, z: 0,
-        roll: A.roll, pitch: A.pitch, yaw: A.yaw,
-        wing:   18 + A.wingsOpen * 55,             // lúc đầu xoè, sau co xuống
-        sweep:  A.wingsOpen * 14,
-        wscale: 1 + A.wingsOpen * 0.35,
-        headYaw: 0,
-        scale: fallScale,
-        opacity: 1
-    });
-
-    if (A.y > window.innerHeight + H * 2 || tt > 3.5) {
-        removeOwl();
-        scheduleSpawn(1600);
-    }
-}
-
-    // ---------- vòng lặp & vòng đời ----------
+        // ---------- vòng lặp & vòng đời ----------
         function loop(now) {
-        if (mode === 'none') { raf = 0; return; }
-        raf = requestAnimationFrame(loop);
-        const dt = Math.min(0.05, (now - (last || now)) / 1000);
-        last = now;
-        if      (mode === 'fly')      stepFly(now, dt);
-        else if (mode === 'walkin')   stepWalkIn(now, dt);
-        else if (mode === 'hopin')    stepHopIn(now, dt);
-        else if (mode === 'descend')  stepDescend(now, dt);
-        else if (mode === 'floatin')  stepFloatIn(now, dt);
-        else if (mode === 'settle')   stepSettle(now, dt);
-        else if (mode === 'perch')    stepPerch(now, dt);
-        else if (mode === 'fall')     stepFall(now, dt);
-        else if (mode === 'frogjump') stepFrogJump(now, dt);   // ← MỚI
-        else if (mode === 'scare')    stepScare(now, dt);
-    }
+            if (mode === 'none') { raf = 0; return; }
+            raf = requestAnimationFrame(loop);
+            const dt = Math.min(0.05, (now - (last || now)) / 1000);
+            last = now;
+            if (mode === 'fly') stepFly(now, dt);
+            else if (mode === 'walkin') stepWalkIn(now, dt);
+            else if (mode === 'hopin') stepHopIn(now, dt);
+            else if (mode === 'descend') stepDescend(now, dt);
+            else if (mode === 'floatin') stepFloatIn(now, dt);
+            else if (mode === 'settle') stepSettle(now, dt);
+            else if (mode === 'perch') stepPerch(now, dt);
+            else if (mode === 'fall') stepFall(now, dt);
+            else if (mode === 'frogjump') stepFrogJump(now, dt);   // ← MỚI
+            else if (mode === 'scare') stepScare(now, dt);
+        }
 
-    function startLoop() { if (!raf) { last = 0; raf = requestAnimationFrame(loop); } }
+        function startLoop() { if (!raf) { last = 0; raf = requestAnimationFrame(loop); } }
 
-    function removeOwl() {
-        if (owl) owl.remove();
-        owl = null; mode = 'none';
-    }
+        function removeOwl() {
+            if (owl) owl.remove();
+            owl = null; mode = 'none';
+        }
 
         function spawn() {
-        if (mode !== 'none') return;
-        const E = perchPoint();
-        if (!E) return;
-        ensureLayer();
-        buildOwl();
-        if (reduced()) {
-            mode = 'perch'; A = { head: 0, headTo: 0, nextLook: Infinity };
-            owl.classList.add('perched');
-        } else {
-            startEntry(E);                       // ← đổi từ startFly(E)
+            if (mode !== 'none') return;
+            const E = perchPoint();
+            if (!E) return;
+            ensureLayer();
+            buildOwl();
+            if (reduced()) {
+                mode = 'perch'; A = { head: 0, headTo: 0, nextLook: Infinity };
+                owl.classList.add('perched');
+            } else {
+                startEntry(E);                       // ← đổi từ startFly(E)
+            }
+            startLoop();
         }
-        startLoop();
-    }
 
-    function scheduleSpawn(ms) {
-        if (spawnTimer) clearTimeout(spawnTimer);
-        spawnTimer = setTimeout(() => { spawnTimer = 0; if (wanted()) spawn(); }, ms);
-    }
+        function scheduleSpawn(ms) {
+            if (spawnTimer) clearTimeout(spawnTimer);
+            spawnTimer = setTimeout(() => { spawnTimer = 0; if (wanted()) spawn(); }, ms);
+        }
 
-    
-    function despawn() {
-    if (spawnTimer) { clearTimeout(spawnTimer); spawnTimer = 0; }
-    if (layer) layer.querySelectorAll('.owl-bullet,.owl-feather,.owl-ring,.owl-muzzle').forEach(n => n.remove());
-    const old = owl;
-    owl = null; mode = 'none';
-    if (old) {
-        old.classList.remove('perched');       // ← bỏ class có pointer-events: auto
-        old.style.pointerEvents = 'none';      // ← chắc chắn không chặn click trong lúc fade
-        old.style.transition = 'opacity .35s ease';
-        old.style.opacity = '0';
-        setTimeout(() => old.remove(), 400);
-    }
-}
+
+        function despawn() {
+            if (spawnTimer) { clearTimeout(spawnTimer); spawnTimer = 0; }
+            if (layer) layer.querySelectorAll('.owl-bullet,.owl-feather,.owl-ring,.owl-muzzle').forEach(n => n.remove());
+            const old = owl;
+            owl = null; mode = 'none';
+            if (old) {
+                old.classList.remove('perched');       // ← bỏ class có pointer-events: auto
+                old.style.pointerEvents = 'none';      // ← chắc chắn không chặn click trong lúc fade
+                old.style.transition = 'opacity .35s ease';
+                old.style.opacity = '0';
+                setTimeout(() => old.remove(), 400);
+            }
+        }
 
 
         return {
@@ -10201,7 +10201,7 @@ const AuthOwl = (() => {
         loop();
     }
 
-        function fly(from, to) {
+    function fly(from, to) {
         const dur = 720;
         const dx = from.x - to.x, dy = from.y - to.y;
         flyAnim = el.animate(
@@ -10351,15 +10351,15 @@ const AuthOwl = (() => {
     function init() { if (ensure()) place(false, authMode); }
 
     function applyTheme(themeId) {
-    if (!inner) return;
-    inner.innerHTML = OwlFx.markup(0, themeId);
-    owl = inner.querySelector('.owl3d');
-    parts = { wl: owl.querySelector('.o-wl'), wr: owl.querySelector('.o-wr'), head: owl.querySelector('.o-head') };
-    parts.wl.style.transform = 'translateZ(7px)';
-    parts.wr.style.transform = 'translateZ(7px)';
-    parts.head.style.transform = 'translateZ(12px)';
-    place(false, lastMode);
-}
+        if (!inner) return;
+        inner.innerHTML = OwlFx.markup(0, themeId);
+        owl = inner.querySelector('.owl3d');
+        parts = { wl: owl.querySelector('.o-wl'), wr: owl.querySelector('.o-wr'), head: owl.querySelector('.o-head') };
+        parts.wl.style.transform = 'translateZ(7px)';
+        parts.wr.style.transform = 'translateZ(7px)';
+        parts.head.style.transform = 'translateZ(12px)';
+        place(false, lastMode);
+    }
 
     return { init, moveTo, updateLit, onEmailChange, applyTheme };
 })();
@@ -10511,8 +10511,8 @@ async function saveUserDepartment(deptId) {
             return false;
         };
 
-        if (followsOld(loadDeptPref('spin'),   DEPT_ALL)) { spinDeptFilter   = value || DEPT_ALL; saveDeptPref('spin',   spinDeptFilter); }
-        if (followsOld(loadDeptPref('stats'),  DEPT_ALL)) { statsDeptFilter  = value || DEPT_ALL; saveDeptPref('stats',  statsDeptFilter); }
+        if (followsOld(loadDeptPref('spin'), DEPT_ALL)) { spinDeptFilter = value || DEPT_ALL; saveDeptPref('spin', spinDeptFilter); }
+        if (followsOld(loadDeptPref('stats'), DEPT_ALL)) { statsDeptFilter = value || DEPT_ALL; saveDeptPref('stats', statsDeptFilter); }
         if (followsOld(loadDeptPref('dayoff'), DEPT_ALL)) { dayOffDeptFilter = value || DEPT_ALL; saveDeptPref('dayoff', dayOffDeptFilter); }
 
         // Bộ lọc trong modal Update chỉ theo dept mới nếu user chưa chọn tay
@@ -10602,7 +10602,7 @@ function initDepartmentUi() {
         workHoursViewDept = e.target.value;
         saveDeptPref('hours', workHoursViewDept);
         rebuildWorkHoursMap();
-       // renderSchedule();
+        // renderSchedule();
         renderWorkHoursSaved();
         renderWorkHoursPreview();
     });
@@ -10780,7 +10780,7 @@ function parseWorkHoursText(text) {
             .filter((c, i, arr) => c !== '' || arr.length <= 3);
 
         const date = parseWorkHoursDate(cols[0]);
-        const motion  = parseWorkHoursNumber(cols[1]);
+        const motion = parseWorkHoursNumber(cols[1]);
         const station = parseWorkHoursNumber(cols[2]);
 
         // Dòng tiêu đề (dòng đầu, không có ngày và không có số hợp lệ nào ở 2 cột sau)
@@ -10824,24 +10824,24 @@ function renderWorkHoursPreview() {
         host.innerHTML = `<table class="wh-table">
             <thead><tr><th>Ngày</th><th>Motion</th><th>Station</th><th>Trạng thái</th></tr></thead>
             <tbody>${workHoursParsed.map(r => {
-                if (r.error) {
-                    return `<tr><td colspan="3" class="wh-note">${escapeHtml(r.line)}</td><td><span class="wh-tag err">${escapeHtml(r.error)}</span></td></tr>`;
-                }
-                const old = workHoursMap[r.date];
-                let tag;
-                if (r.skipped) tag = '<span class="wh-tag skip">Trùng trong dữ liệu dán · bỏ qua</span>';
-                else if (old) {
-                    const oM = isValidWhNumber(old.motion)  ? formatWorkHours(old.motion)  + 'h' : '—';
-                    const oS = isValidWhNumber(old.station) ? formatWorkHours(old.station) + 'h' : '—';
-                    tag = `<span class="wh-tag dup">Đã có · M ${oM} / S ${oS}</span>`;
-                } else tag = '<span class="wh-tag new">Mới</span>';
+            if (r.error) {
+                return `<tr><td colspan="3" class="wh-note">${escapeHtml(r.line)}</td><td><span class="wh-tag err">${escapeHtml(r.error)}</span></td></tr>`;
+            }
+            const old = workHoursMap[r.date];
+            let tag;
+            if (r.skipped) tag = '<span class="wh-tag skip">Trùng trong dữ liệu dán · bỏ qua</span>';
+            else if (old) {
+                const oM = isValidWhNumber(old.motion) ? formatWorkHours(old.motion) + 'h' : '—';
+                const oS = isValidWhNumber(old.station) ? formatWorkHours(old.station) + 'h' : '—';
+                tag = `<span class="wh-tag dup">Đã có · M ${oM} / S ${oS}</span>`;
+            } else tag = '<span class="wh-tag new">Mới</span>';
 
-                return `<tr class="${r.skipped ? 'is-skip' : ''}">
+            return `<tr class="${r.skipped ? 'is-skip' : ''}">
                     <td>${formatWorkHoursDateLabel(r.date)}</td>
                     <td>${fmtVal(r.motion)}</td>
                     <td>${fmtVal(r.station)}</td>
                     <td class="wh-note">${tag}</td></tr>`;
-            }).join('')}</tbody></table>`;
+        }).join('')}</tbody></table>`;
     }
 
     saveBtn.disabled = usable.length === 0;
@@ -10871,7 +10871,7 @@ function renderWorkHoursSaved() {
     }
 
     host.innerHTML = items.map(it => {
-        const mV = isValidWhNumber(it.motion)  ? `M: ${formatWorkHours(it.motion)}h`  : '';
+        const mV = isValidWhNumber(it.motion) ? `M: ${formatWorkHours(it.motion)}h` : '';
         const sV = isValidWhNumber(it.station) ? `S: ${formatWorkHours(it.station)}h` : '';
         const valsText = [mV, sV].filter(Boolean).join(' · ') || '—';
 
@@ -10896,7 +10896,7 @@ async function commitWorkHours(rows) {
         const dept = workHoursViewDept;
         const payload = rows.map(r => ({
             date: r.date,
-            motion:  isValidWhNumber(r.motion)  ? r.motion  : null,
+            motion: isValidWhNumber(r.motion) ? r.motion : null,
             station: isValidWhNumber(r.station) ? r.station : null,
             department: dept,
             updatedBy: currentUser.uid,
@@ -10967,7 +10967,7 @@ function addQuickWorkHoursRow() {
     }
 
     const area = document.getElementById('whPasteArea');
-    const motionText  = isValidWhNumber(motion)  ? String(motion)  : '';
+    const motionText = isValidWhNumber(motion) ? String(motion) : '';
     const stationText = isValidWhNumber(station) ? String(station) : '';
     area.value = (area.value.trim() ? area.value.replace(/\s+$/, '') + '\n' : '')
         + `${dateVal}\t${motionText}\t${stationText}`;
@@ -11057,7 +11057,7 @@ function cleanupMyDuplicateDayOffs() {
         ids.forEach(id => {
             if (dayOffCleaned.has(id)) return;
             dayOffCleaned.add(id);
-            deleteDoc(doc(db, DAYOFF_COLLECTION, id)).catch(() => {});
+            deleteDoc(doc(db, DAYOFF_COLLECTION, id)).catch(() => { });
         });
     });
 }
@@ -11382,7 +11382,7 @@ function renderDayOffDetails() {
     const todayKey = localDateKey(new Date());
     const rows = dayOffsList
         .filter(o => o.date >= todayKey && dayOffInDept(o.userId) && (!dayOffFocusUid || o.userId === dayOffFocusUid))
-                .sort((a, b) => {
+        .sort((a, b) => {
             // Ưu tiên mới đăng ký (createdAt) lên đầu
             const ca = a.createdAt || '';
             const cb = b.createdAt || '';
@@ -11400,7 +11400,7 @@ function renderDayOffDetails() {
         document.getElementById('dayOffDetailList').innerHTML = '<div class="empty-state empty-state-sm"><i class="bi bi-calendar-check"></i><br>Chưa có lịch off nào</div>';
         return;
     }
-        document.getElementById('dayOffDetailList').innerHTML = rows.map(o => {
+    document.getElementById('dayOffDetailList').innerHTML = rows.map(o => {
         const isMine = o.userId === currentUser.uid;
         const name = dayOffUserName(o.userId, o.userName);
         const avatarUrl = getUserAvatarUrl(o.userId);
@@ -11619,12 +11619,12 @@ function resetSalaryCalc() {
 }
 
 function updateSalaryTotals() {
-        const lcb = parseMoney('salLCB');
+    const lcb = parseMoney('salLCB');
     const standardDays = parseSalaryNumber('salStandardDays') || SALARY_DEFAULT_STANDARD_DAYS;
     const dailyRate = standardDays > 0 ? lcb / standardDays : 0;
     const hourlyRate = dailyRate / 8;
 
-        // Ca đêm = (LCB / Ngày công chuẩn / 8) × 0.3 × số giờ + (số giờ / 8) × 10.000
+    // Ca đêm = (LCB / Ngày công chuẩn / 8) × 0.3 × số giờ + (số giờ / 8) × 10.000
     const nightShiftHours = parseSalaryNumber('salNightShift');
     const nightShiftPay = hourlyRate * 0.3 * nightShiftHours + (nightShiftHours / 8) * 10000;
 
@@ -12129,7 +12129,7 @@ function parseEtaDirectFromText(text) {
     }
 
     const { rawLines, dateLineIdx, headerLineIdx } = found;
-    const dateCells   = etaSplitLine(rawLines[dateLineIdx]);
+    const dateCells = etaSplitLine(rawLines[dateLineIdx]);
     const headerCells = etaSplitLine(rawLines[headerLineIdx]).map(c => (c || '').trim().toUpperCase());
 
     const dayColumns = [];
@@ -12140,18 +12140,18 @@ function parseEtaDirectFromText(text) {
     if (!dayColumns.length) return { error: 'Dòng ngày không có mốc mm/dd hợp lệ.' };
 
     const findCol = (pred) => headerCells.findIndex(pred);
-    const colStyle     = findCol(h => h === 'STYLE');
+    const colStyle = findCol(h => h === 'STYLE');
     const colLineAlloc = findCol(h => h.includes('LINE ALLOCATED'));
-    const colFrame     = findCol(h => h === 'FRAME');
-    const colEff       = findCol(h => h === 'EFF');
-    const colItem      = findCol(h => h === 'ITEM');
-    const colTotal     = findCol(h => h === 'TOTAL');
-    const colLock      = findCol(h => h === 'LOCK_QTY');
-    const colRemain    = findCol(h => h === 'REMAIN');
-    const colAshton    = findCol(h => h === 'ASHTON');
-    const colDirect    = findCol(h => h === 'DIRECT');
-    const colEta       = findCol(h => h === 'ETA');
-    const colPickup    = findCol(h => h === 'PICK UP' || h === 'PICKUP' || h === 'PICK_UP');
+    const colFrame = findCol(h => h === 'FRAME');
+    const colEff = findCol(h => h === 'EFF');
+    const colItem = findCol(h => h === 'ITEM');
+    const colTotal = findCol(h => h === 'TOTAL');
+    const colLock = findCol(h => h === 'LOCK_QTY');
+    const colRemain = findCol(h => h === 'REMAIN');
+    const colAshton = findCol(h => h === 'ASHTON');
+    const colDirect = findCol(h => h === 'DIRECT');
+    const colEta = findCol(h => h === 'ETA');
+    const colPickup = findCol(h => h === 'PICK UP' || h === 'PICKUP' || h === 'PICK_UP');
 
     let colLine = -1;
     const afterAlloc = colLineAlloc >= 0 ? colLineAlloc + 1 : 0;
@@ -12172,19 +12172,19 @@ function parseEtaDirectFromText(text) {
 
         rows.push({
             rowIndex: rows.length + 1,
-            style:         colStyle >= 0 ? (cells[colStyle] || '').trim() : '',
+            style: colStyle >= 0 ? (cells[colStyle] || '').trim() : '',
             lineAllocated: colLineAlloc >= 0 ? (cells[colLineAlloc] || '').trim() : '',
-            frame:         colFrame >= 0 ? (cells[colFrame] || '').trim() : '',
-            eff:           colEff >= 0 ? (cells[colEff] || '').trim() : '',
+            frame: colFrame >= 0 ? (cells[colFrame] || '').trim() : '',
+            eff: colEff >= 0 ? (cells[colEff] || '').trim() : '',
             item,
-            line:          colLine >= 0 ? (cells[colLine] || '').trim() : '',
-            total:   colTotal >= 0  ? etaParseNum(cells[colTotal])  : 0,
-            lockQty: colLock >= 0   ? etaParseNum(cells[colLock])   : 0,
-            remain:  colRemain >= 0 ? etaParseNum(cells[colRemain]) : 0,
-            ashton:  colAshton >= 0 ? etaParseNum(cells[colAshton]) : 0,
-            direct:  colDirect >= 0 ? etaParseNum(cells[colDirect]) : 0,
-            eta:     colEta >= 0    ? (cells[colEta] || '').trim()    : '',
-            pickup:  colPickup >= 0 ? (cells[colPickup] || '').trim() : '',
+            line: colLine >= 0 ? (cells[colLine] || '').trim() : '',
+            total: colTotal >= 0 ? etaParseNum(cells[colTotal]) : 0,
+            lockQty: colLock >= 0 ? etaParseNum(cells[colLock]) : 0,
+            remain: colRemain >= 0 ? etaParseNum(cells[colRemain]) : 0,
+            ashton: colAshton >= 0 ? etaParseNum(cells[colAshton]) : 0,
+            direct: colDirect >= 0 ? etaParseNum(cells[colDirect]) : 0,
+            eta: colEta >= 0 ? (cells[colEta] || '').trim() : '',
+            pickup: colPickup >= 0 ? (cells[colPickup] || '').trim() : '',
             dailyQty: dayColumns.map(dc => ({
                 date: dc.date,
                 qty: etaParseNum(cells[dc.index])
@@ -12421,13 +12421,13 @@ function renderEtaDirectResults() {
     const uniqueItems = new Set(checkEtaDirectResults.map(r => r.itemKey));
 
     const hasErrorRow = (r) => r.itemLevel.itemIssues.some(i => i.level === 'error') ||
-                              r.rowLevel.rowIssues.some(i => i.level === 'error');
-    const hasWarnRow  = (r) => !hasErrorRow(r) &&
-                              (r.itemLevel.itemIssues.length > 0 || r.rowLevel.rowIssues.length > 0);
+        r.rowLevel.rowIssues.some(i => i.level === 'error');
+    const hasWarnRow = (r) => !hasErrorRow(r) &&
+        (r.itemLevel.itemIssues.length > 0 || r.rowLevel.rowIssues.length > 0);
 
     const withError = checkEtaDirectResults.filter(hasErrorRow).length;
-    const withWarn  = checkEtaDirectResults.filter(hasWarnRow).length;
-    const okCount   = total - withError - withWarn;
+    const withWarn = checkEtaDirectResults.filter(hasWarnRow).length;
+    const okCount = total - withError - withWarn;
     const totalDirect = checkEtaDirectResults.reduce((s, r) => s + (r.row.direct || 0), 0);
 
     document.getElementById('etaDirectStats').innerHTML = `
@@ -12517,7 +12517,7 @@ function renderEtaDirectRowCells(res, dayColumns, rowCount = 1) {
         ${row.lineAllocated ? `<span class="line-alloc" title="LINE ALLOCATED: ${escapeHtml(row.lineAllocated)}">${escapeHtml(row.lineAllocated)}</span>` : ''}
     </td>`;
 
-    const etaCell    = `<td class="col-eta">${row.eta    ? `<span class="eta-pill eta">${escapeHtml(row.eta)}</span>` : '<span class="text-muted">—</span>'}</td>`;
+    const etaCell = `<td class="col-eta">${row.eta ? `<span class="eta-pill eta">${escapeHtml(row.eta)}</span>` : '<span class="text-muted">—</span>'}</td>`;
     const pickupCell = `<td class="col-pickup">${row.pickup ? `<span class="eta-pill pickup">${escapeHtml(row.pickup)}</span>` : '<span class="text-muted">—</span>'}</td>`;
     const directCell = `<td class="col-qty">${row.direct > 0 ? `<span class="eta-pill direct">${row.direct}</span>` : '<span class="text-muted">—</span>'}</td>`;
     const ashtonCell = `<td class="col-qty">${row.ashton > 0 ? `<span class="eta-pill ashton">${row.ashton}</span>` : '<span class="text-muted">—</span>'}</td>`;
@@ -12609,7 +12609,7 @@ function renderEtaDirectGrid() {
             if (d.qty > 0) { if (c < first) first = c; if (c > last) last = c; }
         });
         const hasErr = r.itemLevel.itemIssues.some(x => x.level === 'error') ||
-                       r.rowLevel.rowIssues.some(x => x.level === 'error');
+            r.rowLevel.rowIssues.some(x => x.level === 'error');
         const hasAny = r.itemLevel.itemIssues.length > 0 || r.rowLevel.rowIssues.length > 0;
         allRows.push({
             i, res: r, line,
