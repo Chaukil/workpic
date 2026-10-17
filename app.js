@@ -57,6 +57,7 @@ let workHoursMap = {};           // { 'YYYY-MM-DD': { date, motion, station, ...
 let scheduleWorkHoursMap = {};
 let unsubscribeWorkHours = null;
 let workHoursParsed = [];        // kết quả phân tích ô dán
+let editingWhDate = null;
 const WORKHOURS_COLLECTION = 'workHours';
 let workHoursAll = [];           // toàn bộ document giờ làm việc (mọi bộ phận)
 
@@ -7180,7 +7181,7 @@ function renderQuickChat() {
 // ============================================================
 
 // Bắt path trong dấu ngoặc kép — có thể chứa dấu cách, dấu &, dấu . trong tên folder
-const QUOTE_CHARS = `"'\u201c\u201d\u2018\u2019`; 
+const QUOTE_CHARS = `"'\u201c\u201d\u2018\u2019`;
 const FOLDER_QUOTED_RE = new RegExp(`[${QUOTE_CHARS}]([^${QUOTE_CHARS}\\n\\r]+)[${QUOTE_CHARS}]`, 'g');
 const FOLDER_UNQUOTED_RE = /(?:[A-Za-z]:[\\\/][^\s<>"'“”‘’|?*\n\r]+|\\\\[^\s<>"'“”‘’|?*\n\r]+)/g;
 
@@ -7206,10 +7207,10 @@ function findFolderPaths(text) {
     let m;
     while ((m = FOLDER_QUOTED_RE.exec(text)) !== null) {
         let inner = (m[1] || '').trim();
-        
+
         // Xử lý triệt để dấu 3 chấm ở cuối (do text bị cắt ngắn)
         inner = inner.replace(/(\.\.\.|…)$/, '').trim();
-        
+
         if (!isWindowsPath(inner)) continue;
 
         // Xác định vị trí chính xác của chuỗi path bên trong dấu ngoặc kép để thay thế
@@ -7219,7 +7220,7 @@ function findFolderPaths(text) {
         const end = start + inner.length;
 
         results.push({ start, end, path: inner, quoted: true });
-        
+
         // Đánh dấu vùng ngoặc kép đã xử lý để không bị quét lại ở Bước 2
         for (let i = m.index; i < m.index + m[0].length; i++) used[i] = true;
     }
@@ -10970,19 +10971,49 @@ function renderWorkHoursSaved() {
         const sV = isValidWhNumber(it.station) ? `S: ${formatWorkHours(it.station)}h` : '';
         const valsText = [mV, sV].filter(Boolean).join(' · ') || '—';
 
+        // Chế độ chỉnh sửa (Inline Edit)
+        // Chế độ chỉnh sửa (Inline Edit)
+        if (editingWhDate === it.date) {
+            return `
+                <div class="wh-saved-item is-editing" data-date="${escapeHtml(it.date)}" style="flex-wrap: wrap; align-items: stretch; border-color: var(--primary); gap: 0.5rem;">
+                    <div style="flex: 1 1 100%; font-size: 0.78rem; color: var(--primary);">
+                        <strong>Đang sửa: ${formatDateShortDMY(it.date)}</strong>
+                    </div>
+                    
+                    <div style="display:flex; gap:0.4rem; flex: 1 1 100%; align-items: center;">
+                        <input type="text" inputmode="decimal" class="form-control form-control-sm" id="edit-wh-m-${it.date}" value="${isValidWhNumber(it.motion) ? formatWorkHours(it.motion) : ''}" placeholder="Motion" style="flex: 1 1 50px; min-width: 0;">
+                        
+                        <input type="text" inputmode="decimal" class="form-control form-control-sm" id="edit-wh-s-${it.date}" value="${isValidWhNumber(it.station) ? formatWorkHours(it.station) : ''}" placeholder="Station" style="flex: 1 1 50px; min-width: 0;">
+                        
+                        <button type="button" class="btn btn-sm btn-save" data-act="save-edit" title="Lưu" style="flex: none; padding: 0.35rem 0.65rem;">
+                            <i class="bi bi-check-lg"></i>
+                        </button>
+                        
+                        <button type="button" class="btn btn-sm btn-cancel" data-act="cancel-edit" title="Hủy" style="flex: none; padding: 0.35rem 0.65rem;">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+                </div>`;
+        }
+
+        // Chế độ xem bình thường
         return `
             <div class="wh-saved-item" data-date="${escapeHtml(it.date)}">
                 <div>
                     <strong>${formatDateShortDMY(it.date)}${it.date === todayKey ? ' · hôm nay' : ''}</strong>
                     <div class="wh-saved-vals">${valsText}</div>
                 </div>
-                <button type="button" class="wh-saved-del" data-act="del" title="Xóa ngày này">
-                    <i class="bi bi-trash-fill"></i>
-                </button>
+                <div style="display:flex; gap:0.2rem;">
+                    <button type="button" class="wh-saved-del" data-act="edit" title="Sửa ngày này" style="color: var(--primary);">
+                        <i class="bi bi-pencil-fill"></i>
+                    </button>
+                    <button type="button" class="wh-saved-del" data-act="del" title="Xóa ngày này">
+                        <i class="bi bi-trash-fill"></i>
+                    </button>
+                </div>
             </div>`;
     }).join('');
 }
-
 async function commitWorkHours(rows) {
     const btn = document.getElementById('whSaveBtn');
     btn.disabled = true;
@@ -11093,23 +11124,84 @@ function initWorkHoursUi() {
         document.getElementById('whPasteArea').value = '';
         renderWorkHoursPreview();
     });
-    document.getElementById('whSavedList').addEventListener('click', (e) => {
-        const btn = e.target.closest('[data-act="del"]');
+    document.getElementById('whSavedList').addEventListener('click', async (e) => {
+        const btn = e.target.closest('[data-act]');
         if (!btn) return;
-        const date = btn.closest('.wh-saved-item').dataset.date;
-        showConfirmDialog({
-            title: 'Xóa giờ làm việc',
-            message: `Xóa giờ làm việc ngày ${formatWorkHoursDateLabel(date)}?`,
-            confirmText: 'Xóa',
-            confirmClass: 'btn-delete',
-            onConfirm: async () => {
-                try { await deleteDoc(doc(db, WORKHOURS_COLLECTION, workHoursDocId(workHoursViewDept, date))); }
-                catch (err) {
-                    console.error('Lỗi xóa giờ làm việc:', err);
-                    showNotification('Lỗi', 'Không xóa được.', false, 'danger');
+
+        const item = btn.closest('.wh-saved-item');
+        const date = item.dataset.date;
+        const act = btn.dataset.act;
+
+        // 1. Xóa giờ làm việc
+        if (act === 'del') {
+            showConfirmDialog({
+                title: 'Xóa giờ làm việc',
+                message: `Xóa giờ làm việc ngày ${formatWorkHoursDateLabel(date)}?`,
+                confirmText: 'Xóa',
+                confirmClass: 'btn-delete',
+                onConfirm: async () => {
+                    try {
+                        await deleteDoc(doc(db, WORKHOURS_COLLECTION, workHoursDocId(workHoursViewDept, date)));
+                        showNotification('Đã xóa', 'Xóa giờ làm việc thành công.', false, 'success');
+                        if (editingWhDate === date) editingWhDate = null;
+                    }
+                    catch (err) {
+                        console.error('Lỗi xóa giờ làm việc:', err);
+                        showNotification('Lỗi', 'Không xóa được.', false, 'danger');
+                    }
                 }
+            });
+        }
+        // 2. Bật chế độ sửa
+        else if (act === 'edit') {
+            editingWhDate = date;
+            renderWorkHoursSaved();
+        }
+        // 3. Hủy sửa
+        else if (act === 'cancel-edit') {
+            editingWhDate = null;
+            renderWorkHoursSaved();
+        }
+        // 4. Lưu chỉnh sửa
+        else if (act === 'save-edit') {
+            const motionRaw = document.getElementById(`edit-wh-m-${date}`).value;
+            const stationRaw = document.getElementById(`edit-wh-s-${date}`).value;
+            const motion = parseWorkHoursNumber(motionRaw);
+            const station = parseWorkHoursNumber(stationRaw);
+
+            if (Number.isNaN(motion) || Number.isNaN(station)) {
+                showNotification('Sai định dạng', 'Giờ không hợp lệ (chỉ dùng số, có thể dùng . hoặc ,).', false, 'warning');
+                return;
             }
-        });
+            if (motion === null && station === null) {
+                showNotification('Thiếu dữ liệu', 'Nhập ít nhất Motion hoặc Station.', false, 'warning');
+                return;
+            }
+
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<span class="loading" style="width:14px;height:14px;border-width:2px;"></span>';
+            btn.disabled = true;
+
+            try {
+                await setDoc(doc(db, WORKHOURS_COLLECTION, workHoursDocId(workHoursViewDept, date)), {
+                    date: date,
+                    motion: isValidWhNumber(motion) ? motion : null,
+                    station: isValidWhNumber(station) ? station : null,
+                    department: workHoursViewDept,
+                    updatedBy: currentUser.uid,
+                    updatedByName: currentUser.displayName || currentUser.email || '',
+                    updatedAt: new Date().toISOString()
+                });
+                showNotification('Thành công', `Đã cập nhật giờ làm việc ngày ${formatDateShortDMY(date)}.`, false, 'success');
+                editingWhDate = null; 
+                renderWorkHoursSaved(); // Tắt chế độ sửa, Realtime listener sẽ tự load lại list
+            } catch (err) {
+                console.error('Lỗi sửa giờ làm việc:', err);
+                showNotification('Lỗi', 'Không thể cập nhật.', false, 'danger');
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+            }
+        }
     });
 }
 
@@ -12383,7 +12475,7 @@ function analyzeItemLevelEta(itemRows, dayColumns) {
     if (ashton > 0 && totalSL < ashton) {
         itemIssues.push({
             level: 'error', code: 'ASHTON', scope: 'item',
-            msg: `Tổng SL ${totalSL} < ASHTON ${ashton} — thiếu ${ashton - totalSL}`
+            msg: `Hàng ASHTON ${ashton} kit không được rớt ra ngoài — thiếu ${ashton - totalSL}`
         });
     }
 
@@ -12419,7 +12511,7 @@ function analyzeItemLevelEta(itemRows, dayColumns) {
                 if (etaDayQty <= 0) {
                     itemIssues.push({
                         level: 'error', code: 'ETA_PICKUP', scope: 'item',
-                        msg: `Trễ: ETA ${etaLabel} (PICK UP ${pickupLabel}) nhưng không có hàng lên ngày ${etaLabel} — ${runText}`
+                        msg: `Trễ Direct ${pickupLabel} do ETA ${etaLabel} nhưng không có hàng lên ngày ${etaLabel} — ${runText}`
                     });
                 }
             } else if (etaDayQty < required) {
@@ -12644,19 +12736,23 @@ function renderEtaDirectRowCells(res, dayColumns, rowCount = 1) {
 }
 
 // Ô "VẤN ĐỀ" gộp: lỗi cấp ITEM (ETA/PICK UP, DIRECT, ASHTON) + lỗi cấp DÒNG (ETA).
-// Lỗi LINE không in chữ vì đã có dấu X đỏ cạnh LINE.
 function etaIssuesCellHtml(itemIssues, rowIssues) {
     const parts = [];
+    
+    // Vẫn hiển thị lỗi cấp ITEM (ETA, DIRECT, ASHTON, PICKUP)
     (itemIssues || []).forEach(it => parts.push(`
         <div class="eta-issue ${it.level} item-level">
             <i class="bi ${it.level === 'error' ? 'bi-x-octagon-fill' : 'bi-exclamation-triangle-fill'}"></i>
             <span>${escapeHtml(it.msg)}</span>
         </div>`));
+        
+    // Lọc BỎ lỗi LINE để không hiển thị chữ ở cột PROBLEM (vì đã có dấu X đỏ)
     (rowIssues || []).filter(it => it.code !== 'LINE').forEach(it => parts.push(`
         <div class="eta-issue ${it.level}">
             <i class="bi ${it.level === 'error' ? 'bi-x-circle-fill' : 'bi-exclamation-triangle-fill'}"></i>
             <span>${escapeHtml(it.msg)}</span>
         </div>`));
+        
     return parts.length
         ? `<div class="eta-issue-list">${parts.join('')}</div>`
         : '<span class="text-muted">—</span>';
@@ -12669,6 +12765,7 @@ function renderEtaDirectGrid() {
     const onlyIssues = document.getElementById('etaDirectOnlyIssues').checked;
     const dupOnly = !!document.getElementById('etaDirectOnlyDup')?.checked;
     const lineFilter = (document.getElementById('etaDirectLineFilter')?.value || '').trim().toUpperCase();
+    const probFilter = document.getElementById('etaDirectProblemFilter')?.value || 'all';
     const q = (document.getElementById('etaDirectSearch')?.value || '').trim().toUpperCase();
     const sortMode = document.getElementById('etaDirectSort')?.value || 'date';
     const { dayColumns } = checkEtaDirectParsed;
@@ -12734,6 +12831,13 @@ function renderEtaDirectGrid() {
 
     // Lọc
     let visibleRows = onlyIssues ? allRows.filter(r => r.sev < 2) : allRows;
+    if (probFilter !== 'all') {
+        visibleRows = visibleRows.filter(r => {
+            const itemHas = r.res.itemLevel.itemIssues.some(i => i.code === probFilter);
+            const rowHas = r.res.rowLevel.rowIssues.some(i => i.code === probFilter);
+            return itemHas || rowHas;
+        });
+    }
     if (dupOnly) {
         // Chỉ giữ item lặp nhiều dòng, gom các dòng của cùng 1 item sát nhau
         // (nhóm xếp theo vị trí dòng đầu tiên của item; trong nhóm: theo thứ tự ca rồi line)
@@ -12754,10 +12858,11 @@ function renderEtaDirectGrid() {
     const visibleItemCount = new Set(visibleRows.map(r => r.res.itemKey)).size;
     if (countEl) countEl.textContent = `Hiển thị ${visibleRows.length}/${allRows.length} dòng · ${visibleItemCount} item`;
 
-    if (!visibleRows.length) {
-        const filtering = !!(lineFilter || q || dupOnly);
+        if (!visibleRows.length) {
+        // THÊM probFilter VÀO ĐIỀU KIỆN:
+        const filtering = !!(lineFilter || q || dupOnly || probFilter !== 'all');
         gridEl.innerHTML = filtering
-            ? `<div class="eta-empty"><i class="bi bi-funnel"></i><strong>Không có dòng nào khớp bộ lọc.</strong><br>${dupOnly ? 'Không có item nào bị trùng theo bộ lọc hiện tại. ' : ''}Thử đổi line / từ khóa${onlyIssues ? ' hoặc bỏ tick "Chỉ hiện dòng có vi phạm"' : ''}.</div>`
+            ? `<div class="eta-empty"><i class="bi bi-funnel"></i><strong>Không có dòng nào khớp bộ lọc.</strong><br>${dupOnly ? 'Không có item nào bị trùng theo bộ lọc hiện tại. ' : ''}Thử đổi line / vấn đề / từ khóa${onlyIssues ? ' hoặc bỏ tick "Chỉ hiện dòng có vi phạm"' : ''}.</div>`
             : `<div class="eta-empty">
                 <i class="bi bi-shield-check"></i>
                 <strong>Không phát hiện vi phạm nào!</strong><br>
@@ -12885,6 +12990,7 @@ function initCheckEtaDirectUi() {
     document.getElementById('etaDirectOnlyIssues').addEventListener('change', renderEtaDirectGrid);
     document.getElementById('etaDirectOnlyDup').addEventListener('change', renderEtaDirectGrid);
     document.getElementById('etaDirectLineFilter').addEventListener('change', renderEtaDirectGrid);
+    document.getElementById('etaDirectProblemFilter').addEventListener('change', renderEtaDirectGrid);
     document.getElementById('etaDirectSort').addEventListener('change', renderEtaDirectGrid);
     let etaSearchTimer = null;
     document.getElementById('etaDirectSearch').addEventListener('input', () => {

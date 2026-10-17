@@ -7952,7 +7952,7 @@ body {
 
 .wh-layout {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 280px;
+    grid-template-columns: minmax(0, 1fr) 340px;
     gap: 1rem;
 }
 
