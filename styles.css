@@ -13952,3 +13952,255 @@ html *, body * {
     -webkit-font-smoothing: inherit;
     -moz-osx-font-smoothing: inherit;
 }
+
+/* ============================================================
+   TẾT — Phụng múa dưới đáy màn hình (dùng chung đường chạy/lật của múa lân) + pháo nổ
+   ============================================================ */
+.tet-phung-wrap {
+    width: min(280px, 26vw);
+}
+
+.tp-body {
+    transform-box: fill-box;
+    transform-origin: 50% 100%;
+    animation: tpDance .45s ease-in-out infinite alternate;
+}
+
+@keyframes tpDance {
+    from {
+        transform: translateY(0) rotate(-2deg);
+    }
+
+    to {
+        transform: translateY(-7px) rotate(2.5deg);
+    }
+}
+
+.tp-head {
+    transform-box: fill-box;
+    transform-origin: 80% 95%;
+    animation: tpHead .9s ease-in-out infinite alternate;
+}
+
+@keyframes tpHead {
+    from {
+        transform: rotate(-12deg) translateY(0);
+    }
+
+    to {
+        transform: rotate(10deg) translateY(-5px);
+    }
+}
+
+.tp-wing {
+    transform-box: fill-box;
+    transform-origin: 6% 94%;
+    animation: tpWing .42s ease-in-out infinite alternate;
+}
+
+@keyframes tpWing {
+    from {
+        transform: rotate(8deg) scaleY(.92);
+    }
+
+    to {
+        transform: rotate(-26deg) scaleY(1.05);
+    }
+}
+
+.tp-tail {
+    transform-box: fill-box;
+    transform-origin: 0% 50%;
+    animation: ttTail .7s ease-in-out infinite alternate;
+}
+
+/* Pháo hoa + bánh pháo (mức "Mưa hoa & pháo nổ") */
+.tet-pao-layer {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 1005;
+}
+
+body.modal-open .tet-pao-layer {
+    opacity: 0;
+}
+
+.tet-boom {
+    position: absolute;
+    width: 0;
+    height: 0;
+}
+
+.tet-boom::before {
+    content: "";
+    position: absolute;
+    left: -14px;
+    top: -14px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #fff 0%, var(--c) 40%, transparent 70%);
+    opacity: 0;
+    animation: tetFlash var(--p) ease-out var(--d) infinite;
+}
+
+.tet-boom-sky::before {
+    left: -26px;
+    top: -26px;
+    width: 52px;
+    height: 52px;
+}
+
+.tet-boom i {
+    position: absolute;
+    left: -2px;
+    top: -2px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--c);
+    box-shadow: 0 0 6px 1px var(--c);
+    opacity: 0;
+    animation: tetSpark var(--p) linear var(--d) infinite;
+}
+
+@keyframes tetSpark {
+    0% {
+        opacity: 0;
+        transform: translate(0, 0) scale(.3);
+        animation-timing-function: cubic-bezier(.1, .8, .3, 1);
+    }
+
+    2% {
+        opacity: 1;
+    }
+
+    16% {
+        opacity: 1;
+        transform: translate(var(--dx), var(--dy)) scale(1);
+        animation-timing-function: ease-in;
+    }
+
+    30%,
+    100% {
+        opacity: 0;
+        transform: translate(calc(var(--dx) * 1.12), calc(var(--dy) * 1.12 + 34px)) scale(.4);
+    }
+}
+
+@keyframes tetFlash {
+    0% {
+        opacity: 0;
+        transform: scale(.2);
+    }
+
+    2% {
+        opacity: .95;
+        transform: scale(1);
+    }
+
+    10%,
+    100% {
+        opacity: 0;
+        transform: scale(4);
+    }
+}
+
+.tet-fc {
+    position: absolute;
+    right: 10px;
+    top: 34vh;
+    width: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transform-origin: top center;
+    animation: tetFcSway 2.6s ease-in-out infinite alternate;
+}
+
+.tet-fc::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ffd54f;
+    box-shadow: 0 0 4px #ffb300;
+    margin-bottom: 2px;
+}
+
+@keyframes tetFcSway {
+    from {
+        transform: rotate(-2deg);
+    }
+
+    to {
+        transform: rotate(2deg);
+    }
+}
+
+.tet-fc-item {
+    position: relative;
+    width: 14px;
+    height: 30px;
+    margin-top: 2px;
+    border-radius: 3px;
+    border-top: 4px solid #ffd54f;
+    border-bottom: 3px solid #ffd54f;
+    background: linear-gradient(90deg, #b71c1c, #ef5350 45%, #b71c1c);
+    animation: tetFcShake var(--p) linear var(--d) infinite;
+}
+
+.tet-fc-item::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 2px;
+    background: #2b1208;
+    opacity: 0;
+    animation: tetFcChar var(--p) linear var(--d) infinite;
+}
+
+.tet-fc-item .tet-boom {
+    left: 50%;
+    top: 50%;
+}
+
+@keyframes tetFcShake {
+
+    0%,
+    5%,
+    100% {
+        transform: scale(1);
+    }
+
+    1.5% {
+        transform: scale(1.5);
+    }
+}
+
+@keyframes tetFcChar {
+    0% {
+        opacity: 0;
+    }
+
+    2% {
+        opacity: .9;
+    }
+
+    88% {
+        opacity: .9;
+    }
+
+    96%,
+    100% {
+        opacity: 0;
+    }
+}
+
+/* Cây đào dày hoa: tắt 2 hiệu ứng nhấp nháy bên trong SVG (mỗi khung hình sẽ vẽ lại cả ~2000 bông → lag) */
+.tet-tree-scene .tt-glow,
+.tet-tree-scene .tet-featured {
+    animation: none;
+}

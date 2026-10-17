@@ -204,7 +204,7 @@ function applyTheme(theme) {
 // ============================================================
 const TOPBAR_THEMES = [
     { id: 'default', name: 'Mặc định', emoji: '☀️', desc: 'Trời sáng/tối tự nhiên' },
-    { id: 'tet', name: 'Tết', emoji: '🌸', desc: 'Hoa đào, câu đối, đèn lồng đỏ' },
+    { id: 'tet', name: 'Tết', emoji: '🌸', desc: 'Hoa đào, rồng bay, phụng múa, pháo nổ' },
     { id: 'trungthu', name: 'Trung Thu', emoji: '🌕', desc: 'Trăng rằm, đèn lồng trôi' },
     { id: 'noel', name: 'Noel', emoji: '🎄', desc: 'Tuyết rơi, ông già Noel chạy ngang' },
     { id: 'rain', name: 'Mưa', emoji: '🌧️', desc: 'Mưa rơi, mây đen, chớp' },
@@ -218,7 +218,7 @@ let currentTopbarTheme = 'default';
 const FX_FULLSCREEN_KEY = 'workpic-fx-fullscreen';
 let fxFullscreen = false;
 const FX_CONFIG = {
-    tet: { glyphs: ['🌸', '🌸', '💮', '🌺'], count: 26, size: [14, 24], dur: [9, 16] },
+    tet: { glyphs: ['🌸', '🌸', '💮', '🌺'], count: 26, size: [8, 14], dur: [9, 16] },
     trungthu: { glyphs: ['⭐', '✨', '🌟', '⭐'], count: 28, size: [12, 22], dur: [8, 15] },
     noel: { glyphs: ['❄\uFE0E', '❅', '❆', '•'], count: 50, size: [10, 22], dur: [7, 14] },
     rain: { rain: true, count: 80, dur: [0.7, 1.3] },
@@ -962,7 +962,7 @@ const ThreeFx = (() => {
         fallPoints(ctx, {
             count: cnt(P.blossom),
             texture: T.blossoms(THREE), atlas: [2, 1],
-            size: [26, 56], speed: P.speed, z: [-9, 4],
+            size: [12, 26], speed: P.speed, z: [-9, 4],
             xRange: [-0.95, -0.30],                                  // ← neo vùng trái
             sway: 1.0, wind: P.wind, spin: 2.2, flip: 0.85, dir: 1, alpha: 1,
             colors: ['#ffffff'], blend: THREE.NormalBlending,
@@ -973,7 +973,7 @@ const ThreeFx = (() => {
         fallPoints(ctx, {
             count: cnt(P.petal),
             texture: T.petals(THREE), atlas: [2, 1],
-            size: [16, 36], speed: P.speed, z: [-10, 4],
+            size: [8, 18], speed: P.speed, z: [-10, 4],
             xRange: [-1.00, -0.20],                                  // ← hơi rộng hơn để cánh bay xa
             sway: 1.1, wind: P.wind * 1.2, spin: 2.8, flip: 1, dir: 1, alpha: 0.98,
             colors: ['#ffffff', '#ffe3ec'], blend: THREE.NormalBlending,
@@ -983,7 +983,7 @@ const ThreeFx = (() => {
         // Lì xì + đồng tiền vàng — giữ phân bố toàn màn hình (điểm nhấn)
         if (P.gift > 0) fallPoints(ctx, {
             count: cnt(P.gift), texture: T.gifts(THREE), atlas: [2, 1],
-            size: [22, 46], speed: [P.speed[0] * 0.9, P.speed[1] * 1.1], z: [-8, 3],
+            size: [16, 32], speed: [P.speed[0] * 0.9, P.speed[1] * 1.1], z: [-8, 3],
             sway: 0.8, wind: P.wind, spin: 2.0, flip: 0.9, dir: 1, alpha: 1,
             colors: ['#ffffff'], blend: THREE.NormalBlending,
             lightMul: [0.95, 0.95, 0.95], lightBlend: THREE.NormalBlending
@@ -1872,11 +1872,11 @@ const FX_LEVEL_INFO = {
         ]
     },
     tet: {
-        labels: ['Hoa rơi nhẹ', 'Hoa rơi nhiều', 'Mưa hoa'],
+        labels: ['Hoa rơi nhẹ', 'Phụng múa', 'Mưa hoa & pháo nổ'],
         hints: [
-            'Vài bông hoa đào, hoa mai rơi nhẹ.',
-            'Hoa đào, hoa mai, cánh hoa, lì xì và kim tuyến vàng rơi đều.',
-            'Mưa hoa dày đặc, có gió, nhiều lì xì và đồng tiền vàng.'
+            'Cây đào nở rộ, vài cánh hoa nhỏ rơi nhẹ; rồng bay đậu trên các nút.',
+            'Hoa đào, cánh hoa, lì xì và kim tuyến vàng rơi đều; thêm phụng múa chạy dọc đáy màn hình.',
+            'Mưa hoa dày đặc, có gió, nhiều lì xì và đồng tiền vàng; thêm pháo hoa nổ trên trời và bánh pháo nổ liên hồi.'
         ]
     },
     trungthu: {
@@ -2354,6 +2354,79 @@ function buildLionSvg() {
     </svg>`;
 }
 
+// ============================================================
+// TẾT — Phụng múa chạy dọc đáy màn hình (giống múa lân của Trung Thu) + pháo nổ (mức cao nhất)
+// ============================================================
+function buildPhoenixSvg() {
+    const cols = ['#e53935', '#ff7043', '#ffb300', '#26a69a', '#d81b60'];
+    const ends = [[262, 10], [268, 40], [266, 72], [258, 104], [244, 130]];
+    const sx = 192, sy = 80;
+    const feathers = ends.map(([ex, ey], i) => {
+        const dx = ex - sx, dy = ey - sy, len = Math.hypot(dx, dy);
+        const px = -dy / len, py = dx / len, w = 13;
+        const mx = sx + dx * 0.5, my = sy + dy * 0.5;
+        const ux = sx + dx * 0.88, uy = sy + dy * 0.88;
+        return `<path d="M${sx} ${sy - 3} Q${(mx + px * w).toFixed(1)} ${(my + py * w).toFixed(1)} ${ex} ${ey} Q${(mx - px * w).toFixed(1)} ${(my - py * w).toFixed(1)} ${sx} ${sy + 3} Z" fill="${cols[i % cols.length]}" stroke="#fff3c4" stroke-width="1" stroke-opacity=".7"/>` +
+            `<circle cx="${ux.toFixed(1)}" cy="${uy.toFixed(1)}" r="3.6" fill="#fff8e1" stroke="${cols[(i + 2) % cols.length]}" stroke-width="1.6"/>`;
+    }).join('');
+    return `
+    <svg viewBox="0 0 270 150" aria-hidden="true">
+        <g class="tp-body">
+            <g class="tt-leg lb1"><path d="M140 104 L138 134" stroke="#f59e0b" stroke-width="5" stroke-linecap="round"/><path d="M127 139 q11 -7 24 0" stroke="#f59e0b" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+            <g class="tt-leg lb2"><path d="M164 104 L166 134" stroke="#d97706" stroke-width="5" stroke-linecap="round"/><path d="M153 139 q11 -7 24 0" stroke="#d97706" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+            <g class="tp-tail">${feathers}</g>
+            <ellipse cx="150" cy="82" rx="52" ry="30" fill="#e53935" stroke="#ffd54f" stroke-width="3"/>
+            <ellipse cx="140" cy="92" rx="34" ry="17" fill="#ffd54f"/>
+            <path d="M116 88 q8 8 16 0 M134 92 q8 8 16 0 M152 90 q8 8 16 0 M126 98 q8 7 16 0 M144 100 q8 7 16 0" stroke="#f59e0b" stroke-width="2" fill="none" stroke-linecap="round" opacity=".8"/>
+            <g class="tp-wing">
+                <path d="M128 78 C122 52 140 24 190 12 C184 24 186 30 192 36 C182 34 176 40 174 46 C182 52 178 58 172 62 C166 60 160 66 158 74 Z" fill="#ffb300" stroke="#c2410c" stroke-width="1.5"/>
+                <path d="M132 74 C130 56 146 36 176 24 C162 40 152 56 150 74 Z" fill="#ffe082" opacity=".75"/>
+                <path d="M134 74 L184 18 M142 76 L180 42 M150 76 L172 58" stroke="#c2410c" stroke-width=".8" fill="none" opacity=".6" stroke-linecap="round"/>
+            </g>
+            <path d="M118 84 C100 80 88 66 82 52" stroke="#e53935" stroke-width="20" stroke-linecap="round" fill="none"/>
+            <path d="M116 90 C100 86 92 72 88 60" stroke="#ffd54f" stroke-width="7" stroke-linecap="round" fill="none" opacity=".85"/>
+        </g>
+        <g class="tp-head">
+            <path d="M66 30 C58 12 70 -2 80 2 C72 10 74 20 76 30 Z" fill="#ffb300" stroke="#c2410c" stroke-width="1"/>
+            <path d="M72 28 C70 8 84 0 94 8 C84 12 82 20 82 30 Z" fill="#ff7043" stroke="#c2410c" stroke-width="1"/>
+            <path d="M60 32 C48 20 52 6 62 4 C58 14 62 22 66 30 Z" fill="#26a69a" stroke="#00695c" stroke-width="1"/>
+            <circle cx="72" cy="44" r="18" fill="#e53935" stroke="#7f1d1d" stroke-width="1.5"/>
+            <ellipse cx="77" cy="52" rx="5" ry="3.2" fill="#ff8a80" opacity=".85"/>
+            <circle cx="68" cy="40" r="5.2" fill="#fff" stroke="#222" stroke-width="1.4"/><circle cx="67" cy="40.5" r="2.6" fill="#111"/><circle cx="66" cy="39.5" r=".9" fill="#fff"/>
+            <path d="M56 40 L32 47 L56 49 Z" fill="#ffd54f" stroke="#c99a00" stroke-width="1.2" stroke-linejoin="round"/>
+            <g class="tt-jaw"><path d="M56 49 L36 51 L54 57 Z" fill="#f59e0b" stroke="#c99a00" stroke-width="1.2" stroke-linejoin="round"/></g>
+            <path d="M78 56 q6 8 0 14 q-4 -6 -2 -12 Z" fill="#d81b60"/>
+        </g>
+    </svg>`;
+}
+
+// Pháo hoa trên trời + dây bánh pháo nổ (chỉ ở mức cao nhất). Thuần CSS animation, không dùng timer.
+function buildTetPaoHtml() {
+    const rnd = (a, b) => a + Math.random() * (b - a);
+    const colors = ['#ffd54f', '#ff5252', '#ff9800', '#fff59d', '#ff80ab', '#80d8ff', '#b9f6ca'];
+    const sparks = (n, rMin, rMax) => {
+        let s = '';
+        for (let k = 0; k < n; k++) {
+            const a = (k / n) * Math.PI * 2 + rnd(-0.15, 0.15);
+            const r = rnd(rMin, rMax);
+            s += `<i style="--dx:${(Math.cos(a) * r).toFixed(0)}px;--dy:${(Math.sin(a) * r).toFixed(0)}px"></i>`;
+        }
+        return s;
+    };
+    let html = '';
+    [[12, 18], [30, 32], [50, 14], [68, 28], [86, 16], [92, 44]].forEach(([x, y], i) => {
+        const p = rnd(4.5, 7.5);
+        html += `<div class="tet-boom tet-boom-sky" style="left:${(x + rnd(-4, 4)).toFixed(1)}%;top:${(y + rnd(-4, 6)).toFixed(1)}%;` +
+            `--c:${colors[i % colors.length]};--p:${p.toFixed(1)}s;--d:${(-rnd(0, p)).toFixed(2)}s">${sparks(14, 55, 100)}</div>`;
+    });
+    let items = '';
+    for (let i = 0; i < 8; i++) {
+        items += `<div class="tet-fc-item" style="--p:6s;--d:${(i * 0.32).toFixed(2)}s;--c:#ffb300"><span class="tet-boom">${sparks(6, 22, 42)}</span></div>`;
+    }
+    html += `<div class="tet-fc">${items}</div>`;
+    return html;
+}
+
 function renderBackdropScene(on, theme) {
     let el = document.getElementById('fxBackdrop');
     if (!on) { if (el) el.remove(); return; }
@@ -2468,21 +2541,28 @@ function buildTetScene() {
         { cx: 260, cy: 60, r: 70 },
         { cx: 140, cy: 350, r: 60 },
         { cx: 370, cy: 350, r: 60 },
+        // cụm bổ sung — lấp các khoảng trống giữa tán
+        { cx: 300, cy: 260, r: 70 },
+        { cx: 190, cy: 290, r: 65 },
+        { cx: 340, cy: 95, r: 60 },
+        { cx: 110, cy: 80, r: 55 },
+        { cx: 410, cy: 160, r: 60 },
+        { cx: 90, cy: 330, r: 55 },
     ];
 
     // Vẽ bông + nụ: 72% bông nở, 28% nụ
     let blossomsSvg = '';
     clusters.forEach(c => {
-        const count = Math.max(16, Math.floor(c.r * c.r / 62));   // giảm mật độ so với circle đơn
+        const count = Math.max(28, Math.floor(c.r * c.r / 42));   // dày gần gấp đôi bản cũ (/62)
         for (let i = 0; i < count; i++) {
             const ang = rnd(0, Math.PI * 2);
             const dist = Math.pow(Math.random(), 0.55) * c.r;
             const x = c.cx + Math.cos(ang) * dist;
             const y = c.cy + Math.sin(ang) * dist;
             const isBud = Math.random() < 0.28;
-            const size = rnd(0.7, 1.5);
+            const size = rnd(0.8, 1.7);
             const rot = rnd(0, 360);
-            const op = rnd(0.82, 1);
+            const op = rnd(0.85, 1);
             const sym = isBud ? 'tetN' : 'tetB';
             blossomsSvg += `<use href="#${sym}" transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${rot.toFixed(0)}) scale(${size.toFixed(2)})" opacity="${op.toFixed(2)}"/>`;
         }
@@ -2490,7 +2570,7 @@ function buildTetScene() {
 
     // ── Lá non rải rác ──
     let leavesSvg = '';
-    for (let i = 0; i < 45; i++) {
+    for (let i = 0; i < 60; i++) {
         const c = clusters[Math.floor(Math.random() * clusters.length)];
         const ang = rnd(0, Math.PI * 2);
         const dist = Math.pow(Math.random(), 0.6) * c.r;
@@ -2511,6 +2591,14 @@ function buildTetScene() {
         { x: 250, y: 70, s: 2.8 },
         { x: 40, y: 130, s: 2.3 },
         { x: 460, y: 100, s: 2.0 },
+        { x: 190, y: 110, s: 2.3 },
+        { x: 320, y: 90, s: 2.2 },
+        { x: 300, y: 260, s: 2.1 },
+        { x: 190, y: 300, s: 2.0 },
+        { x: 100, y: 350, s: 2.1 },
+        { x: 400, y: 330, s: 2.0 },
+        { x: 70, y: 60, s: 2.0 },
+        { x: 420, y: 165, s: 2.2 },
     ];
     const featured = feats.map(p => {
         const rot = rnd(0, 360);
@@ -2566,6 +2654,7 @@ function renderFullscreenFx() {
     ThreeFx.stop();                                                           // innerHTML bên dưới sẽ xoá canvas cũ
     SnowPile.stop();
     document.querySelectorAll('.hl-spider-rig').forEach(el => el.remove());
+    document.querySelectorAll('.tet-front-fx').forEach(el => el.remove());   // phụng múa + pháo nổ của Tết
     renderBackdropScene(active && (theme === 'trungthu' || theme === 'tet'), theme);
     if (!active) {
         if (layer) layer.remove();
@@ -2602,6 +2691,25 @@ function renderFullscreenFx() {
         if (lvl >= 2) html += '<div class="tt-bunny-wrap"><div class="tt-lion-flip"><span class="tt-bunny">🐇</span><span class="tt-bunny-lantern">🏮</span></div></div>';
     }
     layer.innerHTML = html;
+
+    // TẾT: phụng múa chạy dọc đáy màn hình (như múa lân) từ mức 2; pháo nổ ở mức cao nhất
+    // Đặt ở body vì layer Tết có z-index: -1 (nằm sau nội dung) — phụng và pháo cần hiện phía trước
+    if (theme === 'tet') {
+        if (lvl >= 1) {
+            const phung = document.createElement('div');
+            phung.className = 'tt-lion-wrap tet-phung-wrap tet-front-fx';
+            phung.setAttribute('aria-hidden', 'true');
+            phung.innerHTML = `<div class="tt-lion-flip">${buildPhoenixSvg()}</div>`;
+            document.body.appendChild(phung);
+        }
+        if (lvl >= 2) {
+            const pao = document.createElement('div');
+            pao.className = 'tet-pao-layer tet-front-fx';
+            pao.setAttribute('aria-hidden', 'true');
+            pao.innerHTML = buildTetPaoHtml();
+            document.body.appendChild(pao);
+        }
+    }
 
     // ═══════════════════════════════════════════════════════════
     // NHỆN TREO — chỉ hiện ở chủ đề Halloween + mức "Đêm kinh hoàng"
@@ -3740,25 +3848,6 @@ document.addEventListener('DOMContentLoaded', function () {
         if (event.key === 'Escape') {
             hideConfirmModal();
         }
-    });
-
-    document.addEventListener('click', (e) => {
-        const btn = e.target.closest('.folder-open-btn');
-        if (!btn) return;
-        e.preventDefault();
-        e.stopPropagation();
-
-        const path = btn.dataset.path;
-        if (!path) return;
-
-        if (!isFolderHandlerInstalled()) {
-            // Chưa cài → hiện modal hướng dẫn
-            openFolderInstallModal(path);
-            return;
-        }
-
-        // Đã cài → mở protocol
-        openFolderViaProtocol(path);
     });
 
     initNotificationActionBridge();
@@ -7091,17 +7180,17 @@ function renderQuickChat() {
 // ============================================================
 
 // Bắt path trong dấu ngoặc kép — có thể chứa dấu cách, dấu &, dấu . trong tên folder
-const FOLDER_QUOTED_RE = /["']([^"'\n\r]{3,})["']/g;
-// Bắt path không ngoặc — dừng ở space/tab (giữ hành vi cũ)
-const FOLDER_UNQUOTED_RE = /(?:[A-Za-z]:\\[^\s<>"'|?*\n\r]+|\\\\[^\s<>"'|?*\n\r]+)/g;
+const QUOTE_CHARS = `"'\u201c\u201d\u2018\u2019`; 
+const FOLDER_QUOTED_RE = new RegExp(`[${QUOTE_CHARS}]([^${QUOTE_CHARS}\\n\\r]+)[${QUOTE_CHARS}]`, 'g');
+const FOLDER_UNQUOTED_RE = /(?:[A-Za-z]:[\\\/][^\s<>"'“”‘’|?*\n\r]+|\\\\[^\s<>"'“”‘’|?*\n\r]+)/g;
 
 // Kiểm tra 1 chuỗi có phải là đường dẫn Windows hợp lệ không
 function isWindowsPath(s) {
     if (!s) return false;
     const t = s.trim();
-    return /^[A-Za-z]:\\/.test(t) || /^\\\\/.test(t);
+    // Hỗ trợ ổ đĩa C:\ hoặc C:/ và đường dẫn mạng \\Server
+    return /^[A-Za-z]:[\\\/]/.test(t) || /^\\\\/.test(t);
 }
-
 /**
  * Tìm tất cả path trong text.
  * Trả về mảng [{start, end, path, quoted}] đã sắp theo vị trí.
@@ -7112,43 +7201,45 @@ function findFolderPaths(text) {
     const results = [];
     const used = new Array(text.length).fill(false);
 
-    // ── Bước 1: Tìm path trong ngoặc kép trước ──
+    // ── Bước 1: Tìm path trong ngoặc kép trước (ưu tiên cao nhất) ──
     FOLDER_QUOTED_RE.lastIndex = 0;
     let m;
     while ((m = FOLDER_QUOTED_RE.exec(text)) !== null) {
-        const inner = (m[1] || '').trim();
+        let inner = (m[1] || '').trim();
+        
+        // Xử lý triệt để dấu 3 chấm ở cuối (do text bị cắt ngắn)
+        inner = inner.replace(/(\.\.\.|…)$/, '').trim();
+        
         if (!isWindowsPath(inner)) continue;
 
-        // Cắt path — bỏ dấu ngoặc ở hai đầu
-        const innerStart = m.index + (m[0].length - m[1].length - 1);
-        const innerEnd = innerStart + m[1].length;
-        // Trim lại để khớp chính xác (vì m[1] có thể có space đầu/cuối)
-        const leading = m[1].length - m[1].replace(/^\s+/, '').length;
-        const trailing = m[1].length - m[1].replace(/\s+$/, '').length;
-        const start = innerStart + leading;
-        const end = innerEnd - trailing;
+        // Xác định vị trí chính xác của chuỗi path bên trong dấu ngoặc kép để thay thế
+        const fullMatch = m[0];
+        const startOffset = fullMatch.indexOf(m[1]);
+        const start = m.index + startOffset + (m[1].length - m[1].trimStart().length);
+        const end = start + inner.length;
 
         results.push({ start, end, path: inner, quoted: true });
-        // Đánh dấu cả vùng ngoặc kép (bao gồm cả dấu ") là đã dùng
+        
+        // Đánh dấu vùng ngoặc kép đã xử lý để không bị quét lại ở Bước 2
         for (let i = m.index; i < m.index + m[0].length; i++) used[i] = true;
     }
 
     // ── Bước 2: Tìm path không ngoặc ở vùng còn lại ──
     FOLDER_UNQUOTED_RE.lastIndex = 0;
     while ((m = FOLDER_UNQUOTED_RE.exec(text)) !== null) {
-        // Bỏ qua nếu bất kỳ ký tự nào của match đã bị dùng
         let overlap = false;
         for (let i = m.index; i < m.index + m[0].length; i++) {
             if (used[i]) { overlap = true; break; }
         }
         if (overlap) continue;
 
-        // Cắt dấu câu ở cuối (giữ lại nếu là phần của path)
         let path = m[0];
-        // Bỏ dấu câu phổ biến ở cuối câu
-        const trimmed = path.replace(/[.,;:!?]+$/, '');
-        // Nhưng nếu path kết thúc bằng \ sau khi trim thì giữ dấu chấm đã cắt
+        // Cắt bỏ các dấu câu hoặc dấu 3 chấm bị dính ở cuối
+        let trimmed = path.replace(/[.,;:!?]+$/, '').replace(/(\.\.\.|…)$/, '').trim();
+
         const finalPath = trimmed || path;
+        if (!isWindowsPath(finalPath)) continue;
+
         results.push({
             start: m.index,
             end: m.index + finalPath.length,
@@ -7160,7 +7251,6 @@ function findFolderPaths(text) {
     results.sort((a, b) => a.start - b.start);
     return results;
 }
-
 function enhanceFolderLinks(containerEl) {
     if (!containerEl) return;
 
@@ -9000,7 +9090,7 @@ async function confirmPresenterAssignment() {
 // ============================================================
 const MASCOT_INFO = {
     default: { key: 'owl', bubble: 'Hụt rồi nhé! 🦉', bulletClass: 'owl-bullet' },
-    tet: { key: 'cat', bubble: 'Meo~ 🐱', bulletClass: 'mascot-paw' },
+    tet: { key: 'dragon', bubble: 'Gầm~ 🐉', bulletClass: 'mascot-paw' },
     trungthu: { key: 'rabbit', bubble: 'Thỏ chạy! 🐰', bulletClass: 'mascot-carrot' },
     noel: { key: 'reindeer', bubble: 'Húuuu 🦌', bulletClass: 'mascot-snowball' },
     rain: { key: 'frog', bubble: 'Ộp! 🐸', bulletClass: 'mascot-tongue' },
@@ -9010,7 +9100,7 @@ const MASCOT_INFO = {
 
 const MASCOT_MOVEMENT = {
     default: { entry: 'fly', idle: 'owl' },
-    tet: { entry: 'walk', idle: 'cat' },
+    tet: { entry: 'fly', idle: 'dragon' },      // rồng bay (vỗ cánh như cú)
     trungthu: { entry: 'hop', idle: 'rabbit' },   // hop từ cạnh (không phải từ dưới)
     noel: { entry: 'trot', idle: 'reindeer' },
     rain: { entry: 'hop', idle: 'frog' },
@@ -9021,7 +9111,7 @@ const MASCOT_MOVEMENT = {
 // Tên hiển thị của mascot theo từng chủ đề (dùng cho phần Cài đặt)
 const MASCOT_LABELS = {
     default: { emoji: '🦉', singular: 'cú', plural: 'cú' },
-    tet: { emoji: '🐱', singular: 'mèo', plural: 'mèo' },
+    tet: { emoji: '🐉', singular: 'rồng', plural: 'rồng' },
     trungthu: { emoji: '🐰', singular: 'thỏ ngọc', plural: 'thỏ ngọc' },
     noel: { emoji: '🦌', singular: 'tuần lộc', plural: 'tuần lộc' },
     rain: { emoji: '🐸', singular: 'ếch', plural: 'ếch' },
@@ -9055,45 +9145,48 @@ function updateMascotSettingsLabel() {
 function mascotPartsHtml(theme) {
     switch (theme) {
         // ─────────────────────────────────────────────────────────
-        // MÈO — đầu tròn, tai nhọn, thân tròn, chân trước là 2 chân mèo
+        // RỒNG — đầu có sừng vàng, râu dài, cánh đỏ-vàng (vỗ cánh khi bay), đuôi uốn có ngọn lửa vàng
         // ─────────────────────────────────────────────────────────
         case 'tet': return `
             <svg class="o-part o-tail" viewBox="0 0 100 100">
-                <path d="M62 78 Q90 74 84 40 Q82 30 74 32 Q80 55 66 70 Q62 74 60 78 Z"
-                      fill="#f59e0b" stroke="#92400e" stroke-width="0.8"/>
+                <path d="M60 80 Q92 84 88 58 Q86 46 94 40 Q80 40 80 56 Q82 72 62 70 Z" fill="#dc2626" stroke="#7f1d1d" stroke-width="0.8"/>
+                <path d="M94 40 L99 30 L90 34 L92 24 L85 34 Z" fill="#ffd54f" stroke="#c99a00" stroke-width="0.6"/>
+                <path d="M72 76 Q84 74 84 62 M84 70 l3 -2 M82 60 l3 -3" stroke="#ffd54f" stroke-width="1.1" fill="none" stroke-linecap="round" opacity=".85"/>
             </svg>
             <svg class="o-part o-body" viewBox="0 0 100 100">
-                <ellipse cx="50" cy="68" rx="23" ry="26" fill="#f59e0b" stroke="#92400e" stroke-width="0.8"/>
-                <ellipse cx="50" cy="74" rx="13" ry="17" fill="#fef3c7"/>
-                <path d="M40 62 q10 5 20 0 M38 70 q12 6 24 0" stroke="#c2710c" stroke-width="1.3" fill="none" opacity=".45" stroke-linecap="round"/>
-                <ellipse cx="42" cy="93" rx="6" ry="3.5" fill="#fef3c7" stroke="#92400e" stroke-width="0.6"/>
-                <ellipse cx="58" cy="93" rx="6" ry="3.5" fill="#fef3c7" stroke="#92400e" stroke-width="0.6"/>
+                <ellipse cx="50" cy="68" rx="22" ry="26" fill="#dc2626" stroke="#7f1d1d" stroke-width="0.8"/>
+                <ellipse cx="50" cy="74" rx="13" ry="19" fill="#fde68a"/>
+                <path d="M40 60 h20 M38 67 h24 M38 74 h24 M40 81 h20" stroke="#d97706" stroke-width="1.2" opacity=".6" stroke-linecap="round"/>
+                <path d="M50 44 l-3 -5 l3 1 l3 -1 Z" fill="#ffd54f"/>
+                <path d="M39 93 l-3 5 M39 93 l0 6 M39 93 l3 5 M61 93 l-3 5 M61 93 l0 6 M61 93 l3 5" stroke="#ffd54f" stroke-width="2.2" stroke-linecap="round"/>
             </svg>
-            <svg class="o-part o-wl" viewBox="0 0 100 100">
-                <ellipse cx="20" cy="76" rx="6" ry="11" fill="#f59e0b" stroke="#92400e" stroke-width="0.8"/>
-                <ellipse cx="20" cy="78" rx="3.5" ry="6" fill="#fef3c7"/>
-            </svg>
-            <svg class="o-part o-wr" viewBox="0 0 100 100">
-                <ellipse cx="80" cy="76" rx="6" ry="11" fill="#f59e0b" stroke="#92400e" stroke-width="0.8"/>
-                <ellipse cx="80" cy="78" rx="3.5" ry="6" fill="#fef3c7"/>
-            </svg>
+            <svg class="o-part o-wl" viewBox="0 0 100 100"><g>
+                <path d="M34 50 C24 36 10 34 3 48 Q10 50 12 56 Q5 60 7 70 Q15 67 17 74 Q15 83 23 88 Q31 76 36 64 Z" fill="#f59e0b" stroke="#7f1d1d" stroke-width="0.8"/>
+                <path d="M34 52 L4 49 M34 56 L8 70 M35 60 L18 78 M35 62 L24 87" stroke="#b91c1c" stroke-width="1" fill="none" opacity=".7" stroke-linecap="round"/>
+            </g></svg>
+            <svg class="o-part o-wr" viewBox="0 0 100 100"><g transform="translate(100,0) scale(-1,1)">
+                <path d="M34 50 C24 36 10 34 3 48 Q10 50 12 56 Q5 60 7 70 Q15 67 17 74 Q15 83 23 88 Q31 76 36 64 Z" fill="#f59e0b" stroke="#7f1d1d" stroke-width="0.8"/>
+                <path d="M34 52 L4 49 M34 56 L8 70 M35 60 L18 78 M35 62 L24 87" stroke="#b91c1c" stroke-width="1" fill="none" opacity=".7" stroke-linecap="round"/>
+            </g></svg>
             <svg class="o-part o-head" viewBox="0 0 100 100">
-                <path d="M28 24 L22 2 L42 18 Z" fill="#f59e0b" stroke="#92400e" stroke-width="0.8"/>
-                <path d="M72 24 L78 2 L58 18 Z" fill="#f59e0b" stroke="#92400e" stroke-width="0.8"/>
-                <path d="M30 19 L27 8 L38 18 Z" fill="#fecaca"/>
-                <path d="M70 19 L73 8 L62 18 Z" fill="#fecaca"/>
-                <ellipse cx="50" cy="38" rx="25" ry="21" fill="#f59e0b" stroke="#92400e" stroke-width="0.8"/>
-                <path d="M42 20 q6 -4 12 0" stroke="#c2710c" stroke-width="1.2" fill="none" opacity=".55"/>
-                <ellipse cx="40" cy="38" rx="4.5" ry="6.5" fill="#fff"/>
-                <ellipse cx="60" cy="38" rx="4.5" ry="6.5" fill="#fff"/>
-                <ellipse cx="40" cy="38" rx="1.8" ry="4.5" fill="#111"/>
-                <ellipse cx="60" cy="38" rx="1.8" ry="4.5" fill="#111"/>
-                <ellipse class="o-lid" cx="40" cy="38" rx="4.7" ry="6.7" fill="#f59e0b"/>
-                <ellipse class="o-lid" cx="60" cy="38" rx="4.7" ry="6.7" fill="#f59e0b"/>
-                <path d="M48 47 L50 45 L52 47 L50 49.5 Z" fill="#ec4899"/>
-                <path d="M50 49.5 Q47 53 44 52 M50 49.5 Q53 53 56 52" stroke="#7f1d1d" stroke-width="0.9" fill="none" stroke-linecap="round"/>
-                <path d="M22 40 L36 41 M22 45 L36 45 M78 40 L64 41 M78 45 L64 45"
-                      stroke="#7f1d1d" stroke-width="0.6" opacity=".55" fill="none"/>
+                <path d="M34 22 Q26 8 16 6 Q22 14 24 22 Z" fill="#ffd54f" stroke="#c99a00" stroke-width="0.8"/>
+                <path d="M66 22 Q74 8 84 6 Q78 14 76 22 Z" fill="#ffd54f" stroke="#c99a00" stroke-width="0.8"/>
+                <path d="M30 26 q-6 -2 -9 4 q5 1 6 5 q-6 1 -7 7 q6 -1 9 3 Z" fill="#f59e0b"/>
+                <path d="M70 26 q6 -2 9 4 q-5 1 -6 5 q6 1 7 7 q-6 -1 -9 3 Z" fill="#f59e0b"/>
+                <ellipse cx="50" cy="38" rx="27" ry="21" fill="#dc2626" stroke="#7f1d1d" stroke-width="0.8"/>
+                <path d="M30 28 Q40 22 46 28 M70 28 Q60 22 54 28" stroke="#ffd54f" stroke-width="2" fill="none" stroke-linecap="round"/>
+                <circle cx="50" cy="24" r="2.6" fill="#fff" stroke="#ffd54f" stroke-width="1"/>
+                <ellipse cx="50" cy="48" rx="15" ry="10" fill="#fb923c"/>
+                <circle cx="44" cy="47" r="1.6" fill="#7f1d1d"/><circle cx="56" cy="47" r="1.6" fill="#7f1d1d"/>
+                <path d="M40 54 Q50 60 60 54" stroke="#7f1d1d" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+                <path d="M43 55 l1.5 4 l1.5 -3.5 M57 55 l-1.5 4 l-1.5 -3.5" fill="#fff" stroke="#fff" stroke-width="0.6"/>
+                <ellipse cx="38" cy="36" rx="6" ry="5.5" fill="#fff"/><ellipse cx="62" cy="36" rx="6" ry="5.5" fill="#fff"/>
+                <circle cx="38.5" cy="36" r="4" fill="#fbbf24"/><circle cx="61.5" cy="36" r="4" fill="#fbbf24"/>
+                <ellipse cx="38.5" cy="36" rx="2" ry="3.4" fill="#111"/><ellipse cx="61.5" cy="36" rx="2" ry="3.4" fill="#111"/>
+                <circle cx="37.5" cy="34.5" r="0.9" fill="#fff"/><circle cx="60.5" cy="34.5" r="0.9" fill="#fff"/>
+                <ellipse class="o-lid" cx="38" cy="36" rx="6.3" ry="5.8" fill="#dc2626"/>
+                <ellipse class="o-lid" cx="62" cy="36" rx="6.3" ry="5.8" fill="#dc2626"/>
+                <path d="M36 50 Q18 50 10 60 Q8 64 12 68 M64 50 Q82 50 90 60 Q92 64 88 68" stroke="#ffd54f" stroke-width="1.6" fill="none" stroke-linecap="round"/>
             </svg>`;
 
         // ─────────────────────────────────────────────────────────
@@ -9655,9 +9748,11 @@ const OwlFx = (() => {
                 // ma đung đưa
                 out.bodyRoll = Math.sin(now / 1600) * 4;
                 out.bodyScale = 1 + Math.sin(now / 1000) * 0.02;
-            } else if (idle === 'cat') {
-                // mèo vẫy đuôi, đôi khi ngó quanh
-                out.tailAngle = Math.sin(now / 380) * 16;
+            } else if (idle === 'dragon') {
+                // rồng vẫy đuôi, đầu khẽ lắc, thân nhấp nhô
+                out.tailAngle = Math.sin(now / 420) * 14;
+                out.headYaw = Math.sin(now / 1500) * 5;
+                out.bodyRoll = Math.sin(now / 1900) * 1.5;
             }
             return out;
         }
