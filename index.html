@@ -95,9 +95,11 @@
                 <p id="confirmModalMessage">Bạn có chắc chắn muốn tiếp tục?</p>
             </div>
             <div class="confirm-modal-actions">
-                <button type="button" class="btn btn-cancel btn-sm" id="confirmCancelBtn">Hủy</button>
-                <button type="button" class="btn btn-save btn-sm" id="confirmOkBtn">Xác nhận</button>
-            </div>
+    <button type="button" class="btn btn-cancel btn-sm" id="confirmCancelBtn">Hủy</button>
+    <!-- Nút phụ (dùng cho "Chuyển tạm" / "Không chuyển job") -->
+    <button type="button" class="btn btn-primary btn-sm d-none" id="confirmExtraBtn">Tùy chọn</button>
+    <button type="button" class="btn btn-save btn-sm" id="confirmOkBtn">Xác nhận</button>
+</div>
         </div>
     </div>
 
@@ -353,6 +355,14 @@
                                         <div class="btn-shine"></div>
                                     </button>
                                 </div>
+                                <div class="col-12 mt-2">
+                                    <button class="btn btn-ai-parse w-100" id="aiParseBtn" type="button"
+                                        title="Dán tin nhắn / email / ghi chú — AI tự tách thành job">
+                                        <i class="bi bi-stars"></i>
+                                        <span>✨ Dán → Tạo Job (AI)</span>
+                                        <div class="btn-shine"></div>
+                                    </button>
+                                </div>
                             </div>
 
                             <div id="jobList" class="job-list"></div>
@@ -369,20 +379,27 @@
                                     <i class="bi bi-layout-sidebar-inset"></i>
                                 </button>
                                 <div class="modern-card-header-icon">
-                                    <i class="bi bi-calendar3"></i>
+                                    <i class="bi bi-calendar3" id="scheduleHeaderIcon"></i>
                                 </div>
                                 <div class="modern-card-header-text">
-                                    <h6 class="mb-0">Lịch Làm Việc</h6>
-                                    <small>2 tuần tới · công việc định kỳ</small>
+                                    <h6 class="mb-0" id="scheduleHeaderTitle">Lịch Làm Việc</h6>
+                                    <small id="scheduleHeaderSub">2 tuần tới · công việc định kỳ</small>
                                 </div>
                             </div>
-                            <div class="form-check form-switch mb-0">
-                                <input class="form-check-input" type="checkbox" id="showSunday" checked>
-                                <label class="form-check-label switch-label small" for="showSunday">Chủ Nhật</label>
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <button class="btn btn-sm btn-outline-light" id="toggleScheduleViewBtn" type="button"
+                                    title="Đổi chế độ xem">
+                                    <i class="bi bi-bar-chart-steps"></i>
+                                    <span class="d-none d-md-inline ms-1">Timeline</span>
+                                </button>
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input" type="checkbox" id="showSunday" checked>
+                                    <label class="form-check-label switch-label small" for="showSunday">CN</label>
+                                </div>
                             </div>
                         </div>
                         <div class="card-body p-1">
-                            <div class="table-responsive">
+                            <div id="calendarView" class="table-responsive">
                                 <table class="table table-bordered schedule-table mb-0">
                                     <thead>
                                         <tr id="scheduleHeader"></tr>
@@ -390,6 +407,7 @@
                                     <tbody id="scheduleBody"></tbody>
                                 </table>
                             </div>
+                            <div id="timelineView" class="timeline-view d-none"></div>
                         </div>
                     </div>
 
@@ -1014,7 +1032,7 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
                                     <option value="ETA">Chạy trước ETA</option>
                                     <option value="DIRECT">Thiếu DIRECT</option>
                                     <option value="ASHTON">Thiếu ASHTON</option>
-                                    <option value="ETA_PICKUP">Trễ PICK UP</option>
+                                    <option value="ETA_PICKUP">Trễ DIRECT</option>
                                 </select>
                                 <div class="eta-search-box">
                                     <i class="bi bi-search"></i>
@@ -1503,6 +1521,18 @@ Số thập phân dùng . hoặc ,"></textarea>
                         </div>
                     </div>
                     <div class="mb-3">
+                        <label class="form-label fw-bold" for="profileWorkShift">
+                            <i class="bi bi-clock-history"></i> Ca làm việc
+                        </label>
+                        <select class="form-select" id="profileWorkShift">
+                            <option value="day">☀️ Ca ngày (07:00 – 20:00)</option>
+                            <option value="night">🌙 Ca đêm (20:00 – 07:00 hôm sau)</option>
+                        </select>
+                        <div class="form-text">
+                            <i class="bi bi-info-circle"></i> Chỉ ảnh hưởng khung giờ hiển thị của Timeline.
+                        </div>
+                    </div>
+                    <div class="mb-3">
                         <label class="form-label fw-bold"><i class="bi bi-shield-lock-fill"></i> Mật khẩu</label>
                         <div class="input-group">
                             <input type="password" class="form-control" id="profileNewPassword"
@@ -1701,6 +1731,112 @@ Số thập phân dùng . hoặc ,"></textarea>
                             <i class="bi bi-x-circle-fill"></i> Từ chối
                         </button>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Job Parser Modal -->
+    <div class="modal fade" id="aiJobParserModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content ai-parser-modal-content">
+                <div class="modal-header modern-header modern-header-ai">
+                    <div class="modern-header-inner">
+                        <div class="modern-header-icon"><i class="bi bi-stars"></i></div>
+                        <div class="modern-header-text">
+                            <h5 class="modal-title mb-0">✨ Dán → Tạo Job (AI)</h5>
+                            <p class="modern-header-subtitle mb-0">Dán tin nhắn, email, ghi chú — AI tự tách thành job
+                            </p>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+
+                    <!-- Step 1: API key setup -->
+                    <div id="aiKeyStep" class="ai-step d-none">
+                        <div class="ai-setup-card">
+                            <h6><i class="bi bi-key-fill"></i> Bước 1: Nhập Gemini API key</h6>
+                            <p class="small text-muted mb-2">
+                                Lấy key <strong>miễn phí</strong> tại
+                                <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Google
+                                    AI Studio</a>.
+                                Key chỉ lưu trên máy bạn (localStorage), không gửi đi đâu khác.
+                            </p>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="aiKeyInput" placeholder="AIzaSy...">
+                                <button class="btn btn-save" type="button" id="aiKeySaveBtn">
+                                    <i class="bi bi-check-circle-fill"></i> Lưu &amp; Tiếp tục
+                                </button>
+                            </div>
+                            <div class="form-text mt-2">
+                                <i class="bi bi-shield-exclamation"></i>
+                                Key: AQ.Ab8RN6KNTq-5cvufbq4BXhLINrN-na0lhp0PSUZlo4Y-BVlfeQ
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Paste textarea -->
+                    <div id="aiPasteStep" class="ai-step d-none">
+                        <label class="form-label fw-bold" for="aiPasteText">
+                            <i class="bi bi-clipboard-data-fill"></i> Dán văn bản vào đây
+                        </label>
+                        <textarea class="form-control ai-parse-textarea" id="aiPasteText" rows="8" placeholder="VD:
+Mai 9h họp review Q4 với Marketing, 90 phút.
+Chiều 2h chuẩn bị slide cho khách Nhật.
+Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
+                        <div class="ai-paste-hints">
+                            <span><i class="bi bi-check2"></i> Tin nhắn / email</span>
+                            <span><i class="bi bi-check2"></i> Ghi chú họp</span>
+                            <span><i class="bi bi-check2"></i> Danh sách task</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mt-3 gap-2 flex-wrap">
+                            <div class="small text-muted">
+                                <i class="bi bi-shield-check"></i> Không có mạng / lo privacy?
+                                <button type="button" class="btn btn-link btn-sm p-0" id="aiFallbackBtn">Dùng parser cơ
+                                    bản</button>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="aiChangeKeyBtn">
+                                    <i class="bi bi-key"></i> Đổi key
+                                </button>
+                                <button type="button" class="btn btn-ai-analyze" id="aiAnalyzeBtn">
+                                    <i class="bi bi-magic"></i> Phân tích
+                                    <div class="btn-shine"></div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Loading -->
+                    <div id="aiLoading" class="ai-loading d-none">
+                        <div class="ai-loading-bounce">
+                            <span></span><span></span><span></span>
+                        </div>
+                        <p class="ai-loading-text">AI đang đọc và phân tích...</p>
+                    </div>
+
+                    <!-- Step 3: Results -->
+                    <div id="aiResultStep" class="ai-step d-none">
+                        <div class="ai-result-header">
+                            <div>
+                                <h6 class="mb-1"><i class="bi bi-list-check"></i> Job tìm được</h6>
+                                <small class="text-muted" id="aiResultCount">0 job</small>
+                            </div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="aiBackToPasteBtn">
+                                <i class="bi bi-arrow-left"></i> Dán lại
+                            </button>
+                        </div>
+                        <div id="aiResultList" class="ai-result-list"></div>
+                    </div>
+
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-cancel" data-bs-dismiss="modal">Hủy</button>
+                    <button type="button" class="btn btn-save d-none" id="aiCreateJobsBtn">
+                        <i class="bi bi-check-circle-fill"></i> Tạo <span id="aiCreateCount">0</span> job
+                        <div class="btn-shine"></div>
+                    </button>
                 </div>
             </div>
         </div>

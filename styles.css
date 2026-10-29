@@ -14204,3 +14204,822 @@ body.modal-open .tet-pao-layer {
 .tet-tree-scene .tet-featured {
     animation: none;
 }
+
+/* ============================================================
+   AI JOB PARSER — Nút + Modal + Result Cards
+   ============================================================ */
+.btn-ai-parse {
+    position: relative;
+    overflow: hidden;
+    border: none;
+    border-radius: 11px;
+    padding: 0.55rem 0.75rem;
+    background: linear-gradient(135deg, #f59e0b 0%, #ec4899 50%, #8b5cf6 100%);
+    color: #fff;
+    font-size: var(--fs-sm);
+    font-weight: 700;
+    box-shadow: 0 6px 16px rgba(236, 72, 153, 0.28);
+    transition: transform 0.22s var(--ease-out-expo, ease-out), box-shadow 0.22s ease;
+}
+
+.btn-ai-parse:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 22px rgba(236, 72, 153, 0.38);
+}
+
+.btn-ai-parse i {
+    animation: aiSparkle 2.4s ease-in-out infinite;
+}
+
+@keyframes aiSparkle {
+    0%, 100% { transform: rotate(0deg) scale(1); }
+    25% { transform: rotate(-8deg) scale(1.15); }
+    75% { transform: rotate(8deg) scale(1.15); }
+}
+
+.modal-header.modern-header-ai {
+    background: linear-gradient(135deg, #f59e0b 0%, #ec4899 45%, #8b5cf6 100%);
+}
+
+.ai-parser-modal-content {
+    overflow: hidden;
+}
+
+.ai-step {
+    animation: aiStepIn 0.22s ease;
+}
+
+@keyframes aiStepIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.ai-setup-card {
+    padding: 1rem 1.1rem;
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.06), rgba(139, 92, 246, 0.06));
+    border: 1px dashed rgba(139, 92, 246, 0.35);
+}
+
+.ai-setup-card h6 {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: var(--text);
+    margin-bottom: 0.5rem;
+}
+
+.ai-parse-textarea {
+    min-height: 200px;
+    font-size: 0.85rem;
+    line-height: 1.55;
+    border-radius: 12px;
+    background: var(--surface-muted);
+    font-family: var(--font-family);
+    resize: vertical;
+}
+
+.ai-parse-textarea:focus {
+    background: var(--surface);
+}
+
+.ai-paste-hints {
+    display: flex;
+    gap: 0.9rem;
+    flex-wrap: wrap;
+    margin-top: 0.6rem;
+    font-size: 0.72rem;
+    color: var(--muted);
+    font-weight: 600;
+}
+
+.ai-paste-hints i {
+    color: #16a34a;
+    margin-right: 2px;
+}
+
+.btn-ai-analyze {
+    position: relative;
+    overflow: hidden;
+    border: none;
+    border-radius: 10px;
+    padding: 0.55rem 1.1rem;
+    background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+    color: #fff;
+    font-weight: 700;
+    box-shadow: 0 6px 14px rgba(236, 72, 153, 0.28);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.btn-ai-analyze:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(236, 72, 153, 0.38);
+}
+
+.btn-ai-analyze:disabled {
+    opacity: 0.6;
+}
+
+/* Loading */
+.ai-loading {
+    text-align: center;
+    padding: 2.5rem 1rem;
+}
+
+.ai-loading-bounce {
+    display: inline-flex;
+    gap: 8px;
+    margin-bottom: 1rem;
+}
+
+.ai-loading-bounce span {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #a855f7, #ec4899);
+    animation: aiBounce 1.2s ease-in-out infinite;
+    box-shadow: 0 2px 6px rgba(236, 72, 153, 0.35);
+}
+
+.ai-loading-bounce span:nth-child(2) { animation-delay: 0.15s; }
+.ai-loading-bounce span:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes aiBounce {
+    0%, 80%, 100% { transform: scale(0.5); opacity: 0.5; }
+    40% { transform: scale(1.2); opacity: 1; }
+}
+
+.ai-loading-text {
+    margin: 0;
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+/* Result cards */
+.ai-result-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding-bottom: 0.75rem;
+    margin-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+}
+
+.ai-result-header h6 {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--text);
+}
+
+.ai-result-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.ai-job-card {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface-muted);
+    overflow: hidden;
+    transition: border-color 0.18s ease, background-color 0.18s ease;
+}
+
+.ai-job-card.unchecked {
+    opacity: 0.55;
+}
+
+.ai-job-card:hover {
+    border-color: rgba(139, 92, 246, 0.35);
+}
+
+.ai-job-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.65rem;
+    background: rgba(139, 92, 246, 0.06);
+    border-bottom: 1px solid var(--border);
+}
+
+.ai-job-card-check input {
+    cursor: pointer;
+    width: 18px;
+    height: 18px;
+    accent-color: #8b5cf6;
+}
+
+.ai-job-card-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #8b5cf6, #ec4899);
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.7rem;
+}
+
+.ai-job-card-del {
+    margin-left: auto;
+    border: none;
+    background: transparent;
+    color: var(--danger);
+    cursor: pointer;
+    border-radius: 6px;
+    padding: 0.2rem 0.35rem;
+    transition: background-color 0.15s ease;
+}
+
+.ai-job-card-del:hover {
+    background: rgba(239, 68, 68, 0.12);
+}
+
+.ai-job-card-body {
+    padding: 0.65rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.ai-job-card-meta {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 0.8fr 0.8fr;
+    gap: 0.4rem;
+}
+
+@media (max-width: 576px) {
+    .ai-job-card-meta {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+.ai-job-card-duration {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.ai-job-card-duration input {
+    flex: 1;
+    min-width: 0;
+}
+
+.ai-job-card-duration span {
+    font-size: 0.68rem;
+    color: var(--muted);
+    white-space: nowrap;
+}
+
+.ai-job-card-desc {
+    font-size: 0.72rem;
+    color: var(--muted);
+    padding: 0.35rem 0.5rem;
+    background: var(--surface);
+    border-radius: 8px;
+    border: 1px dashed var(--border);
+    line-height: 1.4;
+}
+
+body.theme-dark .ai-setup-card {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(139, 92, 246, 0.1));
+}
+
+body.theme-dark .ai-job-card {
+    background: rgba(30, 41, 59, 0.55);
+}
+
+body.theme-dark .ai-job-card-header {
+    background: rgba(139, 92, 246, 0.14);
+}
+
+body.theme-dark .ai-job-card-desc {
+    background: rgba(15, 23, 42, 0.6);
+}
+
+body.theme-dark .ai-parse-textarea {
+    background: rgba(30, 41, 59, 0.5);
+}
+
+/* ============================================================
+   TIMELINE VIEW (Gantt)
+   ============================================================ */
+.schedule-view-tabs {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    background: rgba(255, 255, 255, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: 10px;
+}
+
+.schedule-view-tab {
+    padding: 0.3rem 0.75rem;
+    border: none;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.85);
+    border-radius: 7px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.schedule-view-tab:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+}
+
+.schedule-view-tab.active {
+    background: rgba(255, 255, 255, 0.95);
+    color: #0f766e;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+.timeline-view {
+    padding: 0.35rem;
+    background: var(--surface-muted);
+    border-radius: 0 0 14px 14px;
+}
+
+.timeline-scroll {
+    overflow-x: hidden;
+    /* Xóa bỏ overflow-y: auto và max-height để timeline dài xuống tự nhiên */
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+    /* Thêm position relative để làm mốc cho sticky header */
+    position: relative; 
+}
+
+.timeline-header-row,
+.timeline-row {
+    display: flex;
+    align-items: stretch;
+    border-bottom: 1px solid var(--border);
+    width: 100%;
+}
+
+.timeline-header-row {
+    position: sticky;
+    top: 0; /* Dính lên đỉnh của khung cuộn (#mainContent) */
+    z-index: 5;
+    background: var(--surface-strong);
+    border-bottom: 2px solid var(--border);
+}
+
+.timeline-day-label {
+    width: 100px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.6rem;
+    border-right: 1px solid var(--border);
+    background: var(--surface-strong);
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+
+.timeline-day-dow {
+    font-weight: 800;
+    color: var(--primary);
+    min-width: 22px;
+}
+
+.timeline-day-date {
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+}
+
+.timeline-overlap-badge {
+    margin-left: auto;
+    padding: 0.1rem 0.4rem;
+    background: rgba(239, 68, 68, 0.15);
+    color: #dc2626;
+    border-radius: 999px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.timeline-row.today-row {
+    background: rgba(99, 102, 241, 0.06);
+}
+
+.timeline-row.today-row .timeline-day-label {
+    background: rgba(99, 102, 241, 0.15);
+    color: #4338ca;
+}
+
+.timeline-row.off-day .timeline-day-label {
+    background: repeating-linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0 6px, rgba(239, 68, 68, 0.15) 6px 12px);
+}
+
+.timeline-row.past-row {
+    opacity: 0.55;
+}
+
+.timeline-track {
+    flex: 1 1 auto; /* Tự động lấp đầy khoảng trống */
+    position: relative;
+    /* Tạo vạch kẻ dọc tự động dựa trên số cột (--cols) */
+    background-image: repeating-linear-gradient(
+        to right,
+        rgba(148, 163, 184, 0.15) 0,
+        rgba(148, 163, 184, 0.15) 1px,
+        transparent 1px,
+        transparent calc(100% / var(--cols))
+    );
+    background-size: 100% 100%;
+    transition: height 0.25s ease;
+}
+
+.timeline-track::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(to right, rgba(148, 163, 184, 0.15) 1px, transparent 1px);
+    background-size: 72px 100%;
+    pointer-events: none;
+}
+
+.timeline-hours-track {
+    display: flex;
+    border-bottom: none;
+    background-image: none; /* Không dùng vạch kẻ dọc cho header */
+}
+
+.timeline-hour {
+    flex: 1 1 0; /* Chia đều không gian cho các cột giờ */
+    padding: 0.5rem 0.2rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--muted);
+    text-align: left;
+    border-right: 1px dashed rgba(148, 163, 184, 0.25);
+    box-sizing: border-box;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Job bên trong track */
+.timeline-job {
+    position: absolute;
+    /* Không set left/width cứng ở đây, JS sẽ set % */
+    border-radius: 6px;
+    padding: 0.2rem 0.4rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.2);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    cursor: grab;
+    user-select: none;
+    overflow: hidden;
+}
+
+.timeline-job:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 5px 14px rgba(15, 23, 42, 0.3);
+    z-index: 10;
+}
+
+.timeline-job.past {
+    opacity: 0.35;
+    filter: grayscale(0.8);
+    box-shadow: none !important;
+}
+
+.timeline-job.active {
+    z-index: 10;
+    border: 2px solid transparent; /* Nhường chỗ cho viền giả */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.timeline-job.active::before {
+    content: '';
+    position: absolute;
+    inset: -2px; /* Bao trùm viền */
+    border-radius: 8px; /* Bo góc bằng với job */
+    background: conic-gradient(from 0deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #8f00ff, #ff0000);
+    z-index: -1;
+    animation: rotateRainbow 2.5s linear infinite;
+}
+
+@keyframes rotateRainbow {
+    to { filter: hue-rotate(360deg); }
+}
+
+.timeline-job:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 5px 14px rgba(15, 23, 42, 0.24);
+    z-index: 2;
+}
+
+.timeline-job.daily    { background: linear-gradient(135deg, #ef4444, #f87171); }
+.timeline-job.weekly   { background: linear-gradient(135deg, #14b8a6, #2dd4bf); }
+.timeline-job.biweekly { background: linear-gradient(135deg, #3b82f6, #60a5fa); }
+.timeline-job.monthly  { background: linear-gradient(135deg, #f59e0b, #facc15); color: #422006; }
+.timeline-job.once     { background: linear-gradient(135deg, #06b6d4, #22d3ee); }
+.timeline-job.custom   { background: linear-gradient(135deg, #8b5cf6, #a78bfa); }
+
+.timeline-job.shifted {
+    background: linear-gradient(135deg, #ec4899, #f472b6) !important;
+    border: 1px dashed rgba(255, 255, 255, 0.65);
+}
+
+.timeline-job.presenter {
+    background: linear-gradient(135deg, #8b5cf6, #a855f7) !important;
+}
+
+.timeline-job.overlap {
+    box-shadow: 0 0 0 2px #fbbf24, 0 2px 6px rgba(15, 23, 42, 0.2);
+}
+
+.timeline-job.completed {
+    opacity: 0.55;
+    text-decoration: line-through;
+}
+
+.timeline-job-time {
+    font-size: 0.6rem;
+    font-weight: 800;
+    line-height: 1.1;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+.timeline-job-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+}
+
+.timeline-now-line {
+    position: absolute;
+    top: -3px;
+    bottom: -3px;
+    width: 3px;
+    background: #ef4444;
+    z-index: 20;
+    pointer-events: none;
+    box-shadow: 0 0 6px rgba(239, 68, 68, 0.7);
+}
+
+.timeline-now-line::before {
+    content: '';
+    position: absolute;
+    top: -5px;
+    left: -4px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #ef4444;
+    box-shadow: 0 0 6px rgba(239, 68, 68, 0.7);
+}
+
+.timeline-empty {
+    text-align: center;
+    padding: 2.5rem 1rem;
+    color: var(--muted);
+    font-size: 0.85rem;
+}
+
+.timeline-empty i {
+    font-size: 2rem;
+    color: var(--muted);
+    opacity: 0.5;
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+body.theme-dark .timeline-scroll {
+    background: rgba(15, 23, 42, 0.6);
+}
+
+body.theme-dark .timeline-header-row,
+body.theme-dark .timeline-day-label {
+    background: rgba(30, 41, 59, 0.9);
+}
+
+body.theme-dark .timeline-track::before {
+    background-image: linear-gradient(to right, rgba(71, 85, 105, 0.3) 1px, transparent 1px);
+}
+
+body.theme-dark .timeline-row.today-row {
+    background: rgba(99, 102, 241, 0.1);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .timeline-day-label {
+        width: 75px;
+        font-size: 0.68rem;
+        padding: 0.3rem;
+    }
+    .timeline-track {
+        height: 40px;
+    }
+    .timeline-job-time {
+        display: none;
+    }
+    .timeline-hour {
+        font-size: 0.65rem;
+        padding: 0.3rem 0.1rem;
+    }
+}
+
+/* ============================================================
+   TIMELINE — OVERLAP WARNING, KÉO THẢ, CROSS-DAY (CA ĐÊM)
+   ============================================================ */
+
+/* Overlap: nền sọc đỏ + viền vàng pulse — cảnh báo mạnh */
+.timeline-job.overlap {
+    background: repeating-linear-gradient(
+        45deg,
+        #dc2626 0, #dc2626 8px,
+        #991b1b 8px, #991b1b 16px
+    ) !important;
+    box-shadow: 0 0 0 2px #fbbf24, 0 3px 10px rgba(239, 68, 68, 0.55) !important;
+    color: #fff !important;
+    z-index: 3;
+    animation: timelineOverlapPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes timelineOverlapPulse {
+    0%, 100% { box-shadow: 0 0 0 2px #fbbf24, 0 3px 10px rgba(239, 68, 68, 0.55); }
+    50%      { box-shadow: 0 0 0 4px #ef4444, 0 5px 16px rgba(239, 68, 68, 0.8); }
+}
+
+.timeline-overlap-tag {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 18px;
+    height: 18px;
+    background: #fbbf24;
+    color: #111827;
+    border-radius: 50%;
+    font-size: 11px;
+    line-height: 18px;
+    text-align: center;
+    font-weight: 900;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, .35);
+    z-index: 4;
+    animation: overlapTagBlink 1.2s ease-in-out infinite;
+}
+
+@keyframes overlapTagBlink {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.15); }
+}
+
+/* Job của ca đêm (sáng hôm sau) — viền tím để phân biệt */
+.timeline-job.cross-day-job {
+    border-left: 3px solid #a855f7;
+}
+
+/* Kéo thả */
+.timeline-job {
+    cursor: grab;
+    user-select: none;
+}
+
+.timeline-job:active {
+    cursor: grabbing;
+}
+
+.timeline-job.dragging {
+    opacity: 0.35 !important;
+    transform: scale(0.98);
+}
+
+.timeline-track.drag-over {
+    background: rgba(59, 130, 246, 0.10);
+    box-shadow: inset 0 0 0 2px rgba(59, 130, 246, 0.55);
+    transition: background-color .12s ease, box-shadow .12s ease;
+}
+
+/* Cột giờ vắt qua nửa đêm (ca đêm) — tô nền tím nhẹ để dễ phân biệt */
+.timeline-hour.cross-day {
+    background: rgba(168, 85, 247, 0.08);
+    color: #a855f7;
+    border-right-color: rgba(168, 85, 247, 0.3);
+}
+body.theme-dark .timeline-hour.cross-day {
+    background: rgba(168, 85, 247, 0.18);
+    color: #d8b4fe;
+}
+
+/* Nút toggle view nhỏ gọn trên header xanh */
+#toggleScheduleViewBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* ============================================================
+   TIMELINE NÂNG CAO — CHIA LÀN, DỜI LÊN, CẢNH BÁO
+   ============================================================ */
+
+/* 1. Tăng chiều cao track để chứa được nhiều làn */
+/* Sửa lại thành: */
+.timeline-track {
+    position: relative;
+    height: 48px; /* Chiều cao mặc định cho 1 làn (44px job + 4px padding) */
+    flex: 1 1 auto; /* SỬA TẠI ĐÂY: Để tự động giãn hết chiều ngang */
+    min-width: 0; /* Chống tràn flex */
+    border-left: 1px solid var(--border);
+    transition: height 0.25s ease; 
+    
+    /* Vẽ lại vạch kẻ dọc dựa trên số cột giờ để khớp màu sắc */
+    background-image: repeating-linear-gradient(
+        to right,
+        rgba(148, 163, 184, 0.15) 0,
+        rgba(148, 163, 184, 0.15) 1px,
+        transparent 1px,
+        transparent calc(100% / var(--cols))
+    );
+    background-size: 100% 100%;
+}
+
+/* Xóa bỏ vạch kẻ cũ bị fix cứng 72px để tránh đè lên vạch mới */
+.timeline-track::before {
+    display: none;
+}
+
+.timeline-job {
+    /* Đảm bảo job luôn nằm trong track */
+    position: absolute;
+    padding: 0.1rem 0.4rem;
+    box-sizing: border-box;
+    /* Xóa các thuộc tính top/bottom cũ để JS tự tính toán */
+    top: auto; 
+    bottom: auto;
+}
+
+/* 2. Tô màu hồng cho job dời lên (từ ngày off) */
+.timeline-job.shifted {
+    background: linear-gradient(135deg, #ec4899, #f472b6) !important;
+    border: 1px dashed rgba(255, 255, 255, 0.8) !important;
+    color: #fff !important;
+}
+
+/* 3. Viền cầu vồng cho job đang chạy (active) */
+.timeline-job.active {
+    z-index: 10;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    border: 2px solid transparent;
+}
+.timeline-job.active::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 8px;
+    background: conic-gradient(from 0deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #8f00ff, #ff0000);
+    z-index: -1;
+    animation: rotateRainbow 2.5s linear infinite;
+}
+@keyframes rotateRainbow {
+    to { filter: hue-rotate(360deg); }
+}
+
+/* 4. Làm mờ job quá khứ */
+.timeline-job.past {
+    opacity: 0.35;
+    filter: grayscale(0.8);
+    box-shadow: none !important;
+}
+
+/* 5. Cảnh báo trùng giờ (Overlap) */
+.timeline-job.overlap {
+    background: repeating-linear-gradient(
+        45deg,
+        #dc2626 0, #dc2626 8px,
+        #991b1b 8px, #991b1b 16px
+    ) !important;
+    box-shadow: 0 0 0 2px #fbbf24, 0 3px 10px rgba(239, 68, 68, 0.55) !important;
+    color: #fff !important;
+    z-index: 5;
+    animation: timelineOverlapPulse 1.6s ease-in-out infinite;
+}
+
+/* Nếu job vừa overlap vừa active, ưu tiên viền cầu vồng */
+.timeline-job.active.overlap::before {
+    background: conic-gradient(from 0deg, #fbbf24, #ef4444, #fbbf24, #ef4444);
+}
