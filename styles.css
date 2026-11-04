@@ -11587,6 +11587,17 @@ body.theme-dark .eta-grid .col-total .sl-sub.sl-short {
     /* trên topbar (1000), dưới cú (1010) và modal (1050) */
     pointer-events: none;
     overflow: hidden;
+    contain: strict;
+}
+
+/* Pause decorative motion while controls and dialogs are in use. */
+body.modal-open #fxFullscreen *,
+body.modal-open #fxBackdrop *,
+body.modal-open .tet-front-fx *,
+body.modal-open .hl-spider-rig *,
+body.modal-open .topbar-sky *,
+body.fx-fullscreen-on .topbar-sky * {
+    animation-play-state: paused !important;
 }
 
 #fxFullscreen .fx-p {

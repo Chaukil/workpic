@@ -301,6 +301,7 @@ const ThreeFx = (() => {
     let threePromise = null;
     let state = null;
     let token = 0;
+    let sharedRenderer = null;
 
     function loadThree() {
         if (!threePromise) threePromise = import(THREE_URL).catch(err => { threePromise = null; throw err; });
@@ -1774,13 +1775,15 @@ const ThreeFx = (() => {
     // ---------------------------------------------------------- khung chung
     function build(THREE, layer, theme, lvl) {
         const lowEnd = (navigator.hardwareConcurrency || 4) <= 4 || window.innerWidth < 700;
-        const pixel = Math.min(window.devicePixelRatio || 1, 1.5);
+        const pixel = Math.min(window.devicePixelRatio || 1, lowEnd ? 1 : 1.25,
+            Math.sqrt(1500000 / Math.max(1, window.innerWidth * window.innerHeight)));
 
-        const canvas = document.createElement('canvas');
+        const canvas = sharedRenderer?.domElement || document.createElement('canvas');
         canvas.className = 'fx-three-canvas' + (theme === 'space' ? ' fx-galaxy-canvas' : '');
         layer.prepend(canvas);
 
-        const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, powerPreference: 'low-power' });
+        const renderer = sharedRenderer || new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, powerPreference: 'low-power' });
+        sharedRenderer = renderer;
         renderer.setPixelRatio(pixel);
         renderer.setSize(window.innerWidth, window.innerHeight, false);
         renderer.setClearColor(0x000000, 0);
@@ -1796,7 +1799,7 @@ const ThreeFx = (() => {
         state = s;
         const ctx = {
             THREE, scene, camera, lowEnd, pixel, lvl,
-            cnt: (n) => Math.round(n * (lowEnd ? 0.5 : 1)),
+            cnt: (n) => Math.round(n * (lowEnd ? 0.4 : 0.75)),
             aspectMats: s.aspectMats, timeMats: s.timeMats, lightFns: s.lightFns, updaters: s.updaters, onFit: s.onFit,
             own: (...items) => items.forEach(i => i && s.owned.push(i))
         };
@@ -1804,6 +1807,8 @@ const ThreeFx = (() => {
 
         s.fit = () => {
             const w = window.innerWidth, h = window.innerHeight, aspect = w / h;
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, lowEnd ? 1 : 1.25,
+                Math.sqrt(1500000 / Math.max(1, w * h))));
             renderer.setSize(w, h, false);
             camera.aspect = aspect;
             camera.updateProjectionMatrix();
@@ -1815,7 +1820,7 @@ const ThreeFx = (() => {
             s.my = (e.clientY / window.innerHeight - 0.5) * 2;
         };
         s.onVis = () => {
-            if (document.hidden) { cancelAnimationFrame(s.raf); s.raf = 0; }
+            if (document.hidden || document.body.classList.contains('modal-open')) { cancelAnimationFrame(s.raf); s.raf = 0; }
             else if (!s.raf) { s.last = 0; s.raf = requestAnimationFrame(s.loop); }
         };
         s.applyMode = (light) => { s.light = light; s.lightFns.forEach(fn => fn(light)); };
@@ -1838,7 +1843,9 @@ const ThreeFx = (() => {
         window.addEventListener('resize', s.fit);
         if (theme === 'space') window.addEventListener('pointermove', s.onMove, { passive: true });
         document.addEventListener('visibilitychange', s.onVis);
-        s.raf = requestAnimationFrame(s.loop);
+        document.addEventListener('shown.bs.modal', s.onVis);
+        document.addEventListener('hidden.bs.modal', s.onVis);
+        s.onVis();
     }
 
     function stop() {
@@ -1849,9 +1856,11 @@ const ThreeFx = (() => {
         window.removeEventListener('resize', s.fit);
         window.removeEventListener('pointermove', s.onMove);
         document.removeEventListener('visibilitychange', s.onVis);
-        s.owned.forEach(o => { try { o.dispose(); } catch (e) { /* ignore */ } });
-        s.renderer.dispose();
-        if (s.renderer.forceContextLoss) s.renderer.forceContextLoss();
+        document.removeEventListener('shown.bs.modal', s.onVis);
+        document.removeEventListener('hidden.bs.modal', s.onVis);
+        new Set(s.owned).forEach(o => { try { o.dispose(); } catch (e) { /* ignore */ } });
+        s.scene.clear();
+        s.renderer.renderLists.dispose();
         s.canvas.remove();
     }
 
@@ -1862,9 +1871,18 @@ const ThreeFx = (() => {
         if (!BUILDERS[theme]) return false;
         let THREE;
         try { THREE = await loadThree(); } catch (e) { console.warn('Không tải được Three.js — dùng hiệu ứng CSS:', e); return false; }
+        while (my === token && layer.isConnected && (document.hidden || document.body.classList.contains('modal-open'))) {
+            await new Promise(resolve => setTimeout(resolve, 150));
+        }
         if (my !== token || !layer.isConnected || layer.dataset.fx !== theme) return null;
         try { build(THREE, layer, theme, lvl); return true; }
-        catch (e) { console.warn('WebGL không khả dụng — dùng hiệu ứng CSS:', e); stop(); return false; }
+        catch (e) {
+            console.warn('WebGL không khả dụng — dùng hiệu ứng CSS:', e);
+            stop();
+            sharedRenderer?.dispose();
+            sharedRenderer = null;
+            return false;
+        }
     }
 
     return { start, stop: () => { token++; stop(); }, isActive: () => !!state };
@@ -2443,12 +2461,14 @@ function buildTetPaoHtml() {
 function renderBackdropScene(on, theme) {
     let el = document.getElementById('fxBackdrop');
     if (!on) { if (el) el.remove(); return; }
+    if (el?.dataset.theme === theme) return;
     if (!el) {
         el = document.createElement('div');
         el.id = 'fxBackdrop';
         el.setAttribute('aria-hidden', 'true');
         document.body.appendChild(el);
     }
+    el.dataset.theme = theme;
     el.innerHTML = (theme === 'tet') ? buildTetScene() : buildTrungThuScene();
 }
 // ============================================================
@@ -2654,13 +2674,27 @@ function cssFxFallbackHtml(theme, cfg, lvl) {
     return html;
 }
 
+let fullscreenFxTimer = null;
+let fullscreenFxSignature = '';
+let fullscreenFxGeneration = 0;
 function renderFullscreenFx() {
+    clearTimeout(fullscreenFxTimer);
+    // Coalesce rapid settings changes and let the control paint before scene construction.
+    fullscreenFxTimer = setTimeout(commitFullscreenFx, 100);
+}
+
+function commitFullscreenFx() {
     let layer = document.getElementById('fxFullscreen');
     const theme = currentTopbarTheme;
     const cfg = FX_CONFIG[theme];
     const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const active = fxFullscreen && !!cfg && !reduced;
     const lvl = getFxLevelIndex(theme);
+    const signature = `${theme}:${active}:${lvl}`;
+    if (signature === fullscreenFxSignature && (!active || layer?.isConnected)) return;
+    fullscreenFxSignature = signature;
+    const generation = ++fullscreenFxGeneration;
+    document.body.classList.toggle('fx-fullscreen-on', active);
     const backdrop = active && (!!cfg.galaxy || theme === 'trungthu' || theme === 'halloween' || theme === 'tet');
     document.body.classList.toggle('fx-space-full', active && !!cfg.galaxy);   // topbar hoà vào nền vũ trụ
     document.body.classList.toggle('fx-backdrop-on', backdrop);                // khung nội dung thành kính mờ để thấy nền phía sau
@@ -2791,7 +2825,7 @@ function renderFullscreenFx() {
     if (theme === 'noel' && lvl === 2) SnowPile.start(layer);                  // tuyết lớn: có đống tuyết
 
     ThreeFx.start(layer, theme, lvl).then(ok => {
-        if (ok === false && layer.isConnected && layer.dataset.fx === theme && !layer.querySelector('canvas:not(.fx-snow-pile)')) {
+        if (generation === fullscreenFxGeneration && ok === false && layer.isConnected && layer.dataset.fx === theme && !layer.querySelector('canvas:not(.fx-snow-pile)')) {
             layer.insertAdjacentHTML('afterbegin', cssFxFallbackHtml(theme, cfg, lvl));
         }
     });
