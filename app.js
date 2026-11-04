@@ -1,6 +1,8 @@
+import { convertWorkHoursRows } from './work-hours-data.js';
+import { resolveApiUrl } from './api-client.js';
 // Firebase Configuration - Chỉ sử dụng Firestore
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, getDocs, onSnapshot, enableIndexedDbPersistence, query, where, writeBatch, arrayUnion, arrayRemove }
+import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, getDocs, onSnapshot, enableIndexedDbPersistence, query, where, writeBatch, runTransaction, arrayUnion, arrayRemove }
     from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, EmailAuthProvider, reauthenticateWithCredential, updatePassword }
     from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -153,7 +155,6 @@ let aiJobParserModal = null;
 let aiParsedJobs = [];
 let aiSelectedJobs = new Set();
 const GEMINI_API_KEY_STORAGE = 'workpic_gemini_api_key';
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent';
 
 // === Timeline view ===
 let scheduleView = 'calendar';  // 'calendar' | 'timeline'
@@ -3746,6 +3747,14 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     document.getElementById('confirmMigrateLegacyJobsBtn').addEventListener('click', migrateLegacyJobs);
     document.getElementById('viewDataBtn').addEventListener('click', openViewDataModal);
+    let todayTimelineTimer;
+    const todayModal = document.getElementById('viewDataModal');
+    todayModal.addEventListener('shown.bs.modal', () => {
+        renderTodayJobs();
+        clearInterval(todayTimelineTimer);
+        todayTimelineTimer = setInterval(renderTodayJobs, 1000);
+    });
+    todayModal.addEventListener('hidden.bs.modal', () => clearInterval(todayTimelineTimer));
     document.getElementById('checkDueBtn').addEventListener('click', openCheckDueModal);
     document.getElementById('presenterSpinBtn').addEventListener('click', openPresenterSpinModal);
     document.getElementById('spinNowBtn').addEventListener('click', spinPresenterWheel);
@@ -3761,6 +3770,10 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('confirmSpinBtn').addEventListener('click', confirmPresenterAssignment);
     document.getElementById('checkDueCompareBtn').addEventListener('click', runCheckDueCompare);
     document.getElementById('checkDueClearBtn').addEventListener('click', clearCheckDueForm);
+    document.getElementById('checkDueEditBtn').addEventListener('click', () => {
+        setCheckDueInputCollapsed(false);
+        updateCheckDueStep(1);
+    });
     document.getElementById('checkDueCopyBtn').addEventListener('click', copyCheckDueResult);
     document.getElementById('checkDueOldFile').addEventListener('change', (e) => handleCheckDueFile(e, 'old'));
     document.getElementById('checkDueNewFile').addEventListener('change', (e) => handleCheckDueFile(e, 'new'));
@@ -4498,6 +4511,7 @@ async function toggleOutOfScheduleJob(job) {
 
 // Render Schedule Calendar (2 tuần tới) - FIXED PAST/TODAY/FUTURE LOGIC
 function renderSchedule() {
+    renderTodayJobs();
     if (scheduleView === 'timeline') {
         renderTimeline();
         return;
@@ -5223,63 +5237,89 @@ async function loadTransferUsers() {
     }
 }
 
-async function openViewDataModal() {
-    const usersContainer = document.getElementById('usersViewList');
-    const jobsContainer = document.getElementById('activeJobsViewList');
-    usersContainer.innerHTML = '<p class="text-muted">Đang tải danh sách user...</p>';
-    jobsContainer.innerHTML = '<p class="text-muted">Đang tải job...</p>';
+function openViewDataModal() {
+    if (!currentUser) return;
     viewDataModal.show();
+    renderTodayJobs();
+}
 
-    const activeJobs = jobs.filter(job =>
-        currentUser &&
-        job.ownerId === currentUser.uid &&
-        job.isPaused !== true &&
-        job.isOutOfSchedule !== true
-    ).sort((firstJob, secondJob) => {
-        const weekdayDifference = getWeekdayIndex(firstJob.date) - getWeekdayIndex(secondJob.date);
-        if (weekdayDifference !== 0) return weekdayDifference;
-        return String(firstJob.time || '').localeCompare(String(secondJob.time || ''));
-    });
+function openJobFromToday(job) {
+    const todayModal = document.getElementById('viewDataModal');
+    const jobModal = document.getElementById('viewJobModal');
+    // Switch modals after the transition so Bootstrap keeps focus and backdrops correct.
+    todayModal.addEventListener('hidden.bs.modal', () => {
+        jobModal.addEventListener('hidden.bs.modal', () => {
+            if (currentUser) openViewDataModal();
+        }, { once: true });
+        openViewJobModal(job);
+    }, { once: true });
+    viewDataModal.hide();
+}
 
-    if (activeJobs.length === 0) {
-        jobsContainer.innerHTML = '<p class="text-muted">Không có job đang thực hiện.</p>';
-    } else {
-        jobsContainer.innerHTML = `
-            <table class="table table-sm table-bordered align-middle">
-                <thead><tr><th>Tiêu đề</th><th>Loại</th><th>Thứ thực hiện</th><th>Giờ</th></tr></thead>
-                <tbody>${activeJobs.map(job => `
-                    <tr>
-                        <td>${escapeHtml(job.title)}</td>
-                        <td><span class="job-type-label ${escapeHtml(job.type)}">${escapeHtml(getTypeLabel(job.type))}</span></td>
-                        <td>${escapeHtml(getWeekdayLabel(job.date))}</td>
-                        <td>${escapeHtml(job.time || '-')}</td>
-                    </tr>`).join('')}</tbody>
-            </table>`;
+function getTodayShift(now = new Date()) {
+    const isNight = currentUser?.workShift === 'night';
+    const date = new Date(now);
+    date.setHours(0, 0, 0, 0);
+    if (isNight && now.getHours() < 7) date.setDate(date.getDate() - 1);
+    const end = new Date(date);
+    if (isNight) end.setDate(end.getDate() + 1);
+    return { date, end, isNight, startHour: isNight ? 20 : 7, endHour: isNight ? 31 : 20 };
+}
+
+function renderTodayJobs() {
+    const modal = document.getElementById('viewDataModal');
+    if (!currentUser || !modal?.classList.contains('show')) return;
+    const container = document.getElementById('todayTimelineView');
+    const scrollLeft = container.querySelector('.timeline-scroll')?.scrollLeft || 0;
+    renderTimeline({ todayOnly: true, containerId: 'todayTimelineView' });
+    const scroll = container.querySelector('.timeline-scroll');
+    if (scroll) scroll.scrollLeft = scrollLeft;
+    const now = new Date();
+    const { date, end: rangeEnd, isNight, startHour, endHour } = getTodayShift(now);
+    const dateKey = localDateKey(date);
+    const hours = scheduleWorkHoursMap[dateKey];
+    const shiftLabel = isNight ? 'Ca đêm 20:00–07:00 hôm sau' : 'Ca ngày 07:00–20:00';
+    document.getElementById('todayWorkHours').innerHTML = `<strong><i class="bi bi-clock"></i> Giờ làm việc · ${escapeHtml(date.toLocaleDateString('vi-VN'))}</strong>
+        <span class="d-block">${shiftLabel} · ${escapeHtml(getDeptName(currentUser.department || '') || 'Chưa phân bộ phận')}</span>
+        <span class="d-block">${hours ? `Motion · M151: <strong>${escapeHtml(formatWorkHours(hours.motion))}</strong> · Station · O100: <strong>${escapeHtml(formatWorkHours(hours.station))}</strong>` : 'Chưa có dữ liệu giờ làm việc cho ngày này.'}</span>`;
+    const byDate = buildScheduleEntries(date, rangeEnd, jobs.filter(job => !job.isPaused && !job.isOutOfSchedule));
+    const shiftStart = new Date(date);
+    shiftStart.setHours(startHour);
+    const shiftEnd = new Date(date);
+    shiftEnd.setHours(endHour);
+    const entries = Object.entries(byDate).flatMap(([key, items]) => items.map(entry => {
+        const time = entry.overrideTime || entry.job.time || '08:00';
+        const [h, m] = time.split(':').map(Number);
+        const start = parseJobDate(key);
+        start.setHours(h, m, 0, 0);
+        return { ...entry, start, end: new Date(start.getTime() + getJobDuration(entry.job) * 60000) };
+    })).filter(entry => entry.start < shiftEnd && entry.end > shiftStart)
+        .sort((a, b) => a.start - b.start);
+    let activeCount = 0;
+    const list = document.getElementById('todayJobsList');
+    const markup = entries.map(entry => {
+        const time = entry.overrideTime || entry.job.time || '08:00';
+        const { start, end } = entry;
+        const active = now >= start && now < end;
+        if (active && !entry.completed) activeCount++;
+        const state = active ? 'active' : (now >= end ? 'past' : '');
+        const label = entry.completed ? 'Đã hoàn thành' : active ? 'Đang chạy' : now >= end ? 'Đã qua giờ' : 'Sắp tới';
+        const endTime = end.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+        return `<button type="button" class="timeline-job today-job-card ${escapeHtml(entry.job.type || 'once')} ${state} ${entry.completed ? 'completed' : ''} ${entry.shiftedFrom || entry.movedFrom ? 'shifted' : ''} ${entry.job.isPresenterJob ? 'presenter' : ''}" data-today-job-id="${escapeHtml(entry.job.id)}">
+            <span class="today-job-time">${escapeHtml(time)}–${endTime}${localDateKey(end) !== dateKey ? ' (+1 ngày)' : ''}</span>
+            <span class="today-job-title">${escapeHtml(entry.job.title || '(không tên)')}</span>
+            <span class="today-job-status">${label}</span>
+        </button>`;
+    }).join('') || '<p class="text-muted text-center py-4">Hôm nay chưa có job nào trong lịch.</p>';
+    // Preserve keyboard focus when only the clock has changed.
+    if (list.innerHTML !== markup) {
+        list.innerHTML = markup;
+        list.querySelectorAll('[data-today-job-id]').forEach(button => button.addEventListener('click', () => {
+            const job = jobs.find(job => job.id === button.dataset.todayJobId);
+            if (job) openJobFromToday(job);
+        }));
     }
-
-    try {
-        const usersSnapshot = await getDocs(collection(db, 'users'));
-        const users = [];
-        usersSnapshot.forEach(userDoc => users.push(userDoc.data()));
-        // Chỉ hiển thị user đang đăng nhập (currentUser), ẩn các user khác
-        // để tránh danh sách user dài đẩy phần "Job đang thực hiện" xuống dưới.
-        const loggedInUsers = users.filter(user => user.uid === currentUser.uid);
-        loggedInUsers.sort((a, b) => (a.displayName || a.email).localeCompare(b.displayName || b.email));
-        usersContainer.innerHTML = loggedInUsers.length
-            ? `<table class="table table-sm table-bordered align-middle">
-                <thead><tr><th>Tên</th><th>Email</th><th>Trạng thái</th></tr></thead>
-                <tbody>${loggedInUsers.map(user => `
-                    <tr>
-                        <td>${escapeHtml(user.displayName || '-')}</td>
-                        <td>${escapeHtml(user.email || '-')}</td>
-                        <td><span class="badge bg-success">Đang đăng nhập</span></td>
-                    </tr>`).join('')}</tbody>
-            </table>`
-            : '<p class="text-muted">Không có user nào đang đăng nhập.</p>';
-    } catch (error) {
-        console.error('Lỗi tải danh sách user:', error);
-        usersContainer.innerHTML = '<p class="text-danger">Không thể tải danh sách user. Kiểm tra Firestore Rules.</p>';
-    }
+    document.getElementById('todayJobsSummary').textContent = `${date.toLocaleDateString('vi-VN')} · ${isNight ? 'Ca đêm 20:00–07:00' : 'Ca ngày 07:00–20:00'} · ${entries.length} job · ${activeCount} đang chạy`;
 }
 
 function escapeHtml(value) {
@@ -5317,7 +5357,15 @@ function openCheckDueModal() {
     }
 }
 
+function setCheckDueInputCollapsed(collapsed) {
+    document.getElementById('checkDueInputSection').classList.toggle('d-none', collapsed);
+    const editBtn = document.getElementById('checkDueEditBtn');
+    editBtn.classList.toggle('d-none', !collapsed);
+    editBtn.setAttribute('aria-expanded', String(!collapsed));
+}
+
 function clearCheckDueForm() {
+    setCheckDueInputCollapsed(false);
     document.getElementById('checkDueOldPaste').value = '';
     document.getElementById('checkDueNewPaste').value = '';
     document.getElementById('checkDueOldFile').value = '';
@@ -5656,11 +5704,11 @@ async function handleCheckDueFile(event, which) {
             checkDueOldRows = parsed.old;
             checkDueNewRows = parsed.new;
 
-            infoEl.textContent = `✓ "${file.name}" · sheet "${parsed.oldSheetName}" = Ban_dau`;
+            infoEl.textContent = `✓ "${file.name}" · sheet "${parsed.oldSheetName}" = Dữ liệu system`;
             infoEl.classList.add('has-file');
 
             const otherInfoEl = document.getElementById(which === 'old' ? 'checkDueNewFileInfo' : 'checkDueOldFileInfo');
-            otherInfoEl.textContent = `✓ "${file.name}" · sheet "${parsed.newSheetName}" = CanDoi`;
+            otherInfoEl.textContent = `✓ "${file.name}" · sheet "${parsed.newSheetName}" = Dữ liệu mong muốn`;
             otherInfoEl.classList.add('has-file');
 
             setCheckDueSourceBadge('old', parsed.old.length);
@@ -5738,7 +5786,8 @@ function runCheckDueCompare() {
     const { oldRows, newRows } = getCheckDueInputRows();
 
     if (!oldRows || oldRows.length === 0 || !newRows || newRows.length === 0) {
-        updateCheckDueStatus('Vui lòng nhập/tải đầy đủ dữ liệu Ban_dau và CanDoi trước khi so sánh.');
+        setCheckDueInputCollapsed(false);
+        updateCheckDueStatus('Vui lòng nhập/tải đầy đủ Dữ liệu system và Dữ liệu mong muốn trước khi so sánh.');
         updateCheckDueStep(1);
         return;
     }
@@ -5748,6 +5797,7 @@ function runCheckDueCompare() {
     const section = document.getElementById('checkDueResultSection');
     const tableContainer = document.getElementById('checkDueResultTable');
 
+    setCheckDueInputCollapsed(true);
     compareBtn.disabled = true;
     section.style.display = 'none';
     tableContainer.innerHTML = '';
@@ -5768,7 +5818,7 @@ function runCheckDueCompare() {
         tableContainer.classList.add('check-due-result-animate');
 
         compareBtn.disabled = false;
-        updateCheckDueStatus(`Ban_dau: ${oldRows.length} dòng · CanDoi: ${newRows.length} dòng · ${checkDueResultRows.length} thay đổi`);
+        updateCheckDueStatus(`Dữ liệu system: ${oldRows.length} dòng · Dữ liệu mong muốn: ${newRows.length} dòng · ${checkDueResultRows.length} thay đổi`);
     }, 650);
 }
 
@@ -5793,7 +5843,7 @@ function renderCheckDueResult() {
         tableContainer.innerHTML = `
             <div class="text-center text-muted py-4">
                 <i class="bi bi-check2-circle" style="font-size:2rem;color:#16a34a;"></i>
-                <p class="mt-2 mb-0">Không có thay đổi nào giữa Ban_dau và CanDoi.</p>
+                <p class="mt-2 mb-0">Không có thay đổi nào giữa Dữ liệu system và Dữ liệu mong muốn.</p>
             </div>`;
         return;
     }
@@ -6836,8 +6886,10 @@ function listenUserNotifications() {
                         n.type && n.type.includes('rejected') ? 'warning' : 'info'
                     );
                     // Job trong ngày đã được làm xong → nhắc cả trên desktop như nhắc job
-                    if (n.type === 'quickjob_completed') {
-                        showQuickJobDesktopNotification('✅ Job trong ngày đã hoàn thành', n.message, n.jobId || change.doc.id);
+                    if (n.type === 'quickjob_completed' || n.type === 'quickjob_invited') {
+                        notifyOnce(`desktop_quick_${currentUser.uid}_${n.id}`, () => {
+                            showQuickJobDesktopNotification(n.type === 'quickjob_completed' ? '✅ Job trong ngày đã hoàn thành' : '📩 Bạn được chỉ định job', n.message, n.jobId || change.doc.id);
+                        });
                     }
                 }
             });
@@ -6888,6 +6940,11 @@ function listenQuickJobs() {
             snapshot.docChanges().forEach(change => {
                 const data = { id: change.doc.id, ...change.doc.data() };
                 const isMine = data.createdBy === currentUser.uid || data.assigneeUid === currentUser.uid;
+                if (change.type === 'added' && data.status === 'open' && data.createdBy !== currentUser.uid && isQuickJobVisibleToMe(data)) {
+                    notifyOnce(`desktop_quick_open_${currentUser.uid}_${data.id}`, () => {
+                        showQuickJobDesktopNotification('📩 Job trong ngày mới', `${data.createdByName || 'Đồng nghiệp'} gửi: ${data.content}${data.deadline ? ' · Hạn: ' + data.deadline : ''}`, data.id);
+                    });
+                }
 
                 if (change.type === 'modified' && data.status === 'claimed' && isMine) {
                     // Có người nhận job -> tự động mở khung chat
@@ -7479,6 +7536,7 @@ async function quickChatSelfClaim(jobId) {
             assigneeUid: currentUser.uid,
             assigneeName: currentUser.displayName || currentUser.email,
             time,
+            claimedAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
         });
 
@@ -7600,7 +7658,8 @@ async function quickChatConfirmAssign(jobId) {
         await pushNotification(
             invitedUid,
             'quickjob_invited',
-            `${currentUser.displayName || currentUser.email} đã chỉ định bạn nhận job "${job.content}"`
+            `${currentUser.displayName || currentUser.email} đã chỉ định bạn nhận job "${job.content}"${job.deadline ? ' · Hạn: ' + job.deadline : ''}`,
+            jobId
         );
 
         showNotification('Đã gửi chỉ định', `Đã chỉ định ${invitedName} nhận job "${job.content}".`, false, 'success');
@@ -7677,6 +7736,7 @@ async function quickChatAcceptInvite(jobId) {
             assigneeUid: currentUser.uid,
             assigneeName: currentUser.displayName || currentUser.email,
             time,
+            claimedAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
         });
 
@@ -7756,24 +7816,48 @@ async function quickChatCancelInvite(jobId) {
     }
 }
 
+function quickJobCompletionDetails(job, completedAt) {
+    const details = [];
+    const startedAt = job.claimedAt || (job.status === 'claimed' ? job.updatedAt : null);
+    const started = new Date(startedAt || '');
+    const finished = new Date(completedAt);
+    if (Number.isFinite(started.getTime()) && finished >= started) {
+        const seconds = Math.floor((finished - started) / 1000);
+        details.push(`Thời gian từ lúc nhận: ${seconds < 60 ? seconds + ' giây' : Math.floor(seconds / 60) + ' phút'}`);
+    }
+    if (job.deadline && job.dateKey) {
+        const due = new Date(`${job.dateKey}T${job.deadline}:00`);
+        if (Number.isFinite(due.getTime())) {
+            const delta = due - finished;
+            const minutes = Math.ceil(Math.abs(delta) / 60000);
+            details.push(delta > 0 ? `Hoàn thành trước hạn ${minutes} phút (hạn ${job.deadline})` : delta === 0 ? `Hoàn thành đúng hạn (${job.deadline})` : `Hoàn thành trễ hạn ${minutes} phút (hạn ${job.deadline})`);
+        }
+    }
+    return details.join(' · ');
+}
+
 async function quickChatComplete(jobId) {
     const job = quickJobsList.find(j => j.id === jobId);
     if (!job || !currentUser) return;
     try {
-        await updateDoc(doc(db, 'quickJobs', jobId), {
-            status: 'completed',
-            completedAt: new Date().toISOString()
+        await runTransaction(db, async transaction => {
+            const ref = doc(db, 'quickJobs', jobId);
+            const snapshot = await transaction.get(ref);
+            if (!snapshot.exists()) return;
+            const latest = snapshot.data();
+            if (latest.status !== 'claimed' || latest.assigneeUid !== currentUser.uid) return;
+            const completedAt = new Date().toISOString();
+            const details = quickJobCompletionDetails(latest, completedAt);
+            transaction.update(ref, { status: 'completed', completedAt, completionDetails: details });
+            const recipients = new Set([latest.createdBy, latest.invitedBy].filter(uid => uid && uid !== currentUser.uid));
+            for (const uid of recipients) {
+                transaction.set(doc(collection(db, 'notifications')), {
+                    userId: uid, type: 'quickjob_completed', jobId,
+                    message: `${currentUser.displayName || currentUser.email} đã hoàn thành job "${latest.content}"${details ? ' · ' + details : ''}`,
+                    timestamp: completedAt, read: false
+                });
+            }
         });
-        // Báo cho người tạo job và người đã chỉ định mình (nếu khác nhau), không báo cho chính mình
-        const recipients = new Set([job.createdBy, job.invitedBy].filter(uid => uid && uid !== currentUser.uid));
-        for (const uid of recipients) {
-            await pushNotification(
-                uid,
-                'quickjob_completed',
-                `${currentUser.displayName || currentUser.email} đã hoàn thành job "${job.content}"`,
-                jobId
-            );
-        }
     } catch (error) {
         console.error('Lỗi hoàn thành job:', error);
         showNotification('Lỗi', 'Không thể cập nhật hoàn thành.', false, 'danger');
@@ -8331,10 +8415,11 @@ function showNotification(title, message, isSystemNotification = false, type = '
     }, 5000);
 
     if (isSystemNotification && 'Notification' in window && Notification.permission === 'granted') {
-        new Notification(title, {
+        const desktopNotification = new Notification(title, {
             body: message,
             icon: 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="#6366f1"/><path d="M32 14a12 12 0 0 0-12 12v8l-4 6h32l-4-6v-8a12 12 0 0 0-12-12zm-5 30a5 5 0 0 0 10 0z" fill="#fff"/></svg>')
         });
+        setTimeout(() => desktopNotification.close(), 15000);
     }
 
 }
@@ -8462,17 +8547,18 @@ async function showQuickJobDesktopNotification(title, body, refId) {
         icon: 'https://cdn-icons-png.flaticon.com/512/2972/2972185.png',
         badge: 'https://cdn-icons-png.flaticon.com/512/2693/2693507.png',
         tag: `quickjob-done-${refId}`,
-        requireInteraction: true,
+        requireInteraction: false,
         silent: false,
         data: { kind: 'quickjob', jobId: refId }
     };
     try {
         const reg = await getSwRegistration();
-        if (reg) { await reg.showNotification(title, options); return; }
+        if (reg) { await showTimedDesktopNotification(reg, title, options); return; }
     } catch (err) {
         console.warn('showNotification (job trong ngày) lỗi, dùng thông báo thường:', err);
     }
     const n = new Notification(title, options);
+    setTimeout(() => n.close(), 15000);
     n.onclick = (event) => {
         event.preventDefault();
         window.focus();
@@ -8563,6 +8649,34 @@ async function handleJobNotificationAction(d) {
 }
 
 // ---------------- Kiểm tra & hiển thị nhắc nhở ----------------
+const notificationClaims = new Set();
+function notifyOnce(key, send) {
+    const claim = () => {
+        if (notificationClaims.has(key) || localStorage.getItem(key)) return;
+        notificationClaims.add(key);
+        localStorage.setItem(key, 'true');
+        send();
+    };
+    if (navigator.locks?.request) {
+        navigator.locks.request(key, claim).catch(error => console.warn('Notification claim failed:', error));
+    } else claim();
+}
+
+async function showTimedDesktopNotification(reg, title, options) {
+    const instanceId = `${Date.now()}-${Math.random()}`;
+    await reg.showNotification(title, {
+        ...options,
+        requireInteraction: false,
+        data: { ...options.data, instanceId }
+    });
+    setTimeout(async () => {
+        try {
+            const notifications = await reg.getNotifications({ tag: options.tag });
+            notifications.filter(n => n.data?.instanceId === instanceId).forEach(n => n.close());
+        } catch (error) { console.warn('Cannot close desktop notification:', error); }
+    }, 15000);
+}
+
 function checkNotifications() {
     const now = new Date();
     const lead = notifyLeadMinutes;
@@ -8587,22 +8701,23 @@ function checkNotifications() {
             if (dueAt.getTime() < now.getTime() - 120000) continue;
 
             const dateKey = localDateKey(day);
-            const slots = [{ at: dueAt, kind: 'due' }];
-            if (lead > 0) slots.push({ at: new Date(dueAt.getTime() - lead * 60000), kind: 'lead' });
+            const slots = [{ at: new Date(dueAt.getTime() - Math.max(0, lead) * 60000), kind: lead > 0 ? 'lead' : 'due' }];
 
             slots.forEach(({ at, kind }) => {
                 const elapsed = now.getTime() - at.getTime();
                 if (elapsed < 0 || elapsed >= 120000) return;   // chỉ nhắc trong 2 phút kể từ mốc
                 // Đã bấm "Đợi tí" qua mốc này → bỏ nhắc ở mốc này, sẽ nhắc lại đúng lúc hết thời gian chờ
                 if (entry.snoozeUntil && new Date(entry.snoozeUntil).getTime() > at.getTime()) return;
-                const key = `notified_${job.id}_${dateKey}_${timeStr}_${kind}${kind === 'lead' ? lead : ''}`;
-                if (localStorage.getItem(key)) return;
-                localStorage.setItem(key, 'true');
+                const key = `notified_once_${currentUser?.uid || ''}_${job.id}_${entry.originDate || dateKey}_${dateKey}_${timeStr}`;
+                if (localStorage.getItem(`notified_${job.id}_${dateKey}_${timeStr}_due`) ||
+                    localStorage.getItem(`notified_${job.id}_${dateKey}_${timeStr}_lead${lead}`)) return;
                 const message = kind === 'lead'
                     ? `Còn ${lead} phút nữa (${timeStr}): ${job.title}`
                     : `Đã đến giờ thực hiện: ${job.title}`;
-                showNotification('🔔 Nhắc nhở Job', message, false);
-                showDesktopNotification(job, { kind, originDate: entry.originDate, time: timeStr });
+                notifyOnce(key, () => {
+                    showNotification('🔔 Nhắc nhở Job', message, false);
+                    showDesktopNotification(job, { kind, originDate: entry.originDate, time: timeStr });
+                });
             });
         }
     });
@@ -8618,10 +8733,10 @@ function checkNotifications() {
         const job = jobs.find(j => j.id === o.jobId);
         if (!job || job.isPaused === true || job.isOutOfSchedule === true || job.enableNotification === false) return;
         const key = `notified_snooze_${o.id}_${o.snoozeUntil}`;
-        if (localStorage.getItem(key)) return;
-        localStorage.setItem(key, 'true');
-        showNotification('⏳ Nhắc lại Job', `Hết thời gian chờ: ${job.title}`, false, 'warning');
-        showDesktopNotification(job, { kind: 'snooze', originDate: o.occurrenceDate, time: o.overrideTime || job.time });
+        notifyOnce(key, () => {
+            showNotification('⏳ Nhắc lại Job', `Hết thời gian chờ: ${job.title}`, false, 'warning');
+            showDesktopNotification(job, { kind: 'snooze', originDate: o.occurrenceDate, time: o.overrideTime || job.time });
+        });
     });
 }
 
@@ -8670,8 +8785,8 @@ async function createNotification(job, ctx = {}) {
         icon: 'https://cdn-icons-png.flaticon.com/512/2972/2972185.png',
         badge: 'https://cdn-icons-png.flaticon.com/512/2693/2693507.png',
         tag: jobNotificationTag(job.id, originDate),   // cùng job + ngày thì thay thông báo cũ
-        renotify: true,
-        requireInteraction: true,                      // giữ thông báo cho đến khi bấm
+        renotify: false,
+        requireInteraction: false,
         silent: false,
         actions,
         data: { jobId: job.id, originDate, kind: ctx.kind || 'due' }
@@ -8681,7 +8796,7 @@ async function createNotification(job, ctx = {}) {
     try {
         const reg = await getSwRegistration();
         if (reg) {
-            await reg.showNotification(title, options);
+            await showTimedDesktopNotification(reg, title, options);
             return;
         }
     } catch (err) {
@@ -8698,7 +8813,7 @@ async function createNotification(job, ctx = {}) {
         if (clickedJob) openViewJobModal(clickedJob);
         notification.close();
     };
-    setTimeout(() => notification.close(), 30000);
+    setTimeout(() => notification.close(), 15000);
 }
 
 
@@ -8722,6 +8837,7 @@ function startUiRefreshLoop() {
 }
 
 function refreshUiForCurrentTime() {
+    renderTodayJobs();
     const now = new Date();
     const minuteKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}-${now.getHours()}-${now.getMinutes()}`;
 
@@ -10976,50 +11092,11 @@ function parseWorkHoursText(text) {
 }
 
 function renderWorkHoursPreview() {
-    const area = document.getElementById('whPasteArea');
-    const host = document.getElementById('whPreview');
-    const saveBtn = document.getElementById('whSaveBtn');
-    const saveText = document.getElementById('whSaveBtnText');
-    workHoursParsed = parseWorkHoursText(area.value);
-
-    const usable = workHoursParsed.filter(r => !r.error && !r.skipped);
-    const dupCount = usable.filter(r => workHoursMap[r.date]).length;
     document.getElementById('whPreviewCount').textContent = workHoursParsed.length;
-
-    const fmtVal = (v) => isValidWhNumber(v)
-        ? `${formatWorkHours(v)}h`
-        : '<span class="text-muted">—</span>';
-
-    if (workHoursParsed.length === 0) {
-        host.innerHTML = '<div class="wh-empty">Chưa có dữ liệu</div>';
-    } else {
-        host.innerHTML = `<table class="wh-table">
-            <thead><tr><th>Ngày</th><th>Motion</th><th>Station</th><th>Trạng thái</th></tr></thead>
-            <tbody>${workHoursParsed.map(r => {
-            if (r.error) {
-                return `<tr><td colspan="3" class="wh-note">${escapeHtml(r.line)}</td><td><span class="wh-tag err">${escapeHtml(r.error)}</span></td></tr>`;
-            }
-            const old = workHoursMap[r.date];
-            let tag;
-            if (r.skipped) tag = '<span class="wh-tag skip">Trùng trong dữ liệu dán · bỏ qua</span>';
-            else if (old) {
-                const oM = isValidWhNumber(old.motion) ? formatWorkHours(old.motion) + 'h' : '—';
-                const oS = isValidWhNumber(old.station) ? formatWorkHours(old.station) + 'h' : '—';
-                tag = `<span class="wh-tag dup">Đã có · M ${oM} / S ${oS}</span>`;
-            } else tag = '<span class="wh-tag new">Mới</span>';
-
-            return `<tr class="${r.skipped ? 'is-skip' : ''}">
-                    <td>${formatWorkHoursDateLabel(r.date)}</td>
-                    <td>${fmtVal(r.motion)}</td>
-                    <td>${fmtVal(r.station)}</td>
-                    <td class="wh-note">${tag}</td></tr>`;
-        }).join('')}</tbody></table>`;
-    }
-
-    saveBtn.disabled = usable.length === 0;
-    saveText.textContent = usable.length === 0
-        ? 'Lưu giờ làm việc'
-        : `Lưu ${usable.length} ngày${dupCount ? ` (${dupCount} trùng)` : ''}`;
+    document.getElementById('whPreview').innerHTML = workHoursParsed.length
+        ? '<table class="wh-table"><thead><tr><th>Ngày</th><th>Motion · M151</th><th>Station · O100</th></tr></thead><tbody>' + workHoursParsed.map(r =>
+            '<tr><td>' + formatWorkHoursDateLabel(r.date) + '</td><td>' + formatWorkHours(r.motion) + '</td><td>' + formatWorkHours(r.station) + '</td></tr>').join('') + '</tbody></table>'
+        : '<div class="wh-empty">Bấm Update dữ liệu để lấy giờ làm việc.</div>';
 }
 
 function renderWorkHoursSaved() {
@@ -11047,31 +11124,6 @@ function renderWorkHoursSaved() {
         const sV = isValidWhNumber(it.station) ? `S: ${formatWorkHours(it.station)}h` : '';
         const valsText = [mV, sV].filter(Boolean).join(' · ') || '—';
 
-        // Chế độ chỉnh sửa (Inline Edit)
-        // Chế độ chỉnh sửa (Inline Edit)
-        if (editingWhDate === it.date) {
-            return `
-                <div class="wh-saved-item is-editing" data-date="${escapeHtml(it.date)}" style="flex-wrap: wrap; align-items: stretch; border-color: var(--primary); gap: 0.5rem;">
-                    <div style="flex: 1 1 100%; font-size: 0.78rem; color: var(--primary);">
-                        <strong>Đang sửa: ${formatDateShortDMY(it.date)}</strong>
-                    </div>
-                    
-                    <div style="display:flex; gap:0.4rem; flex: 1 1 100%; align-items: center;">
-                        <input type="text" inputmode="decimal" class="form-control form-control-sm" id="edit-wh-m-${it.date}" value="${isValidWhNumber(it.motion) ? formatWorkHours(it.motion) : ''}" placeholder="Motion" style="flex: 1 1 50px; min-width: 0;">
-                        
-                        <input type="text" inputmode="decimal" class="form-control form-control-sm" id="edit-wh-s-${it.date}" value="${isValidWhNumber(it.station) ? formatWorkHours(it.station) : ''}" placeholder="Station" style="flex: 1 1 50px; min-width: 0;">
-                        
-                        <button type="button" class="btn btn-sm btn-save" data-act="save-edit" title="Lưu" style="flex: none; padding: 0.35rem 0.65rem;">
-                            <i class="bi bi-check-lg"></i>
-                        </button>
-                        
-                        <button type="button" class="btn btn-sm btn-cancel" data-act="cancel-edit" title="Hủy" style="flex: none; padding: 0.35rem 0.65rem;">
-                            <i class="bi bi-x-lg"></i>
-                        </button>
-                    </div>
-                </div>`;
-        }
-
         // Chế độ xem bình thường
         return `
             <div class="wh-saved-item" data-date="${escapeHtml(it.date)}">
@@ -11079,110 +11131,100 @@ function renderWorkHoursSaved() {
                     <strong>${formatDateShortDMY(it.date)}${it.date === todayKey ? ' · hôm nay' : ''}</strong>
                     <div class="wh-saved-vals">${valsText}</div>
                 </div>
-                <div style="display:flex; gap:0.2rem;">
-                    <button type="button" class="wh-saved-del" data-act="edit" title="Sửa ngày này" style="color: var(--primary);">
-                        <i class="bi bi-pencil-fill"></i>
-                    </button>
-                    <button type="button" class="wh-saved-del" data-act="del" title="Xóa ngày này">
-                        <i class="bi bi-trash-fill"></i>
-                    </button>
-                </div>
+
             </div>`;
     }).join('');
 }
-async function commitWorkHours(rows) {
-    const btn = document.getElementById('whSaveBtn');
-    btn.disabled = true;
-    try {
-        const nowIso = new Date().toISOString();
-        const dept = workHoursViewDept;
-        const payload = rows.map(r => ({
-            date: r.date,
-            motion: isValidWhNumber(r.motion) ? r.motion : null,
-            station: isValidWhNumber(r.station) ? r.station : null,
-            department: dept,
-            updatedBy: currentUser.uid,
-            updatedByName: currentUser.displayName || currentUser.email || '',
-            updatedAt: nowIso
-        }));
-        for (let i = 0; i < payload.length; i += 400) {
-            const batch = writeBatch(db);
-            payload.slice(i, i + 400).forEach(p =>
-                batch.set(doc(db, WORKHOURS_COLLECTION, workHoursDocId(dept, p.date)), p));
-            await batch.commit();
-        }
-        showNotification('Thành công', `Đã lưu giờ làm việc cho ${payload.length} ngày${dept ? ' · ' + getDeptName(dept) : ''}.`, false, 'success');
-        document.getElementById('whPasteArea').value = '';
-        renderWorkHoursPreview();
-    } catch (error) {
-        console.error('Lỗi lưu giờ làm việc:', error);
-        showNotification('Lỗi', 'Không lưu được giờ làm việc. Kiểm tra Firestore rules cho collection "workHours".', false, 'danger');
-        renderWorkHoursPreview();
-    }
+let workHoursSyncBusy = false;
+function reportWorkHoursError(error) {
+    const host = document.getElementById('whSyncError');
+    host.textContent = error.message || String(error);
+    host.hidden = false;
+    console.error('Work-hours update failed:', error);
+    showNotification('Không cập nhật được giờ làm việc', 'Xem chi tiết lỗi trong form Update giờ làm việc.', false, 'danger');
 }
-
 async function saveWorkHours() {
-    if (!currentUser) return;
-    renderWorkHoursPreview();
-    const errors = workHoursParsed.filter(r => r.error);
-    const usable = workHoursParsed.filter(r => !r.error && !r.skipped);
-    if (usable.length === 0) return;
-    const dups = usable.filter(r => workHoursMap[r.date]);
-
-    const proceed = () => commitWorkHours(usable);
-    if (dups.length === 0 && errors.length === 0) { proceed(); return; }
-
-    const parts = [];
-    if (dups.length) {
-        const list = dups.slice(0, 6).map(r => formatDateShortDMY(r.date)).join(', ') + (dups.length > 6 ? ` … (+${dups.length - 6})` : '');
-        parts.push(`${dups.length} ngày đã có dữ liệu (${list}) — bạn có muốn cập nhật không?`);
-    }
-    if (errors.length) parts.push(`${errors.length} dòng lỗi sẽ bị bỏ qua.`);
-    showConfirmDialog({
-        title: dups.length ? 'Có ngày bị trùng' : 'Có dòng bị lỗi',
-        message: parts.join(' '),
-        confirmText: dups.length ? 'Cập nhật' : 'Vẫn lưu',
-        onConfirm: proceed
-    });
-}
-
-function addQuickWorkHoursRow() {
-    const dateVal = document.getElementById('whQuickDate').value;
-    const motionRaw = document.getElementById('whQuickMotion').value.trim();
-    const stationRaw = document.getElementById('whQuickStation').value.trim();
-
-    if (!dateVal) {
-        showNotification('Thiếu dữ liệu', 'Chọn ngày.', false, 'warning');
-        return;
-    }
-
-    const motion = parseWorkHoursNumber(motionRaw);
-    const station = parseWorkHoursNumber(stationRaw);
-
-    if (Number.isNaN(motion) || Number.isNaN(station)) {
-        showNotification('Sai định dạng', 'Giờ không hợp lệ (chỉ dùng số, có thể dùng . hoặc ,).', false, 'warning');
-        return;
-    }
-    if (motion === null && station === null) {
-        showNotification('Thiếu dữ liệu', 'Nhập ít nhất Motion hoặc Station.', false, 'warning');
-        return;
-    }
-
-    const area = document.getElementById('whPasteArea');
-    const motionText = isValidWhNumber(motion) ? String(motion) : '';
-    const stationText = isValidWhNumber(station) ? String(station) : '';
-    area.value = (area.value.trim() ? area.value.replace(/\s+$/, '') + '\n' : '')
-        + `${dateVal}\t${motionText}\t${stationText}`;
-
-    document.getElementById('whQuickMotion').value = '';
-    document.getElementById('whQuickStation').value = '';
-    renderWorkHoursPreview();
+    if (!currentUser || workHoursSyncBusy) return;
+    workHoursSyncBusy = true;
+    document.getElementById('whSyncError').hidden = true;
+    const btn = document.getElementById('whSaveBtn');
+    const dept = workHoursViewDept;
+    const user = currentUser;
+    btn.disabled = true;
+    document.getElementById('whDeptSelect').disabled = true;
+    const reset = () => {
+        workHoursSyncBusy = false;
+        btn.disabled = false;
+        document.getElementById('whDeptSelect').disabled = false;
+        document.getElementById('whSaveBtnText').textContent = 'Update dữ liệu';
+    };
+    try {
+        document.getElementById('whSaveBtnText').textContent = 'Đang lấy dữ liệu…';
+        const apiUrl = resolveApiUrl(location);
+        let response;
+        try {
+            response = await fetch(apiUrl, { cache: 'no-store', signal: AbortSignal.timeout(60000) });
+        } catch (error) {
+            throw new Error(error.name === 'TimeoutError'
+                ? 'Kết nối IBM quá thời gian chờ. Vui lòng thử lại.'
+                : 'Không kết nối được server trên máy này. Mở start-server.pyw và bật server. Nếu dùng GitHub Pages, cho phép trang truy cập localhost/mạng cục bộ trong trình duyệt rồi thử lại.');
+        }
+        if (!response.ok) {
+            let failure = null;
+            try { failure = await response.json(); } catch { /* Static servers may return an HTML 404. */ }
+            const lines = [`HTTP ${response.status} · ${apiUrl}`];
+            if (failure && failure.error) {
+                lines.push(String(failure.error));
+                if (failure.stage) lines.push('Bước lỗi: ' + failure.stage);
+                if (failure.code !== undefined) lines.push('Mã lỗi: ' + failure.code);
+                if (Array.isArray(failure.details)) lines.push(...failure.details.map(String));
+                if (failure.hint) lines.push('Gợi ý: ' + failure.hint);
+            } else lines.push(response.status === 404
+                ? 'Không tìm thấy API. Chạy serve-work-hours.ps1 và mở http://localhost:8080.'
+                : 'Không nhận được lỗi chi tiết. Khởi động lại server bằng start-server.pyw bản mới và xem nhật ký.');
+            throw new Error(lines.join('\n'));
+        }
+        const data = await response.json();
+        const rows = convertWorkHoursRows(data.rows);
+        workHoursParsed = rows;
+        renderWorkHoursPreview();
+        if (!rows.length) { showNotification('Thông báo', 'Query không có dữ liệu phù hợp.', false, 'info'); reset(); return; }
+        // Read fresh data instead of relying on the realtime cache for duplicate detection.
+        const snapshot = await getDocs(query(collection(db, WORKHOURS_COLLECTION), where('date', '>=', rows[0].date), where('date', '<=', rows[rows.length - 1].date)));
+        const existing = new Map();
+        snapshot.forEach(d => { if (resolveWorkHoursDept(d.id, d.data()) === dept) existing.set(d.data().date, d.id); });
+        const duplicates = rows.filter(r => existing.has(r.date));
+        const commit = async () => {
+            workHoursSyncBusy = true;
+            btn.disabled = true;
+            document.getElementById('whDeptSelect').disabled = true;
+            try {
+                if (!currentUser || currentUser.uid !== user.uid) throw new Error('Phiên đăng nhập đã thay đổi.');
+                for (let i = 0; i < rows.length; i += 400) {
+                    const batch = writeBatch(db);
+                    rows.slice(i, i + 400).forEach(r => batch.set(doc(db, WORKHOURS_COLLECTION, existing.get(r.date) || workHoursDocId(dept, r.date)), {
+                        ...r, department: dept, updatedBy: user.uid,
+                        updatedByName: user.displayName || user.email || '', updatedAt: new Date().toISOString()
+                    }, { merge: true }));
+                    await batch.commit();
+                }
+                showNotification('Thành công', 'Đã thêm ' + (rows.length - duplicates.length) + ' ngày mới và cập nhật ' + duplicates.length + ' ngày trùng.', false, 'success');
+            } catch (error) { reportWorkHoursError(error); }
+            finally { reset(); }
+        };
+        if (duplicates.length) {
+            showConfirmDialog({ title: 'Dữ liệu giờ làm việc đã tồn tại',
+                message: duplicates.length + ' ngày trùng, ' + (rows.length - duplicates.length) + ' ngày mới. Bạn có muốn update không?',
+                confirmText: 'Update', onConfirm: commit });
+            // The dialog owns confirmation; cancel leaves all records unchanged.
+            reset();
+        } else await commit();
+    } catch (error) { reportWorkHoursError(error); reset(); }
 }
 
 function openWorkHoursModal() {
     workHoursModalOpen = true;
-    document.getElementById('whQuickDate').value = localDateKey(new Date());
-    rebuildWorkHoursMap();          // đảm bảo không dùng map cũ
+    rebuildWorkHoursMap();
     fillDeptSelect(document.getElementById('whDeptSelect'), workHoursViewDept, { none: true, noneLabel: 'Chưa phân bộ phận' });
     renderWorkHoursSaved();
     renderWorkHoursPreview();
@@ -11193,92 +11235,7 @@ function initWorkHoursUi() {
     workHoursModal = new bootstrap.Modal(document.getElementById('workHoursModal'));
     document.getElementById('workHoursModal').addEventListener('hidden.bs.modal', () => { workHoursModalOpen = false; });
     document.getElementById('workHoursBtn').addEventListener('click', openWorkHoursModal);
-    document.getElementById('whPasteArea').addEventListener('input', renderWorkHoursPreview);
     document.getElementById('whSaveBtn').addEventListener('click', saveWorkHours);
-    document.getElementById('whQuickAddBtn').addEventListener('click', addQuickWorkHoursRow);
-    document.getElementById('whClearBtn').addEventListener('click', () => {
-        document.getElementById('whPasteArea').value = '';
-        renderWorkHoursPreview();
-    });
-    document.getElementById('whSavedList').addEventListener('click', async (e) => {
-        const btn = e.target.closest('[data-act]');
-        if (!btn) return;
-
-        const item = btn.closest('.wh-saved-item');
-        const date = item.dataset.date;
-        const act = btn.dataset.act;
-
-        // 1. Xóa giờ làm việc
-        if (act === 'del') {
-            showConfirmDialog({
-                title: 'Xóa giờ làm việc',
-                message: `Xóa giờ làm việc ngày ${formatWorkHoursDateLabel(date)}?`,
-                confirmText: 'Xóa',
-                confirmClass: 'btn-delete',
-                onConfirm: async () => {
-                    try {
-                        await deleteDoc(doc(db, WORKHOURS_COLLECTION, workHoursDocId(workHoursViewDept, date)));
-                        showNotification('Đã xóa', 'Xóa giờ làm việc thành công.', false, 'success');
-                        if (editingWhDate === date) editingWhDate = null;
-                    }
-                    catch (err) {
-                        console.error('Lỗi xóa giờ làm việc:', err);
-                        showNotification('Lỗi', 'Không xóa được.', false, 'danger');
-                    }
-                }
-            });
-        }
-        // 2. Bật chế độ sửa
-        else if (act === 'edit') {
-            editingWhDate = date;
-            renderWorkHoursSaved();
-        }
-        // 3. Hủy sửa
-        else if (act === 'cancel-edit') {
-            editingWhDate = null;
-            renderWorkHoursSaved();
-        }
-        // 4. Lưu chỉnh sửa
-        else if (act === 'save-edit') {
-            const motionRaw = document.getElementById(`edit-wh-m-${date}`).value;
-            const stationRaw = document.getElementById(`edit-wh-s-${date}`).value;
-            const motion = parseWorkHoursNumber(motionRaw);
-            const station = parseWorkHoursNumber(stationRaw);
-
-            if (Number.isNaN(motion) || Number.isNaN(station)) {
-                showNotification('Sai định dạng', 'Giờ không hợp lệ (chỉ dùng số, có thể dùng . hoặc ,).', false, 'warning');
-                return;
-            }
-            if (motion === null && station === null) {
-                showNotification('Thiếu dữ liệu', 'Nhập ít nhất Motion hoặc Station.', false, 'warning');
-                return;
-            }
-
-            const originalHTML = btn.innerHTML;
-            btn.innerHTML = '<span class="loading" style="width:14px;height:14px;border-width:2px;"></span>';
-            btn.disabled = true;
-
-            try {
-                await setDoc(doc(db, WORKHOURS_COLLECTION, workHoursDocId(workHoursViewDept, date)), {
-                    date: date,
-                    motion: isValidWhNumber(motion) ? motion : null,
-                    station: isValidWhNumber(station) ? station : null,
-                    department: workHoursViewDept,
-                    updatedBy: currentUser.uid,
-                    updatedByName: currentUser.displayName || currentUser.email || '',
-                    updatedAt: new Date().toISOString()
-                });
-                showNotification('Thành công', `Đã cập nhật giờ làm việc ngày ${formatDateShortDMY(date)}.`, false, 'success');
-                editingWhDate = null;
-                renderWorkHoursSaved(); // Tắt chế độ sửa, Realtime listener sẽ tự load lại list
-            } catch (err) {
-                console.error('Lỗi sửa giờ làm việc:', err);
-                showNotification('Lỗi', 'Không thể cập nhật.', false, 'danger');
-                btn.innerHTML = originalHTML;
-                btn.disabled = false;
-            }
-        }
-    });
 }
 
 // ============================================================
@@ -11687,11 +11644,13 @@ function setScheduleView(mode) {
 // TIMELINE — hỗ trợ ca ngày (07:00-20:00) & ca đêm (20:00-07:00),
 // cảnh báo overlap, kéo thả đổi giờ với confirm.
 // ============================================================
-function renderTimeline() {
-    const container = document.getElementById('timelineView');
+function renderTimeline({ todayOnly = false, containerId = 'timelineView' } = {}) {
+    const container = document.getElementById(containerId);
     if (!container) return;
+    const expandedJobId = container.querySelector('.timeline-job-hover-source')?.dataset?.jobId;
+    container.clearTimelineHover?.();
 
-    const isNight = (currentUser && currentUser.workShift === 'night');
+    const isNight = currentUser && currentUser.workShift === 'night';
     const START_HOUR = isNight ? 20 : 7;
     const END_HOUR = isNight ? 31 : 20;
     const HOURS = END_HOUR - START_HOUR; // Tổng số cột giờ
@@ -11710,16 +11669,19 @@ function renderTimeline() {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    if (todayOnly) today.setTime(getTodayShift().date.getTime());
     const startDate = new Date(today);
     const startDay = startDate.getDay();
     const diffToMonday = startDay === 0 ? -6 : 1 - startDay;
-    startDate.setDate(startDate.getDate() + diffToMonday);
-    const totalWeeks = 2;
+    if (!todayOnly) startDate.setDate(startDate.getDate() + diffToMonday);
+    const totalWeeks = todayOnly ? 1 : 2;
     const rangeEnd = new Date(startDate);
-    rangeEnd.setDate(rangeEnd.getDate() + (totalWeeks * 7) - 1);
+    rangeEnd.setDate(rangeEnd.getDate() + (todayOnly ? 0 : (totalWeeks * 7) - 1));
 
     const activeJobs = jobs.filter(job => job.isPaused !== true && job.isOutOfSchedule !== true);
-    const jobsByDate = buildScheduleEntries(startDate, rangeEnd, activeJobs);
+    const dataEnd = new Date(rangeEnd);
+    if (todayOnly && isNight) dataEnd.setDate(dataEnd.getDate() + 1);
+    const jobsByDate = buildScheduleEntries(startDate, dataEnd, activeJobs);
     const myOffMap = getMyOffMap();
     const todayKeyStr = localDateKey(today);
     const now = new Date();
@@ -11731,6 +11693,14 @@ function renderTimeline() {
 
     const getShiftEntries = (dateStr) => {
         if (!isNight) return (jobsByDate[dateStr] || []).map(e => ({ entry: e, crossDay: false }));
+        if (todayOnly) {
+            const next = parseJobDate(dateStr);
+            next.setDate(next.getDate() + 1);
+            return [
+                ...(jobsByDate[dateStr] || []).filter(e => (e.overrideTime || e.job.time || '08:00') >= '20:00').map(entry => ({ entry, crossDay: false })),
+                ...(jobsByDate[localDateKey(next)] || []).filter(e => (e.overrideTime || e.job.time || '08:00') < '07:00').map(entry => ({ entry, crossDay: true }))
+            ];
+        }
 
         const out = [];
         (jobsByDate[dateStr] || []).forEach(e => {
@@ -11799,7 +11769,7 @@ function renderTimeline() {
         return list;
     };
 
-    const daysToShow = showSunday ? 7 : 6;
+    const daysToShow = todayOnly ? 1 : (showSunday ? 7 : 6);
     let rowsHtml = '';
     let totalShown = 0;
 
@@ -11838,8 +11808,8 @@ function renderTimeline() {
 
                 const { startDate: jStart, endDate: jEnd } = getJobDateRange(entry, dateStr, crossDay);
                 let stateClass = '';
-                if (now >= jStart && now <= jEnd) stateClass = 'active';
-                else if (now > jEnd || isPastRow) stateClass = 'past';
+                if (now >= jStart && now < jEnd) stateClass = 'active';
+                else if (now >= jEnd || isPastRow) stateClass = 'past';
 
                 const pObj = { entry, crossDay, stateClass, startMin: shiftStartMin, endMin: shiftStartMin + duration, leftPct, widthPct };
 
@@ -11896,9 +11866,10 @@ function renderTimeline() {
                          title="${escapeHtml(tooltip)}"
                          data-job-id="${e.job.id}"
                          data-origin-date="${e.originDate}"
-                         draggable="true">
+                         draggable="${!todayOnly}">
                         <span class="timeline-job-time">${displayTime}</span>
                         <span class="timeline-job-title">${escapeHtml(title)}</span>
+                        <span class="timeline-job-details">Thời lượng: ${dur} phút</span>
                         ${isOverlap ? '<span class="timeline-overlap-tag" title="Job bị trùng giờ">!</span>' : ''}
                     </div>`;
             };
@@ -11948,7 +11919,7 @@ function renderTimeline() {
     `;
 
     // Vạch đỏ "Bây giờ"
-    let nowHourF = now.getHours() + now.getMinutes() / 60;
+    let nowHourF = now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
     if (isNight && nowHourF < 12) nowHourF += 24;
     const nowShiftMin = nowHourF * 60;
 
@@ -11966,13 +11937,56 @@ function renderTimeline() {
 
     // Bind Drag & Drop
     container.querySelectorAll('.timeline-job[data-job-id]').forEach(el => {
+        el.addEventListener('mouseenter', () => {
+            if (el.classList.contains('dragging')) return;
+            container.clearTimelineHover?.();
+            const rect = el.getBoundingClientRect();
+            const preview = el.cloneNode(true);
+            preview.removeAttribute('style');
+            preview.removeAttribute('title');
+            preview.removeAttribute('data-job-id');
+            preview.setAttribute('aria-hidden', 'true');
+            preview.classList.add('timeline-job-expanded');
+            const width = Math.min(Math.max(rect.width, 320), window.innerWidth - 16);
+            preview.style.width = `${width}px`;
+            preview.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - width - 8))}px`;
+            preview.style.top = `${rect.top}px`;
+            document.body.appendChild(preview);
+            const height = preview.getBoundingClientRect().height;
+            preview.style.top = `${Math.max(8, Math.min(rect.top, window.innerHeight - height - 8))}px`;
+            el.classList.add('timeline-job-hover-source');
+            const clear = () => {
+                preview.remove();
+                el.classList.remove('timeline-job-hover-source');
+                window.removeEventListener('scroll', clear, true);
+                window.removeEventListener('resize', clear);
+                document.removeEventListener('show.bs.modal', clear);
+                document.removeEventListener('hide.bs.modal', clear);
+                container.clearTimelineHover = null;
+            };
+            container.clearTimelineHover = clear;
+            window.addEventListener('scroll', clear, true);
+            window.addEventListener('resize', clear);
+            document.addEventListener('show.bs.modal', clear);
+            document.addEventListener('hide.bs.modal', clear);
+        });
+        el.addEventListener('mouseleave', () => container.clearTimelineHover?.());
+        if (expandedJobId && el.dataset.jobId === expandedJobId) {
+            el.dispatchEvent(new Event('mouseenter'));
+        }
         el.addEventListener('click', (ev) => {
+            container.clearTimelineHover?.();
             if (el.dataset.justDragged === '1') { ev.stopPropagation(); return; }
             const job = jobs.find(j => j.id === el.dataset.jobId);
-            if (job) openViewJobModal(job);
+            if (job) {
+                if (todayOnly) openJobFromToday(job);
+                else openViewJobModal(job);
+            }
         });
 
+        if (todayOnly) return;
         el.addEventListener('dragstart', (ev) => {
+            container.clearTimelineHover?.();
             const jobRect = el.getBoundingClientRect();
             const offsetX = ev.clientX - jobRect.left;
             ev.dataTransfer.effectAllowed = 'move';
@@ -11991,6 +12005,7 @@ function renderTimeline() {
         });
     });
 
+    if (todayOnly) return;
     container.querySelectorAll('.timeline-track[data-date]').forEach(track => {
         track.addEventListener('dragover', (ev) => {
             ev.preventDefault();
@@ -12094,12 +12109,60 @@ async function handleTimelineDrop(ev, track, START_HOUR, END_HOUR, HOURS, TOTAL_
 // ============================================================
 // AI JOB PARSER — Gemini API + fallback rule-based
 // ============================================================
+const GEMINI_CONNECTION_STORAGE = 'workpic_gemini_connection';
+let geminiConnectionMemory;
+function getGeminiConnection() {
+    try { return geminiConnectionMemory || JSON.parse(localStorage.getItem(GEMINI_CONNECTION_STORAGE) || '{}'); }
+    catch { return geminiConnectionMemory || {}; }
+}
+function saveGeminiConnection(update) {
+    geminiConnectionMemory = { ...getGeminiConnection(), ...update };
+    try { localStorage.setItem(GEMINI_CONNECTION_STORAGE, JSON.stringify(geminiConnectionMemory)); } catch {}
+}
+function geminiModelOrder() {
+    const { model, models } = getGeminiConnection();
+    return [...new Set([model, ...(models || GEMINI_MODEL_FALLBACKS)].filter(Boolean))];
+}
+async function checkGeminiConnection() {
+    const apiKey = getGeminiApiKey();
+    if (!apiKey) throw new Error('Chưa có Gemini API key.');
+    if (!getGeminiConnection().model) await listAvailableGeminiModels();
+    const deadline = Date.now() + 30000;
+    for (const model of geminiModelOrder()) {
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) break;
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), Math.min(10000, remaining));
+        try {
+            const result = await callGemini(model, 'Return only the JSON array: []', apiKey, controller.signal);
+            if (result.ok && result.data.candidates?.[0]?.content?.parts?.some(p => p.text)) {
+                saveGeminiConnection({ model });
+                return model;
+            }
+            if ([401, 403, 429].includes(result.status)) {
+                const error = new Error(result.error); error.fatal = true; throw error;
+            }
+            const connection = getGeminiConnection();
+            saveGeminiConnection({
+                model: connection.model === model ? null : connection.model,
+                ...(result.status === 404 ? { models: (connection.models || GEMINI_MODEL_FALLBACKS).filter(name => name !== model) } : {})
+            });
+        } catch (error) {
+            if (error.fatal) throw error;
+        } finally { clearTimeout(timer); }
+    }
+    throw new Error('Chưa kết nối được model. Vui lòng thử lại hoặc dùng parser cơ bản.');
+}
 function getGeminiApiKey() {
     try { return localStorage.getItem(GEMINI_API_KEY_STORAGE) || ''; }
     catch (e) { return ''; }
 }
 
 function saveGeminiApiKey(key) {
+    if (String(key).trim() !== getGeminiApiKey()) {
+        geminiConnectionMemory = {};
+        try { localStorage.removeItem(GEMINI_CONNECTION_STORAGE); } catch {}
+    }
     try { localStorage.setItem(GEMINI_API_KEY_STORAGE, String(key).trim()); }
     catch (e) { /* ignore */ }
 }
@@ -12149,15 +12212,16 @@ function initAIParserUi() {
         renderAIParsedJobs();
     });
 
-    // Trong initAIParserUi()
-document.getElementById('aiCheckModelsBtn')?.addEventListener('click', async () => {
-    try {
-        await listAvailableGeminiModels();
-        showNotification('Xong', 'Đã in danh sách model ra Console (F12).', false, 'success');
-    } catch (e) {
-        showNotification('Lỗi', e.message, false, 'danger');
-    }
-});
+    document.getElementById('aiCheckModelsBtn')?.addEventListener('click', async (event) => {
+        const button = event.currentTarget;
+        button.disabled = true;
+        try {
+            const model = await checkGeminiConnection();
+            showNotification('Kết nối thành công', 'Đã lưu ' + model + ' để dùng cho lần sau.', false, 'success');
+        } catch (e) {
+            showNotification('Lỗi', e.message, false, 'danger');
+        } finally { button.disabled = false; }
+    });
 
     document.getElementById('aiBackToPasteBtn').addEventListener('click', () => showAIStep('paste'));
     document.getElementById('aiCreateJobsBtn').addEventListener('click', createSelectedJobs);
@@ -12173,13 +12237,12 @@ async function listAvailableGeminiModels() {
     console.log('📋 Đang lấy danh sách model từ Gemini API...');
     const res = await fetch(
         'https://generativelanguage.googleapis.com/v1beta/models?pageSize=100',
-        { headers: { 'x-goog-api-key': apiKey } }
+        { headers: { 'x-goog-api-key': apiKey }, signal: AbortSignal.timeout(8000) }
     );
 
     if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        console.error(`❌ Lỗi ${res.status}: ${err?.error?.message || res.statusText}`);
-        return;
+        throw new Error('HTTP ' + res.status + ': ' + (err?.error?.message || res.statusText));
     }
 
     const data = await res.json();
@@ -12195,6 +12258,10 @@ async function listAvailableGeminiModels() {
             outputTokenLimit: m.outputTokenLimit
         }));
 
+    const modelsForJobs = table.map(m => m.name)
+        .filter(name => /gemini-.*flash/.test(name) && !/image|audio|live|tts|native/.test(name))
+        .sort((a, b) => Number(b.includes('lite')) - Number(a.includes('lite')));
+    if (modelsForJobs.length) saveGeminiConnection({ models: modelsForJobs });
     console.table(table);
     return table;
 }
@@ -12268,6 +12335,7 @@ async function handleAIAnalyze() {
 
 // Danh sách model thử theo thứ tự: nhanh/ổn định trước, model mới sau
 const GEMINI_MODEL_FALLBACKS = [
+    'gemini-2.5-flash-lite',
     'gemini-2.0-flash',          // Ổn định nhất, không thinking
     'gemini-2.0-flash-lite',     // Nhẹ nhất, ít bị quá tải
     'gemini-1.5-flash',          // Legacy nhưng rất ổn định
@@ -12294,7 +12362,7 @@ async function callGemini(model, prompt, apiKey, signal) {
                 temperature: 0.2,
                 maxOutputTokens: 4096,
                 // Tắt thinking cho các model 2.5 để tránh timeout
-                ...(model.includes('2.5') ? { thinkingConfig: { thinkingBudget: 0 } } : {})
+                ...(/^gemini-2\.5-flash/.test(model) ? { thinkingConfig: { thinkingBudget: 0 } } : {})
             }
         }),
         signal
@@ -12348,9 +12416,12 @@ ${text}
 
     const errors = [];
 
-    for (const model of GEMINI_MODEL_FALLBACKS) {
+    const deadline = Date.now() + 45000;
+    for (const model of geminiModelOrder()) {
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) break;
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 45000);   // 45s mỗi model
+        const timer = setTimeout(() => controller.abort(), Math.min(15000, remaining));
 
         try {
             console.log(`🤖 [Gemini] Thử model: ${model} ...`);
@@ -12359,6 +12430,13 @@ ${text}
 
             if (!result.ok) {
                 const code = result.status;
+                if (code === 404) {
+                    const connection = getGeminiConnection();
+                    saveGeminiConnection({
+                        model: connection.model === model ? null : connection.model,
+                        models: (connection.models || GEMINI_MODEL_FALLBACKS).filter(name => name !== model)
+                    });
+                }
                 // 400/401/403 → key hoặc cấu hình sai, dừng luôn
                 if ([400, 401, 403].includes(code)) {
                     throw new Error(`API key không hợp lệ hoặc chưa bật Gemini API (${code}): ${result.error}`);
@@ -12375,7 +12453,9 @@ ${text}
             }
 
             // Thành công
-            const aiText = result.data.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+            const candidate = result.data.candidates?.[0];
+            if (!candidate || candidate.finishReason === 'MAX_TOKENS') throw new Error('AI trả về dữ liệu thiếu hoặc quá dài.');
+            const aiText = (candidate.content?.parts || []).filter(part => !part.thought).map(part => part.text || '').join('');
             let parsed;
             try {
                 parsed = JSON.parse(aiText);
@@ -12386,13 +12466,16 @@ ${text}
             }
 
             console.log(`✅ [Gemini] Model chạy được: ${model} · ${parsed.length} job`);
-            return validateAIJobs(parsed);
+            if (!Array.isArray(parsed)) throw new Error('AI phải trả về danh sách job.');
+            const jobs = validateAIJobs(parsed);
+            saveGeminiConnection({ model });
+            return jobs;
 
         } catch (e) {
             clearTimeout(timer);
             if (e.name === 'AbortError') {
-                console.warn(`⏱️ [Gemini] ${model} timeout 45s → thử model kế tiếp`);
-                errors.push(`${model}: timeout 45s`);
+                console.warn(`⏱️ [Gemini] ${model} timeout 15s → thử model kế tiếp`);
+                errors.push(`${model}: timeout 15s`);
                 continue;
             }
             // Lỗi key/quota đã throw ở trên → không nuốt

@@ -343,9 +343,9 @@
                                     </div>
                                 </div>
                                 <div class="col-6">
-                                    <button class="btn btn-view-data w-100" id="viewDataBtn" type="button">
+                                    <button class="btn btn-view-data w-100" id="viewDataBtn" type="button" title="Xem toàn bộ job hôm nay theo thời gian thực">
                                         <i class="bi bi-eye-fill"></i>
-                                        <span>Xem</span>
+                                        <span>Job hiện tại</span>
                                     </button>
                                 </div>
                                 <div class="col-6">
@@ -666,21 +666,17 @@
                             <i class="bi bi-bar-chart-fill"></i>
                         </div>
                         <div class="modern-header-text">
-                            <h5 class="modal-title mb-0">User và job đang thực hiện</h5>
-                            <p class="modern-header-subtitle mb-0">Tổng quan danh sách user và job đang hoạt động</p>
+                            <h5 class="modal-title mb-0">Timeline hôm nay</h5>
+                            <p class="modern-header-subtitle mb-0" id="todayJobsSummary" aria-live="polite"></p>
                         </div>
                     </div>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <section class="view-data-section">
-                        <h6><i class="bi bi-people-fill"></i> Danh sách user</h6>
-                        <div id="usersViewList" class="table-responsive"></div>
-                    </section>
-                    <section class="view-data-section mt-4">
-                        <h6><i class="bi bi-play-circle-fill"></i> Job đang thực hiện của tôi</h6>
-                        <div id="activeJobsViewList" class="table-responsive"></div>
-                    </section>
+                    <div id="todayWorkHours" class="alert alert-info py-2 mb-3" aria-live="polite"></div>
+                    <p class="text-muted small">Vạch đỏ: thời gian hiện tại · Viền cầu vồng: đang chạy · Mờ: đã qua giờ · Màu theo loại job như Timeline.</p>
+                    <div id="todayTimelineView" class="timeline-view"></div>
+                    <div id="todayJobsList" class="today-jobs-list mt-3"></div>
                 </div>
             </div>
         </div>
@@ -724,6 +720,7 @@
                         </div>
                     </div>
 
+                    <div id="checkDueInputSection">
                     <div class="check-due-mode-tabs" role="tablist">
                         <button class="check-due-mode-tab active" id="checkDuePasteTab" data-bs-toggle="tab"
                             data-bs-target="#checkDuePastePane" type="button" role="tab">
@@ -745,7 +742,6 @@
                                         </div>
                                         <div class="check-due-source-info">
                                             <h6>Dữ liệu system</h6>
-                                            <span>Dữ liệu gốc</span>
                                         </div>
                                         <span class="check-due-source-badge" id="checkDueOldPasteBadge">0 dòng</span>
                                     </div>
@@ -765,7 +761,6 @@ Không cần đúng thứ tự hay tên cột."></textarea>
                                         </div>
                                         <div class="check-due-source-info">
                                             <h6>Dữ liệu mong muốn</h6>
-                                            <span>Dữ liệu so sánh</span>
                                         </div>
                                         <span class="check-due-source-badge" id="checkDueNewPasteBadge">0 dòng</span>
                                     </div>
@@ -784,7 +779,7 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
                                             <i class="bi bi-file-earmark-text-fill"></i>
                                         </div>
                                         <div class="check-due-source-info">
-                                            <h6>File dữ liệu system</h6>
+                                            <h6>Dữ liệu system</h6>
                                             <span>Excel · CSV · ODS</span>
                                         </div>
                                         <span class="check-due-source-badge" id="checkDueOldFileBadge">0 dòng</span>
@@ -806,7 +801,7 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
                                             <i class="bi bi-file-earmark-diff-fill"></i>
                                         </div>
                                         <div class="check-due-source-info">
-                                            <h6>File dữ liệu mong muốn</h6>
+                                            <h6>Dữ liệu mong muốn</h6>
                                             <span>Excel · CSV · ODS</span>
                                         </div>
                                         <span class="check-due-source-badge" id="checkDueNewFileBadge">0 dòng</span>
@@ -826,16 +821,21 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
                         </div>
                     </div>
 
+                    </div>
                     <div class="check-due-toolbar">
                         <div class="check-due-status" id="checkDueStatus">
                             <i class="bi bi-info-circle"></i> Sẵn sàng so sánh
                         </div>
                         <div class="check-due-toolbar-actions">
+                            <button type="button" class="btn btn-outline-secondary btn-sm d-none" id="checkDueEditBtn"
+                                aria-controls="checkDueInputSection" aria-expanded="false">
+                                <i class="bi bi-pencil-square"></i> Sửa dữ liệu
+                            </button>
                             <button type="button" class="btn btn-outline-secondary btn-sm" id="checkDueClearBtn">
                                 <i class="bi bi-eraser-fill"></i> Xóa dữ liệu
                             </button>
                             <button type="button" class="btn btn-compare" id="checkDueCompareBtn">
-                                <i class="bi bi-arrow-left-right"></i> So Sánh
+                                <i class="bi bi-arrow-left-right"></i> Check change due
                                 <div class="btn-shine"></div>
                             </button>
                         </div>
@@ -1207,77 +1207,25 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
                         <div class="modern-header-icon"><i class="bi bi-clock-history"></i></div>
                         <div class="modern-header-text">
                             <h5 class="modal-title mb-0">Update giờ làm việc</h5>
-                            <p class="modern-header-subtitle mb-0">Nhập giờ Motion &amp; Station theo ngày — hiển thị ở
-                                góc phải ô ngày trên lịch</p>
+                            <p class="modern-header-subtitle mb-0">Tự động lấy giờ Motion &amp; Station từ dữ liệu sản xuất</p>
                         </div>
                     </div>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
+                    <div class="wh-sync-toolbar">
                     <div class="dept-filter wh-dept-row">
                         <label for="whDeptSelect"><i class="bi bi-diagram-3-fill"></i> Bộ phận</label>
                         <select class="form-select form-select-sm" id="whDeptSelect"></select>
-                        <span class="wh-dept-hint">Giờ nhập &amp; hiển thị trên lịch là của bộ phận này</span>
+                        <span class="wh-dept-hint">Cập nhật giờ làm việc cho bộ phận đang chọn</span>
                     </div>
+                    <button type="button" class="btn btn-save" id="whSaveBtn"><i class="bi bi-arrow-repeat"></i> <span id="whSaveBtnText">Update dữ liệu</span></button>
+                    </div>
+                    <div class="wh-sync-info"><i class="bi bi-info-circle-fill"></i><span>Lấy giờ Motion và Station từ dữ liệu sản xuất. Ngày đã có dữ liệu sẽ được hỏi xác nhận trước khi cập nhật.</span></div>
+                    <pre id="whSyncError" class="alert alert-danger small" role="alert" hidden style="white-space:pre-wrap; overflow-wrap:anywhere; user-select:text;"></pre>
                     <div class="wh-layout">
-                        <div class="wh-input-col">
-                            <div class="wh-block">
-                                <div class="wh-block-title"><i class="bi bi-plus-circle-fill"></i> Thêm nhanh 1 ngày
-                                </div>
-                                <div class="wh-quick-row">
-                                    <input type="date" class="form-control form-control-sm" id="whQuickDate">
-                                    <input type="text" inputmode="decimal" class="form-control form-control-sm"
-                                        id="whQuickMotion" placeholder="Motion (h) — tùy chọn">
-                                    <input type="text" inputmode="decimal" class="form-control form-control-sm"
-                                        id="whQuickStation" placeholder="Station (h) — tùy chọn">
-                                    <button type="button" class="btn btn-sm btn-save" id="whQuickAddBtn"><i
-                                            class="bi bi-plus-lg"></i></button>
-                                </div>
-                            </div>
-                            <div class="wh-block">
-                                <div class="wh-block-title"><i class="bi bi-clipboard-data-fill"></i> Dán nhiều ngày
-                                </div>
-                                <textarea class="form-control wh-textarea" id="whPasteArea" rows="8" placeholder="Dán từ Excel, mỗi dòng 1 ngày, 3 cột theo thứ tự:
-Ngày  |  Giờ Motion  |  Giờ Station
-
-VD (đủ 2 cột):
-10/07	9.75	9.75
-10/08	8	7.5
-
-VD (chỉ nhập Motion):
-10/09/2026	10
-
-Ngày nhận (ưu tiên THÁNG trước):
-  mm/dd · mm/dd/yy · mm/dd/yyyy · yyyy-mm-dd
-  5-Oct · Oct-5 · 1yymmdd
-Số thập phân dùng . hoặc ,"></textarea>
-                                <div class="wh-hint"><i class="bi bi-info-circle"></i> Dòng tiêu đề (nếu có) sẽ tự bỏ
-                                    qua. Ngày đã có dữ liệu sẽ được hỏi trước khi cập nhật.</div>
-                            </div>
-                            <div class="wh-block">
-                                <div class="wh-block-title"><i class="bi bi-eye-fill"></i> Xem trước <span
-                                        class="wh-count" id="whPreviewCount">0</span></div>
-                                <div class="wh-preview" id="whPreview">
-                                    <div class="wh-empty">Chưa có dữ liệu</div>
-                                </div>
-                            </div>
-                            <div class="d-flex justify-content-between align-items-center mt-3 gap-2 flex-wrap">
-                                <button type="button" class="btn btn-outline-secondary btn-sm" id="whClearBtn"><i
-                                        class="bi bi-eraser-fill"></i> Xóa ô dán</button>
-                                <button type="button" class="btn btn-save" id="whSaveBtn" disabled>
-                                    <i class="bi bi-check-circle-fill"></i> <span id="whSaveBtnText">Lưu giờ làm
-                                        việc</span>
-                                    <div class="btn-shine"></div>
-                                </button>
-                            </div>
-                        </div>
-                        <aside class="wh-saved-col">
-                            <div class="wh-block">
-                                <div class="wh-block-title"><i class="bi bi-calendar-check-fill"></i> Đã nhập gần đây
-                                </div>
-                                <div class="wh-saved-list" id="whSavedList"></div>
-                            </div>
-                        </aside>
+                        <div class="wh-input-col"><div class="wh-block"><div class="wh-block-title"><i class="bi bi-table"></i> Dữ liệu vừa lấy <span class="wh-count" id="whPreviewCount">0</span></div><div class="wh-preview" id="whPreview" aria-live="polite"></div></div></div>
+                        <aside class="wh-saved-col"><div class="wh-block"><div class="wh-block-title"><i class="bi bi-calendar-check-fill"></i> Đã cập nhật</div><div class="wh-saved-list" id="whSavedList"></div></div></aside>
                     </div>
                 </div>
             </div>
@@ -1973,7 +1921,7 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
                                     <div class="ia-item">Đăng ký lịch off<span>Xem &amp; quản lý ngày nghỉ</span></div>
                                     <div class="ia-item">Thống kê job<span>Xem user nào đang có nhiều job và chiếm nhiều
                                             thời gian</span></div>
-                                    <div class="ia-item">Update giờ làm việc<span>Dán nhiều ngày (Ngày · Motion ·
+                                    <div class="ia-item">Update giờ làm việc<span>Lấy dữ liệu tự động (Motion ·
                                             Station), hiện M/S ở góc ô ngày, hỏi khi trùng ngày</span></div>
                                     <div class="ia-item">Tính lương<span>Ước tính thu nhập &amp; thực lãnh trong tháng
                                             theo LCB</span></div>

@@ -7950,6 +7950,82 @@ body {
     gap: 0.25rem;
 }
 
+#workHoursModal .wh-sync-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--surface-muted);
+}
+
+#workHoursModal .wh-sync-toolbar .wh-dept-row {
+    margin: 0;
+    flex: 1;
+    flex-wrap: wrap;
+}
+
+#workHoursModal .wh-sync-toolbar .btn {
+    flex-shrink: 0;
+}
+
+#workHoursModal .wh-sync-info {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    padding: 0.9rem 0.2rem 1.1rem;
+    color: var(--muted);
+    font-size: 0.8rem;
+}
+
+#workHoursModal .wh-sync-info > i {
+    color: var(--primary);
+}
+
+#workHoursModal #whSyncError {
+    flex: 0 0 auto;
+    min-height: 0;
+    max-height: 220px;
+    overflow: auto;
+    padding: 0.9rem 1rem;
+    line-height: 1.6;
+    font-size: 0.8rem;
+    margin-bottom: 1rem;
+}
+
+#workHoursModal .wh-input-col > .wh-block {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    margin-bottom: 0;
+}
+
+#workHoursModal .wh-preview {
+    max-height: 55vh;
+    flex: 1;
+}
+
+#workHoursModal .wh-table th {
+    position: sticky;
+    top: 0;
+    background: var(--surface-muted);
+    z-index: 1;
+}
+
+#workHoursModal .wh-empty {
+    padding: 2.5rem 1rem;
+}
+
+@media (max-width: 575px) {
+    #workHoursModal .wh-sync-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+}
+
 .wh-layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 340px;
@@ -15022,4 +15098,67 @@ body.theme-dark .timeline-hour.cross-day {
 /* Nếu job vừa overlap vừa active, ưu tiên viền cầu vồng */
 .timeline-job.active.overlap::before {
     background: conic-gradient(from 0deg, #fbbf24, #ef4444, #fbbf24, #ef4444);
+}
+.today-jobs-list {
+    display: grid;
+    gap: 10px;
+    padding: 4px;
+}
+.today-jobs-list .today-job-card {
+    position: relative;
+    inset: auto;
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr) 120px;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 54px;
+    height: auto;
+    padding: 12px;
+    text-align: left;
+    white-space: normal;
+    cursor: pointer;
+}
+.today-job-title { overflow-wrap: anywhere; }
+.timeline-job-details { display: none; }
+.timeline-job.timeline-job-expanded {
+    position: fixed;
+    pointer-events: none;
+    transform: none;
+    height: auto !important;
+    min-height: 76px;
+    max-height: 140px;
+    padding: 10px 12px;
+    z-index: 2000;
+    opacity: 1;
+    filter: none;
+    overflow: auto;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.35) !important;
+}
+.timeline-job-expanded .timeline-job-title {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+    flex-shrink: 0;
+}
+.timeline-job-expanded .timeline-job-details {
+    display: block;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: 12px;
+    flex-shrink: 0;
+}
+#todayTimelineView .timeline-scroll { overflow-x: auto; }
+#viewDataModal .modal-dialog {
+    width: calc(100% - 32px);
+    max-width: 1800px;
+    margin-left: auto;
+    margin-right: auto;
+}
+#todayTimelineView .timeline-header-row,
+#todayTimelineView .timeline-row { min-width: 1200px; }
+.today-job-time, .today-job-status { font-size: 12px; }
+@media (max-width: 575px) {
+    .today-jobs-list .today-job-card { grid-template-columns: 1fr; gap: 4px; }
 }
