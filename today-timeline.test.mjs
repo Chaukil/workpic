@@ -14,6 +14,7 @@ const ctx = vm.createContext({
     Date: Clock, currentUser: user, showSunday: false, jobs: [],
     document: { getElementById: () => container, createElement: () => ({ style: {} }) },
     localDateKey: key, parseJobDate: s => new Clock(s + 'T00:00:00'), getMyOffMap: () => ({}),
+    getHolidayName: () => '', getPersonalEvents: () => [],
     escapeHtml: s => s, getJobDuration: j => j.duration,
     buildScheduleEntries: (start, end) => {
         range = [key(start), key(end)];

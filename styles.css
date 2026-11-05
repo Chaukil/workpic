@@ -6549,7 +6549,7 @@ body.theme-dark .day-override-popover {
 
 /* 1) Modal rộng hơn modal-xl mặc định */
 #dayOffModal .modal-dialog {
-    max-width: min(98vw, 1500px);
+    max-width: min(98vw, 1880px);
 }
 
 /* 2) Layout: cột trái & cột phải hẹp lại, cột giữa (lịch) rộng ra */
@@ -8251,15 +8251,50 @@ body.theme-dark .wh-badge.wh-s {
    NGÀY HIỆN TẠI — sáng & tối đều có màu riêng, không còn màu kem
    ============================================================ */
 .schedule-table td.today-cell {
+    position: relative;
     background: rgba(99, 102, 241, 0.10);
     border-color: rgba(99, 102, 241, 0.55);
-    box-shadow: inset 0 0 0 2px rgba(99, 102, 241, 0.55);
+    box-shadow: none;
 }
 
 body.theme-dark .schedule-table td.today-cell {
     background: rgba(99, 102, 241, 0.22);
     border-color: rgba(165, 180, 252, 0.7);
-    box-shadow: inset 0 0 0 2px rgba(165, 180, 252, 0.6);
+    box-shadow: none;
+}
+
+@property --today-border-angle {
+    syntax: '<angle>';
+    initial-value: 0deg;
+    inherits: false;
+}
+
+.schedule-table td.today-cell::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    padding: 3px;
+    border-radius: inherit;
+    background: conic-gradient(from var(--today-border-angle),
+        #ff0000, #ff7f00, #ffff00, #00ff00,
+        #0000ff, #4b0082, #8f00ff, #ff0000);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    pointer-events: none;
+    z-index: 2;
+    animation: todayBorderRotate 3s linear infinite;
+}
+
+@keyframes todayBorderRotate {
+    to { --today-border-angle: 360deg; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .schedule-table td.today-cell::after {
+        animation: none;
+    }
 }
 
 .schedule-table td.today-cell .date-header {
@@ -13224,7 +13259,7 @@ body.theme-light.fx-backdrop-on .schedule-table td:hover {
 body.theme-light.fx-backdrop-on .schedule-table td.today-cell {
     background: rgba(99, 102, 241, 0.20);
     border-color: rgba(99, 102, 241, 0.55);
-    box-shadow: inset 0 0 0 2px rgba(99, 102, 241, 0.55);
+    box-shadow: none;
 }
 
 body.theme-light.fx-backdrop-on .schedule-table td.day-off-cell {
@@ -15170,6 +15205,41 @@ body.theme-dark .timeline-hour.cross-day {
 #todayTimelineView .timeline-header-row,
 #todayTimelineView .timeline-row { min-width: 1200px; }
 .today-job-time, .today-job-status { font-size: 12px; }
+
+/* Lunar dates, statutory holidays and personal calendar entries. */
+.dayoff-toolbar { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+.dayoff-toolbar label { display: grid; gap: 5px; font-size: 0.85rem; font-weight: 600; }
+.dayoff-legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 0.8rem; margin-bottom: 12px; }
+.legend-off { color: #e05268; }
+.legend-holiday { color: #b7790b; }
+.legend-event { color: #0284c7; }
+.dayoff-holiday-settings { padding: 10px 12px; background: var(--surface-muted); border: 1px solid var(--border); border-radius: 10px; }
+.dayoff-holiday-settings summary { cursor: pointer; font-size: 0.85rem; font-weight: 600; }
+.dayoff-holiday-settings p { margin: 10px 0; }
+#dayOffModal .dayoff-day { min-height: 112px; }
+.dayoff-lunar { font-size: 0.65rem; color: var(--muted); line-height: 1.3; }
+#dayOffModal .dayoff-day.holiday { background: rgba(245, 158, 11, .14); border-color: rgba(245, 158, 11, .65); }
+#dayOffModal .dayoff-day.holiday.selected { box-shadow: inset 0 0 0 2px #e05268; }
+#dayOffModal .dayoff-day.holiday.pending { border-style: dashed; }
+.calendar-holiday-label { display: block; font-size: 0.65rem; line-height: 1.35; color: #925500; background: rgba(245, 158, 11, .18); border-radius: 4px; padding: 3px 5px; overflow-wrap: anywhere; }
+body.theme-dark .calendar-holiday-label { color: #fcd34d; }
+.schedule-table td.calendar-holiday-cell { background: rgba(245, 158, 11, .1); }
+body.theme-dark .schedule-table td.calendar-holiday-cell { background: rgba(245, 158, 11, .13); }
+.schedule-table td.calendar-holiday-cell.day-off-cell { box-shadow: inset 0 0 0 2px #e05268; }
+.calendar-personal-event { display: block; width: 100%; text-align: left; border: 1px solid rgba(14, 165, 233, .4); border-radius: 5px; color: #0369a1; background: rgba(14, 165, 233, .12); padding: 4px 5px; margin-top: 3px; font-size: 0.7rem; line-height: 1.35; overflow-wrap: anywhere; cursor: pointer; }
+body.theme-dark .calendar-personal-event { color: #7dd3fc; }
+.dayoff-add-event { position: absolute; top: 3px; right: 3px; border: 0; border-radius: 4px; color: #0284c7; background: rgba(14, 165, 233, .1); width: 24px; height: 24px; line-height: 20px; }
+.personal-calendar-menu { position: fixed; z-index: 1080; width: min(290px, calc(100vw - 16px)); max-height: 50vh; overflow: auto; background: var(--surface, #fff); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: 6px; box-shadow: 0 8px 30px rgba(0, 0, 0, .25); }
+.personal-calendar-menu button { display: block; width: 100%; border: 0; background: transparent; color: inherit; text-align: left; padding: 10px; border-radius: 6px; overflow-wrap: anywhere; }
+.personal-calendar-menu button:hover, .personal-calendar-menu button:focus-visible { background: rgba(14, 165, 233, .14); }
+@media (max-width: 575px) {
+    #dayOffModal .modal-dialog { margin: 6px auto; width: calc(100% - 12px); }
+    #dayOffModal .modal-body { padding: 10px; }
+    #dayOffModal .dayoff-grid { gap: 3px; }
+    #dayOffModal .dayoff-day { min-height: 100px; padding: 4px 2px; }
+    .dayoff-add-event { width: 20px; height: 20px; right: 0; top: 0; }
+    .dayoff-lunar, .calendar-holiday-label { font-size: 0.58rem; }
+}
 @media (max-width: 575px) {
     .today-jobs-list .today-job-card { grid-template-columns: 1fr; gap: 4px; }
 }

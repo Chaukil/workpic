@@ -1,5 +1,6 @@
 import { convertWorkHoursRows } from './work-hours-data.js';
 import { resolveApiUrl } from './api-client.js';
+import { vietnameseLunar, holidaysForYear, monthPair } from './calendar-data.js';
 // Firebase Configuration - Chỉ sử dụng Firestore
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, getDocs, onSnapshot, enableIndexedDbPersistence, query, where, writeBatch, runTransaction, arrayUnion, arrayRemove }
@@ -3175,6 +3176,8 @@ async function handleAuthenticatedUser(user) {
 
     // Fetch user data from Firestore
     const userData = await getUserData(user.uid);
+    currentUser.personalCalendarEvents = Array.isArray(userData?.personalCalendarEvents) ? userData.personalCalendarEvents : [];
+    currentUser.holidayPolicy = userData?.holidayPolicy || {};
 
     if (userData && userData.displayName) {
         // Store displayName in currentUser for easy access
@@ -3795,6 +3798,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('dayOffBtn').addEventListener('click', openDayOffModal);
     document.getElementById('saveDayOffBtn').addEventListener('click', saveDayOffs);
     document.getElementById('dayOffCalendars').addEventListener('click', handleDayOffCalendarClick);
+    setupPersonalCalendar();
     document.getElementById('dayOffUsersList').addEventListener('click', handleDayOffUserClick);
     document.getElementById('dayOffDetailList').addEventListener('click', handleDayOffDetailClick);
     document.getElementById('dayOffReasonPresets').addEventListener('click', (e) => {
@@ -4616,6 +4620,8 @@ function renderSchedule() {
             todayDate.setHours(0, 0, 0, 0);
 
             const offDoc = myOffMap[dateStr] || null;
+            const holiday = getHolidayName(currentDate);
+            if (holiday) cell.classList.add('calendar-holiday-cell');
 
             // Ngày off: tô sọc đỏ; ngày thường: highlight hôm nay
             if (offDoc) {
@@ -4644,6 +4650,24 @@ function renderSchedule() {
             const whBadge = badges.length ? `<span class="wh-badges">${badges.join('')}</span>` : '';
             dateHeader.innerHTML = `<span class="date-header-left"><i class="bi bi-calendar-day"></i> ${formatDateShort(currentDate)}${offDoc ? '<span class="day-off-badge">OFF</span>' : ''}</span>${whBadge}`;
             cell.appendChild(dateHeader);
+            if (holiday) {
+                const note = document.createElement('div');
+                note.className = 'calendar-holiday-label';
+                note.textContent = holiday;
+                cell.appendChild(note);
+            }
+            getPersonalEvents(dateStr).forEach(entry => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'calendar-personal-event';
+                button.textContent = [entry.time, entry.title].filter(Boolean).join(' · ');
+                button.title = entry.notes || entry.title;
+                button.addEventListener('click', async () => {
+                    await openDayOffModal();
+                    openPersonalEventEditor(dateStr, entry.id);
+                });
+                cell.appendChild(button);
+            });
 
             // ===== KÉO-THẢ: ô ngày nhận drop =====
             cell.addEventListener('dragover', (e) => {
@@ -11279,6 +11303,8 @@ function initWorkHoursUi() {
 // ============================================================
 const DAYOFF_COLLECTION = 'dayOffs';
 const DAYOFF_MONTHS_SHOWN = 2;   // tháng hiện tại + tháng sau
+let dayOffViewYear = new Date().getFullYear();
+let dayOffViewMonth = new Date().getMonth();
 
 // Mỗi (người, ngày) chỉ được có 1 lịch off. Gộp bản trùng (race giữa snapshot realtime và cập nhật local,
 // hoặc doc cũ id ngẫu nhiên): ưu tiên doc có id chuẩn `${uid}_${date}`, sau đó doc mới nhất.
@@ -11322,11 +11348,8 @@ function dayOffAllIds(o) {
 
 function listenDayOffs() {
     if (unsubscribeDayOffs) unsubscribeDayOffs();
-    // Lấy từ đầu tháng trước để tuần hiện tại (có thể nằm ở tháng trước) vẫn tính đúng
-    const lower = new Date();
-    lower.setDate(1);
-    lower.setMonth(lower.getMonth() - 1);
-    const q = query(collection(db, DAYOFF_COLLECTION), where('date', '>=', localDateKey(lower)));
+    // Year/month navigation also needs previously registered dates in past years.
+    const q = collection(db, DAYOFF_COLLECTION);
     unsubscribeDayOffs = onSnapshot(q, (snapshot) => {
         dayOffsList = normalizeDayOffs(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
         cleanupMyDuplicateDayOffs();
@@ -11354,7 +11377,7 @@ function resolveShiftedDate(job, originDate, offMap) {
     do {
         d.setDate(d.getDate() - 1);
         guard++;
-    } while (guard < 60 && (offMap[localDateKey(d)] || (d.getDay() === 0 && job.workOnSunday === false)));
+    } while (guard < 60 && (offMap[localDateKey(d)] || getHolidayName(d) || (d.getDay() === 0 && job.workOnSunday === false)));
     return d;
 }
 
@@ -11377,7 +11400,7 @@ function buildScheduleEntries(rangeStart, rangeEnd, jobList) {
             let movedFrom = null;     // dời do override
 
             // 1) Nếu ngày gốc là ngày off → dời lên ngày làm việc liền trước
-            if (offMap[originKey]) {
+            if (offMap[originKey] || getHolidayName(date)) {
                 targetKey = localDateKey(resolveShiftedDate(job, date, offMap));
                 shiftedFrom = originKey;
             }
@@ -11442,6 +11465,8 @@ async function openDayOffModal() {
     dayOffModalOpen = true;
     dayOffFocusUid = null;
     dayOffSelected = new Set(Object.keys(getMyOffMap()));
+    syncDayOffFilters();
+    document.getElementById('personalEventForm').classList.add('d-none');
     document.getElementById('dayOffReason').value = '';
     buildDayOffUsers([]);
     fillDeptSelect(document.getElementById('dayOffDeptSelect'), dayOffDeptFilter, { all: true, none: true, noneLabel: 'Chưa phân bộ phận' });
@@ -11924,12 +11949,17 @@ function renderTimeline({ todayOnly = false, containerId = 'timelineView' } = {}
 
             const dow = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][currentDate.getDay()];
             const overlapPairCount = Math.floor(overlapSet.size / 2);
+            const holidayLabel = getHolidayName(currentDate);
+            const personalLabels = getPersonalEvents(dateStr).map(entry =>
+                `<span class="calendar-personal-event" title="${escapeHtml(entry.notes || entry.title)}">${escapeHtml([entry.time, entry.title].filter(Boolean).join(' · '))}</span>`).join('');
 
             rowsHtml += `
                 <div class="${rowClasses.join(' ')}">
                     <div class="timeline-day-label">
                         <span class="timeline-day-dow">${dow}</span>
                         <span class="timeline-day-date">${currentDate.getDate()}/${currentDate.getMonth() + 1}</span>
+                        ${holidayLabel ? `<span class="calendar-holiday-label">${escapeHtml(holidayLabel)}</span>` : ''}
+                        ${personalLabels}
                         ${overlapPairCount ? `<span class="timeline-overlap-badge" title="${overlapPairCount} cặp job chồng giờ">⚠ ${overlapPairCount}</span>` : ''}
                         ${isOff ? '<span class="timeline-overlap-badge" style="background:rgba(239,68,68,.18);color:#b91c1c">OFF</span>' : ''}
                     </div>
@@ -12777,6 +12807,167 @@ async function createSelectedJobs() {
     }
 }
 
+function getHolidayName(date) {
+    const year = date.getFullYear();
+    return holidaysForYear(year, currentUser?.holidayPolicy?.[year] || {})[localDateKey(date)] || '';
+}
+
+function getPersonalEvents(key) {
+    return (currentUser?.personalCalendarEvents || []).filter(e => e && e.date === key)
+        .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+}
+
+function syncDayOffFilters() {
+    const year = document.getElementById('dayOffYear');
+    const month = document.getElementById('dayOffMonth');
+    const current = new Date().getFullYear();
+    year.innerHTML = Array.from({ length: 21 }, (_, i) => current - 10 + i)
+        .map(y => `<option value="${y}">${y}</option>`).join('');
+    month.innerHTML = Array.from({ length: 12 }, (_, i) => `<option value="${i}">Tháng ${i + 1}</option>`).join('');
+    year.value = dayOffViewYear;
+    month.value = dayOffViewMonth;
+    const policy = currentUser?.holidayPolicy?.[dayOffViewYear] || {};
+    document.getElementById('holidayTetStart').value = policy.tetStart || '';
+    document.getElementById('holidayNationalDay').value = policy.nationalDay || 1;
+    document.getElementById('holidayPolicyStatus').textContent = '';
+}
+
+function openPersonalEventEditor(date, id = '') {
+    const entry = (currentUser?.personalCalendarEvents || []).find(e => e.id === id);
+    const form = document.getElementById('personalEventForm');
+    form.reset();
+    document.getElementById('personalEventId').value = entry?.id || '';
+    document.getElementById('personalEventDate').value = entry?.date || date;
+    document.getElementById('personalEventTitle').value = entry?.title || '';
+    document.getElementById('personalEventTime').value = entry?.time || '';
+    document.getElementById('personalEventNotes').value = entry?.notes || '';
+    document.getElementById('personalEventStatus').textContent = '';
+    document.getElementById('deletePersonalEvent').classList.toggle('d-none', !entry);
+    form.classList.remove('d-none');
+    form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    document.getElementById('personalEventTitle').focus({ preventScroll: true });
+}
+
+async function updatePersonalCalendar(removeOnly = false) {
+    const form = document.getElementById('personalEventForm');
+    if (!removeOnly && !form.reportValidity()) return;
+    const user = currentUser;
+    if (!user) return;
+    const id = document.getElementById('personalEventId').value;
+    const entry = {
+        id: id || crypto.randomUUID(), date: document.getElementById('personalEventDate').value,
+        title: document.getElementById('personalEventTitle').value.trim(),
+        time: document.getElementById('personalEventTime').value,
+        notes: document.getElementById('personalEventNotes').value.trim()
+    };
+    if (!removeOnly && !entry.title) {
+        document.getElementById('personalEventStatus').textContent = 'Vui lòng nhập tên sự kiện.';
+        return;
+    }
+    const buttons = form.querySelectorAll('button');
+    buttons.forEach(b => { b.disabled = true; });
+    try {
+        const snapshot = await getDocs(query(collection(db, 'users'), where('uid', '==', user.uid)));
+        if (snapshot.empty) throw new Error('Không tìm thấy tài khoản để lưu.');
+        // Transactions preserve events added from another device and allow editing one event.
+        await runTransaction(db, async transaction => {
+            const documents = await Promise.all(snapshot.docs.map(d => transaction.get(d.ref)));
+            documents.forEach(d => {
+                const events = (d.data().personalCalendarEvents || []).filter(e => e.id !== entry.id);
+                if (!removeOnly) events.push(entry);
+                transaction.update(d.ref, { personalCalendarEvents: events });
+            });
+        });
+        if (currentUser?.uid !== user.uid) return;
+        user.personalCalendarEvents = (user.personalCalendarEvents || []).filter(e => e.id !== entry.id);
+        if (!removeOnly) user.personalCalendarEvents.push(entry);
+        form.classList.add('d-none');
+        renderDayOffCalendars();
+        renderSchedule();
+    } catch (error) {
+        document.getElementById('personalEventStatus').textContent = `Chưa lưu được sự kiện: ${error.message}`;
+    } finally { buttons.forEach(b => { b.disabled = false; }); }
+}
+
+function setupPersonalCalendar() {
+    const host = document.getElementById('dayOffCalendars');
+    ['dayOffYear', 'dayOffMonth'].forEach(id => document.getElementById(id).addEventListener('change', () => {
+        dayOffViewYear = Number(document.getElementById('dayOffYear').value);
+        dayOffViewMonth = Number(document.getElementById('dayOffMonth').value);
+        syncDayOffFilters();
+        renderDayOffCalendars();
+    }));
+    document.getElementById('dayOffToday').addEventListener('click', () => {
+        dayOffViewYear = new Date().getFullYear(); dayOffViewMonth = new Date().getMonth();
+        syncDayOffFilters(); renderDayOffCalendars();
+    });
+    document.getElementById('personalEventForm').addEventListener('submit', e => {
+        e.preventDefault(); updatePersonalCalendar();
+    });
+    document.getElementById('deletePersonalEvent').addEventListener('click', () => updatePersonalCalendar(true));
+    document.getElementById('cancelPersonalEvent').addEventListener('click', () => {
+        document.getElementById('personalEventForm').classList.add('d-none');
+    });
+    host.addEventListener('click', e => {
+        const add = e.target.closest('[data-add-event]');
+        const edit = e.target.closest('[data-personal-event]');
+        if (add) openPersonalEventEditor(add.dataset.addEvent);
+        if (edit) openPersonalEventEditor(edit.closest('[data-date]').dataset.date, edit.dataset.personalEvent);
+    });
+    const menu = document.createElement('div');
+    menu.className = 'personal-calendar-menu d-none';
+    menu.setAttribute('role', 'menu');
+    document.getElementById('dayOffModal').appendChild(menu);
+    const hideMenu = () => menu.classList.add('d-none');
+    host.addEventListener('contextmenu', e => {
+        const cell = e.target.closest('[data-date]');
+        if (!cell) return;
+        e.preventDefault();
+        menu.replaceChildren();
+        const action = (text, id = '') => {
+            const button = document.createElement('button');
+            button.type = 'button'; button.setAttribute('role', 'menuitem'); button.textContent = text;
+            button.addEventListener('click', () => { hideMenu(); openPersonalEventEditor(cell.dataset.date, id); });
+            menu.appendChild(button);
+        };
+        action('＋ Thêm lịch trình / sự kiện');
+        getPersonalEvents(cell.dataset.date).forEach(entry => action(`Sửa: ${entry.title}`, entry.id));
+        menu.classList.remove('d-none');
+        menu.style.left = `${Math.max(8, Math.min(e.clientX, window.innerWidth - menu.offsetWidth - 8))}px`;
+        menu.style.top = `${Math.max(8, Math.min(e.clientY, window.innerHeight - menu.offsetHeight - 8))}px`;
+        menu.querySelector('button').focus();
+    });
+    document.addEventListener('click', hideMenu);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') hideMenu(); });
+    document.getElementById('dayOffModal').addEventListener('scroll', hideMenu, true);
+    document.getElementById('dayOffModal').addEventListener('hidden.bs.modal', hideMenu);
+    window.addEventListener('resize', hideMenu);
+    document.getElementById('saveHolidayPolicy').addEventListener('click', async e => {
+        const user = currentUser;
+        if (!user) return;
+        const year = dayOffViewYear;
+        const tetStart = document.getElementById('holidayTetStart').value;
+        const status = document.getElementById('holidayPolicyStatus');
+        if (tetStart && (!document.getElementById('holidayTetStart').checkValidity() || Number(tetStart.slice(0, 4)) !== year)) {
+            status.textContent = `Chọn ngày bắt đầu Tết thuộc năm ${year}.`; return;
+        }
+        const policy = { tetStart, nationalDay: Number(document.getElementById('holidayNationalDay').value) };
+        e.target.disabled = true;
+        try {
+            const snapshot = await getDocs(query(collection(db, 'users'), where('uid', '==', user.uid)));
+            if (snapshot.empty) throw new Error('Không tìm thấy tài khoản.');
+            const batch = writeBatch(db);
+            snapshot.docs.forEach(d => batch.update(d.ref, { [`holidayPolicy.${year}`]: policy }));
+            await batch.commit();
+            if (currentUser?.uid !== user.uid) return;
+            user.holidayPolicy = { ...user.holidayPolicy, [year]: policy };
+            renderDayOffCalendars(); renderSchedule();
+            status.textContent = `Đã lưu lịch lễ năm ${year}.`;
+        } catch (error) { status.textContent = `Chưa lưu được: ${error.message}`; }
+        finally { e.target.disabled = false; }
+    });
+}
+
 function renderDayOffCalendars() {
     const host = document.getElementById('dayOffCalendars');
     const today = new Date();
@@ -12798,7 +12989,7 @@ function renderDayOffCalendars() {
 
     let html = '';
     for (let m = 0; m < DAYOFF_MONTHS_SHOWN; m++) {
-        const first = new Date(today.getFullYear(), today.getMonth() + m, 1);
+        const first = monthPair(dayOffViewYear, dayOffViewMonth)[m];
         const daysInMonth = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
         const lead = (first.getDay() + 6) % 7;   // tuần bắt đầu từ T2
 
@@ -12832,9 +13023,14 @@ function renderDayOffCalendars() {
                 }
                 return `<span class="dayoff-chip" style="background:${getDayOffUserColor(e.uid)}">${escapeHtml(avatarInitial({ displayName: e.initialName || e.name }))}</span>`;
             }).join('') + (entries.length > 3 ? `<span class="dayoff-chip more">+${entries.length - 3}</span>` : '');
-            const title = entries.map(e => `${e.name}: ${e.reason || 'Off'}`).join('\n');
+            const date = new Date(first.getFullYear(), first.getMonth(), d);
+            const lunar = vietnameseLunar(date);
+            const holiday = getHolidayName(date);
+            const personal = getPersonalEvents(key);
+            const title = [holiday, ...entries.map(e => `${e.name}: ${e.reason || 'Off'}`)].filter(Boolean).join('\n');
 
             const classes = ['dayoff-day'];
+            if (holiday) classes.push('holiday');
             if (isPast) classes.push('past');
             if (key === todayKey) classes.push('today');
             if (isSunday) classes.push('sunday');
@@ -12844,6 +13040,10 @@ function renderDayOffCalendars() {
 
             html += `<div class="${classes.join(' ')}" data-date="${key}" title="${escapeHtml(title)}">
                 <span class="dayoff-day-num">${d}</span>
+                <span class="dayoff-lunar">${lunar.day}/${lunar.month}${lunar.leap ? ' nhuận' : ''} ÂL</span>
+                <button type="button" class="dayoff-add-event" data-add-event="${key}" aria-label="Thêm sự kiện ngày ${key}" title="Thêm sự kiện cá nhân">+</button>
+                ${holiday ? `<span class="calendar-holiday-label">${escapeHtml(holiday)}</span>` : ''}
+                ${personal.map(e => `<button type="button" class="calendar-personal-event" data-personal-event="${escapeHtml(e.id)}">${escapeHtml([e.time, e.title].filter(Boolean).join(' · '))}</button>`).join('')}
                 <span class="dayoff-chips">${chips}</span>
             </div>`;
         }
@@ -12915,6 +13115,7 @@ function renderDayOffDetails() {
 }
 
 function handleDayOffCalendarClick(event) {
+    if (event.target.closest('[data-add-event], [data-personal-event]')) return;
     const cell = event.target.closest('.dayoff-day[data-date]');
     // Chỉ chọn được ngày từ hôm nay trở đi; lịch của người khác chỉ để xem
     if (!cell || cell.classList.contains('past')) return;
