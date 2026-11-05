@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import { vietnameseLunar, holidaysForYear, monthPair, dateKey } from './calendar-data.js';
+import { personalEventOccurs } from './productivity-data.js';
 const date = s => new Date(`${s}T12:00:00`);
 assert.deepEqual(vietnameseLunar(date('2026-02-17')), { day: 1, month: 1, year: 2026, leap: false });
 assert.deepEqual(vietnameseLunar(date('2026-04-26')), { day: 10, month: 3, year: 2026, leap: false });
@@ -31,7 +32,7 @@ const ctx = vm.createContext({
     dayOffsList: [], dayOffSelected: new Set(), dayOffFocusUid: null,
     getMyOffMap: () => ({}), dayOffInDept: () => true, getUserAvatarUrl: () => null,
     document: { getElementById: () => host }, localDateKey: dateKey, escapeHtml: s => s,
-    vietnameseLunar, holidaysForYear, monthPair
+    vietnameseLunar, holidaysForYear, monthPair, personalEventOccurs
 });
 vm.runInContext(extract('function getHolidayName(', 'function syncDayOffFilters(')
     + extract('function renderDayOffCalendars(', 'function getDayOffDiff('), ctx);
@@ -54,7 +55,8 @@ console.log('Calendar passed: Vietnamese lunar/leap dates, holiday policies, pai
 const fields = {
     personalEventId: { value: 'birthday' }, personalEventDate: { value: '2026-08-12' },
     personalEventTitle: { value: 'Edited birthday' }, personalEventTime: { value: '11:00' },
-    personalEventNotes: { value: 'Bring cake' }, personalEventStatus: { textContent: '' }
+    personalEventNotes: { value: 'Bring cake' }, personalEventStatus: { textContent: '' },
+    personalEventRepeat: { value: 'none' }, personalEventUntil: { value: '' }
 };
 let hidden = false;
 const controls = [{ disabled: false }, { disabled: false }];
@@ -66,6 +68,7 @@ let stored = [...user.personalCalendarEvents, { id: 'other-device', date: '2026-
 let failSave = false;
 const persistence = vm.createContext({
     currentUser: user, crypto: { randomUUID: () => 'new-event' },
+    recordChange: async () => {}, repeatLabel: s => s,
     document: { getElementById: id => fields[id] }, db: {},
     collection: () => ({}), query: () => ({}), where: () => ({}),
     getDocs: async () => ({ empty: false, docs: [{ ref: 'user' }] }),

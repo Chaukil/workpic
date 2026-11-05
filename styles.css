@@ -15258,16 +15258,77 @@ body.theme-dark .calendar-personal-event { color: #7dd3fc; }
 #personalEventForm .dayoff-toolbar label { flex: 1; min-width: 0; }
 #personalEventForm .form-control { font-size: .85rem; }
 #personalEventForm .btn { font-size: .8rem; padding: 6px 10px; }
+.change-history-entry { padding: 14px 0; border-bottom: 1px solid var(--border); }
+.change-history-detail { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .85rem; margin-top: 6px; }
+.job-checklist-panel { padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-muted); }
+.job-checklist-item { display: flex; align-items: start; gap: 10px; padding: 8px 0; cursor: pointer; overflow-wrap: anywhere; }
+.job-checklist-item input { margin-top: 4px; flex-shrink: 0; }
+.job-checklist-item input:checked + span { text-decoration: line-through; opacity: .6; }
+.dayoff-job-preview:not(:empty) { padding: 12px; margin-top: 12px; border: 1px solid var(--border); border-radius: 10px; }
+.dayoff-job-preview summary { font-size: .85rem; font-weight: 600; cursor: pointer; }
+.off-preview-scroll { max-height: 290px; overflow: auto; margin-top: 8px; text-align: left; }
+.off-preview-scroll table {
+    font-size: .8rem;
+    color: var(--text);
+    --bs-table-color: var(--text);
+    --bs-table-bg: var(--surface);
+    --bs-table-border-color: var(--border);
+    --bs-table-striped-color: var(--text);
+    --bs-table-striped-bg: var(--surface-muted);
+    --bs-table-hover-color: var(--text);
+    --bs-table-hover-bg: var(--surface-muted);
+}
+.off-preview-scroll th { position: sticky; top: 0; z-index: 1; background: var(--surface-strong); color: var(--text); }
+.off-preview-scroll td { background: var(--surface); color: var(--text); border-color: var(--border); }
+.off-preview-scroll .text-muted { color: var(--muted) !important; }
+.off-preview-scroll td:first-child { max-width: 260px; overflow-wrap: anywhere; }
+.off-preview-scroll .table tr > :nth-child(2) { color: var(--danger); }
+.off-preview-scroll .table tr > :nth-child(3) { color: var(--success); }
+.off-preview-scroll .table td:nth-child(2), .off-preview-scroll .table td:nth-child(3) { font-weight: 700; }
 
-.dayoff-calendar-controls { align-items: center; gap: 10px; }
-.dayoff-calendar-controls > label { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
-.dayoff-calendar-controls > label select { width: auto; }
+.view-job-meta { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin: 0 0 16px; padding: 1px; background: var(--border); border-radius: 12px; overflow: hidden; }
+.view-job-meta-item { min-width: 0; padding: 14px 16px; background: var(--surface-muted); }
+.view-job-meta dt { display: flex; align-items: center; gap: 6px; margin-bottom: 7px; color: var(--muted); font-size: .72rem; font-weight: 500; }
+.view-job-meta dt i { color: var(--primary); }
+.view-job-meta dd { margin: 0; color: var(--text); font-size: .95rem; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.view-job-meta dd .badge { font-size: .75rem; padding: 5px 9px; }
+.view-job-meta-unit { color: var(--muted); font-size: .75rem; font-weight: 500; }
+@media (max-width: 767px) { .view-job-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); } .view-job-meta-item { padding: 12px; } }
+
+.dayoff-calendar-controls { align-items: center; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.dayoff-period-picker { display: inline-flex; align-items: center; gap: 12px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-muted); }
+.dayoff-period-icon { color: var(--primary); font-size: 1.1rem; }
+#dayOffModal .dayoff-period-picker label { gap: 2px; margin: 0; }
+.dayoff-period-picker label > span { font-size: .65rem; font-weight: 600; color: var(--muted); }
+.dayoff-period-picker label + label { padding-left: 12px; border-left: 1px solid var(--border); }
+#dayOffModal .dayoff-period-picker .form-select { min-width: 88px; width: auto; padding: 2px 22px 2px 0; border: 0; border-radius: 4px; background-color: transparent; box-shadow: none; color: var(--text); font-size: .85rem; font-weight: 700; cursor: pointer; }
+#dayOffModal .dayoff-period-picker .form-select:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+#dayOffModal #dayOffYear option, #dayOffModal #dayOffMonth option { background-color: var(--surface); color: var(--text); }
+#dayOffModal #dayOffYear option:checked, #dayOffModal #dayOffMonth option:checked { background-color: var(--primary-soft); color: var(--primary); }
+#dayOffToday { min-height: 38px; border-color: var(--border); background: var(--surface); color: var(--primary); border-radius: 9px; font-size: .75rem; font-weight: 600; padding: 8px 12px; }
+#dayOffToday:hover { background: var(--primary-soft); border-color: var(--primary); }
 .dayoff-calendar-controls > .dayoff-legend { margin: 0 0 0 auto; justify-content: flex-end; gap: 10px; font-size: .72rem; }
 .dayoff-calendar-controls > .dayoff-holiday-settings { position: relative; padding: 7px 10px; }
 .dayoff-calendar-controls .dayoff-holiday-settings summary { font-size: .75rem; }
 .dayoff-holiday-panel { position: absolute; left: 0; top: calc(100% + 6px); z-index: 25; width: min(440px, calc(100vw - 48px)); padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); box-shadow: 0 8px 24px rgba(0, 0, 0, .18); }
 .calendar-holiday-label, .calendar-personal-event { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 100%; }
+
+/* Native controls and history follow the application's selected theme. */
+#changeHistoryModal, #dayOffModal, .job-checklist-panel { color-scheme: light; }
+body.theme-dark #changeHistoryModal, body.theme-dark #dayOffModal, body.theme-dark .job-checklist-panel { color-scheme: dark; }
+.job-checklist-item input[type="checkbox"] { accent-color: var(--primary); width: 16px; height: 16px; cursor: pointer; }
+#changeHistoryModal .modal-content { background: var(--surface); color: var(--text); border-color: var(--border); }
+#changeHistoryModal .modal-header { border-color: var(--border); }
+#changeHistoryModal .form-control, #changeHistoryModal .form-select { background-color: var(--surface-muted); border-color: var(--border); color: var(--text); }
+#changeHistoryModal .form-control::placeholder { color: var(--muted); }
+#changeHistoryModal .text-muted { color: var(--muted) !important; }
+#changeHistoryModal .btn-close { filter: none; }
+body.theme-dark #changeHistoryModal .btn-close { filter: invert(1) grayscale(100%) brightness(200%); }
+body.theme-dark #changeHistoryModal .form-select,
+body.theme-dark #dayOffModal .form-select { --bs-form-select-bg-img: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23edf2ff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e"); }
 @media (max-width: 767px) {
+    .dayoff-period-picker { flex: 1; }
+    #dayOffModal .dayoff-period-picker label { flex: 1; }
     .dayoff-calendar-controls > .dayoff-legend { width: 100%; }
     .dayoff-calendar-controls > .dayoff-holiday-settings { position: static; }
     .dayoff-holiday-panel { position: static; margin-top: 10px; width: 100%; }

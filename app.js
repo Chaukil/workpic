@@ -1,6 +1,7 @@
 import { convertWorkHoursRows } from './work-hours-data.js';
 import { resolveApiUrl } from './api-client.js';
 import { vietnameseLunar, holidaysForYear, monthPair } from './calendar-data.js';
+import { personalEventOccurs, checklistFromText, compareScheduleEntries } from './productivity-data.js';
 // Firebase Configuration - Chỉ sử dụng Firestore
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, getDocs, onSnapshot, enableIndexedDbPersistence, query, where, writeBatch, runTransaction, arrayUnion, arrayRemove }
@@ -3178,6 +3179,7 @@ async function handleAuthenticatedUser(user) {
     const userData = await getUserData(user.uid);
     currentUser.personalCalendarEvents = Array.isArray(userData?.personalCalendarEvents) ? userData.personalCalendarEvents : [];
     currentUser.holidayPolicy = userData?.holidayPolicy || {};
+    currentUser.changeHistory = userData?.changeHistory || [];
 
     if (userData && userData.displayName) {
         // Store displayName in currentUser for easy access
@@ -3486,6 +3488,8 @@ async function changeAvatar(file) {
 
 function handleSignedOut() {
     currentUser = null;
+    bootstrap.Modal.getInstance(document.getElementById('changeHistoryModal'))?.hide();
+    document.getElementById('changeHistoryList').replaceChildren();
     try {
         [userProfileModal, jobModal, viewJobModal, dayOffModal,
             workHoursModal, salaryCalcModal, statisticsModal,
@@ -3799,6 +3803,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('saveDayOffBtn').addEventListener('click', saveDayOffs);
     document.getElementById('dayOffCalendars').addEventListener('click', handleDayOffCalendarClick);
     setupPersonalCalendar();
+    setupProductivityFeatures();
     document.getElementById('dayOffUsersList').addEventListener('click', handleDayOffUserClick);
     document.getElementById('dayOffDetailList').addEventListener('click', handleDayOffDetailClick);
     document.getElementById('dayOffReasonPresets').addEventListener('click', (e) => {
@@ -4859,7 +4864,7 @@ function renderSchedule() {
                     // Click vào nội dung item → mở xem job đầy đủ (không mở override nữa)
                     scheduleItem.addEventListener('click', (e) => {
                         if (e.target.closest('.schedule-override-btn, .schedule-done-btn')) return;
-                        openViewJobModal(job);
+                        openViewJobModal(job, entry.originDate);
                     });
 
                     // Nút tích hoàn thành (chỉ có khi bật trong Cài đặt)
@@ -4922,6 +4927,7 @@ async function moveJobToDate(jobId, originDate, targetDate) {
                     updatedAt: new Date().toISOString()
                 });
             }
+            await recordChange('job', 'Trả job về ngày gốc', job.title, `${existing.overrideDate || originDate} → ${originDate}`);
             showNotification(
                 'Đã trả về',
                 `"${job.title}" trở về ngày ${formatDateShortDMY(originDate)}`,
@@ -4947,6 +4953,7 @@ async function moveJobToDate(jobId, originDate, targetDate) {
             ...overrideExtras(existing),
             updatedAt: new Date().toISOString()
         });
+        await recordChange('job', 'Dời job', job.title, `Lần ${originDate}: ${existing?.overrideDate || originDate} → ${targetDate}`);
         showNotification(
             'Đã dời job',
             `"${job.title}" → ${formatDateShortDMY(targetDate)} (chỉ lần này)`,
@@ -5068,6 +5075,7 @@ async function saveDayOverrideFromPopover() {
             });
         }
 
+        await recordChange('job', 'Sửa lịch riêng một ngày', job.title, `${occurrenceDate} → ${overrideDate || occurrenceDate} · giờ ${overrideTime || job.time} · ${note || ''}`);
         closeDayOverridePopover();
         showNotification('Đã lưu', 'Tùy chỉnh chỉ áp dụng cho ngày này.', false, 'success');
     } catch (error) {
@@ -5100,6 +5108,7 @@ async function deleteDayOverrideFromPopover() {
         } else {
             await deleteDoc(doc(db, 'jobDayOverrides', docId));
         }
+        await recordChange('job', 'Xóa tùy chỉnh lịch', job.title, occurrenceDate);
         closeDayOverridePopover();
         showNotification('Đã xóa tùy chỉnh', 'Job đã trở về lịch cố định của ngày đó.', false, 'success');
     } catch (error) {
@@ -5149,7 +5158,7 @@ window.toggleTransferSection = function () {
 };
 
 // Sửa function openViewJobModal
-function openViewJobModal(job) {
+function openViewJobModal(job, occurrenceDate = null) {
     currentViewingJobId = job.id;
     currentTransferMode = 'transfer';
 
@@ -5160,22 +5169,12 @@ function openViewJobModal(job) {
 
     const modalBody = document.getElementById('viewModalBody');
     modalBody.innerHTML = `
-        <div class="mb-3">
-            <strong><i class="bi bi-tag-fill"></i> Loại:</strong> 
-            <span class="badge bg-${getTypeBadgeColor(job.type)} ms-2">${getTypeLabel(job.type)}</span>
-        </div>
-        <div class="mb-3">
-            <strong><i class="bi bi-calendar-event"></i> Ngày bắt đầu:</strong> 
-            <span class="ms-2">${formatDate(job.date)}</span>
-        </div>
-        <div class="mb-3">
-            <strong><i class="bi bi-clock"></i> Giờ:</strong> 
-            <span class="ms-2">${job.time}</span>
-        </div>
-                <div class="mb-3">
-            <strong><i class="bi bi-hourglass-split"></i> Thời gian thực hiện:</strong> 
-            <span class="ms-2">${getJobDuration(job)} phút</span>
-        </div>
+        <dl class="view-job-meta">
+            <div class="view-job-meta-item"><dt><i class="bi bi-tag" aria-hidden="true"></i> Loại</dt><dd><span class="badge bg-${getTypeBadgeColor(job.type)}">${escapeHtml(getTypeLabel(job.type))}</span></dd></div>
+            <div class="view-job-meta-item"><dt><i class="bi bi-calendar-event" aria-hidden="true"></i> Ngày bắt đầu</dt><dd>${escapeHtml(formatDate(job.date))}</dd></div>
+            <div class="view-job-meta-item"><dt><i class="bi bi-clock" aria-hidden="true"></i> Giờ bắt đầu</dt><dd>${escapeHtml(job.time || '—')}</dd></div>
+            <div class="view-job-meta-item"><dt><i class="bi bi-hourglass-split" aria-hidden="true"></i> Thời gian thực hiện</dt><dd>${getJobDuration(job)} <span class="view-job-meta-unit">phút</span></dd></div>
+        </dl>
         ${job.isPaused ? `
         <div class="mb-3">
             <div class="alert alert-warning">
@@ -5257,6 +5256,7 @@ function openViewJobModal(job) {
 
     const descEl = modalBody.querySelector('.view-job-content');
     if (descEl) enhanceFolderLinks(descEl);
+    renderJobChecklist(job, occurrenceDate || (job.type === 'once' || job.isOutOfSchedule ? job.date : localDateKey(new Date())), modalBody);
 
     loadTransferUsers();
     viewJobModal.show();
@@ -5302,7 +5302,7 @@ function openViewDataModal() {
     renderTodayJobs();
 }
 
-function openJobFromToday(job) {
+function openJobFromToday(job, occurrenceDate = null) {
     const todayModal = document.getElementById('viewDataModal');
     const jobModal = document.getElementById('viewJobModal');
     // Switch modals after the transition so Bootstrap keeps focus and backdrops correct.
@@ -5310,7 +5310,7 @@ function openJobFromToday(job) {
         jobModal.addEventListener('hidden.bs.modal', () => {
             if (currentUser) openViewDataModal();
         }, { once: true });
-        openViewJobModal(job);
+        openViewJobModal(job, occurrenceDate);
     }, { once: true });
     viewDataModal.hide();
 }
@@ -5364,7 +5364,7 @@ function renderTodayJobs() {
         const state = active ? 'active' : (now >= end ? 'past' : '');
         const label = entry.completed ? 'Đã hoàn thành' : active ? 'Đang chạy' : now >= end ? 'Đã qua giờ' : 'Sắp tới';
         const endTime = end.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-        return `<button type="button" class="timeline-job today-job-card ${escapeHtml(entry.job.type || 'once')} ${state} ${entry.completed ? 'completed' : ''} ${entry.shiftedFrom || entry.movedFrom ? 'shifted' : ''} ${entry.job.isPresenterJob ? 'presenter' : ''}" data-today-job-id="${escapeHtml(entry.job.id)}">
+        return `<button type="button" class="timeline-job today-job-card ${escapeHtml(entry.job.type || 'once')} ${state} ${entry.completed ? 'completed' : ''} ${entry.shiftedFrom || entry.movedFrom ? 'shifted' : ''} ${entry.job.isPresenterJob ? 'presenter' : ''}" data-today-job-id="${escapeHtml(entry.job.id)}" data-today-origin-date="${escapeHtml(entry.originDate)}">
             <span class="today-job-time">${escapeHtml(time)}–${endTime}${localDateKey(end) !== dateKey ? ' (+1 ngày)' : ''}</span>
             <span class="today-job-title">${escapeHtml(entry.job.title || '(không tên)')}</span>
             <span class="today-job-status">${label}</span>
@@ -5375,7 +5375,7 @@ function renderTodayJobs() {
         list.innerHTML = markup;
         list.querySelectorAll('[data-today-job-id]').forEach(button => button.addEventListener('click', () => {
             const job = jobs.find(job => job.id === button.dataset.todayJobId);
-            if (job) openJobFromToday(job);
+            if (job) openJobFromToday(job, button.dataset.todayOriginDate);
         }));
     }
     document.getElementById('todayJobsSummary').textContent = `${date.toLocaleDateString('vi-VN')} · ${isNight ? 'Ca đêm 20:00–07:00' : 'Ca ngày 07:00–20:00'} · ${entries.length} job · ${activeCount} đang chạy`;
@@ -6078,6 +6078,7 @@ async function transferJob() {
                 date: job.date,
                 time: job.time,
                 description: job.description,
+                checklist: job.checklist || [],
                 enableNotification: job.enableNotification,
                 workOnSunday: job.workOnSunday,
                 isPaused: job.isPaused,
@@ -6556,6 +6557,7 @@ function openAddJobModal(isOutOfSchedule = false) {
         : '<i class="bi bi-plus-circle-fill"></i> Thêm Job Mới';
     document.getElementById('jobForm').reset();
     document.getElementById('jobDescription').innerHTML = '';
+    document.getElementById('jobChecklistText').value = '';
 
     const durInput = document.getElementById('jobDuration');
     if (durInput) durInput.value = '';
@@ -6586,6 +6588,7 @@ function openEditJobModal(job) {
     document.getElementById('jobDate').value = job.date;
     document.getElementById('jobTime').value = job.time;
     document.getElementById('jobDescription').innerHTML = job.description || '';
+    document.getElementById('jobChecklistText').value = (job.checklist || []).map(item => item.text).join('\n');
 
     const durInput = document.getElementById('jobDuration');
     if (durInput) durInput.value = job.duration || '';
@@ -6639,6 +6642,7 @@ function togglePauseJob() {
 
 // Sửa function saveJob
 async function saveJob() {
+    const beforeJob = jobs.find(j => j.id === currentEditingJobId);
     const title = document.getElementById('jobTitle').value.trim();
     const type = document.getElementById('jobType').value;
     const date = document.getElementById('jobDate').value;
@@ -6680,6 +6684,7 @@ async function saveJob() {
         date: effectiveDate,
         time: effectiveTime,
         description,
+        checklist: checklistFromText(document.getElementById('jobChecklistText').value, jobs.find(j => j.id === currentEditingJobId)?.checklist || []),
         enableNotification,
         workOnSunday,
         isPaused,
@@ -6700,11 +6705,13 @@ async function saveJob() {
             const jobRef = doc(db, 'jobs', currentEditingJobId);
             delete jobData.ownerId;
             await updateDoc(jobRef, jobData);
+            await recordChange('job', 'Sửa job', title, describeJobChanges(beforeJob, jobData));
             console.log('✅ Job đã được cập nhật:', currentEditingJobId);
             showNotification('Thành công', `Job "${title}" đã được ${isPaused ? 'tạm dừng' : 'cập nhật'}!`);
         } else {
             jobData.createdAt = new Date().toISOString();
             const docRef = await addDoc(collection(db, 'jobs'), jobData);
+            await recordChange('job', 'Thêm job', title, `${effectiveDate} ${effectiveTime} · ${jobData.checklist.length} bước checklist`);
             console.log('✅ Job mới đã được thêm:', docRef.id);
             showNotification('Thành công', `Job "${title}" đã được thêm!`);
         }
@@ -8313,6 +8320,7 @@ async function deleteJob() {
 
                 const jobRef = doc(db, 'jobs', currentEditingJobId);
                 await deleteDoc(jobRef);
+                await recordChange('job', 'Xóa job', jobTitle, `${jobToDelete?.date || ''} ${jobToDelete?.time || ''}`);
                 console.log('✅ Job đã được xóa:', currentEditingJobId);
                 showNotification('Đã xóa', `Job "${jobTitle}" đã được xóa!`, false, 'success');
 
@@ -8518,11 +8526,12 @@ function overrideExtras(existing) {
     return {
         completed: !!(existing && existing.completed === true),
         completedAt: (existing && existing.completedAt) || null,
-        snoozeUntil: (existing && existing.snoozeUntil) || null
+        snoozeUntil: (existing && existing.snoozeUntil) || null,
+        checklistDone: existing?.checklistDone || {}
     };
 }
 function overrideHasExtras(extras) {
-    return extras.completed === true || !!extras.snoozeUntil;
+    return extras.completed === true || !!extras.snoozeUntil || Object.values(extras.checklistDone || {}).some(Boolean);
 }
 
 function getOverrideFor(jobId, occurrenceDateKey) {
@@ -11382,8 +11391,7 @@ function resolveShiftedDate(job, originDate, offMap) {
     return d;
 }
 
-function buildScheduleEntries(rangeStart, rangeEnd, jobList) {
-    const offMap = getMyOffMap();
+function buildScheduleEntries(rangeStart, rangeEnd, jobList, offMap = getMyOffMap()) {
     const startKey = localDateKey(rangeStart);
     const endKey = localDateKey(rangeEnd);
     const scanFrom = new Date(rangeStart);
@@ -12044,8 +12052,8 @@ function renderTimeline({ todayOnly = false, containerId = 'timelineView' } = {}
             if (el.dataset.justDragged === '1') { ev.stopPropagation(); return; }
             const job = jobs.find(j => j.id === el.dataset.jobId);
             if (job) {
-                if (todayOnly) openJobFromToday(job);
-                else openViewJobModal(job);
+                if (todayOnly) openJobFromToday(job, el.dataset.originDate || el.dataset.date);
+                else openViewJobModal(job, el.dataset.originDate || el.dataset.date);
             }
         });
 
@@ -12140,6 +12148,7 @@ async function handleTimelineDrop(ev, track, START_HOUR, END_HOUR, HOURS, TOTAL_
                     time: newTimeStr,
                     updatedAt: new Date().toISOString()
                 });
+                await recordChange('job', 'Đổi giờ cố định', data.title, `${oldTime} → ${newTimeStr}`);
                 showNotification('Đã chuyển cố định', `Job "${data.title}" đã được chuyển sang ${newTimeStr}.`, false, 'success');
             } catch (err) {
                 console.error('Lỗi chuyển giờ cố định:', err);
@@ -12162,6 +12171,7 @@ async function handleTimelineDrop(ev, track, START_HOUR, END_HOUR, HOURS, TOTAL_
                     ...overrideExtras(existing),
                     updatedAt: new Date().toISOString()
                 }, { merge: true });
+                await recordChange('job', 'Đổi giờ riêng một ngày', data.title, `${data.originDate} · ${oldTime} → ${newTimeStr}`);
                 showNotification('Đã chuyển tạm', `Job "${data.title}" đổi sang ${newTimeStr} (chỉ ngày này).`, false, 'success');
             } catch (err) {
                 console.error('Lỗi chuyển giờ tạm:', err);
@@ -12819,7 +12829,7 @@ function compactCalendarLabel(text) {
 }
 
 function getPersonalEvents(key) {
-    return (currentUser?.personalCalendarEvents || []).filter(e => e && e.date === key)
+    return (currentUser?.personalCalendarEvents || []).filter(e => personalEventOccurs(e, key))
         .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
 }
 
@@ -12844,6 +12854,9 @@ function openPersonalEventEditor(date, id = '', anchor = null) {
     form.reset();
     document.getElementById('personalEventId').value = entry?.id || '';
     document.getElementById('personalEventDate').value = entry?.date || date;
+    document.getElementById('personalEventRepeat').value = entry?.repeat || 'none';
+    document.getElementById('personalEventUntil').value = entry?.until || '';
+    document.getElementById('personalEventUntil').disabled = !entry?.repeat || entry.repeat === 'none';
     document.getElementById('personalEventTitle').value = entry?.title || '';
     document.getElementById('personalEventTime').value = entry?.time || '';
     document.getElementById('personalEventNotes').value = entry?.notes || '';
@@ -12871,10 +12884,16 @@ async function updatePersonalCalendar(removeOnly = false) {
         id: id || crypto.randomUUID(), date: document.getElementById('personalEventDate').value,
         title: document.getElementById('personalEventTitle').value.trim(),
         time: document.getElementById('personalEventTime').value,
-        notes: document.getElementById('personalEventNotes').value.trim()
+        notes: document.getElementById('personalEventNotes').value.trim(),
+        repeat: document.getElementById('personalEventRepeat').value,
+        until: document.getElementById('personalEventUntil').value
     };
     if (!removeOnly && !entry.title) {
         document.getElementById('personalEventStatus').textContent = 'Vui lòng nhập tên sự kiện.';
+        return;
+    }
+    if (!removeOnly && entry.until && entry.until < entry.date) {
+        document.getElementById('personalEventStatus').textContent = 'Ngày kết thúc phải từ ngày bắt đầu trở đi.';
         return;
     }
     const buttons = form.querySelectorAll('button');
@@ -12894,6 +12913,8 @@ async function updatePersonalCalendar(removeOnly = false) {
         if (currentUser?.uid !== user.uid) return;
         user.personalCalendarEvents = (user.personalCalendarEvents || []).filter(e => e.id !== entry.id);
         if (!removeOnly) user.personalCalendarEvents.push(entry);
+        await recordChange('event', removeOnly ? 'Xóa sự kiện' : (id ? 'Sửa sự kiện' : 'Thêm sự kiện'), entry.title,
+            `${entry.date}${entry.time ? ' ' + entry.time : ''} · ${repeatLabel(entry.repeat)}${entry.until ? ' · đến ' + entry.until : ''}${entry.notes ? '\n' + entry.notes : ''}`, user);
         form.classList.add('d-none');
         renderDayOffCalendars();
         renderSchedule();
@@ -12963,6 +12984,7 @@ function setupPersonalCalendar() {
             await batch.commit();
             if (currentUser?.uid !== user.uid) return;
             user.holidayPolicy = { ...user.holidayPolicy, [year]: policy };
+            await recordChange('holiday', 'Điều chỉnh lịch lễ', String(year), `Tết: ${tetStart || 'mùng 1–5'}; ngày liền kề Quốc khánh: 0${policy.nationalDay}/09`, user);
             renderDayOffCalendars(); renderSchedule();
             status.textContent = `Đã lưu lịch lễ năm ${year}.`;
         } catch (error) { status.textContent = `Chưa lưu được: ${error.message}`; }
@@ -13073,6 +13095,7 @@ function renderDayOffSummary() {
     }
     document.getElementById('saveDayOffBtn').disabled = !added.length && !removed.length;
     document.getElementById('dayOffReasonWrap').classList.toggle('d-none', !added.length);
+    renderDayOffJobPreview();
 }
 
 function renderDayOffDetails() {
@@ -13153,6 +13176,7 @@ function handleDayOffDetailClick(event) {
                 const target = dayOffsList.find(o => o.id === id);
                 const ids = target ? dayOffAllIds(target) : [id];
                 await Promise.all(ids.map(x => deleteDoc(doc(db, DAYOFF_COLLECTION, x))));
+                await recordChange('off', 'Hủy lịch off', date, target?.reason || '');
                 dayOffSelected.delete(date);
                 dayOffsList = dayOffsList.filter(o => !ids.includes(o.id));
                 renderSchedule();
@@ -13166,7 +13190,9 @@ function handleDayOffDetailClick(event) {
     });
 }
 
-async function saveDayOffs() {
+async function saveDayOffs(previewAccepted = false) {
+    // The click event is not confirmation; only the preview action passes true.
+    previewAccepted = previewAccepted === true;
     if (!currentUser) return;
     const { added, removed, saved } = getDayOffDiff();
     if (!added.length && !removed.length) return;
@@ -13176,6 +13202,16 @@ async function saveDayOffs() {
     if (added.length && !reason) {
         showNotification('Thiếu lý do', 'Vui lòng nhập lý do off cho các ngày mới chọn.', false, 'warning');
         reasonInput.focus();
+        return;
+    }
+    const preview = getDayOffJobPreview();
+    if (!previewAccepted && preview.length) {
+        showConfirmDialog({
+            title: 'Xem trước thay đổi lịch làm việc',
+            message: previewMarkup(preview) + '<p class="small mt-2">Lưu lịch off sẽ áp dụng các thay đổi trên.</p>',
+            confirmText: 'Lưu lịch off', confirmClass: 'btn-save',
+            onConfirm: () => saveDayOffs(true)
+        });
         return;
     }
 
@@ -13200,6 +13236,8 @@ async function saveDayOffs() {
             dayOffAllIds(saved[key]).forEach(id => batch.delete(doc(db, DAYOFF_COLLECTION, id)));
         });
         await batch.commit();
+        await recordChange('off', 'Cập nhật lịch off', 'Lịch off của tôi',
+            `Thêm: ${added.join(', ') || 'không'}; hủy: ${removed.join(', ') || 'không'}; lý do: ${reason || '—'}; ${preview.length} lần job đổi ngày`);
 
         // Cập nhật ngay danh sách local + vẽ lại lịch cố định (không chờ snapshot)
         // Snapshot realtime có thể đã thêm các doc mới trước khi commit() trả về => gộp theo (người, ngày), không concat mù
@@ -14508,6 +14546,170 @@ function initCheckEtaDirectUi() {
         clearTimeout(etaSearchTimer);
         etaSearchTimer = setTimeout(renderEtaDirectGrid, 150);
     });
+}
+
+function repeatLabel(repeat) {
+    return { none: 'Không lặp', weekly: 'Hằng tuần', monthly: 'Hằng tháng', yearly: 'Hằng năm', 'lunar-yearly': 'Hằng năm âm lịch' }[repeat] || 'Không lặp';
+}
+
+function describeJobChanges(before = {}, after = {}) {
+    const labels = { title: 'Tên', type: 'Loại', date: 'Ngày', time: 'Giờ', duration: 'Thời lượng', isPaused: 'Tạm dừng', workOnSunday: 'Làm Chủ Nhật', isOutOfSchedule: 'Ngoài lịch' };
+    const changes = Object.entries(labels).filter(([key]) => before[key] !== after[key])
+        .map(([key, label]) => `${label}: ${String(before[key] ?? '—')} → ${String(after[key] ?? '—')}`);
+    if (before.description !== after.description) changes.push('Đã sửa nội dung');
+    if (JSON.stringify(before.checklist || []) !== JSON.stringify(after.checklist || [])) changes.push(`Checklist: ${(before.checklist || []).length} → ${(after.checklist || []).length} bước (đã sửa nội dung)`);
+    if (JSON.stringify(before.excludedWeekdays || []) !== JSON.stringify(after.excludedWeekdays || [])) changes.push('Đã sửa ngày loại trừ');
+    return changes.join('\n') || 'Lưu thông tin job';
+}
+
+async function recordChange(kind, action, title, detail = '', user = currentUser) {
+    if (!user) return;
+    const entry = {
+        id: crypto.randomUUID(), kind, action, title: String(title).slice(0, 200),
+        detail: String(detail).slice(0, 1200), actor: user.displayName || user.email || user.uid,
+        actorId: user.uid, at: new Date().toISOString()
+    };
+    try {
+        const snapshot = await getDocs(query(collection(db, 'users'), where('uid', '==', user.uid)));
+        if (snapshot.empty) throw new Error('Không tìm thấy tài khoản.');
+        let latest = [];
+        await runTransaction(db, async transaction => {
+            const documents = await Promise.all(snapshot.docs.map(d => transaction.get(d.ref)));
+            documents.forEach(d => {
+                latest = [...(d.data().changeHistory || []), entry].slice(-200);
+                transaction.update(d.ref, { changeHistory: latest });
+            });
+        });
+        if (currentUser?.uid === user.uid) user.changeHistory = latest;
+    } catch (error) {
+        console.error('Không ghi được lịch sử:', error);
+        showNotification('Lịch sử chưa được lưu', 'Thay đổi đã được lưu, nhưng chưa ghi được lịch sử. ' + error.message, false, 'warning');
+    }
+}
+
+function renderChangeHistory() {
+    const search = document.getElementById('changeHistorySearch').value.trim().toLocaleLowerCase('vi');
+    const filter = document.getElementById('changeHistoryFilter').value;
+    const entries = [...(currentUser?.changeHistory || [])].reverse().filter(e =>
+        e.kind !== 'checklist' && !['Hoàn thành job', 'Bỏ hoàn thành job'].includes(e.action) &&
+        (filter === 'all' || e.kind === filter) && `${e.title} ${e.action} ${e.detail} ${e.actor}`.toLocaleLowerCase('vi').includes(search));
+    document.getElementById('changeHistoryList').innerHTML = entries.map(entry =>
+        `<article class="change-history-entry"><div class="d-flex justify-content-between gap-2 flex-wrap"><strong>${escapeHtml(entry.action)} · ${escapeHtml(entry.title)}</strong><time class="small text-muted">${escapeHtml(new Date(entry.at).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }))}</time></div><div class="small text-muted">${escapeHtml(entry.actor)}</div><div class="change-history-detail">${escapeHtml(entry.detail)}</div></article>`
+    ).join('') || '<p class="text-muted">Chưa có thay đổi phù hợp.</p>';
+}
+
+function setupProductivityFeatures() {
+    document.getElementById('changeHistorySearch').addEventListener('input', renderChangeHistory);
+    document.getElementById('changeHistoryFilter').addEventListener('change', renderChangeHistory);
+    document.getElementById('changeHistoryBtn').addEventListener('click', async () => {
+        const user = currentUser;
+        if (!user) return;
+        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('changeHistoryModal'));
+        modal.show();
+        document.getElementById('changeHistoryList').textContent = 'Đang tải lịch sử…';
+        try {
+            const data = await getUserData(user.uid);
+            if (currentUser?.uid !== user.uid) return;
+            user.changeHistory = data?.changeHistory || [];
+            renderChangeHistory();
+        } catch (error) {
+            document.getElementById('changeHistoryList').textContent = 'Không tải được lịch sử. Hãy đóng và mở lại để thử.';
+        }
+    });
+    document.getElementById('personalEventRepeat').addEventListener('change', e => {
+        const until = document.getElementById('personalEventUntil');
+        until.disabled = e.target.value === 'none';
+        if (until.disabled) until.value = '';
+    });
+}
+
+function getDayOffJobPreview() {
+    const { added, removed, saved } = getDayOffDiff();
+    const changed = [...added, ...removed].sort();
+    if (!changed.length) return [];
+    const before = { ...saved }, after = { ...saved };
+    added.forEach(key => { after[key] = { date: key }; });
+    removed.forEach(key => { delete after[key]; });
+    const start = parseJobDate(changed[0]); start.setDate(start.getDate() - 60);
+    const end = parseJobDate(changed[changed.length - 1]); end.setDate(end.getDate() + 31);
+    const active = jobs.filter(j => !j.isPaused && !j.isOutOfSchedule);
+    return compareScheduleEntries(buildScheduleEntries(start, end, active, before), buildScheduleEntries(start, end, active, after));
+}
+
+function previewMarkup(entries) {
+    return `<div class="off-preview-scroll"><table class="table table-sm"><thead><tr><th>Job</th><th>Lịch hiện tại</th><th>Sau khi lưu</th></tr></thead><tbody>${entries.slice(0, 80).map(e =>
+        `<tr><td>${escapeHtml(e.title)}<small class="d-block text-muted">${escapeHtml(e.time)}</small></td><td>${escapeHtml(formatDateShortDMY(e.beforeDate))}</td><td>${escapeHtml(formatDateShortDMY(e.date))}</td></tr>`
+    ).join('')}</tbody></table>${entries.length > 80 ? `<p class="small">Hiển thị 80/${entries.length} lần thay đổi.</p>` : ''}</div>`;
+}
+
+function renderDayOffJobPreview() {
+    const host = document.getElementById('dayOffJobPreview');
+    if (!host) return;
+    const { added, removed } = getDayOffDiff();
+    if (!added.length && !removed.length) { host.innerHTML = ''; return; }
+    const entries = getDayOffJobPreview();
+    host.innerHTML = entries.length
+        ? `<details open><summary>${entries.length} lần xuất hiện của job sẽ đổi ngày</summary>${previewMarkup(entries)}<small class="text-muted">Đã tính ngày lễ, Chủ Nhật, các ngày off liên tiếp và tùy chỉnh dời ngày hiện có.</small></details>`
+        : '<p class="small text-muted mb-0">Không có job nào đổi ngày theo lựa chọn hiện tại.</p>';
+}
+
+function renderJobChecklist(job, occurrenceDate, body) {
+    body.querySelector('.job-checklist-panel')?.remove();
+    if (!job.checklist?.length) return;
+    const panel = document.createElement('section');
+    panel.className = 'job-checklist-panel mb-3';
+    const done = getOverrideFor(job.id, occurrenceDate)?.checklistDone || {};
+    const count = job.checklist.filter(item => done[item.id]).length;
+    const percent = Math.round(count / job.checklist.length * 100);
+    panel.innerHTML = `<div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2"><strong>Checklist · ${count}/${job.checklist.length}</strong><span class="checklist-percent fw-bold">${percent}% hoàn thành</span></div>
+        <progress value="${count}" max="${job.checklist.length}" class="w-100 mb-2" aria-label="Tiến độ hoàn thành task"></progress>
+        ${job.checklist.map(item => `<label class="job-checklist-item"><input type="checkbox" data-checklist-id="${escapeHtml(item.id)}" ${done[item.id] ? 'checked' : ''}><span>${escapeHtml(item.text)}</span></label>`).join('')}
+        <div class="checklist-status small" role="status"></div>`;
+    const contentSection = body.querySelector('.view-job-content')?.closest('.mb-3');
+    const insertBefore = contentSection || body.querySelector('.transfer-section');
+    insertBefore?.before(panel);
+    if (!panel.parentElement) body.appendChild(panel);
+    const updateProgress = () => {
+        const completed = panel.querySelectorAll('[data-checklist-id]:checked').length;
+        panel.querySelector('strong').textContent = `Checklist · ${completed}/${job.checklist.length}`;
+        panel.querySelector('.checklist-percent').textContent = `${Math.round(completed / job.checklist.length * 100)}% hoàn thành`;
+        panel.querySelector('progress').value = completed;
+    };
+    panel.querySelectorAll('[data-checklist-id]').forEach(input => input.addEventListener('change', async () => {
+        const checked = input.checked;
+        input.disabled = true;
+        updateProgress();
+        panel.querySelector('.checklist-status').textContent = '';
+        const user = currentUser;
+        if (!user) {
+            input.checked = !checked;
+            input.disabled = false;
+            updateProgress();
+            return;
+        }
+        try {
+            const ref = doc(db, 'jobDayOverrides', `${user.uid}_${job.id}_${occurrenceDate}`);
+            // Do not read a possibly nonexistent document: owner-based read rules
+            // can reject that read before the first checklist state is created.
+            // Merge only the toggled step, retaining other steps and date overrides.
+            await setDoc(ref, {
+                userId: user.uid, jobId: job.id, occurrenceDate,
+                checklistDone: { [input.dataset.checklistId]: checked },
+                updatedAt: new Date().toISOString()
+            }, { merge: true });
+            if (currentUser?.uid !== user.uid) return;
+            const local = getOverrideFor(job.id, occurrenceDate);
+            const updated = { ...(local?.checklistDone || {}), [input.dataset.checklistId]: checked };
+            if (local) local.checklistDone = updated;
+            else jobDayOverridesList.push({ id: `${user.uid}_${job.id}_${occurrenceDate}`, userId: user.uid, jobId: job.id, occurrenceDate, checklistDone: updated });
+        } catch (error) {
+            input.checked = !checked;
+            updateProgress();
+            panel.querySelector('.checklist-status').textContent = error.code === 'permission-denied'
+                ? 'Firestore chưa cho phép lưu tiến độ checklist. Cần kiểm tra quyền ghi của jobDayOverrides cho tài khoản này.'
+                : `Chưa lưu được checklist: ${error.message}`;
+        } finally { input.disabled = false; }
+    }));
 }
 
 window.addEventListener('beforeunload', () => {

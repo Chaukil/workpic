@@ -387,6 +387,7 @@
                                 </div>
                             </div>
                             <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <button class="btn btn-sm btn-outline-light" id="changeHistoryBtn" type="button"><i class="bi bi-clock-history"></i> Lịch sử</button>
                                 <button class="btn btn-sm btn-outline-light" id="toggleScheduleViewBtn" type="button"
                                     title="Đổi chế độ xem">
                                     <i class="bi bi-bar-chart-steps"></i>
@@ -567,6 +568,11 @@
                             </div>
                             <div id="jobDescription" class="form-control editor-content" contenteditable="true"
                                 style="min-height: 180px;"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="jobChecklistText" class="form-label fw-bold">Checklist</label>
+                            <textarea id="jobChecklistText" class="form-control" rows="3" maxlength="8000" placeholder="Mỗi dòng một bước công việc (tối đa 50 bước)"></textarea>
+                            <small class="text-muted">Đánh dấu tiến độ trong chi tiết job. Mỗi lần xuất hiện có checklist riêng.</small>
                         </div>
                     </form>
                 </div>
@@ -1129,6 +1135,16 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
     </div>
 
     <!-- Day Off Modal -->
+    <div class="modal fade" id="changeHistoryModal" tabindex="-1" aria-labelledby="changeHistoryTitle">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title" id="changeHistoryTitle">Lịch sử thay đổi của tôi</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div>
+            <div class="modal-body">
+                <p class="small text-muted">200 thay đổi gần nhất từ khi có chức năng này: job, checklist, lịch off, lịch lễ và sự kiện cá nhân.</p>
+                <div class="d-flex gap-2 mb-3"><input id="changeHistorySearch" class="form-control" placeholder="Tìm tên, nội dung thay đổi…" aria-label="Tìm lịch sử"><select id="changeHistoryFilter" class="form-select w-auto" aria-label="Loại thay đổi"><option value="all">Tất cả</option><option value="job">Job</option><option value="off">Lịch off</option><option value="holiday">Lịch lễ</option><option value="event">Sự kiện</option></select></div>
+                <div id="changeHistoryList" aria-live="polite"></div>
+            </div>
+        </div></div>
+    </div>
     <div class="modal fade" id="dayOffModal" tabindex="-1">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
@@ -1161,9 +1177,12 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
 
                         <section class="dayoff-main">
                             <div class="dayoff-toolbar dayoff-calendar-controls">
-                                <label for="dayOffYear">Năm <select id="dayOffYear" class="form-select form-select-sm"></select></label>
-                                <label for="dayOffMonth">Tháng bắt đầu <select id="dayOffMonth" class="form-select form-select-sm"></select></label>
-                                <button type="button" class="btn btn-sm btn-outline-primary" id="dayOffToday">Tháng hiện tại</button>
+                                <div class="dayoff-period-picker" role="group" aria-label="Khoảng tháng hiển thị">
+                                    <i class="bi bi-calendar3 dayoff-period-icon" aria-hidden="true"></i>
+                                    <label for="dayOffYear"><span>Năm</span><select id="dayOffYear" class="form-select form-select-sm"></select></label>
+                                    <label for="dayOffMonth"><span>Tháng bắt đầu</span><select id="dayOffMonth" class="form-select form-select-sm"></select></label>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-primary" id="dayOffToday"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> Tháng hiện tại</button>
                             <details class="dayoff-holiday-settings">
                                 <summary>Điều chỉnh lịch lễ của tôi theo năm</summary>
                                 <div class="dayoff-holiday-panel">
@@ -1191,6 +1210,11 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
                                 <input id="personalEventTitle" class="form-control" maxlength="120" required placeholder="VD: Sinh nhật, khám sức khỏe…">
                                 <label class="form-label mt-2" for="personalEventNotes">Ghi chú</label>
                                 <textarea id="personalEventNotes" class="form-control" maxlength="1000" rows="2"></textarea>
+                                <div class="dayoff-toolbar mt-2">
+                                    <label for="personalEventRepeat">Lặp lại <select id="personalEventRepeat" class="form-select form-select-sm"><option value="none">Không lặp</option><option value="weekly">Hằng tuần</option><option value="monthly">Hằng tháng</option><option value="yearly">Hằng năm (dương lịch)</option><option value="lunar-yearly">Hằng năm (âm lịch)</option></select></label>
+                                    <label for="personalEventUntil">Đến hết ngày <input type="date" id="personalEventUntil" class="form-control form-control-sm"></label>
+                                </div>
+                                <small class="text-muted">Sửa/xóa áp dụng cho cả chuỗi. Tháng thiếu ngày sẽ bỏ qua; lặp âm lịch dùng tháng thường.</small>
                                 <div class="d-flex gap-2 mt-3 flex-wrap">
                                     <button type="submit" id="savePersonalEvent" class="btn btn-primary">Lưu sự kiện</button>
                                     <button type="button" id="deletePersonalEvent" class="btn btn-outline-danger d-none">Xóa sự kiện</button>
@@ -1202,6 +1226,7 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
                             <div class="dayoff-form">
                                 <div class="dayoff-form-head"><i class="bi bi-pencil-square"></i> Đăng ký của tôi</div>
                                 <div class="dayoff-summary" id="dayOffSummary"></div>
+                                <div id="dayOffJobPreview" class="dayoff-job-preview" aria-live="polite"></div>
                                 <div id="dayOffReasonWrap" class="d-none">
                                     <label class="form-label fw-bold mt-2" for="dayOffReason">Lý do off *</label>
                                     <input type="text" class="form-control" id="dayOffReason" maxlength="120"
@@ -1211,6 +1236,7 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
                                         <button type="button" data-reason="Việc cá nhân">Việc cá nhân</button>
                                         <button type="button" data-reason="Nghỉ ốm">Nghỉ ốm</button>
                                         <button type="button" data-reason="Đi công tác">Đi công tác</button>
+                                        <button type="button" data-reason="SO">SO</button>
                                     </div>
                                 </div>
                                 <div class="d-flex justify-content-end mt-3">
