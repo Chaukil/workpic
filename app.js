@@ -4653,15 +4653,16 @@ function renderSchedule() {
             if (holiday) {
                 const note = document.createElement('div');
                 note.className = 'calendar-holiday-label';
-                note.textContent = holiday;
+                note.textContent = compactCalendarLabel(holiday);
+                note.title = holiday;
                 cell.appendChild(note);
             }
             getPersonalEvents(dateStr).forEach(entry => {
                 const button = document.createElement('button');
                 button.type = 'button';
                 button.className = 'calendar-personal-event';
-                button.textContent = [entry.time, entry.title].filter(Boolean).join(' · ');
-                button.title = entry.notes || entry.title;
+                button.textContent = compactCalendarLabel(entry.title);
+                button.title = [entry.time, entry.title, entry.notes].filter(Boolean).join('\n');
                 button.addEventListener('click', async () => {
                     await openDayOffModal();
                     openPersonalEventEditor(dateStr, entry.id);
@@ -11951,14 +11952,14 @@ function renderTimeline({ todayOnly = false, containerId = 'timelineView' } = {}
             const overlapPairCount = Math.floor(overlapSet.size / 2);
             const holidayLabel = getHolidayName(currentDate);
             const personalLabels = getPersonalEvents(dateStr).map(entry =>
-                `<span class="calendar-personal-event" title="${escapeHtml(entry.notes || entry.title)}">${escapeHtml([entry.time, entry.title].filter(Boolean).join(' · '))}</span>`).join('');
+                `<span class="calendar-personal-event" title="${escapeHtml([entry.time, entry.title, entry.notes].filter(Boolean).join('\n'))}">${escapeHtml(compactCalendarLabel(entry.title))}</span>`).join('');
 
             rowsHtml += `
                 <div class="${rowClasses.join(' ')}">
                     <div class="timeline-day-label">
                         <span class="timeline-day-dow">${dow}</span>
                         <span class="timeline-day-date">${currentDate.getDate()}/${currentDate.getMonth() + 1}</span>
-                        ${holidayLabel ? `<span class="calendar-holiday-label">${escapeHtml(holidayLabel)}</span>` : ''}
+                        ${holidayLabel ? `<span class="calendar-holiday-label" title="${escapeHtml(holidayLabel)}">${escapeHtml(compactCalendarLabel(holidayLabel))}</span>` : ''}
                         ${personalLabels}
                         ${overlapPairCount ? `<span class="timeline-overlap-badge" title="${overlapPairCount} cặp job chồng giờ">⚠ ${overlapPairCount}</span>` : ''}
                         ${isOff ? '<span class="timeline-overlap-badge" style="background:rgba(239,68,68,.18);color:#b91c1c">OFF</span>' : ''}
@@ -12812,6 +12813,11 @@ function getHolidayName(date) {
     return holidaysForYear(year, currentUser?.holidayPolicy?.[year] || {})[localDateKey(date)] || '';
 }
 
+function compactCalendarLabel(text) {
+    const characters = Array.from(String(text || '').normalize('NFC'));
+    return characters.length > 12 ? characters.slice(0, 11).join('') + '…' : characters.join('');
+}
+
 function getPersonalEvents(key) {
     return (currentUser?.personalCalendarEvents || []).filter(e => e && e.date === key)
         .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
@@ -12832,7 +12838,7 @@ function syncDayOffFilters() {
     document.getElementById('holidayPolicyStatus').textContent = '';
 }
 
-function openPersonalEventEditor(date, id = '') {
+function openPersonalEventEditor(date, id = '', anchor = null) {
     const entry = (currentUser?.personalCalendarEvents || []).find(e => e.id === id);
     const form = document.getElementById('personalEventForm');
     form.reset();
@@ -12844,7 +12850,14 @@ function openPersonalEventEditor(date, id = '') {
     document.getElementById('personalEventStatus').textContent = '';
     document.getElementById('deletePersonalEvent').classList.toggle('d-none', !entry);
     form.classList.remove('d-none');
-    form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    const cell = anchor || document.querySelector(`#dayOffCalendars [data-date="${date}"]`);
+    const rect = cell?.getBoundingClientRect();
+    const gap = 10, margin = 12;
+    const width = form.offsetWidth, height = form.offsetHeight;
+    let left = rect ? rect.right + gap : (window.innerWidth - width) / 2;
+    if (rect && left + width > window.innerWidth - margin) left = rect.left - width - gap;
+    form.style.left = `${Math.max(margin, Math.min(left, window.innerWidth - width - margin))}px`;
+    form.style.top = `${Math.max(margin, Math.min(rect?.top ?? margin, window.innerHeight - height - margin))}px`;
     document.getElementById('personalEventTitle').focus({ preventScroll: true });
 }
 
@@ -12908,40 +12921,29 @@ function setupPersonalCalendar() {
     document.getElementById('cancelPersonalEvent').addEventListener('click', () => {
         document.getElementById('personalEventForm').classList.add('d-none');
     });
+    const form = document.getElementById('personalEventForm');
+    const modal = document.getElementById('dayOffModal');
+    // Keep the floating editor outside the scrolling calendar layout.
+    modal.appendChild(form);
+    const hideEditor = () => form.classList.add('d-none');
     host.addEventListener('click', e => {
-        const add = e.target.closest('[data-add-event]');
         const edit = e.target.closest('[data-personal-event]');
-        if (add) openPersonalEventEditor(add.dataset.addEvent);
-        if (edit) openPersonalEventEditor(edit.closest('[data-date]').dataset.date, edit.dataset.personalEvent);
+        if (edit) openPersonalEventEditor(edit.closest('[data-date]').dataset.date, edit.dataset.personalEvent, edit.closest('[data-date]'));
     });
-    const menu = document.createElement('div');
-    menu.className = 'personal-calendar-menu d-none';
-    menu.setAttribute('role', 'menu');
-    document.getElementById('dayOffModal').appendChild(menu);
-    const hideMenu = () => menu.classList.add('d-none');
     host.addEventListener('contextmenu', e => {
         const cell = e.target.closest('[data-date]');
         if (!cell) return;
         e.preventDefault();
-        menu.replaceChildren();
-        const action = (text, id = '') => {
-            const button = document.createElement('button');
-            button.type = 'button'; button.setAttribute('role', 'menuitem'); button.textContent = text;
-            button.addEventListener('click', () => { hideMenu(); openPersonalEventEditor(cell.dataset.date, id); });
-            menu.appendChild(button);
-        };
-        action('＋ Thêm lịch trình / sự kiện');
-        getPersonalEvents(cell.dataset.date).forEach(entry => action(`Sửa: ${entry.title}`, entry.id));
-        menu.classList.remove('d-none');
-        menu.style.left = `${Math.max(8, Math.min(e.clientX, window.innerWidth - menu.offsetWidth - 8))}px`;
-        menu.style.top = `${Math.max(8, Math.min(e.clientY, window.innerHeight - menu.offsetHeight - 8))}px`;
-        menu.querySelector('button').focus();
+        const entry = e.target.closest('[data-personal-event]');
+        openPersonalEventEditor(cell.dataset.date, entry?.dataset.personalEvent || '', cell);
     });
-    document.addEventListener('click', hideMenu);
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') hideMenu(); });
-    document.getElementById('dayOffModal').addEventListener('scroll', hideMenu, true);
-    document.getElementById('dayOffModal').addEventListener('hidden.bs.modal', hideMenu);
-    window.addEventListener('resize', hideMenu);
+    document.addEventListener('pointerdown', e => {
+        if (!form.contains(e.target)) hideEditor();
+    });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') hideEditor(); });
+    modal.addEventListener('scroll', e => { if (!form.contains(e.target)) hideEditor(); }, true);
+    modal.addEventListener('hidden.bs.modal', hideEditor);
+    window.addEventListener('resize', hideEditor);
     document.getElementById('saveHolidayPolicy').addEventListener('click', async e => {
         const user = currentUser;
         if (!user) return;
@@ -13041,9 +13043,8 @@ function renderDayOffCalendars() {
             html += `<div class="${classes.join(' ')}" data-date="${key}" title="${escapeHtml(title)}">
                 <span class="dayoff-day-num">${d}</span>
                 <span class="dayoff-lunar">${lunar.day}/${lunar.month}${lunar.leap ? ' nhuận' : ''} ÂL</span>
-                <button type="button" class="dayoff-add-event" data-add-event="${key}" aria-label="Thêm sự kiện ngày ${key}" title="Thêm sự kiện cá nhân">+</button>
-                ${holiday ? `<span class="calendar-holiday-label">${escapeHtml(holiday)}</span>` : ''}
-                ${personal.map(e => `<button type="button" class="calendar-personal-event" data-personal-event="${escapeHtml(e.id)}">${escapeHtml([e.time, e.title].filter(Boolean).join(' · '))}</button>`).join('')}
+                ${holiday ? `<span class="calendar-holiday-label" title="${escapeHtml(holiday)}">${escapeHtml(compactCalendarLabel(holiday))}</span>` : ''}
+                ${personal.map(e => `<button type="button" class="calendar-personal-event" data-personal-event="${escapeHtml(e.id)}" title="${escapeHtml([e.time, e.title, e.notes].filter(Boolean).join('\n'))}">${escapeHtml(compactCalendarLabel(e.title))}</button>`).join('')}
                 <span class="dayoff-chips">${chips}</span>
             </div>`;
         }
@@ -13115,7 +13116,7 @@ function renderDayOffDetails() {
 }
 
 function handleDayOffCalendarClick(event) {
-    if (event.target.closest('[data-add-event], [data-personal-event]')) return;
+    if (event.target.closest('[data-personal-event]')) return;
     const cell = event.target.closest('.dayoff-day[data-date]');
     // Chỉ chọn được ngày từ hôm nay trở đi; lịch của người khác chỉ để xem
     if (!cell || cell.classList.contains('past')) return;

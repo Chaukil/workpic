@@ -1160,14 +1160,13 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
                         </aside>
 
                         <section class="dayoff-main">
-                            <div class="dayoff-toolbar">
+                            <div class="dayoff-toolbar dayoff-calendar-controls">
                                 <label for="dayOffYear">Năm <select id="dayOffYear" class="form-select form-select-sm"></select></label>
                                 <label for="dayOffMonth">Tháng bắt đầu <select id="dayOffMonth" class="form-select form-select-sm"></select></label>
                                 <button type="button" class="btn btn-sm btn-outline-primary" id="dayOffToday">Tháng hiện tại</button>
-                            </div>
-                            <div class="dayoff-legend"><span class="legend-off">● Off đã đăng ký</span><span class="legend-holiday">● Nghỉ lễ</span><span class="legend-event">● Sự kiện cá nhân</span></div>
                             <details class="dayoff-holiday-settings">
                                 <summary>Điều chỉnh lịch lễ của tôi theo năm</summary>
+                                <div class="dayoff-holiday-panel">
                                 <p class="small text-muted">Tết mặc định mùng 1–5 tháng Giêng (5 ngày). Có thể đổi ngày bắt đầu theo lịch của đơn vị. Không tự cộng ngày nghỉ bù hoặc hoán đổi.</p>
                                 <div class="dayoff-toolbar">
                                     <label for="holidayTetStart">Ngày bắt đầu 5 ngày Tết <input type="date" id="holidayTetStart" class="form-control form-control-sm"></label>
@@ -1175,10 +1174,13 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
                                     <button type="button" class="btn btn-sm btn-outline-primary" id="saveHolidayPolicy">Lưu lịch lễ của năm</button>
                                 </div>
                                 <div id="holidayPolicyStatus" class="small" role="status"></div>
+                                </div>
                             </details>
-                            <p class="small text-muted mt-2">Chuột phải vào ngày để thêm lịch trình/sự kiện cá nhân. Trên điện thoại, bấm dấu + trong ô ngày. Sự kiện không đăng ký off.</p>
+                            <div class="dayoff-legend"><span class="legend-off">● Off đã đăng ký</span><span class="legend-holiday">● Nghỉ lễ</span><span class="legend-event">● Sự kiện cá nhân</span></div>
+                            </div>
+                            <p class="small text-muted mt-2">Chuột phải vào ngày để thêm lịch trình/sự kiện cá nhân. Sự kiện không đăng ký off.</p>
                             <div class="dayoff-calendars" id="dayOffCalendars"></div>
-                            <form id="personalEventForm" class="dayoff-form d-none mt-3">
+                            <form id="personalEventForm" class="dayoff-form personal-event-popover d-none" role="dialog" aria-label="Lịch trình / sự kiện cá nhân">
                                 <div class="dayoff-form-head">Lịch trình / sự kiện cá nhân</div>
                                 <input type="hidden" id="personalEventId">
                                 <div class="dayoff-toolbar">
