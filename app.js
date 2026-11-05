@@ -276,7 +276,7 @@ function buildGalaxySvg() {
     }
     return `<svg viewBox="-100 -100 200 200" aria-hidden="true">
         <defs>
-            <radialGradient id="fxGalCore"><stop offset="0" stop-color="#fff6e0"/><stop offset=".3" stop-color="#f7c984" stop-opacity=".85"/><stop offset="1" stop-color="#f7c984" stop-opacity="0"/></radialGradient>
+            <radialGradient id="fxGalCore"><stop offset="0" stop-color="#9062bd" stop-opacity=".3"/><stop offset=".3" stop-color="#a54dba" stop-opacity=".16"/><stop offset="1" stop-color="#6045a0" stop-opacity="0"/></radialGradient>
             <filter id="fxGalBlurWide" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="5"/></filter>
             <filter id="fxGalBlur" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1.4"/></filter>
         </defs>
@@ -362,7 +362,7 @@ const ThreeFx = (() => {
             x = mod(x + hw, 2.0 * hw) - hw;
             vec4 mv = modelViewMatrix * vec4(x, y, position.z, 1.0);
             gl_Position = projectionMatrix * mv;
-            gl_PointSize = max(1.0, aRand.z * uPixel * 10.0 / -mv.z);
+            gl_PointSize = clamp(aRand.z * uPixel * 10.0 / -mv.z, 1.0, 96.0 * uPixel);
             vAngle = aRand.x * 6.2831 + uTime * (aRand.w - 0.5) * uSpin;
             vFlip = uTime * (0.7 + aRand.w * 1.3) + aRand.x * 40.0;
             vAlpha = 0.55 + 0.45 * clamp((-mv.z - 4.0) / 14.0, 0.0, 1.0);   // gần: mờ như bokeh, xa: rõ
@@ -653,7 +653,7 @@ const ThreeFx = (() => {
             uniforms: {
                 uTime: { value: 0 }, uTan: { value: TAN }, uAspect: { value: 1.7 }, uPixel: { value: ctx.pixel }, uCamZ: { value: CAM_Z },
                 uSway: { value: o.sway || 0 }, uWind: { value: o.wind || 0 }, uSpin: { value: o.spin || 0 },
-                uDir: { value: o.dir || 1 }, uFlip: { value: o.flip || 0 }, uAlpha: { value: o.alpha == null ? 1 : o.alpha },
+                uDir: { value: o.dir ?? 1 }, uFlip: { value: o.flip || 0 }, uAlpha: { value: o.alpha == null ? 1 : o.alpha },
                 uTex: { value: o.texture }, uAtlas: { value: new THREE.Vector2(atlas[0], atlas[1]) },
                 uLightMul: { value: new THREE.Vector3(1, 1, 1) }
             }
@@ -771,40 +771,39 @@ const ThreeFx = (() => {
         const pos = new Float32Array(N * 3), col = new Float32Array(N * 3), scl = new Float32Array(N), ph = new Float32Array(N);
 
         // ═══════════════════════════════════════════════════════════════
-        // BẢNG MÀU THIÊN HÀ — 6 dải chuyển tiếp như thiên hà thật:
-        //   lõi kem-vàng  →  cam  →  đào  →  hồng tinh vân  →  tím  →  xanh navy
+        // Saturated violet, magenta and blue bands with a subdued core.
         // ═══════════════════════════════════════════════════════════════
-        const cCore = new THREE.Color('#fff8e0');   // lõi trắng-kem
-        const cGold = new THREE.Color('#ffd98a');   // vàng nắng
-        const cOrange = new THREE.Color('#ffb86b');   // cam vàng (dust lane ấm)
-        const cPeach = new THREE.Color('#ff9a7a');   // đào
-        const cPink = new THREE.Color('#ff8fb0');   // hồng tinh vân
-        const cMagenta = new THREE.Color('#d989d9');   // hồng-tím
-        const cPurple = new THREE.Color('#9b8bf0');   // tím xanh
-        const cBlue = new THREE.Color('#6a92f0');   // xanh dương
-        const cBrightB = new THREE.Color('#4a72e0');   // xanh dương đậm
-        const cNavy = new THREE.Color('#3a55b8');   // rìa xanh navy
+        const cCore = new THREE.Color('#a887da');
+        const cGold = new THREE.Color('#bc73c9');
+        const cOrange = new THREE.Color('#da648f');
+        const cPeach = new THREE.Color('#e454ad');
+        const cPink = new THREE.Color('#ec48bc');
+        const cMagenta = new THREE.Color('#b33deb');
+        const cPurple = new THREE.Color('#774bea');
+        const cBlue = new THREE.Color('#397cde');
+        const cBrightB = new THREE.Color('#259fc7');
+        const cNavy = new THREE.Color('#3049a5');
         const cCyan = new THREE.Color('#8ee6ff');   // xanh lơ (cụm sao trẻ)
         const cWhite = new THREE.Color('#ffffff');   // sao trắng
         const tmp = new THREE.Color();
-        const bulgeN = Math.floor(N * 0.14);
+        const bulgeN = Math.floor(N * 0.06);
 
         for (let i = 0; i < N; i++) {
             let x, y, z;
             if (i < bulgeN) {
-                // ══════ LÕI PHÌNH: kem → vàng → cam ══════
-                const r = Math.pow(Math.random(), 2.2) * RAD * 0.22;
+                // Spread the central stars out to avoid a white additive hotspot.
+                const r = Math.pow(Math.random(), 0.65) * RAD * 0.25;
                 const th = Math.random() * Math.PI * 2, ph2 = Math.acos(2 * Math.random() - 1);
                 x = r * Math.sin(ph2) * Math.cos(th);
                 y = r * Math.cos(ph2) * 0.55;
                 z = r * Math.sin(ph2) * Math.sin(th);
                 const t = Math.min(1, r / (RAD * 0.22));
                 tmp.copy(cCore).lerp(cGold, t * 0.85).lerp(cOrange, t * t * 0.45);
-                tmp.multiplyScalar(0.7);
-                scl[i] = 0.3 + Math.random() * 0.5;
+                tmp.multiplyScalar(0.28);
+                scl[i] = 0.2 + Math.random() * 0.3;
             } else {
                 // ══════ NHÁNH XOẮN ══════
-                const radius = Math.random() * RAD;
+                const radius = Math.sqrt(Math.random()) * RAD;
                 const spinA = radius * SPIN;
                 const branchA = ((i % BRANCHES) / BRANCHES) * Math.PI * 2;
                 const sx = Math.random() < 0.5 ? 1 : -1, sy = Math.random() < 0.5 ? 1 : -1, sz = Math.random() < 0.5 ? 1 : -1;
@@ -853,6 +852,7 @@ const ThreeFx = (() => {
 
                 scl[i] = (0.3 + Math.pow(Math.random(), 3) * 1.0) * (0.9 + t * 0.6);
                 if (rnd >= 0.09 && rnd < 0.12) scl[i] *= 1.35;   // sao trắng & tinh vân to hơn chút
+                tmp.multiplyScalar(0.22 + 0.78 * Math.min(1, t / 0.28));
             }
             pos[i * 3] = x; pos[i * 3 + 1] = y; pos[i * 3 + 2] = z;
             col[i * 3] = tmp.r; col[i * 3 + 1] = tmp.g; col[i * 3 + 2] = tmp.b;
@@ -873,24 +873,24 @@ const ThreeFx = (() => {
         tilt.rotation.z = -0.28;
         tilt.add(galaxy);
 
-        // ═══ LÕI phát sáng: kem → vàng → cam ấm (thay vì chỉ trắng-kem) ═══
+        // Soft violet core instead of a large white glow.
         const coreTex = T.glow(THREE, [
-            [0, 'rgba(255,246,214,1)'],
-            [0.22, 'rgba(255,210,140,.75)'],
-            [0.55, 'rgba(255,160,90,.35)'],
-            [1, 'rgba(255,140,80,0)']
+            [0, 'rgba(145,100,205,.35)'],
+            [0.22, 'rgba(165,80,190,.22)'],
+            [0.55, 'rgba(95,65,165,.10)'],
+            [1, 'rgba(65,45,130,0)']
         ]);
         const core = new THREE.Sprite(new THREE.SpriteMaterial({
-            map: coreTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.7
+            map: coreTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.24
         }));
-        core.scale.set(4.6, 4.6, 1);
+        core.scale.set(3.2, 3.2, 1);
         tilt.add(core);
 
         // ═══ HÀO QUANG: tím-hồng → xanh-tím → xanh dương (thay vì chỉ 1 màu xanh) ═══
         const haloTex = T.glow(THREE, [
-            [0, 'rgba(200,160,255,.55)'],
-            [0.35, 'rgba(130,150,255,.38)'],
-            [0.7, 'rgba(70,110,230,.18)'],
+            [0, 'rgba(100,50,190,.08)'],
+            [0.35, 'rgba(85,75,230,.28)'],
+            [0.7, 'rgba(30,120,210,.22)'],
             [1, 'rgba(40,60,200,0)']
         ]);
         const halo = new THREE.Mesh(
@@ -906,8 +906,8 @@ const ThreeFx = (() => {
         // ═══ LỚP TINH VÂN HỒNG — lớp mới, đặc trưng của thiên hà xoắn ốc ═══
         const nebulaTex = T.glow(THREE, [
             [0, 'rgba(255,150,200,0)'],
-            [0.4, 'rgba(255,120,190,.22)'],
-            [0.7, 'rgba(200,100,220,.15)'],
+            [0.4, 'rgba(225,45,160,.32)'],
+            [0.7, 'rgba(145,45,220,.24)'],
             [1, 'rgba(150,80,200,0)']
         ]);
         const nebula = new THREE.Mesh(
@@ -1738,24 +1738,24 @@ const ThreeFx = (() => {
             g.fillStyle = gr; g.fillRect(0, 0, S, S);
         });
 
-        const fogCount = 5 + lvl * 2;
+        const fogCount = [2, 3, 4][lvl];
         const fogs = [];
+        const fogGeometry = new THREE.PlaneGeometry(12, 5);
+        const fogMat = new THREE.MeshBasicMaterial({
+            map: fogTex, transparent: true, depthWrite: false, blending: THREE.NormalBlending, opacity: 0.55
+        });
+        ctx.own(fogTex, fogGeometry, fogMat);
+        ctx.lightFns.push(light => { fogMat.opacity = light ? 0.32 : 0.55; });
         for (let i = 0; i < fogCount; i++) {
-            const fogMat = new THREE.MeshBasicMaterial({
-                map: fogTex, transparent: true, depthWrite: false, blending: THREE.NormalBlending
-            });
-            const fog = new THREE.Mesh(new THREE.PlaneGeometry(15, 6.5), fogMat);
+            const fog = new THREE.Mesh(fogGeometry, fogMat);
             fog.position.set(
                 -12 + (i / fogCount) * 24 + (Math.random() - 0.5) * 3,
                 -3.2 - Math.random() * 0.7,
                 -8 + Math.random() * 3
             );
             fog.userData = { speed: 0.18 + Math.random() * 0.18, phase: Math.random() * Math.PI * 2 };
-            fog.userData.baseOpacity = 0.6 + Math.random() * 0.25;
             ctx.scene.add(fog);
-            ctx.own(fogMat, fog.geometry);
             fogs.push(fog);
-            ctx.lightFns.push(light => { fogMat.opacity = fog.userData.baseOpacity * (light ? 0.6 : 1); });
         }
         ctx.updaters.push((dt, t) => {
             fogs.forEach(f => {
@@ -1806,15 +1806,22 @@ const ThreeFx = (() => {
             own: (...items) => items.forEach(i => i && s.owned.push(i))
         };
         BUILDERS[theme](ctx);
+        // Flat transparent scenery needs one pass, even when visible from both sides.
+        scene.traverse(object => {
+            const material = object.material;
+            if (object.isMesh && material?.transparent && material.side === THREE.DoubleSide) material.forceSinglePass = true;
+        });
 
         s.fit = () => {
             const w = window.innerWidth, h = window.innerHeight, aspect = w / h;
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, lowEnd ? 1 : 1.25,
-                Math.sqrt(1500000 / Math.max(1, w * h))));
+            const nextPixel = Math.min(window.devicePixelRatio || 1, lowEnd ? 1 : 1.25,
+                Math.sqrt(1500000 / Math.max(1, w * h)));
+            renderer.setPixelRatio(nextPixel);
             renderer.setSize(w, h, false);
             camera.aspect = aspect;
             camera.updateProjectionMatrix();
             s.aspectMats.forEach(m => { m.uniforms.uAspect.value = aspect; });
+            s.timeMats.forEach(m => { if (m.uniforms.uPixel) m.uniforms.uPixel.value = nextPixel; });
             s.onFit.forEach(fn => fn(aspect));
         };
         s.onMove = (e) => {
@@ -1905,19 +1912,19 @@ const FX_LEVEL_INFO = {
         ]
     },
     tet: {
-        labels: ['Hoa rơi nhẹ', 'Phụng múa', 'Mưa hoa & pháo nổ'],
+        labels: ['Hoa rơi nhẹ', 'Mưa hoa', 'Sắc xuân rực rỡ'],
         hints: [
-            'Cây đào nở rộ, vài cánh hoa nhỏ rơi nhẹ; rồng bay đậu trên các nút.',
-            'Hoa đào, cánh hoa, lì xì và kim tuyến vàng rơi đều; thêm phụng múa chạy dọc đáy màn hình.',
-            'Mưa hoa dày đặc, có gió, nhiều lì xì và đồng tiền vàng; thêm pháo hoa nổ trên trời và bánh pháo nổ liên hồi.'
+            'Cây đào và vài cánh hoa trôi nhẹ trên nền xuân.',
+            'Hoa đào, cánh hoa, lì xì và ánh vàng chuyển động mềm mại.',
+            'Mưa hoa nhiều lớp, lì xì và kim tuyến vàng chuyển động trên nền cây đào.'
         ]
     },
     trungthu: {
         labels: ['Nhẹ nhàng', 'Bình thường', 'Rước đèn'],
         hints: [
             'Trăng rằm sáng với Chị Hằng, Chú Cuội, thỏ ngọc; vài đèn lồng bay lên.',
-            'Thêm đoàn múa lân chạy dọc đáy màn hình, nhiều đèn lồng và sao rơi hơn.',
-            'Thêm thỏ trắng xách đèn chạy theo đoàn lân, rất nhiều đèn lồng và sao.'
+            'Đèn lồng ấm áp và sao vàng nhiều lớp trên nền trăng rằm.',
+            'Rước đèn với nhiều đèn lồng, sao vàng và một đoàn múa lân dưới chân trang.'
         ]
     },
     rain: {
@@ -1935,9 +1942,9 @@ const FX_LEVEL_INFO = {
     halloween: {
         labels: ['Nhẹ nhàng', 'Bình thường', 'Đêm kinh hoàng'],
         hints: [
-            'Vài quả bí ngô, dơi bay thưa, sương mù nhẹ.',
-            'Bí ngô, dơi, ma nhỏ, nhện treo rải rác; sương mù dày hơn.',
-            'Mưa bí ngô, dơi, đầu lâu, ma; sương mù phủ kín đáy màn hình.'
+            'Trăng hồng, lâu đài xa, vài chú dơi và sương mỏng.',
+            'Dơi bay hai hướng, lá thu trôi và sương mù nhẹ dưới chân trời.',
+            'Bầu trời nhiều sao, đàn dơi, lá thu và sương mù nhiều lớp.'
         ]
     }
 };
@@ -2156,7 +2163,7 @@ const SnowPile = (() => {
         st.dirty = false;
         g.clearRect(0, 0, W, Hc);
         const light = document.body.classList.contains('theme-light');
-        const ys = new Float32Array(n);
+        const ys = st.ys || (st.ys = new Float32Array(n));
         for (let i = 0; i < n; i++) ys[i] = Hc - 2 - h[i] * maxP[i];
 
         // bóng mờ phía dưới mép tuyết (giúp thấy rõ trên nền sáng)
@@ -2188,9 +2195,14 @@ const SnowPile = (() => {
     }
 
     function markDirty() {
-        if (!st || st.dirty) return;
+        if (!st || st.dirty || document.hidden || document.body.classList.contains('modal-open')) return;
         st.dirty = true;
-        requestAnimationFrame(draw);
+        const owner = st;
+        st.raf = requestAnimationFrame(() => {
+            if (st !== owner) return;
+            st.raf = 0;
+            draw();
+        });
     }
 
     function scrape(x, y, dx) {
@@ -2225,7 +2237,7 @@ const SnowPile = (() => {
     }
 
     function onMove(e) {
-        if (!st) return;
+        if (!st || document.hidden || document.body.classList.contains('modal-open')) return;
         const x = e.clientX, y = e.clientY;
         const c = clamp(Math.round(x / STEP), 0, st.n - 1);
         const topY = window.innerHeight - 2 - st.h[c] * st.maxP[c];
@@ -2246,7 +2258,7 @@ const SnowPile = (() => {
     }
 
     function tick() {
-        if (!st) return;
+        if (!st || document.hidden || document.body.classList.contains('modal-open')) return;
         const { n, h } = st;
         let changed = false;
         for (let i = 0; i < n; i++) {
@@ -2263,7 +2275,7 @@ const SnowPile = (() => {
         const data = build();
         const canvas = document.createElement('canvas');
         canvas.className = 'fx-snow-pile';
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const dpr = Math.min(window.devicePixelRatio || 1, 1.25);
         canvas.width = Math.round(data.W * dpr);
         canvas.height = Math.round(data.Hc * dpr);
         canvas.style.width = data.W + 'px';
@@ -2288,6 +2300,7 @@ const SnowPile = (() => {
         if (!st) return;
         save();
         clearInterval(st.timer);
+        cancelAnimationFrame(st.raf || 0);
         window.removeEventListener('pointermove', onMove);
         document.documentElement.removeEventListener('mouseleave', onLeave);
         window.removeEventListener('pagehide', save);
@@ -2588,7 +2601,7 @@ function buildTetScene() {
     // Vẽ bông + nụ: 72% bông nở, 28% nụ
     let blossomsSvg = '';
     clusters.forEach(c => {
-        const count = Math.max(28, Math.floor(c.r * c.r / 42));   // dày gần gấp đôi bản cũ (/62)
+        const count = Math.min(48, Math.max(18, Math.floor(c.r * c.r / 180)));   // dày gần gấp đôi bản cũ (/62)
         for (let i = 0; i < count; i++) {
             const ang = rnd(0, Math.PI * 2);
             const dist = Math.pow(Math.random(), 0.55) * c.r;
@@ -2658,7 +2671,8 @@ function buildTetScene() {
 function cssFxFallbackHtml(theme, cfg, lvl) {
     const rnd = (a, b) => a + Math.random() * (b - a);
     if (cfg.galaxy) return `<div class="fx-galaxy-tilt">${buildGalaxySvg()}</div>`;
-    const count = Math.round(cfg.count * [0.3, 1, 2.4][lvl]);
+    // Keep the fallback bounded even at the highest setting.
+    const count = Math.min(72, Math.round(cfg.count * [0.3, 0.75, 1.25][lvl]));
     let html = '';
     for (let i = 0; i < count; i++) {
         const dur = rnd(cfg.dur[0], cfg.dur[1]) * (lvl === 2 ? 0.75 : 1);
@@ -2679,6 +2693,9 @@ function cssFxFallbackHtml(theme, cfg, lvl) {
 let fullscreenFxTimer = null;
 let fullscreenFxSignature = '';
 let fullscreenFxGeneration = 0;
+document.addEventListener('visibilitychange', () => {
+    document.body.classList.toggle('fx-paused', document.hidden);
+});
 function renderFullscreenFx() {
     clearTimeout(fullscreenFxTimer);
     // Coalesce rapid settings changes and let the control paint before scene construction.
@@ -2736,93 +2753,9 @@ function commitFullscreenFx() {
         if (lvl >= 1) html += `<div class="fx-lightning lv${lvl}"></div>`;     // chớp
         if (lvl === 2) html += '<div class="fx-storm-dim"></div>';             // bão: trời tối sầm
     } else if (theme === 'trungthu') {
-        if (lvl >= 1) html += `<div class="tt-lion-wrap"><div class="tt-lion-flip">${buildLionSvg()}</div></div>`;   // múa lân
-        if (lvl >= 2) html += '<div class="tt-bunny-wrap"><div class="tt-lion-flip"><span class="tt-bunny">🐇</span><span class="tt-bunny-lantern">🏮</span></div></div>';
+        if (lvl === 2) html += `<div class="tt-lion-wrap"><div class="tt-lion-flip">${buildLionSvg()}</div></div>`;   // múa lân
     }
     layer.innerHTML = html;
-
-    // TẾT: phụng múa chạy dọc đáy màn hình (như múa lân) từ mức 2; pháo nổ ở mức cao nhất
-    // Đặt ở body vì layer Tết có z-index: -1 (nằm sau nội dung) — phụng và pháo cần hiện phía trước
-    if (theme === 'tet') {
-        if (lvl >= 1) {
-            const phung = document.createElement('div');
-            phung.className = 'tt-lion-wrap tet-phung-wrap tet-front-fx';
-            phung.setAttribute('aria-hidden', 'true');
-            phung.innerHTML = `<div class="tt-lion-flip">${buildPhoenixSvg()}</div>`;
-            document.body.appendChild(phung);
-        }
-        if (lvl >= 2) {
-            const pao = document.createElement('div');
-            pao.className = 'tet-pao-layer tet-front-fx';
-            pao.setAttribute('aria-hidden', 'true');
-            pao.innerHTML = buildTetPaoHtml();
-            document.body.appendChild(pao);
-        }
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    // NHỆN TREO — chỉ hiện ở chủ đề Halloween + mức "Đêm kinh hoàng"
-    // Click vào → nhện thu lên trên, sau 5 giây đu xuống lại ở vị trí mới
-    // Đặt ở body (không nằm trong layer) vì layer Halloween có z-index: -1
-    // ═══════════════════════════════════════════════════════════
-    if (theme === 'halloween' && lvl === 2) {
-        const spiderRig = document.createElement('div');
-        spiderRig.className = 'hl-spider-rig';
-        spiderRig.id = 'hlSpiderRig';
-        spiderRig.style.left = (14 + Math.random() * 72).toFixed(1) + '%';
-        spiderRig.innerHTML = `
-            <div class="hl-spider-swing">
-                <div class="hl-spider-thread"></div>
-                <div class="hl-spider-body" role="button" tabindex="0" aria-label="Nhện ma — bấm để thu lên">
-                    <svg viewBox="0 0 100 100" aria-hidden="true">
-                        <g fill="none" stroke="#0a0510" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M40 48 Q28 40 20 32 Q16 27 20 24"/>
-                            <path d="M38 52 Q24 50 16 44 Q10 40 14 36"/>
-                            <path d="M38 56 Q24 60 16 68 Q12 72 18 74"/>
-                            <path d="M40 60 Q30 68 26 78 Q24 83 30 84"/>
-                            <path d="M60 48 Q72 40 80 32 Q84 27 80 24"/>
-                            <path d="M62 52 Q76 50 84 44 Q90 40 86 36"/>
-                            <path d="M62 56 Q76 60 84 68 Q88 72 82 74"/>
-                            <path d="M60 60 Q70 68 74 78 Q76 83 70 84"/>
-                        </g>
-                        <ellipse cx="50" cy="62" rx="16" ry="13" fill="#0a0510"/>
-                        <ellipse cx="50" cy="62" rx="10" ry="8" fill="#16051f" opacity=".9"/>
-                        <path d="M50 55 L45 62 L50 62 L45 69 L50 69 L55 62 L50 62 L55 55 Z" fill="#ff2050" opacity=".75"/>
-                        <ellipse cx="50" cy="48" rx="11" ry="9" fill="#1a0a1f"/>
-                        <circle class="spider-eye" cx="44" cy="45" r="2.1" fill="#ff2020">
-                            <animate attributeName="opacity" values="1;0.35;1" dur="1.7s" repeatCount="indefinite"/>
-                        </circle>
-                        <circle class="spider-eye" cx="56" cy="45" r="2.1" fill="#ff2020">
-                            <animate attributeName="opacity" values="1;0.35;1" dur="1.7s" repeatCount="indefinite"/>
-                        </circle>
-                        <circle cx="47" cy="42" r="1.2" fill="#ff5050"/>
-                        <circle cx="53" cy="42" r="1.2" fill="#ff5050"/>
-                        <circle cx="41" cy="47" r="1.4" fill="#ff3030"/>
-                        <circle cx="59" cy="47" r="1.4" fill="#ff3030"/>
-                    </svg>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(spiderRig);
-
-        // Click handler: thu lên → 5s sau đu xuống lại
-        const body = spiderRig.querySelector('.hl-spider-body');
-        let descendTimer = null;
-        const retract = () => {
-            if (spiderRig.classList.contains('retracted')) return;
-            spiderRig.classList.add('retracted');
-            clearTimeout(descendTimer);
-            descendTimer = setTimeout(() => {
-                spiderRig.classList.remove('retracted');
-                // đổi vị trí ngẫu nhiên cho lần đu xuống kế tiếp
-                spiderRig.style.left = (14 + Math.random() * 72).toFixed(1) + '%';
-            }, 5000);
-        };
-        body.addEventListener('click', (e) => { e.stopPropagation(); retract(); });
-        body.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); retract(); }
-        });
-    }
 
     if (theme === 'noel' && lvl === 2) SnowPile.start(layer);                  // tuyết lớn: có đống tuyết
 

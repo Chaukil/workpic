@@ -12080,7 +12080,12 @@ body.theme-light .fx-galaxy-canvas {
 
 /* Khi bật vũ trụ toàn màn hình: nền trang là không gian sâu, topbar trong suốt để thiên hà liền mạch xuyên qua */
 body.theme-dark.fx-space-full {
-    background: radial-gradient(ellipse at 50% 42%, #0a1233 0%, #040817 55%, #02040c 100%) fixed;
+    background:
+        radial-gradient(ellipse at 22% 30%, rgba(105, 40, 170, .28), transparent 48%),
+        radial-gradient(ellipse at 78% 64%, rgba(22, 95, 160, .26), transparent 48%),
+        radial-gradient(ellipse at 66% 18%, rgba(165, 40, 110, .16), transparent 38%),
+        linear-gradient(145deg, #08091d, #050917 55%, #080616);
+    background-attachment: fixed;
 }
 
 body.fx-space-full[data-topbar-theme="space"] .topbar {
@@ -13305,10 +13310,11 @@ body.theme-light.fx-backdrop-on .fx-three-canvas {
 /* ── 9) Riêng VŨ TRỤ: đổi sang tone tím đậm để galaxy nổi bật ── */
 body.theme-light.fx-backdrop-on[data-topbar-theme="space"] {
     background:
-        radial-gradient(ellipse at 50% 42%,
-            rgba(167, 139, 250, 0.24) 0%,
-            rgba(129, 140, 248, 0.16) 55%,
-            rgba(233, 213, 255, 0.08) 100%) fixed;
+        radial-gradient(ellipse at 20% 28%, rgba(139, 92, 246, .22), transparent 50%),
+        radial-gradient(ellipse at 80% 65%, rgba(56, 139, 210, .20), transparent 48%),
+        radial-gradient(ellipse at 65% 15%, rgba(219, 80, 160, .14), transparent 40%),
+        linear-gradient(145deg, #eeeafa, #e7edf8 55%, #f2eaf6);
+    background-attachment: fixed;
 }
 
 /* ── 10) Riêng HALLOWEEN (light): trời chuyển xám tím ── */
@@ -15293,6 +15299,25 @@ body.theme-dark .calendar-personal-event { color: #7dd3fc; }
 .view-job-meta dd { margin: 0; color: var(--text); font-size: .95rem; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .view-job-meta dd .badge { font-size: .75rem; padding: 5px 9px; }
 .view-job-meta-unit { color: var(--muted); font-size: .75rem; font-weight: 500; }
+
+/* One main animated scene per theme; the header must not duplicate it. */
+body.fx-fullscreen-on .topbar .theme-deco { display: none !important; }
+body.modal-open #fxFullscreen *, body.modal-open #fxBackdrop *,
+body.fx-paused #fxFullscreen *, body.fx-paused #fxBackdrop *,
+body.fx-paused .theme-deco * { animation-play-state: paused !important; }
+#fxFullscreen, #fxBackdrop { contain: layout style; }
+body.theme-dark.fx-fullscreen-on[data-topbar-theme="noel"] {
+    background: radial-gradient(ellipse at 20% 15%, #16344b, transparent 60%), linear-gradient(145deg, #081624, #102033 60%, #102c35); background-attachment: fixed;
+}
+body.theme-light.fx-fullscreen-on[data-topbar-theme="noel"] {
+    background: radial-gradient(ellipse at 20% 15%, #cfe7f0, transparent 60%), linear-gradient(145deg, #f0f7fb, #e1ecf7 60%, #e6f4ee); background-attachment: fixed;
+}
+body.theme-dark.fx-fullscreen-on[data-topbar-theme="rain"] {
+    background: radial-gradient(ellipse at 75% 15%, #233346, transparent 65%), linear-gradient(150deg, #0a1520, #101c2a 60%, #0b202b); background-attachment: fixed;
+}
+body.theme-light.fx-fullscreen-on[data-topbar-theme="rain"] {
+    background: radial-gradient(ellipse at 75% 15%, #c1d0df, transparent 65%), linear-gradient(150deg, #e6edf3, #d9e4ec 60%, #d6e8e9); background-attachment: fixed;
+}
 @media (max-width: 767px) { .view-job-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); } .view-job-meta-item { padding: 12px; } }
 
 .dayoff-calendar-controls { align-items: center; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
