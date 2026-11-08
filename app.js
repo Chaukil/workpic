@@ -2,6 +2,8 @@ import { convertWorkHoursRows } from './work-hours-data.js';
 import { resolveApiUrl } from './api-client.js';
 import { vietnameseLunar, holidaysForYear, monthPair } from './calendar-data.js';
 import { personalEventOccurs, checklistFromText, compareScheduleEntries } from './productivity-data.js';
+import { createScheduleLounge } from './schedule-3d.js';
+import { loungeWeekStart, loungeDays } from './schedule-3d-data.js';
 // Firebase Configuration - Chỉ sử dụng Firestore
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, getDocs, onSnapshot, enableIndexedDbPersistence, query, where, writeBatch, runTransaction, arrayUnion, arrayRemove }
@@ -159,7 +161,9 @@ let aiSelectedJobs = new Set();
 const GEMINI_API_KEY_STORAGE = 'workpic_gemini_api_key';
 
 // === Timeline view ===
-let scheduleView = 'calendar';  // 'calendar' | 'timeline'
+let scheduleView = 'calendar';  // 'calendar' | 'timeline' | '3d'
+let scheduleLounge = null;
+let loungeWeek = 0;
 const SCHEDULE_VIEW_STORAGE_KEY = 'workpic_schedule_view';
 
 // Statistics
@@ -182,6 +186,7 @@ function applyTheme(theme) {
     document.body.classList.add('no-theme-transition');
 
     currentTheme = theme;
+    if (scheduleView === '3d' && currentUser) renderSchedule3D();
     document.body.classList.toggle('theme-dark', theme === 'dark');
     document.body.classList.toggle('theme-light', theme === 'light');
     document.documentElement.setAttribute('data-theme', theme);
@@ -2707,7 +2712,7 @@ function commitFullscreenFx() {
     const theme = currentTopbarTheme;
     const cfg = FX_CONFIG[theme];
     const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const active = fxFullscreen && !!cfg && !reduced;
+    const active = fxFullscreen && !!cfg && !reduced && scheduleView !== '3d';
     const lvl = getFxLevelIndex(theme);
     const signature = `${theme}:${active}:${lvl}`;
     if (signature === fullscreenFxSignature && (!active || layer?.isConnected)) return;
@@ -3421,6 +3426,8 @@ async function changeAvatar(file) {
 
 function handleSignedOut() {
     currentUser = null;
+    scheduleLounge?.dispose();
+    scheduleLounge = null;
     bootstrap.Modal.getInstance(document.getElementById('changeHistoryModal'))?.hide();
     document.getElementById('changeHistoryList').replaceChildren();
     try {
@@ -4488,6 +4495,10 @@ async function toggleOutOfScheduleJob(job) {
 // Render Schedule Calendar (2 tuần tới) - FIXED PAST/TODAY/FUTURE LOGIC
 function renderSchedule() {
     renderTodayJobs();
+    if (scheduleView === '3d') {
+        renderSchedule3D();
+        return;
+    }
     if (scheduleView === 'timeline') {
         renderTimeline();
         return;
@@ -11508,27 +11519,32 @@ function initTimelineView() {
     // Đọc view đã lưu
     try {
         const saved = localStorage.getItem(SCHEDULE_VIEW_STORAGE_KEY);
-        if (saved === 'timeline' || saved === 'calendar') scheduleView = saved;
+        if (['timeline', 'calendar', '3d'].includes(saved)) scheduleView = saved;
     } catch (_) { /* ignore */ }
 
-    const btn = document.getElementById('toggleScheduleViewBtn');
-    if (btn) btn.addEventListener('click', toggleScheduleView);
+    document.querySelectorAll('.schedule-view-tab').forEach(button => {
+        button.addEventListener('click', () => setScheduleView(button.dataset.view));
+    });
 
     updateScheduleViewUI();
 }
 
 function toggleScheduleView() {
-    scheduleView = scheduleView === 'calendar' ? 'timeline' : 'calendar';
-    try { localStorage.setItem(SCHEDULE_VIEW_STORAGE_KEY, scheduleView); } catch (_) { }
-    updateScheduleViewUI();
-    renderSchedule();
+    const views = ['calendar', 'timeline', '3d'];
+    setScheduleView(views[(views.indexOf(scheduleView) + 1) % views.length]);
 }
 
 function updateScheduleViewUI() {
     const cal = document.getElementById('calendarView');
     const tl = document.getElementById('timelineView');
+    const lounge = document.getElementById('schedule3dView');
     if (cal) cal.classList.toggle('d-none', scheduleView !== 'calendar');
     if (tl) tl.classList.toggle('d-none', scheduleView !== 'timeline');
+    if (lounge) lounge.classList.toggle('d-none', scheduleView !== '3d');
+    document.querySelectorAll('.schedule-view-tab').forEach(button => {
+        button.classList.toggle('active', button.dataset.view === scheduleView);
+        button.setAttribute('aria-pressed', String(button.dataset.view === scheduleView));
+    });
 
     const btn = document.getElementById('toggleScheduleViewBtn');
     if (btn) {
@@ -11550,6 +11566,10 @@ function updateScheduleViewUI() {
             icon.className = 'bi bi-calendar3';
             title.textContent = 'Lịch Làm Việc';
             sub.textContent = '2 tuần tới · công việc định kỳ';
+        } else if (scheduleView === '3d') {
+            icon.className = 'bi bi-box';
+            title.textContent = 'Phòng Khách Công Việc';
+            sub.textContent = 'Góc nhìn 3D · chọn nhân vật để xem job';
         } else {
             icon.className = 'bi bi-bar-chart-steps';
             title.textContent = 'Timeline Công Việc';
@@ -11629,16 +11649,28 @@ async function saveUserWorkShift(shift) {
 }
 
 function setScheduleView(mode) {
-    if (mode !== 'calendar' && mode !== 'timeline') return;
+    if (!['calendar', 'timeline', '3d'].includes(mode)) return;
     scheduleView = mode;
-    document.querySelectorAll('.schedule-view-tab').forEach(t => {
-        t.classList.toggle('active', t.dataset.view === mode);
-    });
-    const cal = document.getElementById('calendarView');
-    const tl = document.getElementById('timelineView');
-    if (cal) cal.classList.toggle('d-none', mode !== 'calendar');
-    if (tl) tl.classList.toggle('d-none', mode !== 'timeline');
+    try { localStorage.setItem(SCHEDULE_VIEW_STORAGE_KEY, mode); } catch (_) { }
+    scheduleLounge?.setVisible(mode === '3d');
+    updateScheduleViewUI();
+    renderFullscreenFx();
     renderSchedule();
+}
+
+function renderSchedule3D() {
+    if (!currentUser) return;
+    const container = document.getElementById('schedule3dView');
+    if (!container) return;
+    if (!scheduleLounge) scheduleLounge = createScheduleLounge(container, {
+        onOpen: (job, originDate) => openViewJobModal(job, originDate),
+        onWeekChange: week => { loungeWeek = week; renderSchedule3D(); }
+    });
+    const start = loungeWeekStart(new Date(), loungeWeek);
+    const end = new Date(start); end.setDate(end.getDate() + 6);
+    const entries = buildScheduleEntries(start, end, jobs.filter(job => !job.isPaused && !job.isOutOfSchedule));
+    const days = loungeDays(start, entries, { showSunday, off: getMyOffMap(), holiday: getHolidayName });
+    void scheduleLounge.update({ days, week: loungeWeek, theme: currentTheme, today: localDateKey(new Date()) });
 }
 
 // ============================================================
