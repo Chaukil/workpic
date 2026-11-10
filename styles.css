@@ -15300,57 +15300,6 @@ body.theme-dark .calendar-personal-event { color: #7dd3fc; }
 .view-job-meta dd .badge { font-size: .75rem; padding: 5px 9px; }
 .view-job-meta-unit { color: var(--muted); font-size: .75rem; font-weight: 500; }
 
-/* Isometric work lounge: the live schedule, expressed as seats and people. */
-.schedule-lounge { background: var(--surface); border-radius: 12px; overflow: hidden; }
-.lounge-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 20px; flex-wrap: wrap; }
-.lounge-intro { display: grid; gap: 3px; }
-.lounge-eyebrow { font-size: .6rem; font-weight: 800; letter-spacing: .18em; color: var(--muted); }
-.lounge-intro strong { font-size: .95rem; color: var(--text); }
-.lounge-controls { display: flex; gap: 5px; align-items: center; flex-wrap: wrap; }
-.lounge-control { border: 1px solid var(--border); background: var(--surface-muted); color: var(--text); padding: 7px 11px; border-radius: 8px; font-size: .75rem; font-weight: 600; }
-.lounge-control:hover, .lounge-control.is-active { color: var(--primary); background: var(--primary-soft); border-color: var(--primary); }
-.lounge-camera-control { min-width: 33px; font-size: .95rem; padding: 4px 10px; }
-.lounge-stage { position: relative; height: clamp(430px, 62vh, 740px); background: #edf1f4; isolation: isolate; overflow: hidden; touch-action: none; }
-body.theme-dark .lounge-stage { background: #192433; }
-.lounge-stage > canvas { display: block; width: 100%; height: 100%; cursor: grab; }
-.lounge-stage.is-over-job > canvas { cursor: pointer; }
-.lounge-stage:active > canvas { cursor: grabbing; }
-.lounge-message { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 3; padding: 18px; width: min(340px, 90%); border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); font-size: .85rem; text-align: center; box-shadow: var(--shadow); }
-.lounge-day-labels { position: absolute; inset: 0; pointer-events: none; }
-.lounge-day-label { position: absolute; transform: translate(-50%, -100%); width: 102px; text-align: center; display: grid; gap: 2px; color: #354552; padding: 7px 5px; border-radius: 9px; background: rgba(248, 251, 253, .92); border: 1px solid rgba(180, 195, 205, .55); box-shadow: 0 3px 8px rgba(35, 49, 62, .07); }
-.lounge-day-label strong { font-size: .73rem; }
-.lounge-day-label > span { font-size: .62rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lounge-day-label.is-today { border-color: #4d9b84; color: #28755e; }
-body.theme-dark .lounge-day-label { background: rgba(32, 47, 64, .94); color: #dce7ee; border-color: #607489; }
-body.theme-dark .lounge-day-label.is-today { color: #8cd8bb; border-color: #6bbd9e; }
-.lounge-day-count { pointer-events: auto; border: 0; border-radius: 4px; background: transparent; color: inherit; font-size: .6rem; padding: 1px; }
-.lounge-day-count:not(:disabled) { background: var(--primary-soft); color: var(--primary); cursor: pointer; }
-.lounge-day-count:disabled { opacity: .75; }
-.lounge-day-label.lounge-wall-calendar-label, body.theme-dark .lounge-day-label.lounge-wall-calendar-label { background: transparent; border: 0; box-shadow: none; padding: 0; width: 110px; color: var(--text); }
-.lounge-wall-calendar-label > strong, .lounge-wall-calendar-label > span, .lounge-wall-calendar-label .lounge-day-count:disabled { display: none; }
-.lounge-wall-calendar-label .lounge-day-count:not(:disabled) { background: var(--surface); border: 1px solid var(--border); padding: 3px 5px; }
-.lounge-sleep-label { position: absolute; transform: translate(-50%, -100%); font-weight: 800; font-size: .78rem; letter-spacing: .08em; color: #536a86; background: rgba(245, 249, 255, .85); padding: 2px 5px; border-radius: 7px; }
-body.theme-dark .lounge-sleep-label { background: rgba(24, 36, 52, .88); color: #b5c9e3; }
-.lounge-list-job.is-resting { opacity: .6; }
-.lounge-tooltip { position: absolute; z-index: 5; max-width: 245px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 9px; color: var(--text); font-size: .78rem; white-space: pre-line; overflow-wrap: anywhere; pointer-events: none; box-shadow: var(--shadow); }
-.lounge-hint { margin: 0; padding: 10px 20px; color: var(--muted); border-bottom: 1px solid var(--border); font-size: .72rem; }
-.lounge-job-list { padding: 12px 20px 16px; }
-.lounge-job-list summary { font-size: .8rem; font-weight: 600; cursor: pointer; color: var(--text); }
-.lounge-list-body { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 14px; }
-.lounge-list-day { display: flex; flex-direction: column; align-items: stretch; gap: 5px; }
-.lounge-list-day > strong { font-size: .75rem; color: var(--text); }
-.lounge-list-empty { font-size: .7rem; color: var(--muted); }
-.lounge-list-job { text-align: left; background: var(--surface-muted); border: 1px solid var(--border); border-radius: 7px; padding: 8px; font-size: .75rem; color: var(--text); overflow-wrap: anywhere; }
-.lounge-list-job:hover { border-color: var(--primary); color: var(--primary); }
-.lounge-control:focus-visible, .lounge-list-job:focus-visible, .lounge-day-count:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-@media (max-width: 767px) {
-    .lounge-toolbar { padding: 12px; gap: 10px; }
-    .lounge-stage { height: 470px; }
-    .lounge-day-label { width: 72px; padding: 4px 2px; }
-    .lounge-day-label strong { font-size: .63rem; }
-    .lounge-day-label > span, .lounge-day-count { font-size: .56rem; }
-}
-
 /* One main animated scene per theme; the header must not duplicate it. */
 body.fx-fullscreen-on .topbar .theme-deco { display: none !important; }
 body.modal-open #fxFullscreen *, body.modal-open #fxBackdrop *,

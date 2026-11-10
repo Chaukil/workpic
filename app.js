@@ -2,8 +2,8 @@ import { convertWorkHoursRows } from './work-hours-data.js';
 import { resolveApiUrl } from './api-client.js';
 import { vietnameseLunar, holidaysForYear, monthPair } from './calendar-data.js';
 import { personalEventOccurs, checklistFromText, compareScheduleEntries } from './productivity-data.js';
-import { createScheduleLounge } from './schedule-3d.js';
-import { loungeWeekStart, loungeDays } from './schedule-3d-data.js';
+import { createScheduleHouse } from './schedule-house.js';
+import { houseWeekStart, houseDays } from './schedule-house-data.js';
 // Firebase Configuration - Chỉ sử dụng Firestore
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, getDocs, onSnapshot, enableIndexedDbPersistence, query, where, writeBatch, runTransaction, arrayUnion, arrayRemove }
@@ -161,9 +161,9 @@ let aiSelectedJobs = new Set();
 const GEMINI_API_KEY_STORAGE = 'workpic_gemini_api_key';
 
 // === Timeline view ===
-let scheduleView = 'calendar';  // 'calendar' | 'timeline' | '3d'
-let scheduleLounge = null;
-let loungeWeek = 0;
+let scheduleView = 'calendar';  // 'calendar' | 'timeline' | 'house'
+let scheduleHouse = null;
+let houseWeek = 0;
 const SCHEDULE_VIEW_STORAGE_KEY = 'workpic_schedule_view';
 
 // Statistics
@@ -186,7 +186,7 @@ function applyTheme(theme) {
     document.body.classList.add('no-theme-transition');
 
     currentTheme = theme;
-    if (scheduleView === '3d' && currentUser) renderSchedule3D();
+    if (scheduleView === 'house' && currentUser) renderScheduleHouse();
     document.body.classList.toggle('theme-dark', theme === 'dark');
     document.body.classList.toggle('theme-light', theme === 'light');
     document.documentElement.setAttribute('data-theme', theme);
@@ -2712,7 +2712,7 @@ function commitFullscreenFx() {
     const theme = currentTopbarTheme;
     const cfg = FX_CONFIG[theme];
     const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const active = fxFullscreen && !!cfg && !reduced && scheduleView !== '3d';
+    const active = fxFullscreen && !!cfg && !reduced && scheduleView !== 'house';
     const lvl = getFxLevelIndex(theme);
     const signature = `${theme}:${active}:${lvl}`;
     if (signature === fullscreenFxSignature && (!active || layer?.isConnected)) return;
@@ -3426,8 +3426,8 @@ async function changeAvatar(file) {
 
 function handleSignedOut() {
     currentUser = null;
-    scheduleLounge?.dispose();
-    scheduleLounge = null;
+    scheduleHouse?.dispose();
+    scheduleHouse = null;
     bootstrap.Modal.getInstance(document.getElementById('changeHistoryModal'))?.hide();
     document.getElementById('changeHistoryList').replaceChildren();
     try {
@@ -4495,8 +4495,8 @@ async function toggleOutOfScheduleJob(job) {
 // Render Schedule Calendar (2 tuần tới) - FIXED PAST/TODAY/FUTURE LOGIC
 function renderSchedule() {
     renderTodayJobs();
-    if (scheduleView === '3d') {
-        renderSchedule3D();
+    if (scheduleView === 'house') {
+        renderScheduleHouse();
         return;
     }
     if (scheduleView === 'timeline') {
@@ -7371,51 +7371,49 @@ function findFolderPaths(text) {
 function enhanceFolderLinks(containerEl) {
     if (!containerEl) return;
 
-    const walker = document.createTreeWalker(containerEl, NodeFilter.SHOW_TEXT, {
-        acceptNode(node) {
-            const txt = node.nodeValue;
-            if (!txt || txt.length < 4) return NodeFilter.FILTER_REJECT;
-            const tag = node.parentElement && node.parentElement.tagName;
-            if (tag === 'A' || tag === 'CODE' || tag === 'BUTTON' || tag === 'SCRIPT' || tag === 'STYLE') {
-                return NodeFilter.FILTER_REJECT;
-            }
-            return findFolderPaths(txt).length ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+    // Gộp các text node trong cùng dòng: rich text có thể chia path qua nhiều span.
+    const segments = [];
+    let combinedText = '';
+    const blocks = new Set(['DIV', 'P', 'LI', 'UL', 'OL', 'PRE', 'BLOCKQUOTE', 'TR', 'TD', 'TH', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6']);
+    function boundary() {
+        if (combinedText && !combinedText.endsWith('\n')) combinedText += '\n';
+    }
+    function collect(node) {
+        if (node.nodeType === 3) {
+            const start = combinedText.length;
+            combinedText += node.nodeValue;
+            segments.push({ node, start, end: combinedText.length });
+            return;
         }
-    });
-
-    const targets = [];
-    let n;
-    while ((n = walker.nextNode())) targets.push(n);
-
-    targets.forEach(textNode => {
-        const text = textNode.nodeValue;
-        const paths = findFolderPaths(text);
-        if (!paths.length) return;
-
-        const frag = document.createDocumentFragment();
-        let cursor = 0;
-
-        paths.forEach(({ start, end, path }) => {
-            if (start > cursor) {
-                frag.appendChild(document.createTextNode(text.slice(cursor, start)));
-            }
-
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'folder-open-btn';
-            btn.title = `Copy đường dẫn:\n${path}\n\nMở Explorer: Win+E → Ctrl+L → Ctrl+V → Enter`;
-            btn.dataset.path = path;
-            btn.innerHTML = `<i class="bi bi-clipboard-check-fill"></i><span>${escapeHtml(path)}</span>`;
-            frag.appendChild(btn);
-
-            cursor = end;
-        });
-
-        if (cursor < text.length) {
-            frag.appendChild(document.createTextNode(text.slice(cursor)));
+        if (node.nodeType !== 1) return;
+        if (['A', 'CODE', 'BUTTON', 'SCRIPT', 'STYLE', 'BR'].includes(node.tagName)) {
+            boundary();
+            return;
         }
-        textNode.parentNode.replaceChild(frag, textNode);
-    });
+        const block = blocks.has(node.tagName);
+        if (block) boundary();
+        for (const child of node.childNodes) collect(child);
+        if (block) boundary();
+    }
+    collect(containerEl);
+
+    // Thay từ cuối về đầu để giữ nguyên offset của những path phía trước.
+    for (const { start, end, path } of findFolderPaths(combinedText).reverse()) {
+        const first = segments.find(s => s.start <= start && start < s.end);
+        const last = segments.find(s => s.start < end && end <= s.end);
+        if (!first || !last) continue;
+        const range = document.createRange();
+        range.setStart(first.node, start - first.start);
+        range.setEnd(last.node, end - last.start);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'folder-open-btn';
+        btn.title = `Copy đường dẫn:\n${path}\n\nMở Explorer: Win+E → Ctrl+L → Ctrl+V → Enter`;
+        btn.dataset.path = path;
+        btn.innerHTML = `<i class="bi bi-clipboard-check-fill"></i><span>${escapeHtml(path)}</span>`;
+        range.deleteContents();
+        range.insertNode(btn);
+    }
 }
 
 // Bấm link folder → copy path → hiện "Đã copy" ngay trên link 1.2s.
@@ -11518,8 +11516,9 @@ function renderDayOffUsers() {
 function initTimelineView() {
     // Đọc view đã lưu
     try {
-        const saved = localStorage.getItem(SCHEDULE_VIEW_STORAGE_KEY);
-        if (['timeline', 'calendar', '3d'].includes(saved)) scheduleView = saved;
+        const stored = localStorage.getItem(SCHEDULE_VIEW_STORAGE_KEY);
+        const saved = stored === '3d' ? 'house' : stored;
+        if (['timeline', 'calendar', 'house'].includes(saved)) scheduleView = saved;
     } catch (_) { /* ignore */ }
 
     document.querySelectorAll('.schedule-view-tab').forEach(button => {
@@ -11530,17 +11529,17 @@ function initTimelineView() {
 }
 
 function toggleScheduleView() {
-    const views = ['calendar', 'timeline', '3d'];
+    const views = ['calendar', 'timeline', 'house'];
     setScheduleView(views[(views.indexOf(scheduleView) + 1) % views.length]);
 }
 
 function updateScheduleViewUI() {
     const cal = document.getElementById('calendarView');
     const tl = document.getElementById('timelineView');
-    const lounge = document.getElementById('schedule3dView');
+    const house = document.getElementById('scheduleHouseView');
     if (cal) cal.classList.toggle('d-none', scheduleView !== 'calendar');
     if (tl) tl.classList.toggle('d-none', scheduleView !== 'timeline');
-    if (lounge) lounge.classList.toggle('d-none', scheduleView !== '3d');
+    if (house) house.classList.toggle('d-none', scheduleView !== 'house');
     document.querySelectorAll('.schedule-view-tab').forEach(button => {
         button.classList.toggle('active', button.dataset.view === scheduleView);
         button.setAttribute('aria-pressed', String(button.dataset.view === scheduleView));
@@ -11566,8 +11565,8 @@ function updateScheduleViewUI() {
             icon.className = 'bi bi-calendar3';
             title.textContent = 'Lịch Làm Việc';
             sub.textContent = '2 tuần tới · công việc định kỳ';
-        } else if (scheduleView === '3d') {
-            icon.className = 'bi bi-box';
+        } else if (scheduleView === 'house') {
+            icon.className = 'bi bi-building';
             title.textContent = 'Phòng Khách Công Việc';
             sub.textContent = 'Góc nhìn 3D · chọn nhân vật để xem job';
         } else {
@@ -11649,28 +11648,29 @@ async function saveUserWorkShift(shift) {
 }
 
 function setScheduleView(mode) {
-    if (!['calendar', 'timeline', '3d'].includes(mode)) return;
+    if (!['calendar', 'timeline', 'house'].includes(mode)) return;
     scheduleView = mode;
     try { localStorage.setItem(SCHEDULE_VIEW_STORAGE_KEY, mode); } catch (_) { }
-    scheduleLounge?.setVisible(mode === '3d');
+    scheduleHouse?.setVisible(mode === 'house');
     updateScheduleViewUI();
     renderFullscreenFx();
     renderSchedule();
 }
 
-function renderSchedule3D() {
+function renderScheduleHouse() {
     if (!currentUser) return;
-    const container = document.getElementById('schedule3dView');
+    const container = document.getElementById('scheduleHouseView');
     if (!container) return;
-    if (!scheduleLounge) scheduleLounge = createScheduleLounge(container, {
+    if (!scheduleHouse) scheduleHouse = createScheduleHouse(container, {
         onOpen: (job, originDate) => openViewJobModal(job, originDate),
-        onWeekChange: week => { loungeWeek = week; renderSchedule3D(); }
+        onWeekChange: week => { houseWeek = week; renderScheduleHouse(); },
+        onDateChange: () => renderScheduleHouse()
     });
-    const start = loungeWeekStart(new Date(), loungeWeek);
+    const start = houseWeekStart(new Date(), houseWeek);
     const end = new Date(start); end.setDate(end.getDate() + 6);
     const entries = buildScheduleEntries(start, end, jobs.filter(job => !job.isPaused && !job.isOutOfSchedule));
-    const days = loungeDays(start, entries, { showSunday, off: getMyOffMap(), holiday: getHolidayName });
-    void scheduleLounge.update({ days, week: loungeWeek, theme: currentTheme, today: localDateKey(new Date()) });
+    const days = houseDays(start, entries, { off: getMyOffMap(), holiday: getHolidayName });
+    void scheduleHouse.update({ days, week: houseWeek, theme: currentTheme, today: localDateKey(new Date()) });
 }
 
 // ============================================================
