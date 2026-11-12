@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
-    "test": "node --test --test-isolation=none *-data.test.mjs api-client.test.mjs"
+    "test": "node --test --test-isolation=none *-data.test.mjs api-client.test.mjs folder-links.test.mjs ai-parser.test.mjs notifications.test.mjs quick-jobs.test.mjs theme-fx.test.mjs today-timeline.test.mjs"
   },
   "devDependencies": {
     "@rollup/wasm-node": "^4.68.0",

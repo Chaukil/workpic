@@ -5,7 +5,7 @@
     --monthly-color: #f59e0b;
     --quarterly-color: #8b5cf6;
     --yearly-color: #ec4899;
-    --once-color: #06b6d4;
+    --once-color: #facc15;
     --font-family: "Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI",Roboto,"Noto Sans KR",sans-serif;
     --bg: #f5f7fb;
     --surface: #ffffff;
@@ -2099,6 +2099,16 @@ body.theme-dark .schedule-table td:hover {
 
 .schedule-item.daily {
     background: linear-gradient(135deg, rgba(239, 68, 68, 0.9), rgba(248, 113, 113, 0.95));
+}
+
+.schedule-item.once {
+    background: linear-gradient(135deg, #facc15, #fde047);
+    border-color: #eab308;
+}
+
+.schedule-item.once h6, .schedule-item.once small {
+    color: #422006;
+    text-shadow: none;
 }
 
 .schedule-item.weekly {
@@ -14859,7 +14869,7 @@ body.theme-dark .ai-parse-textarea {
 .timeline-job.weekly   { background: linear-gradient(135deg, #14b8a6, #2dd4bf); }
 .timeline-job.biweekly { background: linear-gradient(135deg, #3b82f6, #60a5fa); }
 .timeline-job.monthly  { background: linear-gradient(135deg, #f59e0b, #facc15); color: #422006; }
-.timeline-job.once     { background: linear-gradient(135deg, #06b6d4, #22d3ee); }
+.timeline-job.once     { background: linear-gradient(135deg, #facc15, #fde047); color: #422006; }
 .timeline-job.custom   { background: linear-gradient(135deg, #8b5cf6, #a78bfa); }
 
 .timeline-job.shifted {
@@ -15357,4 +15367,115 @@ body.theme-dark #dayOffModal .form-select { --bs-form-select-bg-img: url("data:i
     .dayoff-calendar-controls > .dayoff-legend { width: 100%; }
     .dayoff-calendar-controls > .dayoff-holiday-settings { position: static; }
     .dayoff-holiday-panel { position: static; margin-top: 10px; width: 100%; }
+}
+
+/* Check Change Due — cùng kích thước và hệ màu với các form công cụ. */
+#checkDueModal .modal-dialog {
+    width: auto;
+    max-width: min(98vw, 1500px);
+    margin: 1.75rem auto;
+}
+#checkDueModal .modal-content {
+    max-height: calc(100dvh - 3.5rem);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl, 18px);
+    color: var(--text);
+}
+#checkDueModal .check-due-header { background: var(--grad-primary); flex-shrink: 0; }
+#checkDueModal .check-due-header-inner { gap: 1rem; }
+#checkDueModal .check-due-header-icon { width: 46px; height: 46px; border-radius: 13px; font-size: 1.35rem; }
+#checkDueModal .check-due-header-subtitle { font-size: .78rem; max-width: 720px; }
+#checkDueModal .check-due-body { padding: 1.25rem 1.5rem; min-height: 0; overflow-y: auto; background: var(--surface); }
+#checkDueModal .check-due-steps { margin-bottom: 1.25rem; padding: .85rem 1rem; background: var(--surface-muted); border: 1px solid var(--border); border-radius: 12px; box-shadow: none; }
+#checkDueModal .check-due-step { color: var(--muted); }
+#checkDueModal .check-due-step.active { color: var(--primary); }
+#checkDueModal .check-due-step-num { background: transparent; box-shadow: none; color: inherit; }
+#checkDueModal .check-due-step.active .check-due-step-num { background: var(--primary-soft); color: var(--primary); box-shadow: none; }
+#checkDueModal .check-due-step-line { background: var(--border); }
+#checkDueModal .check-due-mode-tabs { width: fit-content; max-width: 100%; padding: 4px; margin-bottom: 1rem; background: var(--surface-muted); border: 1px solid var(--border); border-radius: 10px; }
+#checkDueModal .check-due-mode-tab { color: var(--muted); padding: .6rem 1rem; border-radius: 7px; box-shadow: none; }
+#checkDueModal .check-due-mode-tab.active { background: var(--primary-soft); color: var(--primary); box-shadow: none; }
+#checkDueModal .check-due-mode-tab:hover:not(.active) { background: var(--surface-strong); color: var(--text); }
+#checkDueModal .check-due-grid { gap: 1rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+#checkDueModal .check-due-source-card { min-width: 0; padding: 1rem; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-muted); box-shadow: none; }
+#checkDueModal .check-due-source-card:focus-within { border-color: var(--primary); box-shadow: none; }
+#checkDueModal .check-due-source-head { gap: .65rem; margin-bottom: .9rem; }
+#checkDueModal .check-due-source-icon { width: 38px; height: 38px; border-radius: 10px; box-shadow: none; }
+#checkDueModal .check-due-source-icon-old { background: var(--primary-soft); color: var(--primary); }
+#checkDueModal .check-due-source-icon-new { background: var(--surface-strong); color: var(--success); }
+#checkDueModal .check-due-source-info h6 { color: var(--text); font-size: .85rem; }
+#checkDueModal .check-due-source-badge { white-space: nowrap; background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
+#checkDueModal .check-due-source-badge.has-data { background: var(--primary-soft); color: var(--primary); border-color: var(--primary); }
+#checkDueModal .check-due-textarea { display: block; width: 100%; min-height: 270px; padding: .9rem; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 10px; font-size: .8rem; line-height: 1.75; resize: vertical; }
+#checkDueModal .check-due-textarea::placeholder { color: var(--muted); opacity: 1; }
+#checkDueModal .check-due-textarea:focus { background: var(--surface); border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); outline: none; }
+#checkDueModal .check-due-dropzone { min-height: 210px; background: var(--surface); border-color: var(--border); border-radius: 10px; color: var(--text); }
+#checkDueModal .check-due-dropzone:hover,
+#checkDueModal .check-due-dropzone.dragover { background: var(--primary-soft); border-color: var(--primary); }
+#checkDueModal .check-due-dropzone i { color: var(--primary); }
+#checkDueModal .check-due-dropzone-hint { color: var(--muted); }
+#checkDueModal .check-due-file-info { overflow-wrap: anywhere; background: var(--surface); color: var(--muted); }
+#checkDueModal .check-due-file-info.has-file { color: var(--success); }
+#checkDueModal .check-due-file-info.has-error { color: var(--danger); }
+#checkDueModal .check-due-toolbar { margin: 1.25rem 0; padding: 1rem 0; border: 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; box-shadow: none; gap: 1rem; }
+#checkDueModal .check-due-status { color: var(--muted); min-width: 0; overflow-wrap: anywhere; }
+#checkDueModal .check-due-toolbar-actions { gap: .5rem; flex-wrap: wrap; }
+#checkDueModal .check-due-toolbar-actions .btn,
+#checkDueModal .btn-copy-result { min-height: 40px; border-radius: 9px; padding: .55rem .9rem; font-size: .8rem; }
+#checkDueModal .btn-compare { background: var(--grad-primary); color: #fff; border: 0; box-shadow: none; }
+#checkDueModal .btn-compare:hover:not(:disabled) { filter: brightness(1.08); transform: none; }
+#checkDueModal .btn-copy-result { background: var(--primary-soft); color: var(--primary); border: 1px solid var(--border); box-shadow: none; }
+#checkDueModal .btn-copy-result:hover { border-color: var(--primary); transform: none; }
+#checkDueModal .check-due-result { padding: 1rem; background: var(--surface-muted); border: 1px solid var(--border); border-radius: 14px; box-shadow: none; }
+#checkDueModal .check-due-result-header { flex-wrap: wrap; gap: 1rem; }
+#checkDueModal .check-due-result-title > i,
+#checkDueModal .check-due-stat-icon { background: var(--primary-soft); color: var(--primary); box-shadow: none; }
+#checkDueModal .check-due-result-title strong { color: var(--primary); }
+#checkDueModal .check-due-stat { background: var(--surface); min-width: 0; }
+#checkDueModal .check-due-stat-label { text-transform: none; letter-spacing: normal; }
+#checkDueModal .check-due-result-table { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
+#checkDueModal .check-due-result-table table { --bs-table-bg: var(--surface); --bs-table-color: var(--text); --bs-table-border-color: var(--border); --bs-table-hover-bg: var(--primary-soft); --bs-table-hover-color: var(--text); min-width: 560px; }
+#checkDueModal .check-due-result-table thead th { background: var(--surface-strong); }
+#checkDueModal .check-due-diff { color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent); }
+#checkDueModal :is(button, .check-due-dropzone):focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+@media (max-width: 768px) {
+    #checkDueModal .modal-dialog { width: calc(100vw - 1rem); max-width: calc(100vw - 1rem); margin: .5rem auto; }
+    #checkDueModal .modal-content { max-height: calc(100dvh - 1rem); }
+    #checkDueModal .check-due-header, #checkDueModal .check-due-body { padding: 1rem; }
+    #checkDueModal .check-due-grid { grid-template-columns: 1fr; }
+    #checkDueModal .check-due-textarea { min-height: 210px; }
+    #checkDueModal .check-due-toolbar { align-items: stretch; flex-direction: column; }
+    #checkDueModal .check-due-toolbar-actions { width: 100%; }
+    #checkDueModal .check-due-toolbar-actions .btn { flex: 1 1 auto; }
+    #checkDueModal .check-due-steps { gap: .5rem; padding: .75rem .5rem; }
+    #checkDueModal .check-due-step { gap: .3rem; font-size: .72rem; }
+    #checkDueModal .check-due-step-line { min-width: 8px; flex: 1; }
+    #checkDueModal .check-due-stat-row { grid-template-columns: 1fr; }
+}
+
+/* Keep event text readable while making calendar reminders stand out. */
+.calendar-personal-event,
+body.theme-dark .calendar-personal-event {
+    min-height: 48px;
+    padding: 10px 9px;
+    margin: 6px 0;
+    border: 2px solid #eab308;
+    border-radius: 10px;
+    background: #fef08a;
+    color: #422006;
+    font-size: .9rem;
+    font-weight: 700;
+    line-height: 1.5;
+    white-space: normal;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    animation: calendar-event-glow 2s ease-in-out infinite;
+}
+@keyframes calendar-event-glow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(234, 179, 8, .15); background-color: #fef08a; }
+    50% { box-shadow: 0 0 12px 3px rgba(234, 179, 8, .6); background-color: #fde047; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .calendar-personal-event { animation: none; }
 }

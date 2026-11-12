@@ -98,3 +98,17 @@ await vm.runInContext('updatePersonalCalendar(true)', persistence);
 assert.deepEqual(stored.map(e => e.id), ['other-device']);
 assert.equal(user.personalCalendarEvents.length, 0, 'remove deleted event from local UI');
 console.log('Personal calendar persistence passed: edit/delete, concurrent entries and failed save recovery.');
+
+// Department events are read from their owner, without copying private events.
+const sharedContext = vm.createContext({ currentUser: { uid: 'me', department: 'layout', personalCalendarEvents: [{id:'own',date:'2026-11-12'}] },
+    departmentCalendarUsers: {
+        colleague: {department:'layout',personalCalendarEvents:[{id:'shared',date:'2026-11-12',scope:'department',department:'layout'},{id:'private',date:'2026-11-12'}]},
+        other: {department:'other',personalCalendarEvents:[{id:'outside',date:'2026-11-12',scope:'department',department:'other'}]},
+        moved: {department:'layout',personalCalendarEvents:[{id:'old-department',date:'2026-11-12',scope:'department',department:'other'}]}
+    }, personalEventOccurs });
+vm.runInContext(extract('function getPersonalEvents(', 'function syncDayOffFilters('), sharedContext);
+assert.equal(vm.runInContext("getPersonalEvents('2026-11-12').map(e=>e.id).sort().join(',')", sharedContext), 'own,shared');
+assert.equal(vm.runInContext("getPersonalEvents('2026-11-12').find(e=>e.id==='shared').ownerUid", sharedContext), 'colleague');
+vm.runInContext("currentUser.department = ''", sharedContext);
+assert.equal(vm.runInContext("getPersonalEvents('2026-11-12').length", sharedContext), 1);
+console.log('Department events passed: same-department sharing, private isolation, department changes and owner identity.');

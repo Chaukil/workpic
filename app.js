@@ -2,8 +2,6 @@ import { convertWorkHoursRows } from './work-hours-data.js';
 import { resolveApiUrl } from './api-client.js';
 import { vietnameseLunar, holidaysForYear, monthPair } from './calendar-data.js';
 import { personalEventOccurs, checklistFromText, compareScheduleEntries } from './productivity-data.js';
-import { createScheduleHouse } from './schedule-house.js';
-import { houseWeekStart, houseDays } from './schedule-house-data.js';
 // Firebase Configuration - Chỉ sử dụng Firestore
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, getDocs, onSnapshot, enableIndexedDbPersistence, query, where, writeBatch, runTransaction, arrayUnion, arrayRemove }
@@ -161,9 +159,7 @@ let aiSelectedJobs = new Set();
 const GEMINI_API_KEY_STORAGE = 'workpic_gemini_api_key';
 
 // === Timeline view ===
-let scheduleView = 'calendar';  // 'calendar' | 'timeline' | 'house'
-let scheduleHouse = null;
-let houseWeek = 0;
+let scheduleView = 'calendar';  // 'calendar' | 'timeline'
 const SCHEDULE_VIEW_STORAGE_KEY = 'workpic_schedule_view';
 
 // Statistics
@@ -186,7 +182,6 @@ function applyTheme(theme) {
     document.body.classList.add('no-theme-transition');
 
     currentTheme = theme;
-    if (scheduleView === 'house' && currentUser) renderScheduleHouse();
     document.body.classList.toggle('theme-dark', theme === 'dark');
     document.body.classList.toggle('theme-light', theme === 'light');
     document.documentElement.setAttribute('data-theme', theme);
@@ -2712,7 +2707,7 @@ function commitFullscreenFx() {
     const theme = currentTopbarTheme;
     const cfg = FX_CONFIG[theme];
     const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const active = fxFullscreen && !!cfg && !reduced && scheduleView !== 'house';
+    const active = fxFullscreen && !!cfg && !reduced;
     const lvl = getFxLevelIndex(theme);
     const signature = `${theme}:${active}:${lvl}`;
     if (signature === fullscreenFxSignature && (!active || layer?.isConnected)) return;
@@ -3426,8 +3421,6 @@ async function changeAvatar(file) {
 
 function handleSignedOut() {
     currentUser = null;
-    scheduleHouse?.dispose();
-    scheduleHouse = null;
     bootstrap.Modal.getInstance(document.getElementById('changeHistoryModal'))?.hide();
     document.getElementById('changeHistoryList').replaceChildren();
     try {
@@ -4495,10 +4488,6 @@ async function toggleOutOfScheduleJob(job) {
 // Render Schedule Calendar (2 tuần tới) - FIXED PAST/TODAY/FUTURE LOGIC
 function renderSchedule() {
     renderTodayJobs();
-    if (scheduleView === 'house') {
-        renderScheduleHouse();
-        return;
-    }
     if (scheduleView === 'timeline') {
         renderTimeline();
         return;
@@ -4610,7 +4599,7 @@ function renderSchedule() {
                 const button = document.createElement('button');
                 button.type = 'button';
                 button.className = 'calendar-personal-event';
-                button.textContent = compactCalendarLabel(entry.title);
+                button.textContent = entry.title;
                 button.title = [entry.time, entry.title, entry.notes].filter(Boolean).join('\n');
                 button.addEventListener('click', async () => {
                     await openDayOffModal();
@@ -4705,13 +4694,13 @@ function renderSchedule() {
 
                     const now = new Date();
 
-                    if (jobRealDate.getTime() < now.getTime()) {
+                    if (now.getTime() >= jobRealDate.getTime() + getJobDuration(job) * 60000) {
                         // Đã qua thời gian thực tế
                         timeClass = snoozeActive ? 'today' : 'past';
                     } else {
                         // Chưa qua thời gian thực tế
                         const isTodayCell = cellDate.getTime() === todayDate.getTime();
-                        timeClass = isTodayCell ? 'today' : 'future';
+                        timeClass = isTodayCell || now >= jobRealDate ? 'today' : 'future';
                     }
 
                     const displayTime = entry.overrideTime || job.time;
@@ -7680,15 +7669,19 @@ async function quickChatConfirmAssign(jobId) {
 // ============================================================
 // USERS AVATAR — realtime để mọi người thấy avatar mới của nhau
 // ============================================================
+let departmentCalendarUsers = {};
+
 function listenUsersAvatars() {
     if (unsubscribeUsersAvatar) unsubscribeUsersAvatar();
     unsubscribeUsersAvatar = onSnapshot(collection(db, 'users'), (snapshot) => {
         usersAvatarCache = {};
         usersInfoCache = {};
         usersDeptLatest = {};
+        departmentCalendarUsers = {};
         snapshot.forEach(d => {
             const u = d.data();
             if (u.uid) {
+                departmentCalendarUsers[u.uid] = u;
                 collectUserDepts(u);
                 if (u.avatar) usersAvatarCache[u.uid] = u.avatar;
                 usersInfoCache[u.uid] = {
@@ -7707,6 +7700,10 @@ function listenUsersAvatars() {
             renderSchedule();
         }
         rebuildDepartmentsList();
+        if (currentUser && departmentCalendarUsers[currentUser.uid]) {
+            currentUser.personalCalendarEvents = departmentCalendarUsers[currentUser.uid].personalCalendarEvents || [];
+        }
+        if (currentUser) renderSchedule();
         if (document.getElementById('presenterSpinModal')?.classList.contains('show') && spinAllUsers.length) applySpinDeptFilter(false);
 
         if (currentUser && usersAvatarCache[currentUser.uid] && usersAvatarCache[currentUser.uid] !== currentUser.avatar) {
@@ -11517,8 +11514,8 @@ function initTimelineView() {
     // Đọc view đã lưu
     try {
         const stored = localStorage.getItem(SCHEDULE_VIEW_STORAGE_KEY);
-        const saved = stored === '3d' ? 'house' : stored;
-        if (['timeline', 'calendar', 'house'].includes(saved)) scheduleView = saved;
+        const saved = ['timeline', 'calendar'].includes(stored) ? stored : 'calendar';
+        if (['timeline', 'calendar'].includes(saved)) scheduleView = saved;
     } catch (_) { /* ignore */ }
 
     document.querySelectorAll('.schedule-view-tab').forEach(button => {
@@ -11529,17 +11526,15 @@ function initTimelineView() {
 }
 
 function toggleScheduleView() {
-    const views = ['calendar', 'timeline', 'house'];
+    const views = ['calendar', 'timeline'];
     setScheduleView(views[(views.indexOf(scheduleView) + 1) % views.length]);
 }
 
 function updateScheduleViewUI() {
     const cal = document.getElementById('calendarView');
     const tl = document.getElementById('timelineView');
-    const house = document.getElementById('scheduleHouseView');
     if (cal) cal.classList.toggle('d-none', scheduleView !== 'calendar');
     if (tl) tl.classList.toggle('d-none', scheduleView !== 'timeline');
-    if (house) house.classList.toggle('d-none', scheduleView !== 'house');
     document.querySelectorAll('.schedule-view-tab').forEach(button => {
         button.classList.toggle('active', button.dataset.view === scheduleView);
         button.setAttribute('aria-pressed', String(button.dataset.view === scheduleView));
@@ -11565,10 +11560,6 @@ function updateScheduleViewUI() {
             icon.className = 'bi bi-calendar3';
             title.textContent = 'Lịch Làm Việc';
             sub.textContent = '2 tuần tới · công việc định kỳ';
-        } else if (scheduleView === 'house') {
-            icon.className = 'bi bi-building';
-            title.textContent = 'Phòng Khách Công Việc';
-            sub.textContent = 'Góc nhìn 3D · chọn nhân vật để xem job';
         } else {
             icon.className = 'bi bi-bar-chart-steps';
             title.textContent = 'Timeline Công Việc';
@@ -11648,29 +11639,12 @@ async function saveUserWorkShift(shift) {
 }
 
 function setScheduleView(mode) {
-    if (!['calendar', 'timeline', 'house'].includes(mode)) return;
+    if (!['calendar', 'timeline'].includes(mode)) return;
     scheduleView = mode;
     try { localStorage.setItem(SCHEDULE_VIEW_STORAGE_KEY, mode); } catch (_) { }
-    scheduleHouse?.setVisible(mode === 'house');
     updateScheduleViewUI();
     renderFullscreenFx();
     renderSchedule();
-}
-
-function renderScheduleHouse() {
-    if (!currentUser) return;
-    const container = document.getElementById('scheduleHouseView');
-    if (!container) return;
-    if (!scheduleHouse) scheduleHouse = createScheduleHouse(container, {
-        onOpen: (job, originDate) => openViewJobModal(job, originDate),
-        onWeekChange: week => { houseWeek = week; renderScheduleHouse(); },
-        onDateChange: () => renderScheduleHouse()
-    });
-    const start = houseWeekStart(new Date(), houseWeek);
-    const end = new Date(start); end.setDate(end.getDate() + 6);
-    const entries = buildScheduleEntries(start, end, jobs.filter(job => !job.isPaused && !job.isOutOfSchedule));
-    const days = houseDays(start, entries, { off: getMyOffMap(), holiday: getHolidayName });
-    void scheduleHouse.update({ days, week: houseWeek, theme: currentTheme, today: localDateKey(new Date()) });
 }
 
 // ============================================================
@@ -11925,7 +11899,7 @@ function renderTimeline({ todayOnly = false, containerId = 'timelineView' } = {}
             const overlapPairCount = Math.floor(overlapSet.size / 2);
             const holidayLabel = getHolidayName(currentDate);
             const personalLabels = getPersonalEvents(dateStr).map(entry =>
-                `<span class="calendar-personal-event" title="${escapeHtml([entry.time, entry.title, entry.notes].filter(Boolean).join('\n'))}">${escapeHtml(compactCalendarLabel(entry.title))}</span>`).join('');
+                `<span class="calendar-personal-event" title="${escapeHtml([entry.time, entry.title, entry.notes].filter(Boolean).join('\n'))}">${escapeHtml(entry.title)}</span>`).join('');
 
             rowsHtml += `
                 <div class="${rowClasses.join(' ')}">
@@ -12794,7 +12768,14 @@ function compactCalendarLabel(text) {
 }
 
 function getPersonalEvents(key) {
-    return (currentUser?.personalCalendarEvents || []).filter(e => personalEventOccurs(e, key))
+    const own = currentUser?.personalCalendarEvents || [];
+    const department = String(currentUser?.department || '').trim();
+    const shared = department && typeof departmentCalendarUsers !== 'undefined'
+        ? Object.entries(departmentCalendarUsers).flatMap(([uid, user]) =>
+            uid !== currentUser.uid && String(user.department || '').trim() === department
+                ? (user.personalCalendarEvents || []).filter(e => e.scope === 'department' && e.department === department)
+                    .map(e => ({ ...e, ownerUid: uid })) : []) : [];
+    return [...own, ...shared].filter(e => personalEventOccurs(e, key))
         .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
 }
 
@@ -12815,6 +12796,11 @@ function syncDayOffFilters() {
 
 function openPersonalEventEditor(date, id = '', anchor = null) {
     const entry = (currentUser?.personalCalendarEvents || []).find(e => e.id === id);
+    if (id && !entry) {
+        const shared = getPersonalEvents(date).find(e => e.id === id && e.ownerUid);
+        if (shared) showNotification(shared.title, [shared.time, shared.notes, 'Sự kiện chung của bộ phận. Chỉ người tạo được sửa/xóa.'].filter(Boolean).join('\n'), false, 'info');
+        return;
+    }
     const form = document.getElementById('personalEventForm');
     form.reset();
     document.getElementById('personalEventId').value = entry?.id || '';
@@ -12825,6 +12811,7 @@ function openPersonalEventEditor(date, id = '', anchor = null) {
     document.getElementById('personalEventTitle').value = entry?.title || '';
     document.getElementById('personalEventTime').value = entry?.time || '';
     document.getElementById('personalEventNotes').value = entry?.notes || '';
+    document.getElementById('personalEventScope').value = entry?.scope || 'private';
     document.getElementById('personalEventStatus').textContent = '';
     document.getElementById('deletePersonalEvent').classList.toggle('d-none', !entry);
     form.classList.remove('d-none');
@@ -12851,8 +12838,14 @@ async function updatePersonalCalendar(removeOnly = false) {
         time: document.getElementById('personalEventTime').value,
         notes: document.getElementById('personalEventNotes').value.trim(),
         repeat: document.getElementById('personalEventRepeat').value,
-        until: document.getElementById('personalEventUntil').value
+        until: document.getElementById('personalEventUntil').value,
+        scope: document.getElementById('personalEventScope')?.value === 'department' ? 'department' : 'private',
+        department: String(user.department || '').trim()
     };
+    if (!removeOnly && entry.scope === 'department' && !entry.department) {
+        document.getElementById('personalEventStatus').textContent = 'Vui lòng chọn bộ phận trong hồ sơ trước khi tạo sự kiện chung.';
+        return;
+    }
     if (!removeOnly && !entry.title) {
         document.getElementById('personalEventStatus').textContent = 'Vui lòng nhập tên sự kiện.';
         return;
@@ -13031,7 +13024,7 @@ function renderDayOffCalendars() {
                 <span class="dayoff-day-num">${d}</span>
                 <span class="dayoff-lunar">${lunar.day}/${lunar.month}${lunar.leap ? ' nhuận' : ''} ÂL</span>
                 ${holiday ? `<span class="calendar-holiday-label" title="${escapeHtml(holiday)}">${escapeHtml(compactCalendarLabel(holiday))}</span>` : ''}
-                ${personal.map(e => `<button type="button" class="calendar-personal-event" data-personal-event="${escapeHtml(e.id)}" title="${escapeHtml([e.time, e.title, e.notes].filter(Boolean).join('\n'))}">${escapeHtml(compactCalendarLabel(e.title))}</button>`).join('')}
+                ${personal.map(e => `<button type="button" class="calendar-personal-event" data-personal-event="${escapeHtml(e.id)}" title="${escapeHtml([e.time, e.title, e.notes].filter(Boolean).join('\n'))}">${escapeHtml(e.title)}</button>`).join('')}
                 <span class="dayoff-chips">${chips}</span>
             </div>`;
         }

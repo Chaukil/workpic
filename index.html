@@ -13,7 +13,6 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <link rel="stylesheet" href="styles.css">
-    <link rel="stylesheet" href="schedule-house.css">
     <link rel="icon"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>📅</text></svg>">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -392,7 +391,6 @@
                                 <div class="schedule-view-tabs" role="group" aria-label="Chế độ xem lịch">
                                     <button class="schedule-view-tab active" type="button" data-view="calendar" aria-pressed="true"><i class="bi bi-calendar3"></i> Lịch cố định</button>
                                     <button class="schedule-view-tab" type="button" data-view="timeline" aria-pressed="false"><i class="bi bi-bar-chart-steps"></i> Timeline</button>
-                                    <button class="schedule-view-tab" type="button" data-view="house" aria-pressed="false"><i class="bi bi-building"></i> Ng?i nh?</button>
                                 </div>
                                 <div class="form-check form-switch mb-0">
                                     <input class="form-check-input" type="checkbox" id="showSunday" checked>
@@ -410,7 +408,6 @@
                                 </table>
                             </div>
                             <div id="timelineView" class="timeline-view d-none"></div>
-                            <div id="scheduleHouseView" class="d-none"></div>
                         </div>
                     </div>
 
@@ -691,23 +688,23 @@
     </div>
 
     <!-- Check Due Modal -->
-    <div class="modal fade" id="checkDueModal" tabindex="-1">
+    <div class="modal fade" id="checkDueModal" tabindex="-1" aria-labelledby="checkDueTitle" aria-hidden="true">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content check-due-modal-content">
-                <div class="modal-header check-due-header">
-                    <div class="check-due-header-inner">
-                        <div class="check-due-header-icon">
+                <div class="modal-header modern-header modern-header-primary check-due-header">
+                    <div class="check-due-header-inner modern-header-inner">
+                        <div class="check-due-header-icon modern-header-icon">
                             <i class="bi bi-shuffle"></i>
                         </div>
                         <div>
-                            <h5 class="modal-title mb-0">Check Change Due</h5>
+                            <h5 class="modal-title mb-0" id="checkDueTitle">Check Change Due</h5>
                             <p class="check-due-header-subtitle mb-0">
                                 So sánh <strong>FG_MO</strong> giữa system và mong muốn để phát hiện thay đổi
                                 <strong>FG_JOBNO</strong> &amp; <strong>FG_DUE</strong>
                             </p>
                         </div>
                     </div>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
                 </div>
 
                 <div class="modal-body check-due-body">
@@ -729,13 +726,13 @@
                     </div>
 
                     <div id="checkDueInputSection">
-                    <div class="check-due-mode-tabs" role="tablist">
+                    <div class="check-due-mode-tabs" role="tablist" aria-label="Cách nhập dữ liệu">
                         <button class="check-due-mode-tab active" id="checkDuePasteTab" data-bs-toggle="tab"
-                            data-bs-target="#checkDuePastePane" type="button" role="tab">
+                            data-bs-target="#checkDuePastePane" type="button" role="tab" aria-controls="checkDuePastePane" aria-selected="true">
                             <i class="bi bi-clipboard-data-fill"></i> Dán dữ liệu
                         </button>
                         <button class="check-due-mode-tab" id="checkDueFileTab" data-bs-toggle="tab"
-                            data-bs-target="#checkDueFilePane" type="button" role="tab">
+                            data-bs-target="#checkDueFilePane" type="button" role="tab" aria-controls="checkDueFilePane" aria-selected="false">
                             <i class="bi bi-cloud-arrow-up-fill"></i> Tải file lên
                         </button>
                     </div>
@@ -753,7 +750,7 @@
                                         </div>
                                         <span class="check-due-source-badge" id="checkDueOldPasteBadge">0 dòng</span>
                                     </div>
-                                    <textarea class="check-due-textarea" id="checkDueOldPaste" rows="10" placeholder="Dán dữ liệu vào đây...
+                                    <textarea class="check-due-textarea" id="checkDueOldPaste" aria-label="Dữ liệu system" rows="10" placeholder="Dán dữ liệu vào đây...
 
 Hệ thống tự nhận diện cột theo NỘI DUNG:
   • FG_MO     → MX* hoặc MY*
@@ -772,7 +769,7 @@ Không cần đúng thứ tự hay tên cột."></textarea>
                                         </div>
                                         <span class="check-due-source-badge" id="checkDueNewPasteBadge">0 dòng</span>
                                     </div>
-                                    <textarea class="check-due-textarea" id="checkDueNewPaste" rows="10" placeholder="Dán dữ liệu vào đây...
+                                    <textarea class="check-due-textarea" id="checkDueNewPaste" aria-label="Dữ liệu mong muốn" rows="10" placeholder="Dán dữ liệu vào đây...
 
 Tự động nhận diện cột giống bên trái — có thể khác tên cột và thứ tự cột."></textarea>
                                 </div>
@@ -831,7 +828,7 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
 
                     </div>
                     <div class="check-due-toolbar">
-                        <div class="check-due-status" id="checkDueStatus">
+                        <div class="check-due-status" id="checkDueStatus" role="status" aria-live="polite">
                             <i class="bi bi-info-circle"></i> Sẵn sàng so sánh
                         </div>
                         <div class="check-due-toolbar-actions">
@@ -843,7 +840,7 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
                                 <i class="bi bi-eraser-fill"></i> Xóa dữ liệu
                             </button>
                             <button type="button" class="btn btn-compare" id="checkDueCompareBtn">
-                                <i class="bi bi-arrow-left-right"></i> Check change due
+                                <i class="bi bi-arrow-left-right"></i> So sánh dữ liệu
                                 <div class="btn-shine"></div>
                             </button>
                         </div>
@@ -1212,6 +1209,12 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
                                 <input id="personalEventTitle" class="form-control" maxlength="120" required placeholder="VD: Sinh nhật, khám sức khỏe…">
                                 <label class="form-label mt-2" for="personalEventNotes">Ghi chú</label>
                                 <textarea id="personalEventNotes" class="form-control" maxlength="1000" rows="2"></textarea>
+                                <label class="form-label mt-2" for="personalEventScope">Áp dụng cho</label>
+                                <select id="personalEventScope" class="form-select form-select-sm">
+                                    <option value="private">Chỉ mình tôi</option>
+                                    <option value="department">Cả bộ phận của tôi</option>
+                                </select>
+                                <small class="text-muted">Sự kiện chung hiển thị cho người cùng bộ phận; chỉ người tạo được sửa/xóa.</small>
                                 <div class="dayoff-toolbar mt-2">
                                     <label for="personalEventRepeat">Lặp lại <select id="personalEventRepeat" class="form-select form-select-sm"><option value="none">Không lặp</option><option value="weekly">Hằng tuần</option><option value="monthly">Hằng tháng</option><option value="yearly">Hằng năm (dương lịch)</option><option value="lunar-yearly">Hằng năm (âm lịch)</option></select></label>
                                     <label for="personalEventUntil">Đến hết ngày <input type="date" id="personalEventUntil" class="form-control form-control-sm"></label>
@@ -1869,7 +1872,7 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
                         </div>
                         <div class="modern-header-text">
                             <h5 class="modal-title mb-0">Hướng dẫn sử dụng</h5>
-                            <p class="modern-header-subtitle mb-0">Tất cả tính năng trong một chỗ</p>
+                            <p class="modern-header-subtitle mb-0">Cập nhật 12/11/2026 · Lịch cố định, Timeline và các công cụ hiện tại</p>
                         </div>
                     </div>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -1902,16 +1905,17 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
                                     </div>
                                 </div>
                                 <div class="ia-col-body">
-                                    <div class="ia-item">Thêm / Sửa / Xóa Job<span>Once · Daily · Weekly · Biweekly ·
-                                            Monthly</span></div>
+                                    <div class="ia-item">Thêm / Sửa / Xóa Job<span>Một lần · hằng ngày · hằng tuần · 2 tuần/lần · hằng tháng. Nhập giờ bắt đầu và thời lượng theo phút; mặc định 30 phút. Job hằng ngày có thể loại trừ các ngày trong tuần.</span></div>
+                                    <div class="ia-item">Lịch cố định / Timeline<span>Chọn tab trên lịch để đổi cách xem. Timeline hiển thị thời lượng, job đang chạy và cảnh báo trùng giờ; kéo job để đổi giờ sau khi xác nhận.</span></div>
+                                    <div class="ia-item">Job đang làm vẫn sáng<span>Job chỉ mờ khi đến giờ kết thúc = giờ bắt đầu + thời lượng, kể cả qua nửa đêm hoặc có giờ tùy chỉnh. Ví dụ: 09:00, thời lượng 120 phút → sáng đến 11:00.</span></div>
+                                    <div class="ia-item">Checklist theo từng lần làm<span>Nhập mỗi dòng một bước khi tạo/sửa job (tối đa 50 bước). Mở chi tiết từ lịch để tích tiến độ; mỗi lần xuất hiện có checklist riêng.</span></div>
                                     <div class="ia-item">Tạm dừng job<span>Job tạm dừng không hiện trên lịch &amp; không
                                             nhắc</span></div>
                                     <div class="ia-item">Kéo-thả đổi ngày<span>Chỉ ảnh hưởng ngày đó, giữ nguyên
                                             giờ</span></div>
-                                    <div class="ia-item">Nút ⚙️ kế giờ<span>Đổi giờ / dời ngày / ghi chú nhanh cho riêng
-                                            ngày đó</span></div>
+                                    <div class="ia-item">Tùy chỉnh cạnh giờ<span>Đổi giờ / dời ngày / ghi chú nhanh cho riêng lần xuất hiện đó.</span></div>
                                     <div class="ia-item">Tích hoàn thành ✓<span>Bật trong Cài đặt · bấm ✓ trên ô job ·
-                                            tắt thì qua giờ là mặc định hoàn thành</span></div>
+                                            hết thời lượng mà chưa tích sẽ được đánh dấu chưa xong. Tắt chế độ này thì không cần tích thủ công.</span></div>
                                     <div class="ia-item">Chuyển / Copy Job<span>Chỉ gửi được cho người cùng bộ phận ·
                                             người nhận cần xác nhận</span></div>
                                     <div class="ia-item">Job ngoài lịch<span>Việc phát sinh, không lặp lại</span></div>
@@ -1937,6 +1941,7 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
                                     <div class="ia-item">Chuyển / Copy job trong ngày<span>Cần người nhận xác
                                             nhận</span></div>
                                     <div class="ia-item">Cảnh báo quá hạn / trễ hạn<span>Tô đỏ khi trễ</span></div>
+                                    <div class="ia-item">Hoàn thành job trong ngày<span>Người đang nhận job bấm Hoàn thành. Kết quả hiển thị thời gian làm, sớm/trễ so với hạn chót và báo cho người tạo, người chỉ định.</span></div>
                                     <div class="ia-item">Tab "Chung" / "Của tôi"<span>Xem job của mình đang làm &amp; đã
                                             xong</span></div>
                                     <div class="ia-item">Tìm kiếm &amp; lọc<span>Trạng thái · người phụ trách</span>
@@ -1955,15 +1960,15 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
                                     </div>
                                 </div>
                                 <div class="ia-col-body">
-                                    <div class="ia-item">Chọn ngày off<span>Bấm ngày trên lịch tháng này &amp; tháng
-                                            sau</span></div>
+                                    <div class="ia-item">Chọn ngày off<span>Chọn năm và tháng bắt đầu để xem hai tháng liền nhau; bấm Tháng hiện tại để quay về. Chỉ chỉnh sửa lịch của mình.</span></div>
                                     <div class="ia-item">Nhập lý do off<span>Có gợi ý nhanh: Nghỉ phép, Việc cá
                                             nhân…</span></div>
                                     <div class="ia-item">Xem lịch off mọi người<span>Bấm tên thành viên để lọc
                                             riêng</span></div>
-                                    <div class="ia-item">Job tự động dời<span>Job rơi vào ngày off → dời lên ngày làm
-                                            việc liền trước (màu hồng)</span></div>
+                                    <div class="ia-item">Job tự động dời<span>Job rơi vào ngày off hoặc ngày lễ → dời lên ngày làm việc liền trước (màu hồng). Xem trước các job bị ảnh hưởng trước khi lưu off.</span></div>
                                     <div class="ia-item">Xóa lịch off<span>Job tự trở về ngày bình thường</span></div>
+                                    <div class="ia-item">Lịch lễ theo năm<span>Điều chỉnh ngày bắt đầu 5 ngày Tết và ngày nghỉ liền kề 02/09 trong lịch off. Không tự cộng ngày nghỉ bù hoặc hoán đổi.</span></div>
+                                    <div class="ia-item">Sự kiện cá nhân / bộ phận<span>Chuột phải vào ngày để thêm sự kiện, giờ và ghi chú; chọn Chỉ mình tôi hoặc Cả bộ phận của tôi. Chỉ người tạo được sửa/xóa, thành viên cùng bộ phận được xem sự kiện chung. Hỗ trợ lặp theo tuần, tháng, năm dương lịch hoặc năm âm lịch và ngày kết thúc. Ô sự kiện lớn, có hiệu ứng chớp sáng; sự kiện không đăng ký off.</span></div>
                                 </div>
                             </div>
 
@@ -1986,8 +1991,7 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
                                     <div class="ia-item">Đăng ký lịch off<span>Xem &amp; quản lý ngày nghỉ</span></div>
                                     <div class="ia-item">Thống kê job<span>Xem user nào đang có nhiều job và chiếm nhiều
                                             thời gian</span></div>
-                                    <div class="ia-item">Update giờ làm việc<span>Lấy dữ liệu tự động (Motion ·
-                                            Station), hiện M/S ở góc ô ngày, hỏi khi trùng ngày</span></div>
+                                    <div class="ia-item">Update giờ làm việc<span>Trên Windows, mở start-server.pyw, nhập tài khoản IBM rồi bật server. Sau đó dùng Update giờ làm việc để lấy giờ Motion/Station; M/S hiện ở góc ngày, có xác nhận khi trùng ngày.</span></div>
                                     <div class="ia-item">Tính lương<span>Ước tính thu nhập &amp; thực lãnh trong tháng
                                             theo LCB</span></div>
                                 </div>
@@ -2011,8 +2015,7 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
                                             N phút hoặc đúng giờ</span></div>
                                     <div class="ia-item">Nút trong thông báo<span>Hoàn thành · Đợi tí = nhắc lại sau 10
                                             phút</span></div>
-                                    <div class="ia-item">Tích hoàn thành job<span>Bật/tắt việc tự đánh dấu hoàn thành
-                                            khi qua giờ</span></div>
+                                    <div class="ia-item">Tích hoàn thành job<span>Bật/tắt yêu cầu tích hoàn thành thủ công. Khi bật, chỉ các lần job từ ngày bật trở đi cần tích.</span></div>
                                     <div class="ia-item">Chủ đề Header<span>Mặc định, Tết, Trung Thu, Noel, Halloween...
                                             kèm hiệu ứng rơi toàn màn hình</span></div>
                                     <div class="ia-item">Linh vật (Mascot)<span>Cú, Rồng, Thỏ, Tuần lộc, Ma... đậu trên
@@ -2034,8 +2037,10 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
                                     <div class="ia-item">Ẩn / hiện Sidebar<span>Nút ở tiêu đề Lịch làm việc</span></div>
                                     <div class="ia-item">Hiện / ẩn Chủ Nhật<span>Toggle ở tiêu đề Lịch làm việc</span>
                                     </div>
-                                    <div class="ia-item">Hồ sơ cá nhân<span>Đổi avatar, tên hiển thị, bộ phận làm
-                                            việc</span></div>
+                                    <div class="ia-item">Xem job hôm nay<span>Bấm Xem dữ liệu để xem Timeline và danh sách job theo ca ngày 07:00–20:00 hoặc ca đêm 20:00–07:00. Vạch đỏ chỉ giờ hiện tại, viền cầu vồng chỉ job đang chạy; bấm job để mở chi tiết.</span></div>
+                                    <div class="ia-item">Lịch sử thay đổi<span>Bấm Lịch sử ở tiêu đề lịch để xem tối đa 200 thay đổi gần nhất của job, checklist, lịch off, lịch lễ và sự kiện. Có tìm kiếm và lọc theo loại.</span></div>
+                                    <div class="ia-item">Tạo job bằng AI<span>Mở công cụ AI, cấu hình khóa API theo hộp thoại rồi dán tin nhắn/email/ghi chú. Kiểm tra và sửa tên, lịch, giờ, thời lượng trước khi tạo các job đã chọn.</span></div>
+                                    <div class="ia-item">Hồ sơ cá nhân<span>Đổi avatar, tên hiển thị, bộ phận và ca làm việc. Khi đổi ca, có thể chuyển giờ các job hiện tại hoặc giữ nguyên.</span></div>
                                     <div class="ia-item">Mở folder nhanh<span>Bấm vào đường dẫn trong nội dung Job để
                                             copy path</span></div>
                                 </div>
@@ -2075,7 +2080,7 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
                                 <div class="ia-flow-arrow"><i class="bi bi-arrow-right"></i></div>
                                 <div class="ia-flow-step">
                                     <div class="n">6. Hoàn thành</div>
-                                    <div class="d">Thông báo cho người tạo</div>
+                                    <div class="d">Job trong ngày: báo người tạo / chỉ định</div>
                                 </div>
                             </div>
                         </div>

@@ -69,3 +69,25 @@ assert.deepEqual(actions, ['hide-today', 'show-job']);
 events['viewJobModalhidden.bs.modal']();
 assert.deepEqual(actions, ['hide-today', 'show-job', 'return-today']);
 console.log('Job modal transition and return to today timeline passed.');
+
+// Calendar cards stay lit until the occurrence's full duration has elapsed.
+const calendarStateCode = source.slice(source.indexOf('const displayTimeForClass ='), source.indexOf('const displayTime = entry.overrideTime || job.time;'));
+const calendarState = (time, duration, now, { date = '2026-11-08', shift = 'day', overrideTime = null } = {}) => {
+    const context = vm.createContext({ Date, job: { time, duration }, entry: { overrideTime },
+        cellDate: new Date(date + 'T00:00:00'), todayDate: new Date(now.slice(0, 10) + 'T00:00:00'),
+        currentUser: { workShift: shift }, snoozeActive: false, timeClass: 'future',
+        getJobDuration: job => job.duration || 30 });
+    const fixedCode = calendarStateCode.replace('const now = new Date();', 'const now = new Date(' + JSON.stringify(now) + ');');
+    vm.runInContext(fixedCode, context);
+    return context.timeClass;
+};
+assert.equal(calendarState('09:00', 120, '2026-11-08T09:00:00'), 'today');
+assert.equal(calendarState('09:00', 120, '2026-11-08T10:59:59'), 'today');
+assert.equal(calendarState('09:00', 120, '2026-11-08T11:00:00'), 'past');
+assert.equal(calendarState('09:00', null, '2026-11-08T09:29:59'), 'today');
+assert.equal(calendarState('09:00', null, '2026-11-08T09:30:00'), 'past');
+assert.equal(calendarState('09:00', 120, '2026-11-08T12:30:00', { overrideTime: '11:00' }), 'today');
+assert.equal(calendarState('23:30', 120, '2026-11-09T00:30:00'), 'today');
+assert.equal(calendarState('02:00', 120, '2026-11-09T03:59:59', { shift: 'night' }), 'today');
+assert.equal(calendarState('02:00', 120, '2026-11-09T04:00:00', { shift: 'night' }), 'past');
+console.log('Calendar duration passed: start/end boundaries, default duration, overrides and overnight work.');
