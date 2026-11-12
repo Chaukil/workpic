@@ -437,7 +437,7 @@
     </div>
 
     <!-- Job Modal -->
-    <div class="modal fade" id="jobModal" tabindex="-1">
+    <div class="modal fade workpic-dialog" id="jobModal" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content job-modal-content">
                 <div class="modal-header modern-header modern-header-primary">
@@ -450,7 +450,7 @@
                             <p class="modern-header-subtitle mb-0">Tạo job mới cho lịch công việc của bạn</p>
                         </div>
                     </div>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
                 </div>
                 <div class="modal-body">
                     <form id="jobForm">
@@ -597,7 +597,7 @@
     </div>
 
     <!-- View Job Modal -->
-    <div class="modal fade" id="viewJobModal" tabindex="-1">
+    <div class="modal fade workpic-dialog" id="viewJobModal" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header modern-header modern-header-info">
@@ -610,7 +610,7 @@
                             <p class="modern-header-subtitle mb-0">Xem và quản lý thông tin job</p>
                         </div>
                     </div>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
                 </div>
                 <div class="modal-body" id="viewModalBody">
                 </div>
@@ -627,7 +627,7 @@
     </div>
 
     <!-- Migrate Legacy Jobs Modal -->
-    <div class="modal fade" id="migrateLegacyJobsModal" tabindex="-1">
+    <div class="modal fade workpic-dialog" id="migrateLegacyJobsModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header modern-header modern-header-warning">
@@ -640,7 +640,7 @@
                             <p class="modern-header-subtitle mb-0">Chuyển job chưa có user sang tài khoản mới</p>
                         </div>
                     </div>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
                 </div>
                 <div class="modal-body">
                     <p>Chuyển toàn bộ job chưa có user cho tài khoản được chọn.</p>
@@ -662,7 +662,7 @@
     </div>
 
     <!-- View Data Modal -->
-    <div class="modal fade" id="viewDataModal" tabindex="-1">
+    <div class="modal fade workpic-dialog" id="viewDataModal" tabindex="-1">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header modern-header modern-header-info">
@@ -675,7 +675,7 @@
                             <p class="modern-header-subtitle mb-0" id="todayJobsSummary" aria-live="polite"></p>
                         </div>
                     </div>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
                 </div>
                 <div class="modal-body">
                     <div id="todayWorkHours" class="alert alert-info py-2 mb-3" aria-live="polite"></div>
@@ -688,7 +688,7 @@
     </div>
 
     <!-- Check Due Modal -->
-    <div class="modal fade" id="checkDueModal" tabindex="-1" aria-labelledby="checkDueTitle" aria-hidden="true">
+    <div class="modal fade workpic-dialog" id="checkDueModal" tabindex="-1" aria-labelledby="checkDueTitle" aria-hidden="true">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content check-due-modal-content">
                 <div class="modal-header modern-header modern-header-primary check-due-header">
@@ -909,7 +909,7 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
     </div>
 
     <!-- Check ETA & Direct Modal -->
-    <div class="modal fade" id="checkEtaDirectModal" tabindex="-1">
+    <div class="modal fade workpic-dialog" id="checkEtaDirectModal" tabindex="-1">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header modern-header modern-header-eta">
@@ -921,7 +921,7 @@ Tự động nhận diện cột giống bên trái — có thể khác tên c�
                                 ASHTON</p>
                         </div>
                     </div>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
                 </div>
                 <div class="modal-body">
 
@@ -1071,7 +1071,7 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
     </div>
 
     <!-- Presenter Spin Modal -->
-    <div class="modal fade" id="presenterSpinModal" tabindex="-1">
+    <div class="modal fade workpic-dialog" id="presenterSpinModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
             <div class="modal-content spin-modal-content">
                 <div class="modal-header modern-header modern-header-spin">
@@ -1083,7 +1083,7 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
                             </p>
                         </div>
                     </div>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
                 </div>
                 <div class="modal-body">
                     <div class="spin-layout">
@@ -1134,17 +1134,17 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
     </div>
 
     <!-- Day Off Modal -->
-    <div class="modal fade" id="changeHistoryModal" tabindex="-1" aria-labelledby="changeHistoryTitle">
+    <div class="modal fade workpic-dialog" id="changeHistoryModal" tabindex="-1" aria-labelledby="changeHistoryTitle">
         <div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">
-            <div class="modal-header"><h5 class="modal-title" id="changeHistoryTitle">Lịch sử thay đổi của tôi</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div>
+            <div class="modal-header modern-header"><div class="modern-header-inner"><div class="modern-header-icon"><i class="bi bi-clock-history"></i></div><div><h5 class="modal-title" id="changeHistoryTitle">Lịch sử thay đổi của tôi</h5><p class="modern-header-subtitle mb-0">Theo dõi những cập nhật trong công việc của bạn</p></div></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div>
             <div class="modal-body">
                 <p class="small text-muted">200 thay đổi gần nhất từ khi có chức năng này: job, checklist, lịch off, lịch lễ và sự kiện cá nhân.</p>
-                <div class="d-flex gap-2 mb-3"><input id="changeHistorySearch" class="form-control" placeholder="Tìm tên, nội dung thay đổi…" aria-label="Tìm lịch sử"><select id="changeHistoryFilter" class="form-select w-auto" aria-label="Loại thay đổi"><option value="all">Tất cả</option><option value="job">Job</option><option value="off">Lịch off</option><option value="holiday">Lịch lễ</option><option value="event">Sự kiện</option></select></div>
+                <div class="d-flex gap-2 mb-3 history-toolbar"><input id="changeHistorySearch" class="form-control" placeholder="Tìm tên, nội dung thay đổi…" aria-label="Tìm lịch sử"><select id="changeHistoryFilter" class="form-select w-auto" aria-label="Loại thay đổi"><option value="all">Tất cả</option><option value="job">Job</option><option value="off">Lịch off</option><option value="holiday">Lịch lễ</option><option value="event">Sự kiện</option></select></div>
                 <div id="changeHistoryList" aria-live="polite"></div>
             </div>
         </div></div>
     </div>
-    <div class="modal fade" id="dayOffModal" tabindex="-1">
+    <div class="modal fade workpic-dialog" id="dayOffModal" tabindex="-1">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header modern-header modern-header-dayoff">
@@ -1156,7 +1156,7 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
                                 ngày làm việc liền trước</p>
                         </div>
                     </div>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
                 </div>
                 <div class="modal-body">
                     <div class="dayoff-layout">
@@ -1267,7 +1267,7 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
     </div>
 
     <!-- Work Hours Modal -->
-    <div class="modal fade" id="workHoursModal" tabindex="-1">
+    <div class="modal fade workpic-dialog" id="workHoursModal" tabindex="-1">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header modern-header modern-header-teal">
@@ -1278,7 +1278,7 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
                             <p class="modern-header-subtitle mb-0">Tự động lấy giờ Motion &amp; Station từ dữ liệu sản xuất</p>
                         </div>
                     </div>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
                 </div>
                 <div class="modal-body">
                     <div class="wh-sync-toolbar">
@@ -1301,7 +1301,7 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
     </div>
 
     <!-- Salary Calculator Modal -->
-    <div class="modal fade" id="salaryCalcModal" tabindex="-1">
+    <div class="modal fade workpic-dialog" id="salaryCalcModal" tabindex="-1">
         <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
             <div class="modal-content salary-modal-content">
                 <div class="modal-header modern-header modern-header-salary">
@@ -1312,7 +1312,7 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
                             <p class="modern-header-subtitle mb-0">Nhập số liệu để ước tính lương thực lãnh</p>
                         </div>
                     </div>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
                 </div>
                 <div class="modal-body">
                     <div class="salary-lcb-card">
@@ -1484,95 +1484,91 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
     </div>
 
     <!-- User Profile Modal -->
-    <div class="modal fade" id="userProfileModal" tabindex="-1">
-        <div class="modal-dialog modal-md">
+    <div class="modal fade" id="userProfileModal" tabindex="-1" aria-labelledby="profileModalTitle">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header account-modal-header">
+                    <div><span class="account-eyebrow">WORKPIC · TÀI KHOẢN</span><h5 class="modal-title" id="profileModalTitle">Thông tin tài khoản</h5></div>
+                    <button type="button" class="account-icon-button" data-bs-dismiss="modal" aria-label="Đóng thông tin tài khoản"><i class="bi bi-x-lg"></i></button>
+                </div>
+                <div class="modal-body account-modal-body">
+                    <section class="account-identity" aria-label="Hồ sơ của bạn">
+                        <div class="profile-avatar-container">
+                            <img id="profileAvatar" class="profile-avatar-img" src="" alt="Ảnh đại diện">
+                            <button type="button" class="btn-avatar-edit" id="changeAvatarBtn" title="Đổi ảnh đại diện" aria-label="Đổi ảnh đại diện"><i class="bi bi-camera"></i></button>
+                            <input type="file" id="avatarFileInput" accept="image/*" hidden>
+                        </div>
+                        <div class="account-identity-text"><span class="account-role" id="profileRoleBadge">Thành viên</span><h4 id="profileHeroName">Tài khoản của bạn</h4><p id="profileEmail">---</p><small><i class="bi bi-shield-check"></i> Hồ sơ được đồng bộ theo tài khoản</small></div>
+                    </section>
+                    <button type="button" id="openBlessingsBtn" class="blessing-account-button">
+                        <span class="blessing-account-icon"><i class="bi bi-stars"></i></span>
+                        <span><strong id="openBlessingsLabel">Phước lành của tôi</strong><small>Xem thông báo và quyền đang có</small></span>
+                        <i class="bi bi-chevron-right"></i>
+                    </button>
+                    <section class="account-section">
+                        <div class="account-section-heading"><span class="account-section-icon"><i class="bi bi-person-badge"></i></span><div><h6>Hồ sơ cá nhân</h6><p>Một vài thông tin để mọi người nhận ra bạn.</p></div></div>
+                        <label class="form-label" for="profileDisplayName">Tên hiển thị</label>
+                        <div class="input-group account-name-field">
+                            <input type="text" class="form-control" id="profileDisplayName" maxlength="120" placeholder="Tên mọi người sẽ nhìn thấy" autocomplete="nickname">
+                            <button type="button" class="btn account-save-name" id="saveProfileBtn"><i class="bi bi-check2"></i> Lưu tên</button>
+                        </div>
+                        <div class="account-field-grid">
+                            <div><label class="form-label" for="profileDepartment">Bộ phận làm việc</label><div class="input-group"><select class="form-select" id="profileDepartment"></select><button class="btn account-add-department" type="button" id="profileAddDeptBtn" title="Thêm bộ phận" aria-label="Thêm bộ phận"><i class="bi bi-plus-lg"></i></button></div></div>
+                            <div><label class="form-label" for="profileWorkShift">Ca làm việc</label><select class="form-select" id="profileWorkShift"><option value="day">Ca ngày · 07:00–20:00</option><option value="night">Ca đêm · 20:00–07:00</option></select></div>
+                        </div>
+                        <div class="input-group mt-3 d-none" id="profileNewDeptRow"><input type="text" class="form-control" id="profileNewDeptName" maxlength="40" placeholder="Tên bộ phận mới" aria-label="Tên bộ phận mới"><button class="btn account-save-name" type="button" id="profileNewDeptSaveBtn"><i class="bi bi-plus-lg"></i> Thêm</button></div>
+                        <p class="account-inline-note"><i class="bi bi-check-circle"></i> Bộ phận và ca làm việc được lưu khi bạn thay đổi.</p>
+                        <p id="profileSaveStatus" class="account-save-status" role="status" aria-live="polite"></p>
+                    </section>
+                    <details class="account-section account-security">
+                        <summary class="account-section-heading"><span class="account-section-icon"><i class="bi bi-shield-lock"></i></span><span><strong>Bảo mật tài khoản</strong><small>Đổi mật khẩu bằng xác nhận an toàn.</small></span><i class="bi bi-chevron-down"></i></summary>
+                        <div class="account-security-fields"><label class="form-label" for="profileNewPassword">Mật khẩu mới</label><div class="input-group account-password-field"><input type="password" class="form-control" id="profileNewPassword" placeholder="Ít nhất 6 ký tự" minlength="6" autocomplete="new-password"><button type="button" class="btn account-password-toggle" id="profileTogglePassword" aria-label="Hiện mật khẩu mới" aria-pressed="false"><i class="bi bi-eye"></i></button></div><div class="account-security-actions"><span><i class="bi bi-lock"></i> Cần mật khẩu hiện tại để xác nhận.</span><button class="btn account-secondary-button" id="changePasswordBtn" type="button"><i class="bi bi-key"></i> Đổi mật khẩu</button></div></div>
+                    </details>
+                    <button type="button" id="openAdminBtn" class="account-admin-entry d-none"><span class="blessing-account-icon"><i class="bi bi-stars"></i></span><span><strong>Không gian Đấng tối cao</strong><small>Ban phước lành và quản lý thành viên</small></span><i class="bi bi-arrow-up-right"></i></button>
+                </div>
+                <div class="modal-footer account-modal-footer"><button type="button" class="account-logout" id="logoutBtn"><i class="bi bi-box-arrow-left"></i> Đăng xuất</button><button type="button" class="btn account-done-button" data-bs-dismiss="modal">Đóng <i class="bi bi-check2"></i></button></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="blessingsModal" tabindex="-1" aria-labelledby="blessingsModalTitle">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header blessing-modal-header">
+                    <div><span class="blessing-eyebrow">WORKPIC · PHƯỚC LÀNH</span><h5 class="modal-title" id="blessingsModalTitle">Phước lành của tôi</h5></div>
+                    <button type="button" class="blessing-close" data-close-blessings aria-label="Đóng thông báo"><i class="bi bi-x-lg"></i></button>
+                </div>
+                <div class="modal-body" id="myBlessingsList"></div>
+                <div class="modal-footer blessing-modal-footer"><span>Phước lành luôn được cập nhật theo tài khoản của bạn.</span><button type="button" class="btn blessing-acknowledge" data-close-blessings>Đã rõ <i class="bi bi-check2"></i></button></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="adminModal" tabindex="-1" aria-labelledby="adminModalTitle">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header modern-header modern-header-teal">
-                    <div class="modern-header-inner">
-                        <div class="modern-header-icon">
-                            <i class="bi bi-person-circle"></i>
-                        </div>
-                        <div class="modern-header-text">
-                            <h5 class="modal-title mb-0">Thông tin tài khoản</h5>
-                            <p class="modern-header-subtitle mb-0">Quản lý tên hiển thị và ảnh đại diện</p>
-                        </div>
-                    </div>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <div class="admin-brand"><span class="admin-brand-icon"><i class="bi bi-stars"></i></span><div><span class="admin-eyebrow">WORKPIC · PHƯỚC LÀNH</span><h5 id="adminModalTitle" class="modal-title">Đấng tối cao</h5><p class="mb-0 small">Ban phước lành, quản lý quyền và công việc của thành viên.</p></div></div>
+                    <button class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="profile-avatar-container mb-3">
-                        <img id="profileAvatar" class="profile-avatar-img" src="" alt="Avatar">
-                        <button class="btn btn-sm btn-avatar-edit" id="changeAvatarBtn" title="Đổi ảnh đại diện">
-                            <i class="bi bi-camera-fill"></i>
-                        </button>
-                        <input type="file" id="avatarFileInput" accept="image/*" style="display:none;">
+                    <p id="adminStatus" role="status" aria-live="polite" tabindex="-1"></p>
+                    <div class="admin-layout">
+                        <aside>
+                            <div class="admin-directory-heading"><span>THÀNH VIÊN</span><span id="adminUserCount">0</span><button id="adminRefresh" class="btn btn-sm" title="Làm mới danh sách" aria-label="Làm mới danh sách"><i class="bi bi-arrow-clockwise"></i></button></div>
+                            <label for="adminSearch" class="visually-hidden">Tìm tài khoản</label>
+                            <input id="adminSearch" class="form-control mb-3" placeholder="Tìm tên, email, bộ phận…">
+                            <div id="adminUserList"></div>
+                        </aside>
+                        <section id="adminPanelContent"><p>Chọn tài khoản để quản lý.</p></section>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Email</label>
-                        <p class="form-control-static" id="profileEmail">---</p>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Tên hiển thị</label>
-                        <div class="input-group">
-                            <input type="text" class="form-control" id="profileDisplayName"
-                                placeholder="Nhập tên hiển thị">
-                            <button class="btn btn-save" id="saveProfileBtn">
-                                <i class="bi bi-check-circle"></i> Lưu
-                            </button>
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold" for="profileDepartment"><i class="bi bi-diagram-3-fill"></i>
-                            Bộ phận làm việc</label>
-                        <div class="input-group">
-                            <select class="form-select" id="profileDepartment"></select>
-                            <button class="btn btn-outline-primary" type="button" id="profileAddDeptBtn"
-                                title="Thêm bộ phận mới"><i class="bi bi-plus-lg"></i></button>
-                        </div>
-                        <div class="input-group mt-2 d-none" id="profileNewDeptRow">
-                            <input type="text" class="form-control" id="profileNewDeptName" maxlength="40"
-                                placeholder="Tên bộ phận mới">
-                            <button class="btn btn-save" type="button" id="profileNewDeptSaveBtn"><i
-                                    class="bi bi-check-lg"></i> Thêm</button>
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold" for="profileWorkShift">
-                            <i class="bi bi-clock-history"></i> Ca làm việc
-                        </label>
-                        <select class="form-select" id="profileWorkShift">
-                            <option value="day">☀️ Ca ngày (07:00 – 20:00)</option>
-                            <option value="night">🌙 Ca đêm (20:00 – 07:00 hôm sau)</option>
-                        </select>
-                        <div class="form-text">
-                            <i class="bi bi-info-circle"></i> Chỉ ảnh hưởng khung giờ hiển thị của Timeline.
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold"><i class="bi bi-shield-lock-fill"></i> Mật khẩu</label>
-                        <div class="input-group">
-                            <input type="password" class="form-control" id="profileNewPassword"
-                                placeholder="Mật khẩu mới (≥ 6 ký tự)" minlength="6" autocomplete="new-password">
-                            <button class="btn btn-save" id="changePasswordBtn" type="button" title="Đổi mật khẩu">
-                                <i class="bi bi-key-fill"></i> Đổi
-                            </button>
-                        </div>
-                        <div class="form-text"><i class="bi bi-info-circle"></i> Bấm "Đổi" rồi nhập mật khẩu hiện tại để
-                            xác nhận.</div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-danger" id="logoutBtn">
-                        <i class="bi bi-box-arrow-right"></i> Đăng xuất
-                    </button>
-                    <button type="button" class="btn btn-cancel" data-bs-dismiss="modal">Đóng</button>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Change Password Confirm Modal -->
-    <div class="modal fade" id="changePasswordConfirmModal" tabindex="-1">
+    <div class="modal fade workpic-dialog" id="changePasswordConfirmModal" tabindex="-1">
         <div class="modal-dialog modal-md modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header modern-header modern-header-teal">
@@ -1583,7 +1579,7 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
                             <p class="modern-header-subtitle mb-0">Nhập mật khẩu hiện tại để xác nhận</p>
                         </div>
                     </div>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
                 </div>
                 <div class="modal-body">
                     <label class="form-label fw-bold" for="confirmCurrentPassword">Mật khẩu hiện tại *</label>
@@ -1604,7 +1600,7 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
         </div>
     </div>
 
-    <div class="modal fade" id="settingsModal" tabindex="-1">
+    <div class="modal fade workpic-dialog" id="settingsModal" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header modern-header modern-header-primary">
@@ -1615,7 +1611,7 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
                             <p class="modern-header-subtitle mb-0">Tùy chỉnh trải nghiệm sử dụng</p>
                         </div>
                     </div>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
                 </div>
                 <div class="modal-body">
                     <section class="settings-section">
@@ -1691,7 +1687,7 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
     </div>
 
     <!-- Transfer Confirmation Modal -->
-    <div class="modal fade" id="transferConfirmModal" tabindex="-1">
+    <div class="modal fade workpic-dialog" id="transferConfirmModal" tabindex="-1">
         <div class="modal-dialog modal-md">
             <div class="modal-content">
                 <div class="modal-header modern-header modern-header-warning">
@@ -1704,7 +1700,7 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
                             <p class="modern-header-subtitle mb-0">Có người muốn chuyển/copy job cho bạn</p>
                         </div>
                     </div>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
                 </div>
                 <div class="modal-body">
                     <p id="transferConfirmMessage" class="mb-3">Bạn có muốn nhận job này không?</p>
@@ -1722,7 +1718,7 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
     </div>
 
     <!-- Quick Job Transfer/Copy Confirmation Modal -->
-    <div class="modal fade" id="quickJobTransferConfirmModal" tabindex="-1">
+    <div class="modal fade workpic-dialog" id="quickJobTransferConfirmModal" tabindex="-1">
         <div class="modal-dialog modal-md">
             <div class="modal-content">
                 <div class="modal-header modern-header modern-header-warning">
@@ -1735,7 +1731,7 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
                             <p class="modern-header-subtitle mb-0">Xác nhận nhận job phát sinh</p>
                         </div>
                     </div>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
                 </div>
                 <div class="modal-body">
                     <p id="quickJobTransferConfirmMessage" class="mb-3">Bạn có muốn nhận job này không?</p>
@@ -1753,7 +1749,7 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
     </div>
 
     <!-- AI Job Parser Modal -->
-    <div class="modal fade" id="aiJobParserModal" tabindex="-1">
+    <div class="modal fade workpic-dialog" id="aiJobParserModal" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content ai-parser-modal-content">
                 <div class="modal-header modern-header modern-header-ai">
@@ -1765,7 +1761,7 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
                             </p>
                         </div>
                     </div>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
                 </div>
                 <div class="modal-body">
 
@@ -1862,8 +1858,8 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
     </div>
 
     <!-- Guide Modal -->
-    <div class="modal fade" id="guideModal" tabindex="-1">
-        <div class="modal-dialog modal-xl">
+    <div class="modal fade workpic-dialog" id="guideModal" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header modern-header modern-header-primary">
                     <div class="modern-header-inner">
@@ -1872,10 +1868,10 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
                         </div>
                         <div class="modern-header-text">
                             <h5 class="modal-title mb-0">Hướng dẫn sử dụng</h5>
-                            <p class="modern-header-subtitle mb-0">Cập nhật 12/11/2026 · Lịch cố định, Timeline và các công cụ hiện tại</p>
+                            <p class="modern-header-subtitle mb-0">Cập nhật 12/11/2026 · Lịch làm việc, phân quyền và các công cụ hiện tại</p>
                         </div>
                     </div>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
                 </div>
                 <div class="modal-body">
                     <div class="ia-diagram">
@@ -1968,7 +1964,7 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
                                     <div class="ia-item">Job tự động dời<span>Job rơi vào ngày off hoặc ngày lễ → dời lên ngày làm việc liền trước (màu hồng). Xem trước các job bị ảnh hưởng trước khi lưu off.</span></div>
                                     <div class="ia-item">Xóa lịch off<span>Job tự trở về ngày bình thường</span></div>
                                     <div class="ia-item">Lịch lễ theo năm<span>Điều chỉnh ngày bắt đầu 5 ngày Tết và ngày nghỉ liền kề 02/09 trong lịch off. Không tự cộng ngày nghỉ bù hoặc hoán đổi.</span></div>
-                                    <div class="ia-item">Sự kiện cá nhân / bộ phận<span>Chuột phải vào ngày để thêm sự kiện, giờ và ghi chú; chọn Chỉ mình tôi hoặc Cả bộ phận của tôi. Chỉ người tạo được sửa/xóa, thành viên cùng bộ phận được xem sự kiện chung. Hỗ trợ lặp theo tuần, tháng, năm dương lịch hoặc năm âm lịch và ngày kết thúc. Ô sự kiện lớn, có hiệu ứng chớp sáng; sự kiện không đăng ký off.</span></div>
+                                    <div class="ia-item">Sự kiện cá nhân / bộ phận<span>Chuột phải vào ngày để thêm sự kiện, giờ và ghi chú; chọn Chỉ mình tôi hoặc Cả bộ phận của tôi. Chỉ người tạo được sửa/xóa, thành viên cùng bộ phận được xem sự kiện chung. Hỗ trợ lặp theo tuần, tháng, năm dương lịch hoặc năm âm lịch và ngày kết thúc. Sự kiện hiển thị nhãn xanh dương, không đăng ký off.</span></div>
                                 </div>
                             </div>
 
@@ -2016,6 +2012,8 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
                                     <div class="ia-item">Nút trong thông báo<span>Hoàn thành · Đợi tí = nhắc lại sau 10
                                             phút</span></div>
                                     <div class="ia-item">Tích hoàn thành job<span>Bật/tắt yêu cầu tích hoàn thành thủ công. Khi bật, chỉ các lần job từ ngày bật trở đi cần tích.</span></div>
+                                    <div class="ia-item">Quyền sử dụng<span>Đấng tối cao có thể cấp quyền Xem / Thêm / Sửa / Xóa theo từng chức năng. Chức năng không có quyền xem sẽ bị ẩn; chỉ các nút đã được tích quyền mới hiển thị. User chưa được cấp quyền sẽ không thấy chức năng; thay đổi quyền sẽ có thông báo ban hoặc thu hồi phước lành, kèm các quyền cụ thể. Mở form thông báo riêng trong Thông tin tài khoản → Phước lành của tôi; Đấng tối cao có trạng thái Toàn quyền riêng.</span></div>
+                                    <div class="ia-item">Quản lý thành viên của Đấng tối cao<span>Vào Thông tin tài khoản → Đấng tối cao → chọn thành viên. Chuyển tab Hồ sơ / Công việc / Phước lành / Tùy chọn. Tìm hoặc lọc job, bấm Sửa để mở form riêng rồi Lưu hoặc Hủy. Xóa có hộp xác nhận rõ tên job; đổi thành viên khi chưa lưu sẽ được nhắc. Đấng tối cao có thể sửa hoặc xóa job của người khác.</span></div>
                                     <div class="ia-item">Chủ đề Header<span>Mặc định, Tết, Trung Thu, Noel, Halloween...
                                             kèm hiệu ứng rơi toàn màn hình</span></div>
                                     <div class="ia-item">Linh vật (Mascot)<span>Cú, Rồng, Thỏ, Tuần lộc, Ma... đậu trên
@@ -2157,7 +2155,7 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
     </div>
 
     <!-- Quick Job Invite Modal -->
-    <div class="modal fade" id="quickJobInviteModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal fade workpic-dialog" id="quickJobInviteModal" tabindex="-1" data-bs-backdrop="static">
         <div class="modal-dialog modal-md">
             <div class="modal-content">
                 <div class="modal-header modern-header modern-header-primary">
@@ -2187,7 +2185,7 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
     </div>
 
     <!-- Statistics Modal -->
-    <div class="modal fade" id="statisticsModal" tabindex="-1">
+    <div class="modal fade workpic-dialog" id="statisticsModal" tabindex="-1">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header modern-header modern-header-info">
@@ -2199,7 +2197,7 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
                                 gian</p>
                         </div>
                     </div>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
                 </div>
                 <div class="modal-body">
                     <div class="stats-toolbar">
@@ -2309,7 +2307,7 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
 
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.min.js"></script>
+    <script type="module" src="app.js"></script>
 </body>
 
 </html>

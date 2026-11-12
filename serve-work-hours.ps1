@@ -87,8 +87,7 @@ try {
                 $bytes = [Text.Encoding]::UTF8.GetBytes((@{ rows = @($rows.ToArray()) } | ConvertTo-Json -Depth 8 -Compress))
             } else {
                 # Serve only the public application files; never expose scripts or credentials.
-                $files = @{ '/'='index.html'; '/index.html'='index.html'; '/app.js'='app.js'; '/styles.css'='styles.css'; '/sw.js'='sw.js'; '/work-hours-data.js'='work-hours-data.js'; '/api-client.js'='api-client.js' }
-                $files['/app.min.js'] = 'app.min.js'
+                $files = @{ '/'='index.html'; '/index.html'='index.html'; '/app.js'='app.js'; '/styles.css'='styles.css'; '/sw.js'='sw.js'; '/app-data.js'='app-data.js' }
                 if (!$files.ContainsKey($path)) { $response.StatusCode = 404; throw 'Not found' }
                 $file = Join-Path $root $files[$path]
                 $types = @{ '.html'='text/html'; '.js'='application/javascript'; '.css'='text/css'; '.json'='application/json' }

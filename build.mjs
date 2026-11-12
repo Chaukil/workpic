@@ -11,7 +11,6 @@ try {
     const { output } = await bundle.generate({ format: 'es', inlineDynamicImports: true });
     const result = await minify(output[0].code, { module: true, format: { comments: false } });
     if (!result.code) throw new Error('JavaScript bundle is empty');
-    await writeFile('app.min.js', result.code + '\n');
 
     const [template, styles] = await Promise.all([
         readFile('index.html', 'utf8'),
@@ -22,7 +21,7 @@ try {
     const inlineCss = styles.replace(/<\/style/gi, '<\\/style');
     const replacements = [
         ['<link rel="stylesheet" href="styles.css">', `<style>\n${inlineCss}\n</style>`],
-        ['<script type="module" src="app.min.js"></script>', `<script type="module">\n${inlineJs}\n</script>`]
+        ['<script type="module" src="app.js"></script>', `<script type="module">\n${inlineJs}\n</script>`]
     ];
     let html = template;
     for (const [marker, value] of replacements) {
@@ -33,5 +32,4 @@ try {
     await writeFile('dist/index.html', html);
     await copyFile('sw.js', 'dist/sw.js');
 } finally { await bundle.close(); }
-console.log(`Production JavaScript: ${((await stat('app.min.js')).size / 1024).toFixed(1)} KB`);
 console.log(`Deploy dist/: index.html (${((await stat('dist/index.html')).size / 1024).toFixed(1)} KB) + sw.js`);

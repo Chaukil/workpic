@@ -1,13 +1,713 @@
-import { convertWorkHoursRows } from './work-hours-data.js';
-import { resolveApiUrl } from './api-client.js';
-import { vietnameseLunar, holidaysForYear, monthPair } from './calendar-data.js';
-import { personalEventOccurs, checklistFromText, compareScheduleEntries } from './productivity-data.js';
+import { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, holidaysForYear, monthPair, personalEventOccurs, checklistFromText, compareScheduleEntries, ADMIN_EMAIL, FEATURES, ACTIONS, PERMISSION_ACTION_LABELS, hasPermission, normalizePolicy, profilePolicy, createAdminStore, adminJobGroup } from './app-data.js';
 // Firebase Configuration - Chỉ sử dụng Firestore
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, getDocs, onSnapshot, enableIndexedDbPersistence, query, where, writeBatch, runTransaction, arrayUnion, arrayRemove }
+import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, getDoc, getDocs, onSnapshot, enableIndexedDbPersistence, query, where, writeBatch, runTransaction, arrayUnion, arrayRemove }
     from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, EmailAuthProvider, reauthenticateWithCredential, updatePassword }
     from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+// ADMIN UI START
+
+const CONTROLS = {
+    addJobBtn: ['jobs', 'create'], saveJobBtn: ['jobs', 'edit'], deleteJobBtn: ['jobs', 'delete'], pauseJobBtn: ['jobs', 'edit'],
+    viewDataBtn: ['jobs'], exportPdfBtn: ['jobs'], transferJobBtn: ['transfers', 'create'], toggleTransferSectionBtn: ['transfers', 'create'],
+    quickChatToggleBtn: ['quickJobs'], quickChatPanel: ['quickJobs'],
+    dayOffBtn: ['dayOffs'], workHoursBtn: ['workHours'], statisticsBtn: ['statistics'],
+    checkDueBtn: ['checkDue'], checkEtaDirectBtn: ['eta'], presenterSpinBtn: ['spin'],
+    salaryCalcBtn: ['salary'], aiParseBtn: ['ai'], aiCreateJobsBtn: ['jobs', 'create'],
+    changeHistoryBtn: ['history'], settingsBtn: ['settings'], notifBellBtn: ['notifications'],
+    profileAddDeptBtn: ['departments', 'create'], profileNewDeptSaveBtn: ['departments', 'create'],
+    saveProfileBtn: ['profile', 'edit'], changeAvatarBtn: ['profile', 'edit'],
+    profileDepartment: ['profile', 'edit'], profileWorkShift: ['profile', 'edit'],
+    savePersonalEvent: ['events', 'create'], deletePersonalEvent: ['events', 'delete'], quickChatSendBtn: ['quickJobs', 'create'],
+    saveHolidayPolicy: ['holidays', 'edit'], saveDayOffBtn: ['dayOffs', 'edit'], whSaveBtn: ['workHours', 'edit'],
+    transferAcceptBtn: ['transfers', 'edit'], transferRejectBtn: ['transfers', 'edit'],
+    quickJobTransferAcceptBtn: ['transfers', 'edit'], quickJobTransferRejectBtn: ['transfers', 'edit'],
+    quickJobInviteAcceptBtn: ['quickJobs', 'edit'], quickJobInviteRejectBtn: ['quickJobs', 'edit']
+};
+const QUICK_ACTIONS = {
+    'self-claim': ['quickJobs', 'edit'], 'show-assign': ['quickJobs', 'edit'], 'confirm-assign': ['quickJobs', 'edit'],
+    'accept-invite': ['quickJobs', 'edit'], 'reject-invite': ['quickJobs', 'edit'], 'cancel-invite': ['quickJobs', 'edit'],
+    complete: ['quickJobs', 'edit'], reject: ['quickJobs', 'edit'], 'show-edit': ['quickJobs', 'edit'],
+    'save-edit': ['quickJobs', 'edit'], delete: ['quickJobs', 'delete'],
+    'show-transfer': ['transfers', 'create'], 'confirm-transfer': ['transfers', 'create']
+};
+const MODALS = {
+    jobModal: 'jobs', viewJobModal: 'jobs', viewDataModal: 'jobs', dayOffModal: 'dayOffs',
+    workHoursModal: 'workHours', statisticsModal: 'statistics', checkDueModal: 'checkDue',
+    etaDirectModal: 'eta', presenterSpinModal: 'spin', salaryCalcModal: 'salary',
+    aiJobParserModal: 'ai', changeHistoryModal: 'history', settingsModal: 'settings',
+    transferConfirmModal: 'transfers', quickJobTransferConfirmModal: 'transfers', quickJobInviteModal: 'quickJobs'
+};
+const DATA_LABELS = { users: 'Hồ sơ, cài đặt và sự kiện', jobs: 'Job', jobDayOverrides: 'Tùy chỉnh và checklist từng ngày',
+    dayOffs: 'Lịch off', quickJobs: 'Job trong ngày', transferRequests: 'Yêu cầu chuyển job',
+    quickJobTransferRequests: 'Chuyển job trong ngày', notifications: 'Thông báo' };
+
+function createAccessControl({ db, auth, notify }) {
+    let policy = {}, loaded = false, unsubscribe = null;
+    let modal, selected, users = [], records = {}, editor = null, departments = [];
+    let activeTab = 'profile', dirtyProfile = false, dirtyPermissions = false, dirtyEditor = false, editorFocus = null;
+    let resolveConfirmation = null;
+    let lastBlessing = null, announcedBlessing = '';
+    let blessingsModal = null, returnToProfile = false;
+    const isAdmin = () => auth.currentUser?.email?.trim().toLowerCase() === ADMIN_EMAIL;
+    const can = (feature, action = 'view') => isAdmin() || (!!auth.currentUser && loaded && hasPermission(policy, feature, action));
+    const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const api = createAdminStore({ db, auth, sdk: { doc, getDoc, getDocs, collection, query, where, runTransaction, writeBatch } });
+    function requireAccess(feature, action = 'view') {
+        if (can(feature, action)) return true;
+        notify('Không có quyền', 'Tài khoản chưa được cấp quyền thực hiện thao tác này.', false, 'warning');
+        return false;
+    }
+    function apply() {
+        for (const [id, [feature, action = 'view']] of Object.entries(CONTROLS)) {
+            const node = document.getElementById(id);
+            if (!node) continue;
+            // A save button can either create or edit, depending on the open form.
+            const allowed = id === 'saveJobBtn' ? can('jobs', 'create') || can('jobs', 'edit')
+                : id === 'savePersonalEvent' ? can('events', 'create') || can('events', 'edit')
+                : id === 'whSaveBtn' ? can('workHours', 'create') || can('workHours', 'edit')
+                : id === 'saveDayOffBtn' ? can('dayOffs', 'create') || can('dayOffs', 'edit') || can('dayOffs', 'delete') : can(feature, action);
+            node.classList.toggle('access-hidden', !allowed);
+            if (id === 'profileDepartment' || id === 'profileWorkShift') {
+                node.classList.remove('access-hidden'); node.disabled = !allowed;
+            }
+        }
+        document.querySelectorAll('#calendarView, #timelineView, #jobList, #outOfScheduleJobs').forEach(node => node.classList.toggle('access-hidden', !can('jobs')));
+        document.querySelectorAll('.calendar-personal-event').forEach(node => node.classList.toggle('access-hidden', !can('events')));
+        document.querySelectorAll('.schedule-override-btn, .schedule-done-btn, #jobList .btn-edit').forEach(node => node.classList.toggle('access-hidden', !can('jobs', 'edit')));
+        document.querySelectorAll('[data-checklist-id]').forEach(node => { node.disabled = !can('jobs', 'edit'); });
+        document.querySelectorAll('#quickChatPanel [data-action]').forEach(node => {
+            const rule = QUICK_ACTIONS[node.dataset.action];
+            if (rule) node.classList.toggle('access-hidden', !can(...rule));
+        });
+        for (const [id, feature] of Object.entries(MODALS)) {
+            const node = document.getElementById(id);
+            if (node?.classList.contains('show') && !can(feature)) bootstrap.Modal.getInstance(node)?.hide();
+        }
+        const button = document.getElementById('openAdminBtn');
+        if (button) button.classList.toggle('d-none', auth.currentUser?.email?.toLowerCase() !== ADMIN_EMAIL);
+        if (!isAdmin()) modal?.hide();
+        renderMyBlessings();
+        const profileName = document.getElementById('profileDisplayName');
+        if (profileName) profileName.readOnly = !can('profile', 'edit');
+    }
+    function receiveBlessing(documents) {
+        lastBlessing = documents.map(d => d.data().lastBlessing).filter(Boolean)
+            .sort((a, b) => String(b.timestamp || '').localeCompare(String(a.timestamp || '')))[0] || null;
+    }
+    function renderMyBlessings() {
+        const host = document.getElementById('myBlessingsList');
+        if (!host) return;
+        const root = isAdmin();
+        const title = root ? 'Đấng tối cao' : 'Phước lành của tôi';
+        document.getElementById('blessingsModalTitle').textContent = title;
+        const label = document.getElementById('openBlessingsLabel');
+        if (label && label.textContent !== (root ? 'Quyền Đấng tối cao' : title)) label.textContent = root ? 'Quyền Đấng tối cao' : title;
+        const signature = JSON.stringify({ root, policy, lastBlessing, signedIn: !!auth.currentUser });
+        if (host.dataset.renderSignature === signature) return;
+        host.dataset.renderSignature = signature;
+        if (root) {
+            host.innerHTML = '<section class="blessing-hero supreme"><span class="blessing-orbit"><i class="bi bi-stars"></i></span><span class="blessing-state-badge">TOÀN QUYỀN</span><h3>Đấng tối cao</h3><p>Mọi quyền hạn đều thuộc về bạn.<br>Không cần chờ ban phước lành.</p></section><div class="supreme-capabilities"><article><i class="bi bi-grid-1x2"></i><div><strong>Mọi chức năng</strong><p>Xem, thêm, sửa và xóa trên toàn bộ ứng dụng.</p></div><i class="bi bi-check-circle-fill"></i></article><article><i class="bi bi-people"></i><div><strong>Mọi thành viên</strong><p>Quản lý hồ sơ, công việc và dữ liệu của các thành viên.</p></div><i class="bi bi-check-circle-fill"></i></article><article><i class="bi bi-stars"></i><div><strong>Ban và thu hồi phước lành</strong><p>Trao quyền phù hợp và lấy lại bất cứ khi nào cần.</p></div><i class="bi bi-check-circle-fill"></i></article></div><div class="blessing-footnote"><i class="bi bi-shield-check"></i> Quyền tối cao luôn được giữ nguyên cho tài khoản này.</div>';
+            return;
+        }
+        const features = Object.entries(FEATURES).filter(([key]) => can(key));
+        const revoked = lastBlessing?.type === 'blessing_revoked';
+        const heading = lastBlessing ? revoked ? 'Phước lành đã được thu hồi' : lastBlessing.type === 'blessing_granted' ? 'Bạn đã được ban phước lành' : 'Phước lành đã được cập nhật' : features.length ? 'Phước lành đang đồng hành cùng bạn' : 'Phước lành đang chờ bạn';
+        const intro = lastBlessing ? 'Thông báo từ Đấng tối cao' : features.length ? 'Các quyền sử dụng hiện tại của tài khoản.' : 'Bạn sẽ nhận thông báo khi Đấng tối cao ban quyền sử dụng.';
+        const changes = (values, kind, caption) => {
+            if (!Array.isArray(values) || !values.length) return '';
+            return `<section class="blessing-change-block ${kind}"><h6><i class="bi ${kind === 'granted' ? 'bi-plus-circle' : 'bi-dash-circle'}"></i> ${caption}</h6>${values.filter(row => FEATURES[row.feature]).map(row => `<div><strong>${escape(FEATURES[row.feature])}</strong><span>${(Array.isArray(row.actions) ? row.actions : []).filter(action => PERMISSION_ACTION_LABELS[action]).map(action => `<em>${PERMISSION_ACTION_LABELS[action]}</em>`).join('')}</span></div>`).join('')}</section>`;
+        };
+        const changedAt = lastBlessing?.timestamp ? new Date(lastBlessing.timestamp) : null;
+        const time = changedAt && Number.isFinite(changedAt.getTime()) ? changedAt.toLocaleString('vi-VN', { dateStyle: 'medium', timeStyle: 'short' }) : '';
+        const receipt = lastBlessing ? `<div class="blessing-receipt"><div class="blessing-receipt-heading"><strong><i class="bi bi-bell"></i> Lần thay đổi gần nhất</strong><time>${escape(time)}</time></div>${changes(lastBlessing.granted, 'granted', 'Phước lành được ban')}${changes(lastBlessing.revoked, 'revoked', 'Phước lành được lấy lại')}${!lastBlessing.granted?.length && !lastBlessing.revoked?.length ? `<p class="blessing-message">${escape(lastBlessing.message || '')}</p>` : ''}</div>` : '';
+        host.innerHTML = `<section class="blessing-hero ${revoked ? 'recalled' : ''}"><span class="blessing-orbit"><i class="bi ${revoked ? 'bi-arrow-counterclockwise' : 'bi-stars'}"></i></span><h3>${heading}</h3><p>${intro}</p></section>${receipt}<section class="blessing-current"><div class="blessing-current-heading"><h6>Quyền đang có</h6><span>${features.length} chức năng</span></div>${features.length ? `<div class="blessing-rights-grid">${features.map(([key, name]) => `<article><strong>${escape(name)}</strong><div>${ACTIONS.filter(action => can(key, action)).map(action => `<span><i class="bi bi-check2"></i> ${PERMISSION_ACTION_LABELS[action]}</span>`).join('')}</div></article>`).join('')}</div>` : '<div class="blessing-empty"><i class="bi bi-stars"></i><p>Hiện chưa có quyền sử dụng.</p><small>Các chức năng sẽ xuất hiện sau khi bạn được ban phước lành.</small></div>'}</section>`;
+    }
+    function openBlessings(onShown = null) {
+        if (!auth.currentUser) return;
+        const uid = auth.currentUser.uid;
+        const node = document.getElementById('blessingsModal');
+        const show = () => {
+            if (auth.currentUser?.uid !== uid) return;
+            renderMyBlessings();
+            blessingsModal ||= new bootstrap.Modal(node);
+            blessingsModal.show(); onShown?.();
+        };
+        const other = document.querySelector('.modal.show:not(#blessingsModal)');
+        if (other) {
+            other.addEventListener('hidden.bs.modal', show, { once: true });
+            if (other.id === 'userProfileModal') { returnToProfile = true; bootstrap.Modal.getInstance(other)?.hide(); }
+        } else show();
+    }
+    function announceBlessing() {
+        if (isAdmin() || !lastBlessing?.id || !auth.currentUser || announcedBlessing === lastBlessing.id) return;
+        const key = `workpic_blessing_seen_${auth.currentUser.uid}`;
+        try { if (localStorage.getItem(key) === lastBlessing.id) return; } catch { /* Still announce when browser storage is unavailable. */ }
+        announcedBlessing = lastBlessing.id;
+        const id = lastBlessing.id;
+        openBlessings(() => { try { localStorage.setItem(key, id); } catch { /* In-memory deduplication remains active. */ } });
+    }
+    async function start(user) {
+        stop();
+        try {
+            const userQuery = query(collection(db, 'users'), where('uid', '==', user.uid));
+            const initial = await getDocs(userQuery);
+            policy = profilePolicy(initial.docs);
+            receiveBlessing(initial.docs);
+            const profileVersion = docs => docs.map(d => d.data().adminProfileUpdatedAt || '').sort().at(-1) || '';
+            let lastProfileVersion = profileVersion(initial.docs);
+            loaded = true;
+            if (policy.disabled && !isAdmin()) {
+                announceBlessing();
+                notify('Không thể vào ứng dụng', 'Tài khoản đã bị khóa hoặc xóa khỏi ứng dụng.', false, 'warning');
+                await auth.signOut(); return false;
+            }
+            let signature = JSON.stringify(policy);
+            unsubscribe = onSnapshot(userQuery, snapshot => {
+                if (auth.currentUser?.uid !== user.uid) return;
+                policy = profilePolicy(snapshot.docs);
+                receiveBlessing(snapshot.docs);
+                apply();
+                if (policy.disabled && !isAdmin()) { announceBlessing(); auth.signOut(); return; }
+                const next = JSON.stringify(policy);
+                const nextProfileVersion = profileVersion(snapshot.docs);
+                if (next !== signature || nextProfileVersion !== lastProfileVersion) {
+                    signature = next; lastProfileVersion = nextProfileVersion; window.location.reload();
+                }
+            }, error => {
+                loaded = false; apply();
+                notify('Không tải được quyền', error.message, false, 'warning');
+            });
+        } catch (error) {
+            loaded = false;
+            notify('Không tải được quyền', error.message, false, 'warning');
+        }
+        apply();
+        return isAdmin() || loaded;
+    }
+    function stop() {
+        returnToProfile = false; blessingsModal?.hide();
+        dirtyProfile = dirtyPermissions = dirtyEditor = false;
+        lastBlessing = null; announcedBlessing = '';
+        resolveConfirmation?.(false); resolveConfirmation = null;
+        document.getElementById('adminModal')?.removeAttribute('aria-busy');
+        unsubscribe?.(); unsubscribe = null; policy = {}; loaded = false;
+        users = []; selected = null; records = {}; editor = null; modal?.hide();
+        document.getElementById('openAdminBtn')?.classList.add('d-none');
+        const panel = document.getElementById('adminPanelContent');
+        if (panel) panel.replaceChildren();
+    }
+    function setStatus(message, error = false) {
+        const node = document.getElementById('adminStatus');
+        node.textContent = message; node.classList.toggle('text-danger', error);
+    }
+    async function busy(task) {
+        const panel = document.getElementById('adminModal');
+        panel.setAttribute('aria-busy', 'true');
+        const controls = [...panel.querySelectorAll('button, input, select, textarea')];
+        const disabled = controls.map(n => n.disabled);
+        controls.forEach(n => { n.disabled = true; });
+        setStatus('Đang xử lý…');
+        try { await task(); }
+        catch (error) {
+            const message = error.message || 'Không thực hiện được thao tác.';
+            setStatus(message, true);
+            const hint = document.getElementById('adminEditorOverlay')?.hidden === false ? document.getElementById('adminEditorHint') : document.getElementById('adminProfileHint');
+            if (hint) { hint.textContent = message; hint.classList.add('text-danger'); }
+            setTimeout(() => {
+                const invalid = document.querySelector('#adminDocumentEditor :invalid, #adminPane-profile :invalid');
+                invalid?.focus(); invalid?.reportValidity();
+            }, 0);
+        }
+        finally { controls.forEach((n, i) => { n.disabled = disabled[i]; }); panel.removeAttribute('aria-busy'); }
+    }
+    function renderUsers() {
+        const filter = document.getElementById('adminSearch').value.trim().toLowerCase();
+        const matches = users.filter(u => `${u.email} ${u.displayName} ${u.department}`.toLowerCase().includes(filter));
+        document.getElementById('adminUserCount').textContent = matches.length;
+        document.getElementById('adminUserList').innerHTML = matches.map(u =>
+            `<button type="button" class="admin-user ${selected?.uid === u.uid ? 'selected' : ''}" data-admin-user="${escape(u.uid)}" aria-pressed="${selected?.uid === u.uid}"><span class="admin-person-avatar">${escape((u.displayName || u.email || '?').slice(0, 1).toUpperCase())}</span><span class="admin-person-text"><strong>${escape(u.displayName || u.email)}</strong><small>${escape(u.email)}</small><span class="admin-person-meta">${escape(u.department || 'Chưa phân bộ phận')}${u.disabled || u.policy.disabled ? ' · Đã khóa' : ''}</span></span><i class="bi bi-chevron-right"></i></button>`).join('') || '<div class="admin-empty"><i class="bi bi-search"></i><p>Không tìm thấy thành viên.</p><small>Thử tên hoặc email khác.</small></div>';
+    }
+    async function loadUsers() {
+        users = (await api('listUsers')).users;
+        renderUsers(); setStatus(`Đã tải ${users.length} tài khoản.`);
+    }
+    function renderSelection() {
+        const host = document.getElementById('adminPanelContent');
+        if (!selected) { host.innerHTML = '<div class="admin-welcome"><div class="admin-welcome-icon"><i class="bi bi-people"></i></div><span class="admin-eyebrow">BẮT ĐẦU TỪ MỘT THÀNH VIÊN</span><h3>Mọi thứ, gọn trong một nơi.</h3><p>Chọn tài khoản bên trái để cập nhật hồ sơ,<br>quản lý công việc và cấp quyền sử dụng.</p><div class="admin-welcome-chips"><span><i class="bi bi-person-badge"></i> Hồ sơ</span><span><i class="bi bi-check2-square"></i> Công việc</span><span><i class="bi bi-shield-check"></i> Phước lành</span></div></div>'; return; }
+        const root = selected.uid === auth.currentUser?.uid || selected.email?.trim().toLowerCase() === ADMIN_EMAIL;
+        const matrix = normalizePolicy(selected.policy);
+        matrix.disabled = matrix.disabled || selected.disabled;
+        host.innerHTML = `<div class="admin-selected-heading"><span class="admin-selected-avatar">${escape((selected.displayName || selected.email).slice(0, 1).toUpperCase())}</span><div><span class="admin-eyebrow">ĐANG QUẢN LÝ THÀNH VIÊN</span><h4>${escape(selected.displayName || selected.email)}</h4><p>${escape(selected.email)}</p></div><span class="admin-account-badge">${root ? 'Đấng tối cao' : matrix.disabled ? 'Đã khóa' : 'Đang hoạt động'}</span></div><div id="adminSummary" class="admin-summary"></div>
+            ${root ? '<p class="alert alert-info">Đấng tối cao có toàn quyền. Không thể khóa, xóa hoặc giới hạn tài khoản này.</p>' : ''}
+            <div class="admin-tab-bar" role="tablist" aria-label="Quản lý thành viên">${[['profile', 'bi-person-badge', 'Hồ sơ'], ['jobs', 'bi-check2-square', 'Công việc'], ['permissions', 'bi-shield-check', 'Phước lành'], ['advanced', 'bi-sliders', 'Tùy chọn']].map(([key, icon, title]) => `<button type="button" role="tab" id="adminTab-${key}" data-admin-tab="${key}" aria-controls="adminPane-${key}"><i class="bi ${icon}"></i> ${title}</button>`).join('')}<button type="button" class="admin-refresh-data" id="adminLoadData" title="Tải lại dữ liệu" aria-label="Tải lại dữ liệu"><i class="bi bi-arrow-clockwise"></i></button></div>
+            <section id="adminPane-profile" role="tabpanel" aria-labelledby="adminTab-profile"></section><section id="adminPane-jobs" role="tabpanel" aria-labelledby="adminTab-jobs"></section>
+            <section id="adminPane-permissions" role="tabpanel" aria-labelledby="adminTab-permissions"><div class="admin-pane-heading"><h5>Ban phước lành cho thành viên.</h5><p>Tích để ban phước, bỏ tích để lấy lại. Mỗi phước lành là một quyền sử dụng.</p></div><div class="admin-permission-presets"><button type="button" id="adminViewOnly" class="btn btn-sm btn-outline-primary">Chỉ xem</button><button type="button" id="adminSelectAll" class="btn btn-sm btn-outline-primary">Ban toàn bộ</button><button type="button" id="adminClearAll" class="btn btn-sm btn-outline-secondary">Thu hồi toàn bộ</button></div>
+            <div class="admin-permissions"><table class="table"><thead><tr><th>Chức năng</th><th>Xem</th><th>Thêm</th><th>Sửa</th><th>Xóa</th></tr></thead><tbody>
+            ${Object.entries(FEATURES).map(([key, name]) => `<tr><td>${escape(name)}</td>${ACTIONS.map(action => `<td><input type="checkbox" data-feature="${key}" data-action="${action}" aria-label="${escape(name)}: ${action}" ${root || matrix.features[key][action] ? 'checked' : ''} ${root ? 'disabled' : ''}></td>`).join('')}</tr>`).join('')}</tbody></table></div>
+            <label class="d-block my-3"><input type="checkbox" id="adminDisabled" ${matrix.disabled ? 'checked' : ''} ${root ? 'disabled' : ''}> Khóa tài khoản</label>
+            <div class="admin-pane-actions"><span id="adminPermissionsHint">Thay đổi chỉ có hiệu lực sau khi lưu.</span><button class="btn btn-primary" id="adminSavePermissions" ${root ? 'disabled' : ''}><i class="bi bi-check2"></i> Lưu phước lành</button></div>
+            <p class="small text-muted mt-2">Bỏ Xem sẽ tắt toàn bộ quyền của chức năng. Tích quyền để hiện nút; bỏ tích để ẩn nút tương ứng. User chưa được cấp quyền sẽ không thấy các chức năng.</p>
+            </section><section id="adminPane-advanced" role="tabpanel" aria-labelledby="adminTab-advanced"><div id="adminAdvancedData"></div><div class="admin-danger-zone"><h6><i class="bi bi-exclamation-triangle"></i> Xóa thành viên khỏi ứng dụng</h6><p>Xóa các job và dữ liệu liên quan. Bạn sẽ được yêu cầu xác nhận email trước khi xóa.</p><button class="btn btn-outline-danger" id="adminDeleteUser" ${root ? 'disabled' : ''}>Xóa thành viên…</button></div></section>
+            <div id="adminUserData" hidden></div>
+            <div class="admin-editor-overlay" id="adminEditorOverlay" hidden><button type="button" class="admin-editor-backdrop" data-admin-close-editor aria-label="Đóng form chỉnh sửa"></button><section class="admin-editor-drawer" role="dialog" aria-modal="true" aria-labelledby="adminEditorTitle"><header><div><span class="admin-eyebrow" id="adminEditorSubtitle"></span><h5 id="adminEditorTitle">Chỉnh sửa công việc</h5></div><button type="button" class="admin-icon-button" data-admin-close-editor aria-label="Đóng"><i class="bi bi-x-lg"></i></button></header><div id="adminDocumentEditor"></div><footer id="adminEditorActions"></footer></section></div>`;
+        selectTab(activeTab);
+    }
+    function selectTab(key) {
+        activeTab = key;
+        document.querySelectorAll('#adminPanelContent [data-admin-tab]').forEach(button => {
+            const active = button.dataset.adminTab === key;
+            button.classList.toggle('active', active); button.setAttribute('aria-selected', String(active)); button.tabIndex = active ? 0 : -1;
+            document.getElementById(`adminPane-${button.dataset.adminTab}`).hidden = !active;
+        });
+    }
+    async function loadData() {
+        const result = await api('getUserData', { uid: selected.uid });
+        records = result.collections;
+        departments = result.departments || [];
+        const host = document.getElementById('adminUserData');
+        const row = (name, record) => {
+            const value = record.data;
+            const status = { open: 'Chờ nhận', invited: 'Đã chỉ định', claimed: 'Đang làm', completed: 'Hoàn thành' }[value.status] || '';
+            const day = value.date || value.dateKey || '';
+            const displayDay = /^\d{4}-\d{2}-\d{2}$/.test(day) ? day.split('-').reverse().join('/') : day;
+            return `<div class="admin-data-row" data-admin-record-row data-admin-search="${escape([value.title, value.content, textDescription(value.description), day, value.time].filter(Boolean).join(' '))}"><span class="admin-record-icon"><i class="bi ${name === 'quickJobs' ? 'bi-chat-square-text' : 'bi-calendar2-check'}"></i></span><div class="admin-record-title"><strong>${escape(value.title || value.content || value.date || value.displayName || record.id)}</strong><small>${escape([displayDay, value.time, value.duration ? `${value.duration} phút` : '', value.isPaused ? 'Tạm dừng' : ''].filter(Boolean).join(' · '))}</small></div>${status ? `<span class="admin-job-status status-${escape(value.status)}">${status}</span>` : ''}<button class="admin-row-edit" data-edit-collection="${name}" data-record="${records[name].indexOf(record)}"><i class="bi bi-pencil"></i> Sửa</button><button class="admin-row-delete" data-delete-collection="${name}" data-record="${records[name].indexOf(record)}" aria-label="Xóa ${escape(value.title || value.content || record.id)}" title="Xóa"><i class="bi bi-trash3"></i></button></div>`;
+        };
+        const section = (title, name, docs, extra = '') => `<section class="admin-job-section"><div class="admin-section-heading"><h6>${title} <span class="badge text-bg-secondary">${docs.length}</span></h6>${extra}</div>${result.errors?.[name] ? `<p class="text-danger">Không tải được: ${escape(result.errors[name])}</p>` : docs.map(d => row(name, d)).join('') || '<p class="text-muted small mb-0">Chưa có job trong nhóm này.</p>'}</section>`;
+        const jobs = records.jobs || [];
+        host.innerHTML = ((records.users || []).length ? profileEditor(records.users[0].data) : '<p class="text-danger">Không tải được hồ sơ tài khoản.</p>')
+            + '<div class="d-flex gap-2 my-3"><button type="button" class="btn btn-primary" id="adminCreateJob">Thêm job lịch / ngoài lịch</button><button type="button" class="btn btn-outline-primary" data-create-collection="quickJobs">Thêm job trong ngày</button></div>'
+            + section('Job lịch cố định', 'jobs', jobs.filter(d => adminJobGroup(d.data) === 'fixed'))
+            + section('Job một lần', 'jobs', jobs.filter(d => adminJobGroup(d.data) === 'once'))
+            + section('Job ngoài lịch', 'jobs', jobs.filter(d => adminJobGroup(d.data) === 'outside'))
+            + section('Job trong ngày — đã tạo / được giao', 'quickJobs', records.quickJobs || [])
+            + `<details class="admin-data-section"><summary>Dữ liệu khác và chỉnh sửa nâng cao</summary>${Object.entries(records).filter(([name]) => name !== 'jobs' && name !== 'quickJobs').map(([name, docs]) => `<details class="admin-data-section"><summary>${escape(DATA_LABELS[name])} (${docs.length})</summary>${name !== 'users' ? `<button class="btn btn-sm btn-outline-primary mt-2" data-create-collection="${name}">Thêm</button>` : ''}${docs.map((d, i) => `<div class="admin-data-row"><span>${escape(d.data.title || d.data.date || d.data.displayName || d.id)}</span><button class="btn btn-sm btn-outline-primary" data-edit-collection="${name}" data-record="${i}">Sửa</button>${name !== 'users' ? `<button class="btn btn-sm btn-outline-danger" data-delete-collection="${name}" data-record="${i}">Xóa</button>` : ''}</div>`).join('')}</details>`).join('')}</details>`;
+        const failures = Object.keys(result.errors || {}).map(name => DATA_LABELS[name] || name);
+        organizeData();
+        setStatus(failures.length ? `Đã tải các mục được phép. Chưa tải được: ${failures.join(', ')}.` : 'Đã tải thông tin tài khoản và tất cả nhóm job. Bấm Sửa hoặc Xóa ngay cạnh job cần chỉnh.', failures.length > 0);
+    }
+    function organizeData() {
+        const staging = document.getElementById('adminUserData');
+        const profile = staging.firstElementChild;
+        if (!dirtyProfile) {
+            const pane = document.getElementById('adminPane-profile'); pane.replaceChildren(profile);
+            const save = pane.querySelector('#adminSaveProfile');
+                if (pane.querySelector('#adminProfile-displayName')) pane.querySelector('#adminProfile-displayName').required = true;
+            if (save) {
+                const actions = document.createElement('div'); actions.className = 'admin-pane-actions';
+                actions.innerHTML = '<span id="adminProfileHint">Chỉnh thông tin rồi lưu một lần.</span><button type="button" class="btn btn-outline-secondary" id="adminResetProfile">Hoàn tác</button>';
+                actions.appendChild(save); pane.appendChild(actions);
+            }
+        } else profile.remove();
+        const jobsPane = document.getElementById('adminPane-jobs');
+        jobsPane.innerHTML = '<div class="admin-pane-heading"><h5>Công việc của thành viên</h5><p>Tìm nhanh, chọn đúng job, chỉnh sửa ngay.</p></div><div class="admin-job-toolbar"><label class="admin-job-search"><i class="bi bi-search"></i><input type="search" id="adminJobSearch" placeholder="Tìm tên hoặc nội dung job…" aria-label="Tìm công việc"></label><select id="adminJobFilter" class="form-select" aria-label="Loại công việc"><option value="all">Tất cả loại job</option><option value="fixed">Lịch cố định</option><option value="once">Một lần</option><option value="outside">Ngoài lịch</option><option value="quick">Trong ngày</option></select></div>';
+        const addButtons = staging.firstElementChild;
+        if (addButtons) { addButtons.classList.add('admin-add-actions'); jobsPane.appendChild(addButtons); }
+        ['fixed', 'once', 'outside', 'quick'].forEach(group => {
+            const section = staging.querySelector('.admin-job-section');
+            if (section) { section.dataset.adminGroup = group; jobsPane.appendChild(section); }
+        });
+        const advanced = document.getElementById('adminAdvancedData'); advanced.replaceChildren(...staging.children);
+        const count = (records.jobs || []).length + (records.quickJobs || []).length;
+        document.getElementById('adminSummary').innerHTML = `<span><i class="bi bi-building"></i> ${escape(selected.department || 'Chưa phân bộ phận')}</span><span><i class="bi bi-check2-square"></i> ${count} công việc</span><span><i class="bi bi-arrow-repeat"></i> ${(records.jobs || []).filter(d => adminJobGroup(d.data) === 'fixed').length} lịch cố định</span>`;
+        closeEditor(true); selectTab(activeTab);
+    }
+    function filterJobs() {
+        const normalize = value => value.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').replace(/đ/g, 'd');
+        const text = normalize(document.getElementById('adminJobSearch')?.value || '');
+        const group = document.getElementById('adminJobFilter')?.value || 'all';
+        document.querySelectorAll('#adminPane-jobs [data-admin-group]').forEach(section => {
+            let matches = 0;
+            section.querySelectorAll('[data-admin-record-row]').forEach(row => {
+                row.hidden = !normalize(row.dataset.adminSearch || row.textContent).includes(text); if (!row.hidden) matches++;
+            });
+            section.hidden = (group !== 'all' && section.dataset.adminGroup !== group) || (!!text && !matches);
+        });
+    }
+    const localDay = () => {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    };
+    function textDescription(value) {
+        const template = document.createElement('template'); template.innerHTML = value || '';
+        return template.content.textContent || '';
+    }
+    function avatarPreview(value) {
+        return `<span class="admin-avatar-preview"><img id="adminProfileAvatarPreview" ${value ? `src="${escape(value)}"` : 'hidden'} alt="Ảnh đại diện"><i class="bi bi-person" data-avatar-placeholder ${value ? 'hidden' : ''}></i></span>`;
+    }
+    function profileEditor(value) {
+        const options = new Map(departments.map(d => [d.id, d.name]));
+        users.forEach(u => { if (u.department && !options.has(u.department)) options.set(u.department, u.department); });
+        if (value.department && !options.has(value.department)) options.set(value.department, value.department);
+        return `<section class="admin-job-section"><h6>Thông tin tài khoản</h6><div class="admin-form-grid"><div><label for="adminProfile-email" class="form-label">Email đăng nhập</label><input class="form-control" id="adminProfile-email" value="${escape(selected.email)}" readonly></div><div><label for="adminProfile-displayName" class="form-label">Tên hiển thị</label><input class="form-control" id="adminProfile-displayName" maxlength="120" value="${escape(value.displayName || '')}"></div><div><label for="adminProfile-department" class="form-label">Bộ phận</label><select class="form-select" id="adminProfile-department"><option value="">Chưa phân bộ phận</option>${[...options].map(([id, name]) => `<option value="${escape(id)}" ${id === value.department ? 'selected' : ''}>${escape(name)}</option>`).join('')}</select></div><div><label for="adminProfile-workShift" class="form-label">Ca làm việc</label><select class="form-select" id="adminProfile-workShift"><option value="day">Ca ngày</option><option value="night" ${value.workShift === 'night' ? 'selected' : ''}>Ca đêm</option></select></div><div><label for="adminProfile-notifyLeadMinutes" class="form-label">Nhắc trước job</label><select class="form-select" id="adminProfile-notifyLeadMinutes">${[0, 5, 10, 15, 30, 60, 120].map(n => `<option value="${n}" ${n === Number(value.notifyLeadMinutes || 0) ? 'selected' : ''}>${n ? `${n} phút` : 'Đúng giờ'}</option>`).join('')}</select></div><div><label class="form-label" for="adminProfile-avatarFile">Ảnh đại diện</label>${avatarPreview(value.avatar)}<input id="adminProfile-avatarFile" class="form-control" type="file" accept="image/*"><input type="hidden" id="adminProfile-avatar" value="${escape(value.avatar || '')}"><button type="button" class="btn btn-sm btn-outline-secondary mt-1" id="adminClearAvatar">Xóa ảnh đại diện</button></div></div><label class="d-block my-3"><input type="checkbox" id="adminProfile-completion" ${value.jobCompletionEnabled ? 'checked' : ''}> Yêu cầu tích hoàn thành job</label><button class="btn btn-primary" id="adminSaveProfile">Lưu thông tin tài khoản</button><p class="small text-muted mt-2 mb-0">Email và mật khẩu đăng nhập được quản lý trong Firebase Authentication; các trường hồ sơ phía trên sửa trực tiếp tại đây.</p></section>`;
+    }
+    function userOptions(value) {
+        const options = [...users];
+        if (value && !options.some(u => u.uid === value)) options.push({ uid: value, displayName: value });
+        return '<option value="">Chưa chọn</option>' + options.map(u => `<option value="${escape(u.uid)}" ${u.uid === value ? 'selected' : ''}>${escape(u.displayName || u.email || u.uid)}</option>`).join('');
+    }
+    function quickJobEditor(value = {}) {
+        return `<h6>${editor?.create ? 'Thêm' : 'Sửa'} job trong ngày</h6><label for="adminQuick-content" class="form-label">Nội dung job</label><textarea id="adminQuick-content" class="form-control" rows="3">${escape(value.content || '')}</textarea><div class="admin-form-grid"><div><label for="adminQuick-dateKey" class="form-label">Ngày</label><input type="date" id="adminQuick-dateKey" class="form-control" value="${escape(value.dateKey || localDay())}"></div><div><label for="adminQuick-deadline" class="form-label">Hạn chót (không bắt buộc)</label><input type="time" id="adminQuick-deadline" class="form-control" value="${escape(value.deadline || '')}"></div><div><label for="adminQuick-status" class="form-label">Trạng thái</label><select id="adminQuick-status" class="form-select">${Object.entries({ open: 'Chờ nhận', invited: 'Đang chỉ định', claimed: 'Đang làm', completed: 'Đã hoàn thành' }).map(([key, name]) => `<option value="${key}" ${key === (value.status || 'open') ? 'selected' : ''}>${name}</option>`).join('')}</select></div><div><label for="adminQuick-assigneeUid" class="form-label">Người thực hiện</label><select id="adminQuick-assigneeUid" class="form-select">${userOptions(value.assigneeUid)}</select></div><div><label for="adminQuick-invitedUid" class="form-label">Người được chỉ định</label><select id="adminQuick-invitedUid" class="form-select">${userOptions(value.invitedUid)}</select></div></div><button class="btn btn-primary mt-3" id="adminSaveQuickJob">Lưu job trong ngày</button>`;
+    }
+    function jobEditor(value = {}) {
+        const field = (key, title, type = 'text') => `<label class="form-label mt-2" for="adminJob-${key}">${title}</label><input class="form-control" id="adminJob-${key}" type="${type}" value="${escape(value[key] ?? '')}" ${key === 'duration' ? 'min="1" max="1440"' : ''}>`;
+        return `<h6>${editor?.create ? 'Thêm' : 'Sửa'} job của ${escape(selected.displayName || selected.email)}</h6>${field('title', 'Tên job')}<label class="form-label mt-2" for="adminJob-type">Lịch lặp</label><select class="form-select" id="adminJob-type">${Object.entries({ once: 'Một lần', daily: 'Hằng ngày', weekly: 'Hằng tuần', biweekly: '2 tuần/lần', monthly: 'Hằng tháng', custom: 'Ngoài lịch' }).map(([key, label]) => `<option value="${key}" ${(value.isOutOfSchedule ? 'custom' : value.type) === key ? 'selected' : ''}>${label}</option>`).join('')}</select><div class="admin-form-grid"><div>${field('date', 'Ngày', 'date')}</div><div>${field('time', 'Giờ', 'time')}</div><div>${field('duration', 'Thời lượng (phút)', 'number')}</div></div><label for="adminJob-description" class="form-label mt-2">Nội dung</label><textarea id="adminJob-description" class="form-control" rows="4">${escape(textDescription(value.description))}</textarea><label for="adminJob-checklist" class="form-label mt-2">Checklist (mỗi dòng một bước)</label><textarea id="adminJob-checklist" class="form-control" rows="3">${escape((value.checklist || []).map(item => item.text).join('\n'))}</textarea><div class="d-flex flex-wrap gap-3 my-3"><label><input type="checkbox" id="adminJob-paused" ${value.isPaused ? 'checked' : ''}> Tạm dừng</label><label><input type="checkbox" id="adminJob-workOnSunday" ${value.workOnSunday ? 'checked' : ''}> Làm Chủ Nhật</label><label><input type="checkbox" id="adminJob-enableNotification" ${value.enableNotification !== false ? 'checked' : ''}> Nhắc job</label></div><div class="mb-3"><span class="form-label d-block">Loại trừ ngày trong tuần (job hằng ngày)</span>${['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'].map((day, i) => `<label class="me-3"><input type="checkbox" data-admin-excluded="${i}" ${(value.excludedWeekdays || []).includes(i) ? 'checked' : ''}> ${day}</label>`).join('')}</div><button class="btn btn-primary mt-2" id="adminSaveJob">Lưu job</button>`;
+    }
+    function showEditor(markup) {
+        const host = document.getElementById('adminDocumentEditor');
+        host.innerHTML = markup;
+        editorFocus = document.activeElement; dirtyEditor = false;
+        const heading = host.querySelector('h6');
+        document.getElementById('adminEditorTitle').textContent = heading?.textContent || 'Chỉnh sửa dữ liệu'; heading?.remove();
+        document.getElementById('adminEditorSubtitle').textContent = selected.displayName || selected.email;
+        const actions = document.getElementById('adminEditorActions');
+        actions.innerHTML = '<span id="adminEditorHint">Thay đổi chưa được lưu.</span><button type="button" class="btn btn-outline-secondary" data-admin-close-editor>Hủy</button>';
+        const save = host.querySelector('#adminSaveJob, #adminSaveQuickJob, #adminSaveDocument');
+        if (save) actions.appendChild(save);
+        const overlay = document.getElementById('adminEditorOverlay'); overlay.hidden = false;
+        ['adminJob-title', 'adminJob-date', 'adminJob-time', 'adminJob-duration', 'adminQuick-content', 'adminQuick-dateKey'].forEach(id => {
+            const node = document.getElementById(id); if (node) node.required = true;
+        });
+        updateEditorFields();
+        requestAnimationFrame(() => host.querySelector('input:not([type="hidden"]), textarea, select')?.focus());
+    }
+    function updateEditorFields() {
+        const excluded = document.querySelector('[data-admin-excluded]')?.closest('.mb-3');
+        if (excluded) excluded.hidden = document.getElementById('adminJob-type')?.value !== 'daily';
+        const status = document.getElementById('adminQuick-status')?.value;
+        const invited = document.getElementById('adminQuick-invitedUid');
+        const assignee = document.getElementById('adminQuick-assigneeUid');
+        if (invited) invited.closest('div').hidden = status !== 'invited';
+        if (assignee) assignee.closest('div').hidden = !['claimed', 'completed'].includes(status);
+    }
+    async function closeEditor(force = false) {
+        if (!force && dirtyEditor && !await confirmAction({ title: 'Bỏ thay đổi chưa lưu?', description: 'Nội dung đang sửa sẽ không được lưu lại.', label: 'Bỏ thay đổi', destructive: false })) return;
+        const overlay = document.getElementById('adminEditorOverlay'); if (!overlay) return;
+        overlay.hidden = true; document.getElementById('adminDocumentEditor').replaceChildren();
+        document.getElementById('adminEditorActions').replaceChildren(); editor = null; dirtyEditor = false;
+        if (!force && editorFocus?.isConnected) editorFocus.focus();
+    }
+    function confirmAction({ title, description, label = 'Xóa', email = '', destructive = true }) {
+        return new Promise(resolve => {
+            const previous = document.activeElement;
+            const overlay = document.createElement('div'); overlay.className = 'admin-confirm-overlay';
+            overlay.innerHTML = `<section class="admin-confirm-card" role="alertdialog" aria-modal="true" aria-labelledby="adminConfirmTitle" aria-describedby="adminConfirmDescription"><span class="admin-confirm-icon ${destructive ? 'danger' : ''}"><i class="bi ${destructive ? 'bi-trash3' : 'bi-pencil-square'}"></i></span><h5 id="adminConfirmTitle">${escape(title)}</h5><p id="adminConfirmDescription">${escape(description)}</p>${email ? `<label for="adminConfirmEmail">Nhập <strong>${escape(email)}</strong> để xác nhận</label><input id="adminConfirmEmail" class="form-control mt-2" type="email" autocomplete="off">` : ''}<div class="admin-confirm-actions"><button type="button" class="btn btn-outline-secondary" data-confirm-cancel>Giữ lại</button><button type="button" class="btn ${destructive ? 'btn-danger' : 'btn-primary'}" data-confirm-ok ${email ? 'disabled' : ''}>${escape(label)}</button></div></section>`;
+            document.getElementById('adminPanelContent').appendChild(overlay);
+            const finish = value => { overlay.remove(); resolveConfirmation = null; resolve(value); setTimeout(() => { if (previous?.isConnected && !previous.disabled) previous.focus(); }, 0); };
+            resolveConfirmation = finish;
+            overlay.querySelector('[data-confirm-cancel]').addEventListener('click', e => { e.stopPropagation(); finish(false); });
+            overlay.querySelector('[data-confirm-ok]').addEventListener('click', e => { e.stopPropagation(); finish(true); });
+            overlay.querySelector('input')?.addEventListener('input', e => { overlay.querySelector('[data-confirm-ok]').disabled = e.target.value.trim() !== email; });
+            overlay.addEventListener('keydown', e => {
+                if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false); }
+                trapFocus(e, overlay);
+            });
+            (overlay.querySelector('input') || overlay.querySelector('[data-confirm-cancel]')).focus();
+        });
+    }
+    function trapFocus(event, scope) {
+        if (event.key !== 'Tab') return;
+        const nodes = [...scope.querySelectorAll('button:not(:disabled), input:not(:disabled):not([type="hidden"]), textarea:not(:disabled), select:not(:disabled), summary')].filter(n => n.getClientRects().length);
+        if (!nodes.length) return;
+        const first = nodes[0], last = nodes.at(-1);
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    }
+    function setup() {
+        document.getElementById('openBlessingsBtn').addEventListener('click', () => openBlessings());
+        document.getElementById('blessingsModal').addEventListener('click', e => {
+            if (e.target.closest('[data-close-blessings]')) blessingsModal?.hide();
+        });
+        document.getElementById('blessingsModal').addEventListener('hidden.bs.modal', () => {
+            if (returnToProfile && auth.currentUser) {
+                returnToProfile = false;
+                bootstrap.Modal.getInstance(document.getElementById('userProfileModal'))?.show();
+            }
+        });
+        const panel = document.getElementById('adminPanelContent');
+        const trackChanges = e => {
+            if (e.target.id === 'adminJobSearch' || e.target.id === 'adminJobFilter') { filterJobs(); return; }
+            if (e.target.closest('#adminDocumentEditor')) {
+                dirtyEditor = true;
+                const hint = document.getElementById('adminEditorHint'); if (hint) hint.textContent = 'Có thay đổi chưa lưu';
+                updateEditorFields();
+            } else if (e.target.id.startsWith('adminProfile-')) {
+                dirtyProfile = true;
+                const hint = document.getElementById('adminProfileHint'); if (hint) hint.textContent = 'Có thay đổi chưa lưu';
+            } else if (e.target.matches('[data-feature], #adminDisabled')) {
+                dirtyPermissions = true;
+                document.getElementById('adminPermissionsHint').textContent = 'Có thay đổi chưa lưu';
+            }
+        };
+        panel.addEventListener('input', trackChanges); panel.addEventListener('change', trackChanges);
+        document.getElementById('adminModal').addEventListener('keydown', e => {
+            if (e.target.closest('.admin-confirm-overlay')) return;
+            const overlay = document.getElementById('adminEditorOverlay');
+            if (overlay && !overlay.hidden) {
+                if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); if (document.getElementById('adminModal').getAttribute('aria-busy') !== 'true') closeEditor(); }
+                trapFocus(e, overlay.querySelector('.admin-editor-drawer'));
+            } else if (e.target.matches('[data-admin-tab]') && ['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) {
+                e.preventDefault();
+                const tabs = [...document.querySelectorAll('[data-admin-tab]')];
+                const index = tabs.indexOf(e.target);
+                const next = e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : (index + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+                selectTab(tabs[next].dataset.adminTab); tabs[next].focus();
+            }
+        });
+        document.getElementById('adminModal').addEventListener('hide.bs.modal', e => {
+            if (document.getElementById('adminModal').getAttribute('aria-busy') === 'true') { e.preventDefault(); return; }
+            if (!dirtyEditor && !dirtyProfile && !dirtyPermissions) return;
+            e.preventDefault();
+            confirmAction({ title: 'Đóng khi chưa lưu?', description: 'Những thay đổi bạn vừa nhập sẽ không được lưu.', label: 'Bỏ thay đổi', destructive: false }).then(ok => {
+                if (ok) { dirtyEditor = dirtyProfile = dirtyPermissions = false; modal?.hide(); }
+            });
+        });
+        document.getElementById('openAdminBtn').addEventListener('click', () => {
+            if (!isAdmin()) return;
+            document.getElementById('userProfileModal').addEventListener('hidden.bs.modal', async () => {
+                modal ||= new bootstrap.Modal(document.getElementById('adminModal'));
+                modal.show();
+                await busy(async () => {
+                    await loadUsers();
+                    if (selected) selected = users.find(u => u.uid === selected.uid) || null;
+                    renderSelection();
+                    if (selected) await loadData();
+                });
+            }, { once: true });
+            bootstrap.Modal.getInstance(document.getElementById('userProfileModal'))?.hide();
+        });
+        document.getElementById('adminSearch').addEventListener('input', renderUsers);
+        document.getElementById('adminRefresh').addEventListener('click', () => busy(() => loadUsers()));
+        document.getElementById('adminPanelContent').addEventListener('change', e => {
+            if (e.target.id === 'adminProfile-avatarFile') {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                busy(async () => {
+                    if (!file.type.startsWith('image/')) throw new Error('Vui lòng chọn ảnh.');
+                    const image = await createImageBitmap(file);
+                    const scale = Math.min(1, 200 / Math.max(image.width, image.height));
+                    const canvas = document.createElement('canvas');
+                    canvas.width = Math.max(1, Math.round(image.width * scale));
+                    canvas.height = Math.max(1, Math.round(image.height * scale));
+                    canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+                    document.getElementById('adminProfile-avatar').value = canvas.toDataURL('image/jpeg', .8);
+                    const preview = document.getElementById('adminProfileAvatarPreview');
+                    preview.src = document.getElementById('adminProfile-avatar').value; preview.hidden = false;
+                    document.querySelector('[data-avatar-placeholder]').hidden = true;
+                    image.close();
+                    setStatus('Đã chọn ảnh. Bấm Lưu thông tin tài khoản để áp dụng.');
+                });
+                return;
+            }
+            const node = e.target.closest('[data-feature]');
+            if (!node) return;
+            const row = [...document.querySelectorAll('#adminPanelContent [data-feature]')].filter(n => n.dataset.feature === node.dataset.feature);
+            if (node.dataset.action === 'view' && !node.checked) row.forEach(n => { n.checked = false; });
+            else if (node.checked) row.find(n => n.dataset.action === 'view').checked = true;
+        });
+        document.getElementById('adminUserList').addEventListener('click', async e => {
+            if (document.getElementById('adminModal').getAttribute('aria-busy') === 'true') return;
+            const button = e.target.closest('[data-admin-user]'); if (!button) return;
+            if ((dirtyProfile || dirtyPermissions || dirtyEditor) && !await confirmAction({ title: 'Chuyển sang thành viên khác?', description: 'Các thay đổi chưa lưu của thành viên hiện tại sẽ bị bỏ.', label: 'Bỏ thay đổi và chuyển', destructive: false })) return;
+            dirtyProfile = dirtyPermissions = dirtyEditor = false; activeTab = 'profile';
+            selected = users.find(u => u.uid === button.dataset.adminUser); editor = null; records = {};
+            renderUsers(); renderSelection();
+            busy(loadData);
+        });
+        document.getElementById('adminPanelContent').addEventListener('click', e => {
+            if (document.getElementById('adminModal').getAttribute('aria-busy') === 'true') return;
+            const button = e.target.closest('button'); if (!button || !selected) return;
+            if (button.hasAttribute('data-admin-close-editor')) { closeEditor(); return; }
+            if (button.dataset.adminTab) { selectTab(button.dataset.adminTab); return; }
+            if (['adminSelectAll', 'adminClearAll', 'adminViewOnly'].includes(button.id)) {
+                const inputs = [...document.querySelectorAll('#adminPanelContent [data-feature]:not(:disabled)')];
+                if (!inputs.length) return;
+                inputs.forEach(n => { n.checked = button.id === 'adminSelectAll' || (button.id === 'adminViewOnly' && n.dataset.action === 'view'); });
+                dirtyPermissions = true; document.getElementById('adminPermissionsHint').textContent = 'Có thay đổi chưa lưu';
+                setStatus('Bấm Lưu phước lành để ban hoặc thu hồi quyền.'); return;
+            }
+            busy(async () => {
+                if (button.id === 'adminSavePermissions') {
+                    const value = { disabled: document.getElementById('adminDisabled').checked, features: {} };
+                    document.querySelectorAll('#adminPanelContent [data-feature]').forEach(n => {
+                        (value.features[n.dataset.feature] ||= {})[n.dataset.action] = n.checked;
+                    });
+                    const result = await api('setPermissions', { uid: selected.uid, policy: value });
+                    selected.policy = normalizePolicy(value); selected.disabled = value.disabled;
+                    dirtyPermissions = false;
+                    document.querySelector('.admin-account-badge').textContent = selected.disabled ? 'Đã khóa' : 'Đang hoạt động';
+                    renderUsers(); document.getElementById('adminPermissionsHint').textContent = 'Đã lưu phước lành'; setStatus(result.changed === false ? 'Phước lành không thay đổi.' : `${result.notice?.title || 'Đã cập nhật phước lành'}. Thành viên sẽ nhận thông báo kèm quyền được ban hoặc thu hồi.`);
+                } else if (button.id === 'adminLoadData' || button.id === 'adminResetProfile') {
+                    if ((dirtyProfile || dirtyEditor) && !await confirmAction({ title: 'Bỏ các thay đổi chưa lưu?', description: 'Thông tin sẽ được tải lại từ lần lưu gần nhất.', label: 'Tải lại', destructive: false })) { setStatus('Đã giữ lại nội dung đang sửa.'); return; }
+                    dirtyProfile = false; await loadData();
+                }
+                else if (button.id === 'adminClearAvatar') {
+                    document.getElementById('adminProfile-avatar').value = '';
+                    document.getElementById('adminProfile-avatarFile').value = '';
+                    document.getElementById('adminProfileAvatarPreview').hidden = true;
+                    document.getElementById('adminProfileAvatarPreview').removeAttribute('src');
+                    document.querySelector('[data-avatar-placeholder]').hidden = false;
+                    dirtyProfile = true;
+                    setStatus('Đã chọn xóa ảnh. Bấm Lưu thông tin tài khoản để áp dụng.');
+                }
+                else if (button.id === 'adminSaveProfile') {
+                    const value = {};
+                    for (const key of ['displayName', 'department', 'workShift', 'avatar']) value[key] = document.getElementById(`adminProfile-${key}`).value;
+                    value.notifyLeadMinutes = Number(document.getElementById('adminProfile-notifyLeadMinutes').value);
+                    value.jobCompletionEnabled = document.getElementById('adminProfile-completion').checked;
+                    if (!value.displayName.trim()) throw new Error('Vui lòng nhập tên hiển thị.');
+                    await api('saveProfile', { uid: selected.uid, value, today: localDay() });
+                    dirtyProfile = false;
+                    selected.displayName = value.displayName.trim(); selected.department = value.department;
+                    document.querySelector('.admin-selected-heading h4').textContent = selected.displayName;
+                    renderUsers(); await loadData(); setStatus('Đã cập nhật thông tin tài khoản của user đã chọn.');
+                }
+                else if (button.id === 'adminCreateJob') {
+                    editor = { collection: 'jobs', original: {}, create: true };
+                    showEditor(jobEditor({ duration: 30, type: 'once', date: localDay() }));
+                    setStatus('Nhập thông tin job cho user đã chọn.');
+                }
+                else if (button.dataset.createCollection) {
+                    const name = button.dataset.createCollection;
+                    const now = new Date(), day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                    if (name === 'quickJobs') {
+                        editor = { collection: name, create: true, original: {} };
+                        showEditor(quickJobEditor({ dateKey: day, status: 'open' }));
+                        setStatus('Nhập nội dung, ngày, hạn chót và người thực hiện.');
+                        return;
+                    }
+                    const templates = {
+                        dayOffs: { userId: selected.uid, userName: selected.displayName || selected.email, date: day, reason: '', createdAt: now.toISOString() },
+                        jobDayOverrides: { userId: selected.uid, jobId: '', occurrenceDate: day, overrideTime: null, overrideDate: null, note: '' },
+                        quickJobs: { createdBy: selected.uid, createdByName: selected.displayName || selected.email, content: '', status: 'open', dateKey: day, department: selected.department || '', assigneeUid: null, invitedUid: null, createdAt: now.toISOString() },
+                        notifications: { userId: selected.uid, type: 'admin', message: '', timestamp: now.toISOString(), read: false },
+                        transferRequests: { fromUid: selected.uid, toUid: '', jobId: '', mode: 'copy', status: 'pending', createdAt: now.toISOString() },
+                        quickJobTransferRequests: { fromUid: selected.uid, toUid: '', quickJobId: '', mode: 'copy', status: 'pending', createdAt: now.toISOString() }
+                    };
+                    editor = { collection: name, create: true };
+                    showEditor(`<label for="adminDocumentJson" class="form-label mt-3">Thêm ${escape(DATA_LABELS[name])}</label><textarea id="adminDocumentJson" class="form-control" rows="14" spellcheck="false">${escape(JSON.stringify(templates[name], null, 2))}</textarea><button class="btn btn-primary mt-2" id="adminSaveDocument">Thêm dữ liệu</button>`);
+                    setStatus('Điền các trường trong mẫu. Dữ liệu được gắn với user đang chọn.');
+                }
+                else if (button.id === 'adminSaveJob' && editor) {
+                    const value = { ...editor.original };
+                    for (const key of ['title', 'type', 'date', 'time']) value[key] = document.getElementById(`adminJob-${key}`).value;
+                    value.duration = Number(document.getElementById('adminJob-duration').value);
+                    value.isPaused = document.getElementById('adminJob-paused').checked;
+                    value.isOutOfSchedule = value.type === 'custom';
+                    value.workOnSunday = document.getElementById('adminJob-workOnSunday').checked;
+                    value.enableNotification = document.getElementById('adminJob-enableNotification').checked;
+                    const description = document.getElementById('adminJob-description').value;
+                    if (description !== textDescription(editor.original.description)) value.description = escape(description).replace(/\n/g, '<br>');
+                    value.checklist = checklistFromText(document.getElementById('adminJob-checklist').value, editor.original.checklist || []);
+                    value.excludedWeekdays = value.type === 'daily' ? [...document.querySelectorAll('[data-admin-excluded]:checked')].map(n => Number(n.dataset.adminExcluded)) : [];
+                    if (!value.title.trim() || !value.date || !value.time || !Number.isInteger(value.duration) || value.duration < 1 || value.duration > 1440) throw new Error('Điền tên, ngày, giờ và thời lượng 1–1440 phút.');
+                    if (editor.create) await api('createJob', { uid: selected.uid, value });
+                    else await api('saveDocument', { uid: selected.uid, collection: 'jobs', id: editor.id, value });
+                    await loadData(); setStatus('Đã lưu job cho user.');
+                }
+                else if (button.id === 'adminSaveQuickJob' && editor) {
+                    const value = { ...editor.original };
+                    for (const key of ['content', 'dateKey', 'status']) value[key] = document.getElementById(`adminQuick-${key}`).value.trim();
+                    if (!value.content || !value.dateKey) throw new Error('Vui lòng nhập nội dung và ngày.');
+                    for (const key of ['assigneeUid', 'invitedUid']) {
+                        value[key] = document.getElementById(`adminQuick-${key}`).value || null;
+                        const person = users.find(u => u.uid === value[key]);
+                        value[key === 'assigneeUid' ? 'assigneeName' : 'invitedName'] = person ? person.displayName || person.email : value[key] || null;
+                    }
+                    if (['claimed', 'completed'].includes(value.status) && !value.assigneeUid) throw new Error('Chọn người thực hiện cho job đang làm hoặc đã hoàn thành.');
+                    if (value.status === 'invited' && !value.invitedUid) throw new Error('Chọn người được chỉ định.');
+                    const now = new Date().toISOString();
+                    value.deadline = document.getElementById('adminQuick-deadline').value || null;
+                    value.completedAt = value.status === 'completed' ? value.completedAt || now : null;
+                    if (value.assigneeUid !== editor.original.assigneeUid) value.claimedAt = value.assigneeUid ? now : null;
+                    if (value.status === 'open' || value.status === 'invited') {
+                        value.assigneeUid = null; value.assigneeName = null; value.claimedAt = null; value.time = null;
+                    }
+                    if (value.status !== 'invited') { value.invitedUid = null; value.invitedName = null; }
+                    if (value.status === 'open') { value.invitedBy = null; value.invitedByName = null; value.invitedAt = null; }
+                    if (value.status === 'invited') {
+                        value.invitedBy = auth.currentUser.uid;
+                        value.invitedByName = auth.currentUser.displayName || auth.currentUser.email;
+                        value.invitedAt = now;
+                    }
+                    if (['claimed', 'completed'].includes(value.status) && !value.claimedAt) value.claimedAt = now;
+                    value.edited = true; value.editedAt = now;
+                    if (editor.create) {
+                        value.createdByName = selected.displayName || selected.email;
+                        value.createdAt = now; value.department = selected.department || '';
+                        await api('createDocument', { uid: selected.uid, collection: 'quickJobs', value });
+                    } else await api('saveDocument', { uid: selected.uid, collection: 'quickJobs', id: editor.id, value });
+                    await loadData(); setStatus('Đã lưu job trong ngày của user.');
+                }
+                else if (button.id === 'adminDeleteUser') {
+                    if (!await confirmAction({ title: 'Xóa thành viên khỏi ứng dụng?', description: `Xóa các job và dữ liệu liên quan của ${selected.displayName || selected.email}. Tài khoản đăng nhập Firebase vẫn được giữ.`, label: 'Xóa thành viên', email: selected.email })) { setStatus('Đã hủy xóa tài khoản.'); return; }
+                    await api('deleteUser', { uid: selected.uid, confirmUid: selected.uid });
+                    dirtyProfile = dirtyEditor = dirtyPermissions = false; selected = null; renderSelection(); await loadUsers(); setStatus('Đã xóa user khỏi ứng dụng và dọn dữ liệu liên quan.');
+                } else if (button.dataset.editCollection) {
+                    const name = button.dataset.editCollection, record = records[name][Number(button.dataset.record)];
+                    editor = { collection: name, id: record.id, original: record.data };
+                    if (name === 'quickJobs') {
+                        showEditor(quickJobEditor(record.data) + `<details class="mt-3"><summary>Thuộc tính nâng cao</summary><label for="adminDocumentJson" class="form-label mt-2">Toàn bộ dữ liệu job trong ngày</label><textarea id="adminDocumentJson" class="form-control" rows="16" spellcheck="false">${escape(JSON.stringify(record.data, null, 2))}</textarea><button class="btn btn-outline-primary mt-2" id="adminSaveDocument">Lưu dữ liệu nâng cao</button></details>`);
+                        setStatus('Sửa nội dung, hạn chót, trạng thái và người thực hiện job trong ngày.');
+                        return;
+                    }
+                    if (name === 'jobs') {
+                        showEditor(jobEditor(record.data)
+                            + `<details class="mt-3"><summary>Nội dung và thuộc tính nâng cao</summary><label for="adminDocumentJson" class="form-label mt-2">Toàn bộ dữ liệu job</label><textarea id="adminDocumentJson" class="form-control" rows="16" spellcheck="false">${escape(JSON.stringify(record.data, null, 2))}</textarea><button class="btn btn-outline-primary mt-2" id="adminSaveDocument">Lưu dữ liệu nâng cao</button></details>`);
+                        setStatus('Sửa lịch, giờ, thời lượng hoặc tạm dừng job của user.');
+                        return;
+                    }
+                    showEditor(`<label for="adminDocumentJson" class="form-label mt-3">${escape(name)} / ${escape(record.id)}</label><textarea id="adminDocumentJson" class="form-control" rows="16" spellcheck="false">${escape(JSON.stringify(record.data, null, 2))}</textarea><button class="btn btn-primary mt-2" id="adminSaveDocument">Lưu dữ liệu</button>`);
+                    setStatus('Chỉnh nội dung JSON rồi lưu. Các trường liên kết user được giữ nguyên.');
+                } else if (button.id === 'adminSaveDocument' && editor) {
+                    const value = JSON.parse(document.getElementById('adminDocumentJson').value);
+                    await api(editor.create ? 'createDocument' : 'saveDocument', { uid: selected.uid, ...editor, value });
+                    await loadData(); setStatus('Đã cập nhật dữ liệu user.');
+                } else if (button.dataset.deleteCollection) {
+                    const name = button.dataset.deleteCollection, record = records[name][Number(button.dataset.record)];
+                    if (!await confirmAction({ title: 'Xóa công việc này?', description: `“${record.data.title || record.data.content || record.id}” sẽ được xóa khỏi dữ liệu của ${selected.displayName || selected.email}. Thao tác này không thể hoàn tác.`, label: 'Xóa công việc' })) { setStatus('Đã hủy.'); return; }
+                    await api('deleteDocument', { uid: selected.uid, collection: name, id: record.id });
+                    await loadData(); setStatus('Đã xóa dữ liệu.');
+                }
+            });
+        });
+        document.addEventListener('click', e => {
+            const button = e.target.closest('[id]'); const rule = button && CONTROLS[button.id];
+            const feature = rule?.[0];
+            const action = rule?.[1] || 'view';
+            const flexibleSave = ['saveJobBtn', 'savePersonalEvent', 'saveDayOffBtn', 'whSaveBtn'].includes(button?.id);
+            if (rule && !can(feature, flexibleSave ? 'view' : action) && auth.currentUser) {
+                e.preventDefault(); e.stopImmediatePropagation(); requireAccess(feature, action);
+            }
+        }, true);
+        let pending = false;
+        new MutationObserver(() => {
+            if (pending) return;
+            pending = true; requestAnimationFrame(() => { pending = false; apply(); });
+        }).observe(document.body, { childList: true, subtree: true });
+    }
+    async function saveCalendarEvent(entry, removeOnly) {
+        const uid = auth.currentUser?.uid;
+        if (!uid) throw new Error('Vui lòng đăng nhập.');
+        const profiles = await getDocs(query(collection(db, 'users'), where('uid', '==', uid)));
+        if (profiles.empty) throw new Error('Không tìm thấy tài khoản.');
+        await runTransaction(db, async transaction => {
+            const documents = await Promise.all(profiles.docs.map(d => transaction.get(d.ref)));
+            const existing = documents.some(d => (d.data().personalCalendarEvents || []).some(e => e.id === entry.id));
+            if (!requireAccess('events', removeOnly ? 'delete' : existing ? 'edit' : 'create')) throw new Error('Chưa được cấp quyền với sự kiện.');
+            documents.forEach(d => {
+                const events = (d.data().personalCalendarEvents || []).filter(e => e.id !== entry.id);
+                if (!removeOnly) events.push(entry);
+                transaction.update(d.ref, { personalCalendarEvents: events });
+            });
+        });
+        return entry;
+    }
+    return { start, stop, setup, can, requireAccess, isAdmin, apply, saveCalendarEvent, announceBlessing };
+}
+
+// ADMIN UI END
 
 const firebaseConfig = {
     apiKey: "AIzaSyC8sCCoiCxm5cRJukyks0hNXRk7Quoq2HU",
@@ -23,6 +723,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
+const accessControl = createAccessControl({ db, auth, notify: showNotification });
 
 // Global Variables
 let jobModal;
@@ -2834,6 +3535,7 @@ function renderThemeGrid() {
 }
 
 function openSettingsModal() {
+    if (!accessControl.requireAccess('settings', 'view')) return;
     if (!currentUser) return;
     closeThemeFxPopover();               // đảm bảo không còn popover cũ
 
@@ -3106,10 +3808,13 @@ function updatePwReveal() {
 }
 
 async function handleAuthenticatedUser(user) {
+    if (!await accessControl.start(user)) return;
+    if (auth.currentUser?.uid !== user.uid) return;
     currentUser = user;
 
     // Fetch user data from Firestore
     const userData = await getUserData(user.uid);
+    if (auth.currentUser?.uid !== user.uid) return;
     currentUser.personalCalendarEvents = Array.isArray(userData?.personalCalendarEvents) ? userData.personalCalendarEvents : [];
     currentUser.holidayPolicy = userData?.holidayPolicy || {};
     currentUser.changeHistory = userData?.changeHistory || [];
@@ -3140,6 +3845,7 @@ async function handleAuthenticatedUser(user) {
     document.getElementById('authScreen').classList.add('d-none');
     updateUserProfileUI();
     initializeAuthenticatedApp();
+    accessControl.announceBlessing();
 }
 
 /**
@@ -3169,6 +3875,7 @@ function updateUserProfileUI() {
     if (!currentUser) return;
     const displayName = currentUser.displayName || currentUser.email?.split('@')[0] || 'User';
     document.getElementById('userDisplayName').textContent = displayName;
+    document.getElementById('profileHeroName').textContent = displayName;
 
     // Ưu tiên avatar từ Firestore (đồng bộ mọi thiết bị), fallback default
     const avatarSrc = currentUser.avatar
@@ -3178,9 +3885,15 @@ function updateUserProfileUI() {
 
 function openUserProfileModal() {
     if (!currentUser) return;
+    accessControl.apply();
     document.getElementById('profileEmail').textContent = currentUser.email || '---';
 
     const displayName = currentUser.displayName || currentUser.email?.split('@')[0] || '';
+    document.getElementById('profileHeroName').textContent = displayName || 'Tài khoản của bạn';
+    const role = document.getElementById('profileRoleBadge');
+    role.textContent = accessControl.isAdmin() ? 'Đấng tối cao' : 'Thành viên';
+    role.classList.toggle('supreme', accessControl.isAdmin());
+    document.getElementById('profileSaveStatus').textContent = '';
     document.getElementById('profileDisplayName').value = displayName;
     fillDeptSelect(document.getElementById('profileDepartment'), currentUser.department || '', { none: true, noneLabel: '— Chưa chọn —' });
     document.getElementById('profileNewDeptRow').classList.add('d-none');
@@ -3226,6 +3939,7 @@ function normalizeLeadMinutes(value) {
 }
 
 async function saveNotifyLead(minutes) {
+    if (!accessControl.requireAccess('settings', 'edit')) return;
     if (!currentUser) return;
     minutes = normalizeLeadMinutes(minutes);
     notifyLeadMinutes = minutes;
@@ -3261,6 +3975,7 @@ function loadJobCompletionSetting(uid, userData) {
 }
 
 async function saveJobCompletionEnabled(enabled) {
+    if (!accessControl.requireAccess('settings', 'edit')) return;
     if (!currentUser) return;
     jobCompletionEnabled = !!enabled;
     // Bật lại => chỉ tính từ hôm nay, job các ngày trước vẫn xem như đã hoàn thành
@@ -3294,25 +4009,30 @@ async function saveJobCompletionEnabled(enabled) {
 }
 
 async function saveUserProfile() {
+    if (!accessControl.requireAccess('profile', 'edit')) return;
+    const user = currentUser;
+    if (!user) return;
     const newDisplayName = document.getElementById('profileDisplayName').value.trim();
     if (!newDisplayName) {
         showNotification('Thiếu thông tin', 'Vui lòng nhập tên hiển thị.', false, 'warning');
         return;
     }
+    const button = document.getElementById('saveProfileBtn');
+    const status = document.getElementById('profileSaveStatus');
+    const original = button.innerHTML;
+    button.disabled = true; button.innerHTML = '<span class="loading"></span> Đang lưu…';
+    status.textContent = ''; status.classList.remove('text-danger');
 
     try {
         // Update Firestore
         const usersRef = collection(db, 'users');
-        const q = query(usersRef, where('uid', '==', currentUser.uid));
+        const q = query(usersRef, where('uid', '==', user.uid));
         const snapshot = await getDocs(q);
-
-        if (!snapshot.empty) {
-            const userDoc = snapshot.docs[0];
-            await updateDoc(doc(db, 'users', userDoc.id), {
-                displayName: newDisplayName,
-                updatedAt: new Date().toISOString()
-            });
-        }
+        if (snapshot.empty) throw new Error('Không tìm thấy hồ sơ tài khoản.');
+        const batch = writeBatch(db);
+        snapshot.docs.forEach(d => batch.update(d.ref, { displayName: newDisplayName, updatedAt: new Date().toISOString() }));
+        await batch.commit();
+        if (currentUser?.uid !== user.uid) return;
 
         // Update currentUser object
         currentUser.displayName = newDisplayName;
@@ -3320,11 +4040,12 @@ async function saveUserProfile() {
         // Refresh UI
         updateUserProfileUI();
         showNotification('Thành công', 'Đã cập nhật tên hiển thị!', false, 'success');
-        userProfileModal.hide();
+        status.textContent = 'Đã lưu tên hiển thị. Bạn có thể tiếp tục chỉnh thông tin khác.';
     } catch (error) {
         console.error('Lỗi cập nhật profile:', error);
         showNotification('Lỗi', 'Không thể cập nhật tên hiển thị.', false, 'danger');
-    }
+        status.textContent = 'Chưa lưu được. Vui lòng thử lại.'; status.classList.add('text-danger');
+    } finally { button.disabled = false; button.innerHTML = original; }
 }
 
 function handleChangePassword() {
@@ -3385,6 +4106,7 @@ async function confirmChangePassword() {
 
 // Thêm function đổi avatar
 async function changeAvatar(file) {
+    if (!accessControl.requireAccess('profile', 'edit')) return;
     if (!file || !currentUser) return;
     try {
         // Resize nhỏ (~15-30KB) để không vượt giới hạn 1MB của Firestore document
@@ -3420,6 +4142,7 @@ async function changeAvatar(file) {
 }
 
 function handleSignedOut() {
+    accessControl.stop();
     currentUser = null;
     bootstrap.Modal.getInstance(document.getElementById('changeHistoryModal'))?.hide();
     document.getElementById('changeHistoryList').replaceChildren();
@@ -3536,6 +4259,7 @@ function initializeAuthenticatedApp() {
 
 // Trong DOMContentLoaded event listener, THÊM CHECK NULL
 document.addEventListener('DOMContentLoaded', function () {
+    accessControl.setup();
 
     jobModal = new bootstrap.Modal(document.getElementById('jobModal'), {
         backdrop: true,
@@ -3795,11 +4519,27 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('userProfileBtn').addEventListener('click', openUserProfileModal);
     document.getElementById('saveProfileBtn').addEventListener('click', saveUserProfile);
     document.getElementById('changePasswordBtn').addEventListener('click', handleChangePassword);
+    document.getElementById('profileTogglePassword').addEventListener('click', () => {
+        const input = document.getElementById('profileNewPassword');
+        const button = document.getElementById('profileTogglePassword');
+        const reveal = input.type === 'password';
+        input.type = reveal ? 'text' : 'password';
+        button.setAttribute('aria-pressed', String(reveal));
+        button.setAttribute('aria-label', reveal ? 'Ẩn mật khẩu mới' : 'Hiện mật khẩu mới');
+        button.innerHTML = reveal ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
+    });
+    document.getElementById('profileDisplayName').addEventListener('keydown', event => {
+        if (event.key === 'Enter') { event.preventDefault(); saveUserProfile(); }
+    });
     document.getElementById('confirmChangePasswordBtn').addEventListener('click', confirmChangePassword);
     document.getElementById('confirmCurrentPassword').addEventListener('keydown', (e) => {
         if (e.key === 'Enter') { e.preventDefault(); confirmChangePassword(); }
     });
     document.getElementById('userProfileModal').addEventListener('hidden.bs.modal', () => {
+        document.getElementById('profileNewPassword').type = 'password';
+        const toggle = document.getElementById('profileTogglePassword');
+        toggle.setAttribute('aria-pressed', 'false'); toggle.setAttribute('aria-label', 'Hiện mật khẩu mới');
+        toggle.innerHTML = '<i class="bi bi-eye"></i>';
         document.getElementById('profileNewPassword').value = '';
         document.getElementById('changePasswordError').textContent = '';
     });
@@ -4274,6 +5014,7 @@ function formatDateVN(date) {
 
 // Test Firestore Connection
 async function testFirestoreConnection() {
+    if (!accessControl.can('jobs')) { firestoreConnected = true; return true; }
     try {
         if (!currentUser) return false;
         const testCollection = query(collection(db, 'jobs'), where('ownerId', '==', currentUser.uid));
@@ -4303,6 +5044,7 @@ function loadJobs() {
         return;
     }
 
+    if (!accessControl.can('jobs')) return;
     const jobsCollection = query(collection(db, 'jobs'), where('ownerId', '==', currentUser.uid));
 
     if (unsubscribeJobs) unsubscribeJobs();
@@ -4472,6 +5214,7 @@ function renderOutOfScheduleJobs() {
 }
 
 async function toggleOutOfScheduleJob(job) {
+    if (!accessControl.requireAccess('jobs', 'edit')) return;
     try {
         const jobRef = doc(db, 'jobs', job.id);
         await updateDoc(jobRef, {
@@ -4595,18 +5338,6 @@ function renderSchedule() {
                 note.title = holiday;
                 cell.appendChild(note);
             }
-            getPersonalEvents(dateStr).forEach(entry => {
-                const button = document.createElement('button');
-                button.type = 'button';
-                button.className = 'calendar-personal-event';
-                button.textContent = entry.title;
-                button.title = [entry.time, entry.title, entry.notes].filter(Boolean).join('\n');
-                button.addEventListener('click', async () => {
-                    await openDayOffModal();
-                    openPersonalEventEditor(dateStr, entry.id);
-                });
-                cell.appendChild(button);
-            });
 
             // ===== KÉO-THẢ: ô ngày nhận drop =====
             cell.addEventListener('dragover', (e) => {
@@ -4820,6 +5551,20 @@ function renderSchedule() {
                 });
             }
 
+            getPersonalEvents(dateStr).forEach(entry => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'calendar-personal-event';
+                button.textContent = [entry.time, entry.title].filter(Boolean).join(' | ');
+                button.title = [entry.time, entry.title, entry.notes].filter(Boolean).join('\n');
+                button.addEventListener('click', async () => {
+                    await openDayOffModal();
+                    openPersonalEventEditor(dateStr, entry.id);
+                });
+                cell.appendChild(button);
+            });
+
+
             row.appendChild(cell);
         }
 
@@ -4831,6 +5576,7 @@ function renderSchedule() {
 // KÉO-THẢ JOB — lưu override ngày cho lần xuất hiện của job
 // ============================================================
 async function moveJobToDate(jobId, originDate, targetDate) {
+    if (!accessControl.requireAccess('jobs', 'edit')) return;
     if (!currentUser) return;
     const job = jobs.find(j => j.id === jobId);
     if (!job) return;
@@ -4978,6 +5724,7 @@ function _outsideClickClosePopover(e) {
 }
 
 async function saveDayOverrideFromPopover() {
+    if (!accessControl.requireAccess('jobs', 'edit')) return;
     if (!currentOverrideJob || !currentUser) return;
     const { job, occurrenceDate } = currentOverrideJob;
     const overrideTime = document.getElementById('dopTime').value.trim() || null;
@@ -5021,6 +5768,7 @@ async function saveDayOverrideFromPopover() {
 }
 
 async function deleteDayOverrideFromPopover() {
+    if (!accessControl.requireAccess('jobs', 'edit')) return;
     if (!currentOverrideJob || !currentUser) return;
     const { job, occurrenceDate } = currentOverrideJob;
     const docId = `${currentUser.uid}_${job.id}_${occurrenceDate}`;
@@ -5092,6 +5840,7 @@ window.toggleTransferSection = function () {
 
 // Sửa function openViewJobModal
 function openViewJobModal(job, occurrenceDate = null) {
+    if (!accessControl.requireAccess('jobs')) return;
     currentViewingJobId = job.id;
     currentTransferMode = 'transfer';
 
@@ -5230,6 +5979,7 @@ async function loadTransferUsers() {
 }
 
 function openViewDataModal() {
+    if (!accessControl.requireAccess('jobs', 'view')) return;
     if (!currentUser) return;
     viewDataModal.show();
     renderTodayJobs();
@@ -5342,6 +6092,7 @@ const CHECK_DUE_MONTH_MAP = {
 };
 
 function openCheckDueModal() {
+    if (!accessControl.requireAccess('checkDue', 'view')) return;
     checkDueModal.show();
     updateCheckDueStep(checkDueResultRows.length ? 3 : 1);
     if (!document.getElementById('checkDueStatus').textContent.trim()) {
@@ -5930,6 +6681,7 @@ async function openLegacyMigrationModal() {
         const users = [];
         usersSnapshot.forEach(userDoc => {
             const user = userDoc.data();
+            if (user.appDeleted) return;
             if (user.uid) users.push(user);
         });
         users.sort((a, b) => (a.displayName || a.email).localeCompare(b.displayName || b.email));
@@ -5986,6 +6738,7 @@ async function migrateLegacyJobs() {
 }
 
 async function transferJob() {
+    if (!accessControl.requireAccess('transfers', 'create')) return;
     const jobId = currentViewingJobId || currentEditingJobId;
     const targetUid = document.getElementById('transferUserSelect').value;
     const job = jobs.find(item => item.id === jobId);
@@ -6044,6 +6797,7 @@ async function transferJob() {
 
 // Thêm function lắng nghe yêu cầu chuyển job
 function listenTransferRequests() {
+    if (!(accessControl.can('transfers'))) return;
     if (!currentUser) return;
     transferRequestsInitialLoadDone = false;
 
@@ -6101,6 +6855,7 @@ function showTransferConfirmModal(requestId, request) {
 }
 
 async function acceptTransfer() {
+    if (!accessControl.requireAccess('transfers', 'edit')) return;
     if (!pendingTransferRequestId || !pendingTransferRequestData) return;
 
     const mode = pendingTransferRequestData.mode || 'transfer';
@@ -6180,6 +6935,7 @@ async function acceptTransfer() {
 }
 
 async function rejectTransfer() {
+    if (!accessControl.requireAccess('transfers', 'edit')) return;
     if (!pendingTransferRequestId || !pendingTransferRequestData) return;
 
     const mode = pendingTransferRequestData.mode || 'transfer';
@@ -6225,6 +6981,7 @@ async function rejectTransfer() {
 // ============================================================
 
 function listenQuickJobTransferRequests() {
+    if (!(accessControl.can('transfers'))) return;
     if (!currentUser) return;
     quickJobTransferInitialLoadDone = false;
 
@@ -6279,6 +7036,7 @@ function showQuickJobTransferConfirmModal(requestId, request) {
 }
 
 async function acceptQuickJobTransfer() {
+    if (!accessControl.requireAccess('transfers', 'edit')) return;
     if (!pendingQuickJobTransferId || !pendingQuickJobTransferData) return;
     const request = pendingQuickJobTransferData;
     const mode = request.mode || 'transfer';
@@ -6355,6 +7113,7 @@ async function acceptQuickJobTransfer() {
 }
 
 async function rejectQuickJobTransfer() {
+    if (!accessControl.requireAccess('transfers', 'edit')) return;
     if (!pendingQuickJobTransferId || !pendingQuickJobTransferData) return;
     const request = pendingQuickJobTransferData;
     const mode = request.mode || 'transfer';
@@ -6417,6 +7176,7 @@ function quickChatCancelTransferForm() {
 }
 
 async function quickChatConfirmTransfer(jobId) {
+    if (!accessControl.requireAccess('transfers', 'create')) return;
     const select = document.getElementById(`transferSelect-${jobId}`);
     const modeInput = document.querySelector(`input[name="transferMode-${jobId}"]:checked`);
     if (!select || !select.value) {
@@ -6483,6 +7243,7 @@ function getTypeLabel(type) {
 
 // Open Add Job Modal
 function openAddJobModal(isOutOfSchedule = false) {
+    if (!accessControl.requireAccess('jobs', 'create')) return;
     currentEditingJobId = null;
     currentJobIsPaused = false;
     document.getElementById('modalTitle').innerHTML = isOutOfSchedule
@@ -6512,6 +7273,7 @@ function openAddJobModal(isOutOfSchedule = false) {
 
 // Open Edit Job Modal
 function openEditJobModal(job) {
+    if (!accessControl.requireAccess('jobs', 'edit')) return;
     currentEditingJobId = job.id;
     currentJobIsPaused = job.isPaused === true;
 
@@ -6557,6 +7319,7 @@ function openEditJobModal(job) {
 }
 
 function togglePauseJob() {
+    if (!accessControl.requireAccess('jobs', 'edit')) return;
     currentJobIsPaused = !currentJobIsPaused;
 
     const pauseBtn = document.getElementById('pauseJobBtn');
@@ -6575,6 +7338,7 @@ function togglePauseJob() {
 
 // Sửa function saveJob
 async function saveJob() {
+    if (!accessControl.requireAccess('jobs', currentEditingJobId ? 'edit' : 'create')) return;
     const beforeJob = jobs.find(j => j.id === currentEditingJobId);
     const title = document.getElementById('jobTitle').value.trim();
     const type = document.getElementById('jobType').value;
@@ -6701,6 +7465,9 @@ async function pushNotification(toUid, type, message, jobId = null) {
 }
 
 const NOTIF_TYPE_CONFIG = {
+    blessing_granted: { icon: 'bi-stars', color: '#ca8a04', label: 'Được ban phước lành' },
+    blessing_revoked: { icon: 'bi-arrow-counterclockwise', color: '#d97706', label: 'Phước lành được thu hồi' },
+    blessing_changed: { icon: 'bi-stars', color: '#0d9488', label: 'Điều chỉnh phước lành' },
     transfer_sent: { icon: 'bi-send-fill', color: '#3b82f6', label: 'Chuyển job' },
     transfer_accepted: { icon: 'bi-check-circle-fill', color: '#16a34a', label: 'Chấp nhận job' },
     transfer_rejected: { icon: 'bi-x-circle-fill', color: '#dc2626', label: 'Từ chối job' },
@@ -6819,7 +7586,7 @@ function renderNotifDropdown() {
     list.innerHTML = recent.map(n => {
         const config = NOTIF_TYPE_CONFIG[n.type] || { icon: 'bi-bell-fill', color: '#667eea', label: 'Thông báo' };
         return `
-            <div class="notif-item ${n.read ? '' : 'unread'}">
+            <div class="notif-item ${n.read ? '' : 'unread'} ${n.type?.startsWith('blessing_') ? 'notif-blessing' : ''}">
                 <div class="notif-item-icon" style="background:${config.color}">
                     <i class="bi ${config.icon}"></i>
                 </div>
@@ -6861,6 +7628,7 @@ async function markAllNotificationsRead() {
 }
 
 function listenUserNotifications() {
+    if (!(accessControl.can('notifications'))) return;
     if (!currentUser) return;
     notifInitialLoadDone = false;
 
@@ -6877,6 +7645,9 @@ function listenUserNotifications() {
             snapshot.docChanges().forEach(change => {
                 if (change.type === 'added') {
                     const n = { id: change.doc.id, ...change.doc.data() };
+                    // Permission notices are announced after the profile reload;
+                    // keep them in history without producing a second toast here.
+                    if (n.type?.startsWith('blessing_')) return;
                     const config = NOTIF_TYPE_CONFIG[n.type] || { label: 'Thông báo' };
                     showNotification(
                         config.label || 'Thông báo',
@@ -7137,7 +7908,7 @@ function renderQuickJobBubble(job) {
     }
 
     // Owner tools: sửa / xóa (chỉ người tạo)
-    const ownerToolsHtml = isOwn ? `
+    const ownerToolsHtml = (isOwn || accessControl.isAdmin()) ? `
         <div class="quick-chat-owner-tools">
             <button type="button" data-action="show-edit" data-id="${job.id}" title="Sửa"><i class="bi bi-pencil-fill"></i></button>
             <button type="button" class="delete-btn" data-action="delete" data-id="${job.id}" title="Xóa"><i class="bi bi-trash-fill"></i></button>
@@ -7479,6 +8250,7 @@ function localDateKey(dateValue) {
 }
 
 async function sendQuickJob() {
+    if (!accessControl.requireAccess('quickJobs', 'create')) return;
     const input = document.getElementById('quickChatInput');
     const deadlineInput = document.getElementById('quickChatDeadlineInput');
     if (!input || !currentUser) return;
@@ -7522,6 +8294,7 @@ async function sendQuickJob() {
 
 // Nhận job cho chính mình - giờ nhận lấy real-time, không cần nhập tay
 async function quickChatSelfClaim(jobId) {
+    if (!accessControl.requireAccess('quickJobs', 'edit')) return;
     if (!currentUser) return;
     const job = quickJobsList.find(j => j.id === jobId);
     if (!job) return;
@@ -7583,6 +8356,7 @@ async function fetchUsersExceptMe(forceRefresh = false) {
         const byUid = new Map();
         snapshot.forEach(d => {
             const u = d.data();
+            if (u.appDeleted) return;
             if (!u.uid || u.uid === currentUser.uid) return;
             const old = byUid.get(u.uid);
             if (!old || String(u.updatedAt || '') >= String(old.updatedAt || '')) byUid.set(u.uid, u);
@@ -7629,6 +8403,7 @@ function quickChatCancelAssignForm() {
 }
 
 async function quickChatConfirmAssign(jobId) {
+    if (!accessControl.requireAccess('quickJobs', 'edit')) return;
     const select = document.getElementById(`assignSelect-${jobId}`);
     if (!select || !select.value) {
         showNotification('Thiếu thông tin', 'Hãy chọn người nhận job.', false, 'warning');
@@ -7680,6 +8455,7 @@ function listenUsersAvatars() {
         departmentCalendarUsers = {};
         snapshot.forEach(d => {
             const u = d.data();
+            if (u.appDeleted) return;
             if (u.uid) {
                 departmentCalendarUsers[u.uid] = u;
                 collectUserDepts(u);
@@ -7731,6 +8507,7 @@ function getUserAvatarUrl(uid) {
 }
 
 async function quickChatAcceptInvite(jobId) {
+    if (!accessControl.requireAccess('quickJobs', 'edit')) return;
     const job = quickJobsList.find(j => j.id === jobId) || pendingQuickInviteData;
     if (!job || !currentUser) return;
     const time = nowTimeHHmm();
@@ -7765,6 +8542,7 @@ async function quickChatAcceptInvite(jobId) {
 }
 
 async function quickChatRejectInvite(jobId) {
+    if (!accessControl.requireAccess('quickJobs', 'edit')) return;
     const job = quickJobsList.find(j => j.id === jobId) || pendingQuickInviteData;
     if (!job || !currentUser) return;
 
@@ -7803,6 +8581,7 @@ async function quickChatRejectInvite(jobId) {
 }
 
 async function quickChatCancelInvite(jobId) {
+    if (!accessControl.requireAccess('quickJobs', 'edit')) return;
     const job = quickJobsList.find(j => j.id === jobId);
     if (!job || !currentUser) return;
     try {
@@ -7842,6 +8621,7 @@ function quickJobCompletionDetails(job, completedAt) {
 }
 
 async function quickChatComplete(jobId) {
+    if (!accessControl.requireAccess('quickJobs', 'edit')) return;
     const job = quickJobsList.find(j => j.id === jobId);
     if (!job || !currentUser) return;
     try {
@@ -7870,6 +8650,7 @@ async function quickChatComplete(jobId) {
 }
 
 async function quickChatReject(jobId) {
+    if (!accessControl.requireAccess('quickJobs', 'edit')) return;
     const job = quickJobsList.find(j => j.id === jobId);
     if (!job || !currentUser) return;
     try {
@@ -7894,7 +8675,7 @@ async function quickChatReject(jobId) {
     }
 }
 
-// Sửa job trong ngày (chỉ người tạo)
+// Sửa job trong ngày (người tạo hoặc admin)
 function quickChatShowEditForm(jobId) {
     const bubble = document.querySelector(`.quick-chat-bubble[data-job-id="${jobId}"]`);
     if (!bubble) return;
@@ -7909,6 +8690,7 @@ function quickChatCancelEditForm() {
 }
 
 async function quickChatSaveEdit(jobId) {
+    if (!accessControl.requireAccess('quickJobs', 'edit')) return;
     const contentInput = document.getElementById(`editContent-${jobId}`);
     const deadlineInput = document.getElementById(`editDeadline-${jobId}`);
     if (!contentInput) return;
@@ -7931,11 +8713,12 @@ async function quickChatSaveEdit(jobId) {
     }
 }
 
-// Xóa job trong ngày (chỉ người tạo)
+// Xóa job trong ngày (người tạo hoặc admin)
 async function quickChatDeleteJob(jobId) {
+    if (!accessControl.requireAccess('quickJobs', 'delete')) return;
     const job = quickJobsList.find(j => j.id === jobId);
     if (!job || !currentUser) return;
-    if (job.createdBy !== currentUser.uid) return;
+    if (job.createdBy !== currentUser.uid && !accessControl.isAdmin()) return;
 
     if (!confirm(`Xóa job "${job.content}"? Hành động này không thể hoàn tác.`)) return;
 
@@ -7949,6 +8732,7 @@ async function quickChatDeleteJob(jobId) {
 }
 
 function openQuickChatPanel() {
+    if (!accessControl.requireAccess('quickJobs', 'view')) return;
     const panel = document.getElementById('quickChatPanel');
     const toggle = document.getElementById('quickChatToggleBtn');
     if (!panel) return;
@@ -8240,6 +9024,7 @@ function initLayoutDropdown() {
 
 // Delete Job
 async function deleteJob() {
+    if (!accessControl.requireAccess('jobs', 'delete')) return;
     if (!currentEditingJobId) return;
 
     const jobToDelete = jobs.find(j => j.id === currentEditingJobId);
@@ -8444,6 +9229,7 @@ function rebuildScheduleWorkHoursMap() {
 // ============================================================
 
 function listenJobDayOverrides() {
+    if (!(accessControl.can('jobs'))) return;
     if (!currentUser) return;
     if (unsubscribeJobDayOverrides) unsubscribeJobDayOverrides();
 
@@ -8489,6 +9275,7 @@ function jobNotificationTag(jobId, originDate) {
 }
 
 async function setJobOccurrenceCompleted(jobId, originDate, completed) {
+    if (!accessControl.requireAccess('jobs', 'edit')) return;
     if (!currentUser || !jobId || !originDate) return false;
     const job = jobs.find(j => j.id === jobId);
     try {
@@ -8514,6 +9301,7 @@ async function setJobOccurrenceCompleted(jobId, originDate, completed) {
 }
 
 async function snoozeJobOccurrence(jobId, originDate, minutes = SNOOZE_MINUTES) {
+    if (!accessControl.requireAccess('jobs', 'edit')) return;
     if (!currentUser || !jobId || !originDate) return false;
     const job = jobs.find(j => j.id === jobId);
     // Chỉ hoãn trong ngày hôm nay — không đẩy qua ngày mai
@@ -8940,6 +9728,7 @@ function updateSpinCounts() {
 }
 
 async function openPresenterSpinModal() {
+    if (!accessControl.requireAccess('spin', 'view')) return;
     presenterSpinModal.show();
     document.getElementById('spinResultCard').style.display = 'none';
     spinWinner = null;
@@ -8954,6 +9743,7 @@ async function openPresenterSpinModal() {
         usersDeptLatest = {};
         snapshot.forEach(userDoc => {
             const user = userDoc.data();
+            if (user.appDeleted) return;
             if (!user.uid) return;
             spinAllUsers.push(user);
             collectUserDepts(user);
@@ -9246,6 +10036,7 @@ function showSpinResult() {
 }
 
 async function confirmPresenterAssignment() {
+    if (!accessControl.requireAccess('spin', 'create')) return;
     if (!spinWinner) return;
     const btn = document.getElementById('confirmSpinBtn');
     const originalHTML = btn.innerHTML;
@@ -10786,6 +11577,7 @@ function listenDepartments() {
 }
 
 async function saveUserDepartment(deptId) {
+    if (!accessControl.requireAccess('profile', 'edit')) return;
     if (!currentUser) return;
     const value = deptId || '';
     const oldValue = currentUser.department || '';
@@ -10836,6 +11628,7 @@ async function saveUserDepartment(deptId) {
 }
 
 async function addDepartmentFromProfile() {
+    if (!accessControl.requireAccess('departments', 'create')) return;
     const input = document.getElementById('profileNewDeptName');
     const name = input.value.trim().replace(/\s+/g, ' ');
     if (name.length < 2) {
@@ -10916,6 +11709,7 @@ function formatWorkHours(n) {
 }
 
 function listenWorkHours() {
+    if (!(accessControl.can('workHours') || accessControl.can('jobs'))) return;
     if (unsubscribeWorkHours) unsubscribeWorkHours();
     const lower = new Date();
     lower.setMonth(lower.getMonth() - 2);
@@ -11151,6 +11945,7 @@ function reportWorkHoursError(error) {
     showNotification('Không cập nhật được giờ làm việc', 'Xem chi tiết lỗi trong form Update giờ làm việc.', false, 'danger');
 }
 async function saveWorkHours() {
+    if (!accessControl.can('workHours', 'create') && !accessControl.can('workHours', 'edit')) { accessControl.requireAccess('workHours', 'edit'); return; }
     if (!currentUser || workHoursSyncBusy) return;
     workHoursSyncBusy = true;
     document.getElementById('whSyncError').hidden = true;
@@ -11200,6 +11995,9 @@ async function saveWorkHours() {
         const snapshot = await getDocs(query(collection(db, WORKHOURS_COLLECTION), where('date', '>=', rows[0].date), where('date', '<=', rows[rows.length - 1].date)));
         const existing = new Map();
         snapshot.forEach(d => { if (resolveWorkHoursDept(d.id, d.data()) === dept) existing.set(d.data().date, d.id); });
+        for (const row of rows) {
+            if (!accessControl.requireAccess('workHours', existing.has(row.date) ? 'edit' : 'create')) return;
+        }
         const duplicates = rows.filter(r => existing.has(r.date));
         const commit = async () => {
             workHoursSyncBusy = true;
@@ -11230,6 +12028,7 @@ async function saveWorkHours() {
 }
 
 function openWorkHoursModal() {
+    if (!accessControl.requireAccess('workHours', 'view')) return;
     workHoursModalOpen = true;
     rebuildWorkHoursMap();
     fillDeptSelect(document.getElementById('whDeptSelect'), workHoursViewDept, { none: true, noneLabel: 'Chưa phân bộ phận' });
@@ -11296,6 +12095,7 @@ function dayOffAllIds(o) {
 }
 
 function listenDayOffs() {
+    if (!(accessControl.can('dayOffs') || accessControl.can('jobs'))) return;
     if (unsubscribeDayOffs) unsubscribeDayOffs();
     // Year/month navigation also needs previously registered dates in past years.
     const q = collection(db, DAYOFF_COLLECTION);
@@ -11409,6 +12209,7 @@ function getDayOffUserColor(uid) {
 }
 
 async function openDayOffModal() {
+    if (!accessControl.requireAccess('dayOffs', 'view')) return;
     if (!currentUser) return;
     dayOffModalOpen = true;
     dayOffFocusUid = null;
@@ -11430,6 +12231,7 @@ async function openDayOffModal() {
         usersDeptLatest = {};
         snapshot.forEach(userDoc => {
             const user = userDoc.data();
+            if (user.appDeleted) return;
             if (user.uid) {
                 users.push(user);
                 collectUserDepts(user);
@@ -11569,6 +12371,7 @@ function updateScheduleViewUI() {
 }
 
 async function saveUserWorkShift(shift) {
+    if (!accessControl.requireAccess('profile', 'edit')) return;
     if (!currentUser) return;
     const oldShift = currentUser.workShift || 'day';
     const newShift = shift === 'night' ? 'night' : 'day';
@@ -11899,7 +12702,7 @@ function renderTimeline({ todayOnly = false, containerId = 'timelineView' } = {}
             const overlapPairCount = Math.floor(overlapSet.size / 2);
             const holidayLabel = getHolidayName(currentDate);
             const personalLabels = getPersonalEvents(dateStr).map(entry =>
-                `<span class="calendar-personal-event" title="${escapeHtml([entry.time, entry.title, entry.notes].filter(Boolean).join('\n'))}">${escapeHtml(entry.title)}</span>`).join('');
+                `<span class="calendar-personal-event" title="${escapeHtml([entry.time, entry.title, entry.notes].filter(Boolean).join('\n'))}">${escapeHtml([entry.time, entry.title].filter(Boolean).join(' | '))}</span>`).join('');
 
             rowsHtml += `
                 <div class="${rowClasses.join(' ')}">
@@ -12037,6 +12840,7 @@ function renderTimeline({ todayOnly = false, containerId = 'timelineView' } = {}
 }
 
 async function handleTimelineDrop(ev, track, START_HOUR, END_HOUR, HOURS, TOTAL_MINS, isNight) {
+    if (!accessControl.requireAccess('jobs', 'edit')) return;
     if (!currentUser) return;
     let data;
     try { data = JSON.parse(ev.dataTransfer.getData('text/plain') || '{}'); }
@@ -12281,6 +13085,7 @@ async function listAvailableGeminiModels() {
 }
 
 function openAIParserModal() {
+    if (!accessControl.requireAccess('ai', 'view')) return;
     if (!currentUser) return;
     resetAIParserState();
     showAIStep(getGeminiApiKey() ? 'paste' : 'key');
@@ -12699,6 +13504,8 @@ function updateAICreateCount() {
 }
 
 async function createSelectedJobs() {
+    if (!accessControl.requireAccess('ai', 'create')) return;
+    if (!accessControl.requireAccess('jobs', 'create')) return;
     if (!currentUser || !firestoreConnected) {
         showNotification('Chưa kết nối', 'Vui lòng đợi Firestore kết nối.', false, 'danger');
         return;
@@ -12768,6 +13575,7 @@ function compactCalendarLabel(text) {
 }
 
 function getPersonalEvents(key) {
+    if (typeof accessControl !== 'undefined' && !accessControl.can('events')) return [];
     const own = currentUser?.personalCalendarEvents || [];
     const department = String(currentUser?.department || '').trim();
     const shared = department && typeof departmentCalendarUsers !== 'undefined'
@@ -12776,7 +13584,7 @@ function getPersonalEvents(key) {
                 ? (user.personalCalendarEvents || []).filter(e => e.scope === 'department' && e.department === department)
                     .map(e => ({ ...e, ownerUid: uid })) : []) : [];
     return [...own, ...shared].filter(e => personalEventOccurs(e, key))
-        .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+        .sort((a, b) => (a.time || '24:00').localeCompare(b.time || '24:00'));
 }
 
 function syncDayOffFilters() {
@@ -12795,6 +13603,7 @@ function syncDayOffFilters() {
 }
 
 function openPersonalEventEditor(date, id = '', anchor = null) {
+    if (!accessControl.requireAccess('events', id ? 'view' : 'create')) return;
     const entry = (currentUser?.personalCalendarEvents || []).find(e => e.id === id);
     if (id && !entry) {
         const shared = getPersonalEvents(date).find(e => e.id === id && e.ownerUid);
@@ -12827,6 +13636,7 @@ function openPersonalEventEditor(date, id = '', anchor = null) {
 }
 
 async function updatePersonalCalendar(removeOnly = false) {
+    if (!accessControl.requireAccess('events', removeOnly ? 'delete' : (document.getElementById('personalEventId').value ? 'edit' : 'create'))) return;
     const form = document.getElementById('personalEventForm');
     if (!removeOnly && !form.reportValidity()) return;
     const user = currentUser;
@@ -12857,17 +13667,8 @@ async function updatePersonalCalendar(removeOnly = false) {
     const buttons = form.querySelectorAll('button');
     buttons.forEach(b => { b.disabled = true; });
     try {
-        const snapshot = await getDocs(query(collection(db, 'users'), where('uid', '==', user.uid)));
-        if (snapshot.empty) throw new Error('Không tìm thấy tài khoản để lưu.');
-        // Transactions preserve events added from another device and allow editing one event.
-        await runTransaction(db, async transaction => {
-            const documents = await Promise.all(snapshot.docs.map(d => transaction.get(d.ref)));
-            documents.forEach(d => {
-                const events = (d.data().personalCalendarEvents || []).filter(e => e.id !== entry.id);
-                if (!removeOnly) events.push(entry);
-                transaction.update(d.ref, { personalCalendarEvents: events });
-            });
-        });
+        const savedEntry = await accessControl.saveCalendarEvent(entry, removeOnly);
+        Object.assign(entry, savedEntry);
         if (currentUser?.uid !== user.uid) return;
         user.personalCalendarEvents = (user.personalCalendarEvents || []).filter(e => e.id !== entry.id);
         if (!removeOnly) user.personalCalendarEvents.push(entry);
@@ -12924,6 +13725,7 @@ function setupPersonalCalendar() {
     modal.addEventListener('hidden.bs.modal', hideEditor);
     window.addEventListener('resize', hideEditor);
     document.getElementById('saveHolidayPolicy').addEventListener('click', async e => {
+        if (!accessControl.requireAccess('holidays', 'edit')) return;
         const user = currentUser;
         if (!user) return;
         const year = dayOffViewYear;
@@ -13153,6 +13955,8 @@ async function saveDayOffs(previewAccepted = false) {
     previewAccepted = previewAccepted === true;
     if (!currentUser) return;
     const { added, removed, saved } = getDayOffDiff();
+    if (added.length && !accessControl.requireAccess('dayOffs', 'create')) return;
+    if (removed.length && !accessControl.requireAccess('dayOffs', 'delete')) return;
     if (!added.length && !removed.length) return;
 
     const reasonInput = document.getElementById('dayOffReason');
@@ -13300,6 +14104,7 @@ function parseSalaryNumber(id) {
 }
 
 function openSalaryCalcModal() {
+    if (!accessControl.requireAccess('salary', 'view')) return;
     resetSalaryCalc();
     salaryCalcModal.show();
 }
@@ -13392,6 +14197,7 @@ async function ensureUsersInfoCache() {
         usersDeptLatest = {};
         snap.forEach(d => {
             const u = d.data();
+            if (u.appDeleted) return;
             if (u.uid) {
                 collectUserDepts(u);
                 usersInfoCache[u.uid] = {
@@ -13423,6 +14229,7 @@ async function fetchAllJobsForStats() {
 }
 
 async function openStatisticsModal() {
+    if (!accessControl.requireAccess('statistics', 'view')) return;
     if (!statisticsModal) {
         console.error('statisticsModal chưa được khởi tạo');
         showNotification('Lỗi', 'Không mở được thống kê. Vui lòng tải lại trang.', false, 'danger');
@@ -13657,6 +14464,7 @@ function setEtaInputCollapsed(hidden) {
 }
 
 function openCheckEtaDirectModal() {
+    if (!accessControl.requireAccess('eta', 'view')) return;
     checkEtaDirectModal.show();
 
     // Đồng bộ nút toggle với trạng thái hiện tại của vùng dán
@@ -14546,6 +15354,7 @@ async function recordChange(kind, action, title, detail = '', user = currentUser
 }
 
 function renderChangeHistory() {
+    if (!accessControl.requireAccess('history', 'view')) return;
     const search = document.getElementById('changeHistorySearch').value.trim().toLocaleLowerCase('vi');
     const filter = document.getElementById('changeHistoryFilter').value;
     const entries = [...(currentUser?.changeHistory || [])].reverse().filter(e =>
@@ -14560,6 +15369,7 @@ function setupProductivityFeatures() {
     document.getElementById('changeHistorySearch').addEventListener('input', renderChangeHistory);
     document.getElementById('changeHistoryFilter').addEventListener('change', renderChangeHistory);
     document.getElementById('changeHistoryBtn').addEventListener('click', async () => {
+        if (!accessControl.requireAccess('history')) return;
         const user = currentUser;
         if (!user) return;
         const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('changeHistoryModal'));
