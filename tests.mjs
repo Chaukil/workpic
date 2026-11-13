@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs, { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import test from 'node:test';
-import { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, ADMIN_EMAIL, FEATURES, ACTIONS, adminJobGroup, USER_COLLECTIONS, hasPermission, normalizePolicy, profilePolicy, createAdminStore, blessingChanges, blessingNotice } from './app-data.js';
+import { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, ADMIN_EMAIL, FEATURES, ACTIONS, adminJobGroup, USER_COLLECTIONS, hasPermission, normalizePolicy, profilePolicy, createAdminStore, adminJobWeekdays, blessingChanges, blessingNotice } from './app-data.js';
 
 test('saving an account name updates duplicate profiles, keeps the dialog open and reports failures inline', async () => {
     const source = fs.readFileSync('app.js', 'utf8');
@@ -36,9 +36,21 @@ test('saving an account name updates duplicate profiles, keeps the dialog open a
 });
 
 // ===== admin-data checks =====
+test('admin weekday filter follows daily exclusions, weekly anchors and dated jobs', () => {
+    assert.deepEqual(adminJobWeekdays({ type: 'daily', workOnSunday: false, excludedWeekdays: [2, 4] }), [1, 3, 5, 6]);
+    assert.deepEqual(adminJobWeekdays({ type: 'weekly', date: '2026-11-12' }), [4]);
+    assert.deepEqual(adminJobWeekdays({ type: 'biweekly', date: '2026-11-13' }), [5]);
+    assert.deepEqual(adminJobWeekdays({ type: 'once', date: '2026-11-15', workOnSunday: false }), []);
+    assert.deepEqual(adminJobWeekdays({ dateKey: '2026-11-15' }), [0]);
+    assert.deepEqual(adminJobWeekdays({ type: 'daily', isOutOfSchedule: true, date: '2026-11-13' }), [5]);
+    assert.deepEqual(adminJobWeekdays({ type: 'monthly', workOnSunday: false }), [1, 2, 3, 4, 5, 6]);
+    assert.deepEqual(adminJobWeekdays({ type: 'once', date: '2026-02-30' }), []);
+});
 await (async function () {
 function fixture() {
     const denied = new Set();
+    const reads = [];
+    const deleteToken = {};
     let failWrites = false;
     const state = new Map([
         ['users/root', { uid: 'root', email: ADMIN_EMAIL }],
@@ -57,16 +69,24 @@ function fixture() {
     function writer() {
         const writes = [];
         return { set: (ref, data) => writes.push(() => state.set(ref.path, clone(data))),
-            update: (ref, data) => writes.push(() => state.set(ref.path, { ...state.get(ref.path), ...clone(data) })),
+            update: (ref, data) => writes.push(() => {
+                const next = { ...state.get(ref.path) };
+                for (const [key, value] of Object.entries(data)) {
+                    if (value === deleteToken) delete next[key]; else next[key] = clone(value);
+                }
+                state.set(ref.path, next);
+            }),
             delete: ref => writes.push(() => state.delete(ref.path)), commit: async () => { if (failWrites) throw new Error('Write denied'); writes.forEach(write => write()); } };
     }
     const sdk = {
         collection: (_, name) => ({ path: name }),
         doc: (...args) => args.length === 1 ? { path: `${args[0].path}/auto-${++next}` } : { path: `${args[1]}/${args[2]}` },
-        query: (ref, filter) => ({ ...ref, filter }), where: (field, op, value) => ({ field, value }),
+        query: (ref, ...constraints) => ({ ...ref, filter: constraints.find(c => c.field), cap: constraints.find(c => c.cap)?.cap, after: constraints.find(c => c.after)?.after }), where: (field, op, value) => ({ field, value }),
+        limit: cap => ({ cap }), startAfter: document => ({ after: document.ref.path }), deleteField: () => deleteToken,
         getDocs: async ref => {
+            reads.push(ref.path);
             if (denied.has(ref.path)) throw new Error('Read denied: ' + ref.path);
-            const docs = [...state.entries()].filter(([path, data]) => path.startsWith(ref.path + '/') && (!ref.filter || data[ref.filter.field] === ref.filter.value)).map(([path]) => snap({ path }));
+            const docs = [...state.entries()].sort(([a], [b]) => a.localeCompare(b)).filter(([path, data]) => path.startsWith(ref.path + '/') && (!ref.filter || data[ref.filter.field] === ref.filter.value) && (!ref.after || path.localeCompare(ref.after) > 0)).slice(0, ref.cap).map(([path]) => snap({ path }));
             return { docs, empty: !docs.length };
         }, getDoc: async ref => snap(ref), writeBatch: writer,
         runTransaction: async (_, callback) => {
@@ -74,8 +94,54 @@ function fixture() {
             const result = await callback(tx); await tx.commit(); return result;
         }
     };
-    return { state, auth, denied, failWrites: value => { failWrites = value; }, api: createAdminStore({ db: {}, auth, sdk }) };
+    return { state, auth, denied, sdk, reads, failWrites: value => { failWrites = value; }, api: createAdminStore({ db: {}, auth, sdk }) };
 }
+test('admin quota failures bound transaction retries, retain data and stop further requests until cooldown expires', async t => {
+    let clock = Date.now(); t.mock.method(Date, 'now', () => clock);
+    const f = fixture(); const transaction = f.sdk.runTransaction;
+    f.sdk.runTransaction = async (_, callback, options) => {
+        assert.equal(options.maxAttempts, 2);
+        throw Object.assign(new Error('Quota exceeded'), { code: 'resource-exhausted' });
+    };
+    const value = { displayName: 'Changed', workShift: 'day', notifyLeadMinutes: 5 };
+    await assert.rejects(f.api('saveProfile', { uid: 'worker', value }), error => error.code === 'resource-exhausted' && /60 giây/.test(error.message));
+    assert.equal(f.state.get('users/worker').displayName, undefined);
+    const readsBeforeCooldown = f.reads.length;
+    await assert.rejects(f.api('listUsers'), /Firebase đang giới hạn/);
+    assert.equal(f.reads.length, readsBeforeCooldown);
+    clock += 60001; f.sdk.runTransaction = transaction;
+    await f.api('saveProfile', { uid: 'worker', value });
+    assert.equal(f.state.get('users/worker').displayName, 'Changed');
+});
+test('explicit history cleanup paginates, preserves operational data and is safe to repeat', async () => {
+    const f = fixture();
+    const old = new Date(Date.now() - 40 * 86400000).toISOString();
+    const recent = new Date().toISOString();
+    for (let i = 0; i < 205; i++) f.state.set('users/archive-' + String(i).padStart(3, '0'), { uid: 'archive-' + i, changeHistory: [{ action: 'Edit' }], uiPermissions: { disabled: true } });
+    f.state.set('jobs/worker-job', { ownerId: 'worker', title: 'Keep job', transferHistory: [1], copyHistory: [2], checklist: [{ id: 'step' }] });
+    f.state.set('quickJobs/completed', { createdBy: 'worker', status: 'completed', copyHistory: [1], completedAt: old });
+    f.state.set('notifications/old', { timestamp: old, read: false });
+    f.state.set('notifications/recent', { timestamp: recent });
+    f.state.set('notifications/unknown', { timestamp: 'bad' });
+    f.state.set('transferRequests/pending', { status: 'pending', timestamp: old });
+    f.state.set('transferRequests/done', { status: 'accepted', respondedAt: old });
+    f.state.set('quickJobTransferRequests/recent', { status: 'rejected', respondedAt: recent });
+    const result = await f.api('cleanupHistory');
+    assert.deepEqual(result.counts, { profiles: 205, jobs: 2, notifications: 1, requests: 1 });
+    assert.ok(f.reads.filter(p => p === 'users').length >= 2, 'more than one page is processed');
+    assert.equal(f.state.get('users/archive-204').changeHistory, undefined);
+    assert.equal(f.state.get('users/archive-204').uiPermissions.disabled, true);
+    assert.deepEqual(f.state.get('jobs/worker-job'), { ownerId: 'worker', title: 'Keep job', checklist: [{ id: 'step' }] });
+    for (const key of ['quickJobs/completed', 'notifications/recent', 'notifications/unknown', 'transferRequests/pending', 'quickJobTransferRequests/recent']) assert.ok(f.state.has(key), key);
+    assert.equal(f.state.has('notifications/old'), false);
+    assert.equal(f.state.has('transferRequests/done'), false);
+    f.failWrites(true);
+    assert.deepEqual((await f.api('cleanupHistory')).counts, { profiles: 0, jobs: 0, notifications: 0, requests: 0 });
+    f.auth.currentUser.email = 'worker@example.com';
+    const count = f.reads.length;
+    await assert.rejects(f.api('cleanupHistory'), /Đấng tối cao/);
+    assert.equal(f.reads.length, count);
+});
 test('only explicitly checked rights enable actions', () => {
     assert.equal(hasPermission({}, 'jobs'), false);
     assert.equal(hasPermission({ features: { jobs: { edit: true } } }, 'jobs', 'edit'), false);
@@ -581,7 +647,7 @@ const ctx = vm.createContext({
         return dates;
     }
 });
-vm.runInContext(extract('function resolveShiftedDate(', 'function isJobScheduledOnDate(')
+vm.runInContext(extract('function resolveShiftedDate(', 'function getScheduleEntryOnDate(')
     + extract('function getDayOffJobPreview(', 'function previewMarkup('), ctx);
 let preview = vm.runInContext('getDayOffJobPreview()', ctx);
 assert.equal(preview.length, 1);
@@ -599,28 +665,42 @@ assert.equal(preview.length, 2);
 assert.ok(preview.every(e => e.date === '2026-11-07'), 'consecutive off days shift together');
 
 const current = { uid: 'me', displayName: 'My name' };
-let stored = Array.from({ length: 200 }, (_, i) => ({ id: `old-${i}` }));
-let fail = false, warning = '';
+const storage = new Map([['workpic_history_me', JSON.stringify([
+    { id: 'expired', at: '2000-01-01T00:00:00Z' },
+    ...Array.from({ length: 50 }, (_, i) => ({ id: 'old-' + i, at: new Date().toISOString() }))
+])]]);
+let storageBlocked = false;
 const history = vm.createContext({
-    Date, currentUser: current, crypto: { randomUUID: () => 'new' }, db: {},
-    collection() {}, where() {}, query() {},
-    getDocs: async () => ({ empty: false, docs: [{ ref: 'user' }] }),
-    runTransaction: async (_, fn) => {
-        if (fail) throw new Error('Denied');
-        await fn({ get: async () => ({ ref: 'user', data: () => ({ changeHistory: stored }) }),
-            update: (_, data) => { stored = data.changeHistory; } });
-    }, console: { error() {} }, showNotification: title => { warning = title; }
+    Date, currentUser: current, crypto: { randomUUID: () => 'new' },
+    localStorage: { getItem: key => storage.get(key) || null, setItem: (key, value) => { if (storageBlocked) throw new Error('Storage blocked'); storage.set(key, value); } },
+    getDocs: () => assert.fail('History must not read Firebase'), runTransaction: () => assert.fail('History must not write Firebase')
 });
-vm.runInContext(extract('async function recordChange(', 'function renderChangeHistory('), history);
+vm.runInContext(extract('function readLocalChangeHistory(', 'function renderChangeHistory('), history);
 await vm.runInContext("recordChange('job', 'Edit', 'Example', '09:00 → 10:00')", history);
-assert.equal(stored.length, 200, 'bound document history size');
-assert.equal(stored[0].id, 'old-1');
-assert.equal(stored.at(-1).actorId, 'me');
-assert.equal(stored.at(-1).detail, '09:00 → 10:00');
-fail = true;
+const storedHistory = JSON.parse(storage.get('workpic_history_me'));
+assert.equal(storedHistory.length, 50);
+assert.equal(storedHistory[0].id, 'old-1');
+assert.equal(storedHistory.at(-1).actorId, 'me');
+assert.equal(storedHistory.at(-1).detail, '09:00 → 10:00');
+assert.equal(vm.runInContext("readLocalChangeHistory('other').length", history), 0, 'account histories are isolated');
+storageBlocked = true;
 await vm.runInContext("recordChange('job', 'Edit', 'Example')", history);
-assert.ok(warning, 'surface failed history writes without claiming main action failed');
-assert.equal(stored.length, 200);
+assert.equal(current.changeHistory.length, 50, 'blocked browser storage does not interrupt the main action');
+
+const noticeStorage = new Map();
+let rendered = 0;
+const notificationReads = vm.createContext({
+    currentUser: { uid: 'me' }, notificationsList: [{ id: 'one', read: false }, { id: 'two', read: true }],
+    localStorage: { getItem: key => noticeStorage.get(key) || null, setItem: (key, value) => noticeStorage.set(key, value) },
+    renderNotifDropdown: () => { rendered++; },
+    writeBatch: () => assert.fail('Marking notifications read must not write Firebase')
+});
+vm.runInContext(extract('function localNotificationReads(', 'function listenUserNotifications('), notificationReads);
+await vm.runInContext('markAllNotificationsRead()', notificationReads);
+assert.equal(rendered, 1);
+assert.equal(notificationReads.notificationsList.every(n => n.read), true);
+assert.equal(vm.runInContext("localNotificationReads('me').has('one')", notificationReads), true);
+assert.equal(vm.runInContext("localNotificationReads('other').size", notificationReads), 0);
 
 const extras = vm.createContext({});
 vm.runInContext(extract('function overrideExtras(', 'function getOverrideFor('), extras);
@@ -688,6 +768,109 @@ assert.equal(deleted.length, 1, 'ordinary users cannot delete another creator jo
 })();
 
 // ===== theme-fx checks =====
+test('statistics hide unchecked users and list dates matching occurrence counts', () => {
+    const source = fs.readFileSync('app.js', 'utf8');
+    const code = source.slice(source.indexOf('function computeStatistics('), source.indexOf('// CHECK ETA & DIRECT — v3'));
+    const fields = { statsSummary: {}, statsChart: {}, statsTable: {} };
+    let saved = 0;
+    const controls = ['a', 'b'].map(uid => ({
+        addEventListener(_, handler) { this.handler = handler; },
+        closest: () => ({ dataset: { uid }, classList: { add() {}, remove() {} } })
+    }));
+    fields.statsChart.querySelectorAll = () => controls;
+    class StatsDate extends Date { constructor(...args) { super(...(args.length ? args : ['2026-11-13T12:00:00'])); } }
+    const ctx = vm.createContext({
+        Date: StatsDate, currentUser: { uid: 'a' }, statsMode: 'week', statsDeptFilter: '', WORK_HOURS_PER_DAY: 8,
+        statsHiddenUsers: new Set(['b']), usersInfoCache: { a: { displayName: 'Alice' }, b: { displayName: 'Bob' } },
+        statsAllJobs: [
+            { ownerId: 'a', title: 'Alice job', type: 'daily', duration: 30, dates: ['2026-11-09', '2026-11-13'] },
+            { ownerId: 'b', title: 'Bob job', type: 'weekly', duration: 45, dates: ['2026-11-12'] }
+        ],
+        document: { getElementById: id => fields[id] },
+        getJobOccurrences: (job, from, to) => job.dates.map(day => new Date(day + 'T00:00:00')).filter(date => date >= from && date <= to),
+        getJobDuration: job => job.duration, localDateKey: dateKey, deptMatches: () => true,
+        escapeHtml: value => String(value), getTypeLabel: type => type, getUserAvatarUrl: () => '', getStatsUserColor: () => '#123', avatarInitial: () => 'A',
+        saveStatsHiddenUsers: () => { saved++; }
+    });
+    vm.runInContext(code, ctx); vm.runInContext('renderStatistics()', ctx);
+    assert.match(fields.statsTable.innerHTML, /<th>Số lần<\/th>\s*<th>Thứ thực hiện<\/th>/);
+    assert.match(fields.statsTable.innerHTML, /Alice job/);
+    assert.doesNotMatch(fields.statsTable.innerHTML, /Bob job/);
+    assert.match(fields.statsTable.innerHTML, />Thứ Hai<\/time>/);
+    assert.match(fields.statsTable.innerHTML, />Thứ Sáu<\/time>/);
+    const stats = vm.runInContext("computeStatistics('week')", ctx);
+    assert.equal(stats.users[0].jobs[0].occurrences, stats.users[0].jobs[0].occurrenceDates.length);
+    controls[0].checked = false; controls[0].handler({ target: controls[0] });
+    assert.match(fields.statsTable.innerHTML, /Tích chọn user/);
+    controls[1].checked = true; controls[1].handler({ target: controls[1] });
+    assert.match(fields.statsTable.innerHTML, /Bob job/);
+    assert.doesNotMatch(fields.statsTable.innerHTML, /Alice job/);
+    controls[0].checked = true; controls[0].handler({ target: controls[0] });
+    assert.equal(saved, 3);
+    ctx.statsMode = 'today'; vm.runInContext('renderStatistics()', ctx);
+    assert.match(fields.statsTable.innerHTML, />Thứ Sáu<\/time>/);
+    assert.doesNotMatch(fields.statsTable.innerHTML, /Thứ Hai|Bob job/);
+});
+
+test('shared rain renderer keeps one canvas/loop and releases listeners across header and fullscreen modes', () => {
+    const source = fs.readFileSync('app.js', 'utf8');
+    const code = source.slice(source.indexOf('const RainFx ='), source.indexOf('// Thiên hà xoắn ốc'));
+    const listeners = new Map(), frames = new Map(), canvases = [];
+    let serial = 0, reduced = false;
+    const classes = new Set();
+    const add = (name, fn) => { if (!listeners.has(name)) listeners.set(name, new Set()); listeners.get(name).add(fn); };
+    const remove = (name, fn) => listeners.get(name)?.delete(fn);
+    const g = { setTransform() {}, clearRect() {}, fillRect() {}, beginPath() {}, moveTo() {}, lineTo() {}, stroke() {} };
+    const ctx = vm.createContext({
+        navigator: { hardwareConcurrency: 8 },
+        document: { hidden: false, body: { classList: { contains: name => classes.has(name) } }, addEventListener: add, removeEventListener: remove,
+            createElement: () => { const canvas = { getContext: () => g, setAttribute() {}, remove() { this.removed = true; } }; canvases.push(canvas); return canvas; } },
+        window: { devicePixelRatio: 2, matchMedia: () => ({ matches: reduced }), addEventListener: add, removeEventListener: remove },
+        requestAnimationFrame: fn => { frames.set(++serial, fn); return serial; }, cancelAnimationFrame: id => frames.delete(id)
+    });
+    ctx.header = { getBoundingClientRect: () => ({ width: 1440, height: 80 }), prepend() {} };
+    ctx.full = { getBoundingClientRect: () => ({ width: 1440, height: 1000 }), prepend() {} };
+    vm.runInContext(code, ctx);
+    assert.equal(vm.runInContext('RainFx.start(header, 0)', ctx), true);
+    assert.equal(frames.size, 1);
+    assert.equal(vm.runInContext('RainFx.start(full, 2)', ctx), true);
+    assert.equal(canvases[0].removed, true);
+    assert.equal(frames.size, 1);
+    assert.ok(canvases[1].width * canvases[1].height < 1504000, 'bounded canvas pixel budget');
+    classes.add('modal-open'); for (const fn of listeners.get('shown.bs.modal')) fn();
+    assert.equal(frames.size, 0);
+    classes.delete('modal-open'); for (const fn of listeners.get('hidden.bs.modal')) { fn(); fn(); }
+    assert.equal(frames.size, 1, 'resume events cannot duplicate frames');
+    ctx.document.hidden = true; for (const fn of listeners.get('visibilitychange')) fn();
+    assert.equal(frames.size, 0);
+    vm.runInContext('RainFx.stop()', ctx);
+    assert.ok([...listeners.values()].every(set => !set.size));
+    reduced = true;
+    assert.equal(vm.runInContext('RainFx.start(header, 1)', ctx), false);
+    assert.equal(frames.size, 0);
+});
+
+test('rain mode routes to header or fullscreen without starting a second WebGL effect', () => {
+    const source = fs.readFileSync('app.js', 'utf8');
+    const code = source.slice(source.indexOf('function commitFullscreenFx('), source.indexOf('function setFxFullscreen('));
+    const calls = []; let layer = null;
+    const ctx = vm.createContext({
+        currentTopbarTheme: 'rain', FX_CONFIG: { rain: { rain: true } }, fxFullscreen: false,
+        fullscreenFxSignature: '', fullscreenFxGeneration: 0, getFxLevelIndex: () => 1,
+        window: { matchMedia: () => ({ matches: false }) },
+        document: { getElementById: () => layer, querySelector: () => 'header', querySelectorAll: () => [],
+            createElement: () => ({ dataset: {}, isConnected: true, setAttribute() {}, remove() { layer = null; } }),
+            body: { classList: { toggle() {} }, appendChild: element => { layer = element; } } },
+        RainFx: { stop() {}, start: host => calls.push(host) }, ThreeFx: { stop() {}, start: () => assert.fail('Rain must not start WebGL') },
+        SnowPile: { stop() {} }, renderBackdropScene() {}
+    });
+    vm.runInContext(code, ctx); vm.runInContext('commitFullscreenFx()', ctx);
+    assert.deepEqual(calls, ['header']);
+    ctx.fxFullscreen = true; vm.runInContext('commitFullscreenFx()', ctx);
+    assert.equal(calls[1], layer);
+    vm.runInContext('commitFullscreenFx()', ctx);
+    assert.equal(calls.length, 2, 'unchanged settings do not rebuild rain');
+});
 await (async function () {
 const source=fs.readFileSync('app.js','utf8');
 let code=source.slice(source.indexOf('const ThreeFx ='),source.indexOf('// CƯỜNG ĐỘ HIỆU ỨNG'));
@@ -697,7 +880,7 @@ code=code.replace(/const BUILDERS = \{ space:[^\n]+/, `const BUILDERS = { noel: 
     counts.push(ctx.cnt(100));
     const mat={uniforms:{uPixel:{value:0},uTime:{value:0},uAspect:{value:0}}};
     ctx.timeMats.push(mat);ctx.aspectMats.push(mat);mats.push(mat);
-}, rain: ctx => ctx.own(disposable) };`);
+}, tet: ctx => ctx.own(disposable) };`);
 const listeners=new Map();
 const rafs=new Map();let nextRaf=0, constructors=0, disposals=0;
 const counts=[], mats=[];
@@ -747,8 +930,8 @@ assert.equal(rafs.size,0);
 assert.ok([...listeners.values()].every(set=>set.size===0),'no leaked event listeners');
 assert.deepEqual(counts,[75,75]);
 const first=vm.runInContext("ThreeFx.start(layer,'noel',2)",ctx);
-layer.dataset.fx='rain';
-const second=vm.runInContext("ThreeFx.start(layer,'rain',2)",ctx);
+layer.dataset.fx='tet';
+const second=vm.runInContext("ThreeFx.start(layer,'tet',2)",ctx);
 assert.equal(await first,null,'superseded asynchronous start cannot build a stale scene');
 assert.equal(await second,true);
 assert.equal(rafs.size,1);

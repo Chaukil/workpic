@@ -251,6 +251,20 @@ export function blessingNotice(changes) {
         accountChanged ? changes.disabled ? 'Quyền vào ứng dụng đã bị tạm khóa.' : 'Quyền vào ứng dụng đã được khôi phục.' : ''].filter(Boolean).join('\n\n');
     return { type, title, message, granted, revoked };
 }
+export function adminJobWeekdays(job) {
+    const all = [1, 2, 3, 4, 5, 6, 0];
+    const allowed = all.filter(day => day !== 0 || job.workOnSunday !== false);
+    if (!job.isOutOfSchedule && job.type === 'daily') return allowed.filter(day => !(job.excludedWeekdays || []).includes(day));
+    // Monthly jobs can fall on different weekdays in different months.
+    if (!job.isOutOfSchedule && job.type === 'monthly') return allowed;
+    const raw = job.dateKey || job.date || '';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return [];
+    const [year, month, day] = raw.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return [];
+    const weekday = date.getDay();
+    return job.type && !allowed.includes(weekday) ? [] : [weekday];
+}
 export function adminJobGroup(job) {
     return job.isOutOfSchedule || job.type === 'custom' ? 'outside' : job.type === 'once' ? 'once' : 'fixed';
 }
@@ -280,8 +294,23 @@ export function profilePolicy(documents) {
 
 // Application-level controls only. Firebase continues to enforce its existing rules.
 export function createAdminStore({ db, auth, sdk }) {
-    const { collection, doc, getDocs, getDoc, query, where, writeBatch, runTransaction } = sdk;
+    const { collection, doc, getDocs, getDoc, query, where, writeBatch } = sdk;
+    // Keep conflict retries, but avoid the SDK's default five attempts during quota failures.
+    const runTransaction = (database, callback) => sdk.runTransaction(database, callback, { maxAttempts: 2 });
+    const quotaError = error => String(error?.code || '').split('/').at(-1) === 'resource-exhausted';
+    let quotaBlockedUntil = 0;
+    const quotaMessage = seconds => `Firebase đang giới hạn yêu cầu hoặc đã hết hạn mức (429). Chưa xác nhận lưu thành công. Vui lòng chờ ${seconds} giây rồi thử lại; nếu vẫn lỗi, kiểm tra Firestore → Usage trong Firebase Console.`;
     const isAdmin = () => auth.currentUser?.email?.trim().toLowerCase() === ADMIN_EMAIL;
+    return async function adminAction(action, data = {}) {
+        if (!isAdmin()) throw new Error('Chỉ Đấng tối cao được dùng khu vực này.');
+        if (Date.now() < quotaBlockedUntil) throw Object.assign(new Error(quotaMessage(Math.ceil((quotaBlockedUntil - Date.now()) / 1000))), { code: 'resource-exhausted' });
+        try { return await execute(action, data); }
+        catch (error) {
+            if (!quotaError(error)) throw error;
+            quotaBlockedUntil = Date.now() + 60000;
+            throw Object.assign(new Error(quotaMessage(60), { cause: error }), { code: 'resource-exhausted' });
+        }
+    };
     async function find(uid, name) {
         const result = new Map();
         for (const field of USER_COLLECTIONS[name]) {
@@ -297,7 +326,7 @@ export function createAdminStore({ db, auth, sdk }) {
             await batch.commit();
         }
     }
-    return async function adminAction(action, data = {}) {
+    async function execute(action, data = {}) {
         if (!isAdmin()) throw new Error('Chỉ Đấng tối cao được dùng khu vực này.');
         if (action === 'listUsers') {
             const snapshot = await getDocs(collection(db, 'users'));
@@ -315,6 +344,43 @@ export function createAdminStore({ db, auth, sdk }) {
                 return [{ uid, email: profile.email || '', displayName: profile.displayName || '', department: profile.department || '',
                     disabled: policy.disabled === true, policy: normalizePolicy(policy) }];
             }).sort((a, b) => a.email.localeCompare(b.email)) };
+        }
+        if (action === 'cleanupHistory') {
+            const counts = { profiles: 0, jobs: 0, notifications: 0, requests: 0 };
+            const cutoff = Date.now() - 30 * 86400000;
+            // Explicit maintenance only: never run this scan on login or on each save.
+            for (const name of ['users', 'jobs', 'quickJobs', 'notifications', 'transferRequests', 'quickJobTransferRequests']) {
+                let cursor = null;
+                while (true) {
+                    const constraints = [sdk.limit(200)];
+                    if (cursor) constraints.push(sdk.startAfter(cursor));
+                    const page = await getDocs(query(collection(db, name), ...constraints));
+                    if (!page.docs.length) break;
+                    const writes = [];
+                    for (const document of page.docs) {
+                        const value = document.data();
+                        if (['users', 'jobs', 'quickJobs'].includes(name)) {
+                            const fields = name === 'users' ? ['changeHistory'] : ['transferHistory', 'copyHistory'];
+                            const patch = Object.fromEntries(fields.filter(key => Object.hasOwn(value, key)).map(key => [key, sdk.deleteField()]));
+                            if (Object.keys(patch).length) {
+                                writes.push(batch => batch.update(document.ref, patch));
+                                counts[name === 'users' ? 'profiles' : 'jobs']++;
+                            }
+                        } else {
+                            const at = Date.parse(value.respondedAt || value.timestamp || value.createdAt || '');
+                            const disposable = name === 'notifications' || ['accepted', 'rejected', 'cancelled'].includes(value.status);
+                            if (disposable && Number.isFinite(at) && at < cutoff) {
+                                writes.push(batch => batch.delete(document.ref));
+                                counts[name === 'notifications' ? 'notifications' : 'requests']++;
+                            }
+                        }
+                    }
+                    await commit(writes);
+                    cursor = page.docs.at(-1);
+                    if (page.docs.length < 200) break;
+                }
+            }
+            return { ok: true, counts };
         }
         const uid = data.uid;
         if (typeof uid !== 'string' || !uid || uid.includes('/')) throw new Error('User không hợp lệ.');
@@ -350,12 +416,13 @@ export function createAdminStore({ db, auth, sdk }) {
             const collections = {};
             const errors = {};
             for (const name of Object.keys(USER_COLLECTIONS)) {
+                if (name === 'users') { collections.users = profiles.map(d => ({ id: d.id, data: d.data() })); continue; }
                 try { collections[name] = (await find(uid, name)).map(d => ({ id: d.id, data: d.data() })); }
-                catch (error) { collections[name] = []; errors[name] = error.message; }
+                catch (error) { if (quotaError(error)) throw error; collections[name] = []; errors[name] = error.message; }
             }
             let departments = [];
             try { departments = (await getDocs(collection(db, 'departments'))).docs.map(d => ({ id: d.id, name: d.data().name || d.id })); }
-            catch { /* Existing department IDs remain available in the user list. */ }
+            catch (error) { if (quotaError(error)) throw error; /* Existing department IDs remain available in the user list. */ }
             return { collections, departments, errors };
         }
         if (action === 'saveProfile') {

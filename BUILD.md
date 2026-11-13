@@ -1,5 +1,43 @@
 # Build và gộp file phát hành
 
+Tất cả 21 form chiếm **90% chiều rộng và chiều cao màn hình**, bỏ giới hạn chiều rộng
+640/820/1200 px cũ. Tiêu đề và nút cuối luôn nằm ngoài vùng cuộn nội dung. Trên máy tính,
+Thông tin tài khoản và Cài đặt chia cột; nội dung job/checklist đặt cạnh nhau;
+Hướng dẫn chia ba cột. Trên màn hình nhỏ các khung tự xếp lại để đọc và thao tác dễ hơn.
+
+## Hiệu ứng và dọn mã cũ
+
+Mưa dùng một bộ vẽ Canvas 2D chung cho header/toàn màn hình, ba mức cường độ,
+cùng màu, tốc độ, hướng gió và nhịp chớp. Chỉ một canvas/vòng animation hoạt động;
+tạm ngưng khi ẩn tab hoặc mở form; tôn trọng tùy chọn giảm chuyển động của hệ điều hành.
+Không cần tải Three.js chỉ để bật mưa. Các chủ đề khác tiếp tục dùng WebGL hiện có.
+
+Đã bỏ lân Trung thu, các lớp mưa/chớp CSS và shader mưa cũ; xóa 18 hàm không còn
+được gọi, các biến/constant dư và form gán job cũ không có lối mở (quản lý job dùng
+trang Đấng tối cao). Chỉ xóa mã đã xác minh không có chỗ gọi hoặc đã được thay thế.
+Kiểm tra chủ đề thực: `node ui-tests.mjs --themes` (cần mạng tải Three.js).
+
+## Tiết kiệm quota Firebase miễn phí
+
+Trong Đấng tối cao → Công việc, có thể kết hợp tìm kiếm, loại job, lịch lặp
+(daily/weekly/2 tuần/tháng/một lần) và thứ trong tuần. Lọc theo lịch gốc:
+daily tôn trọng thứ loại trừ, weekly/2 tuần lấy thứ của ngày bắt đầu;
+job hằng tháng có thứ thay đổi theo tháng. Không tính ngày dời riêng hoặc lịch off.
+Bộ lọc dùng dữ liệu đã tải, không gọi thêm Firebase.
+
+- Lịch sử thay đổi lưu trên trình duyệt theo tài khoản, tối đa 50 mục trong 7 ngày;
+  mở Lịch sử và ghi nhật ký không đọc/ghi Firestore. Không đồng bộ lịch sử giữa các máy.
+- Đánh dấu thông báo đã đọc lưu tại máy (tối đa 500 ID), không ghi từng thông báo lên Firebase.
+- Không ghi thêm mảng lịch sử chuyển/copy vào job. Giữ job, tiến độ, lịch off, sự kiện,
+  quyền, thông báo giao việc và yêu cầu chuyển/copy để các chức năng tiếp tục hoạt động.
+- Đấng tối cao → chọn thành viên → Tùy chọn → **Dọn dữ liệu phụ cũ** dọn cho mọi thành viên:
+  xóa trường `changeHistory` khỏi hồ sơ, `transferHistory`/`copyHistory` khỏi job,
+  thông báo quá 30 ngày và yêu cầu đã chấp nhận/từ chối/hủy quá 30 ngày.
+  Giữ yêu cầu đang chờ và job đã hoàn thành để thống kê. Ngày không hợp lệ không bị xóa.
+- Dọn theo trang 200 bản ghi, không tự chạy mỗi lần đăng nhập. Thao tác dọn cũng dùng quota;
+  chỉ chạy một lần khi Firestore đã nhận yêu cầu trở lại. Không hoàn lại quota đã dùng trong ngày.
+
+
 Form **Thông tin tài khoản** dùng chung phong cách với Phước lành: hồ sơ, bảo mật và
 lối vào Đấng tối cao được chia thành các khung rõ ràng, hỗ trợ giao diện sáng/tối và điện thoại.
 Bấm **Lưu tên** để lưu tên hiển thị mà không đóng form; bộ phận và ca làm việc tự lưu

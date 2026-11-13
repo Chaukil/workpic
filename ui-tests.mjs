@@ -17,7 +17,7 @@ const source = appSource.slice(appSource.indexOf('// ADMIN UI START') + '// ADMI
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'workpic-admin-ui-'));
 const iconStyles = fs.existsSync('.artifacts/admin-icons.css') ? fs.readFileSync('.artifacts/admin-icons.css','utf8').replace(/url\([^)]*woff2[^)]*\)/g, 'url('+pathToFileURL(path.resolve('.artifacts/admin-icons.woff2')).href+')') : '';
 const script = `
-import { ADMIN_EMAIL, FEATURES, ACTIONS, hasPermission, normalizePolicy, profilePolicy, adminJobGroup, PERMISSION_ACTION_LABELS } from '${pathToFileURL(path.resolve('app-data.js'))}';
+import { ADMIN_EMAIL, FEATURES, ACTIONS, hasPermission, normalizePolicy, profilePolicy, adminJobGroup, adminJobWeekdays, PERMISSION_ACTION_LABELS } from '${pathToFileURL(path.resolve('app-data.js'))}';
 import { checklistFromText } from '${pathToFileURL(path.resolve('app-data.js'))}';
 const check = (value,message) => { if(!value) throw new Error(message); };
 const pause = () => new Promise(resolve=>setTimeout(resolve,30));
@@ -30,6 +30,7 @@ const getDoc=async()=>({data:()=>({})});
 const collection=(_,name)=>({path:name}); const where=()=>({}); const query=ref=>ref;
 const getDocs=async()=>({docs:[{data:()=>({uiPermissions:currentPolicy,lastBlessing:noticeForUser})}],empty:false});
 const writeBatch=()=>({});const runTransaction=async()=>{};
+const deleteField=()=>({});const limit=()=>({});const startAfter=()=>({});
 const onSnapshot=()=>()=>{};
 const sampleRecords={
  users:[{id:'profile-worker',data:{uid:'worker',email:user.email,displayName:'Worker',department:'layout',workShift:'day'}}],
@@ -140,6 +141,16 @@ try{
  document.getElementById('adminJobFilter').value='outside';document.getElementById('adminJobFilter').dispatchEvent(new Event('change',{bubbles:true}));
  check(!document.querySelector('[data-admin-group="outside"]').hidden&&document.querySelector('[data-admin-group="fixed"]').hidden,'job type filter works');
  document.getElementById('adminJobFilter').value='all';document.getElementById('adminJobFilter').dispatchEvent(new Event('change',{bubbles:true}));
+ document.getElementById('adminWeekdayFilter').value='1';document.getElementById('adminWeekdayFilter').dispatchEvent(new Event('change',{bubbles:true}));
+ check([...document.querySelectorAll('[data-admin-group]')].every(n=>n.hidden),'Monday excludes Thursday jobs');
+ document.getElementById('adminWeekdayFilter').value='4';document.getElementById('adminWeekdayFilter').dispatchEvent(new Event('change',{bubbles:true}));
+ check(!document.querySelector('[data-admin-group="fixed"]').hidden,'Thursday includes weekly anchor');
+ document.getElementById('adminRepeatFilter').value='daily';document.getElementById('adminRepeatFilter').dispatchEvent(new Event('change',{bubbles:true}));
+ check(document.querySelector('[data-admin-group="fixed"]').hidden,'daily filter excludes weekly jobs');
+ document.getElementById('adminRepeatFilter').value='weekly';document.getElementById('adminRepeatFilter').dispatchEvent(new Event('change',{bubbles:true}));
+ check(!document.querySelector('[data-admin-group="fixed"]').hidden&&document.querySelector('[data-admin-group="once"]').hidden,'weekday and recurrence combine');
+ document.getElementById('adminWeekdayFilter').value='all';document.getElementById('adminWeekdayFilter').dispatchEvent(new Event('change',{bubbles:true}));
+ document.getElementById('adminRepeatFilter').value='all';document.getElementById('adminRepeatFilter').dispatchEvent(new Event('change',{bubbles:true}));
  const fixedIndex=sampleRecords.jobs.findIndex(r=>r.id==='fixed');
  document.querySelector('[data-edit-collection="jobs"][data-record="'+fixedIndex+'"]').click();await pause();
  check(!document.getElementById('adminEditorOverlay').hidden,'edit opens dedicated drawer');
@@ -232,7 +243,7 @@ async function renderPreview(target) {
         await call('Runtime.evaluate',{expression:'document.fonts.ready',awaitPromise:true});
         if(process.env.DIALOG_UI_AUDIT==='1'){
             const audit=await call('Runtime.evaluate',{expression:`(()=>{
-                const failures=[];const dialogs=[...document.querySelectorAll('.workpic-dialog')];
+                const failures=[];const dialogs=[...document.querySelectorAll('.modal[id]')];
                 const originalTheme=document.body.className;
                 for(const theme of ['theme-light','theme-dark']){
                     document.body.className=theme;
@@ -242,6 +253,7 @@ async function renderPreview(target) {
                         modal.querySelectorAll('.modal-dialog,.modal-content').forEach(n=>{n.style.animation='none';n.style.transition='none';});
                         const content=modal.querySelector('.modal-content');const rect=content.getBoundingClientRect();
                         if(rect.left<0||rect.right>innerWidth+1||rect.width<200||rect.height>innerHeight+1)failures.push(theme+' '+modal.id+' exceeds viewport');
+                        if(Math.abs(rect.width-innerWidth*.9)>2||Math.abs(rect.height-innerHeight*.9)>2)failures.push(theme+' '+modal.id+' must use 90% of viewport');
                         if(getComputedStyle(modal.querySelector('.modal-header')).backgroundImage!=='none')failures.push(theme+' '+modal.id+' retains old header gradient');
                         modal.hidden=previous.hidden;modal.style.display=previous.display;modal.classList.toggle('show',previous.shown);
                     }
@@ -413,6 +425,9 @@ const chrome = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Pro
 if (!chrome) { console.log('Theme GPU smoke skipped: Chrome/Edge unavailable.'); process.exit(0); }
 const source = fs.readFileSync('app.js', 'utf8');
 let code = source.slice(source.indexOf('const ThreeFx ='), source.indexOf('// CƯỜNG ĐỘ HIỆU ỨNG'));
+const rainCode = source.slice(source.indexOf('const RainFx ='), source.indexOf('// Thiên hà xoắn ốc'))
+    .replace('        s.fit();', '        s.frame = frame; s.fit();')
+    .replace('return { start, stop };', 'return { draw: () => { cancelAnimationFrame(state.raf); state.frame(performance.now() + 50); }, start, stop };');
 code = code.replace("if (!threePromise) threePromise = import(THREE_URL).catch(err => { threePromise = null; throw err; });", 'if (!threePromise) threePromise = Promise.resolve(THREE);');
 code = code.replace('return { start, stop: () =>', 'return { inspect: () => state, start, stop: () =>');
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'workpic-fx-'));
@@ -425,6 +440,7 @@ import * as THREE from './three.module.js';
 const errors=[];
 const oldError=console.error; console.error=(...args)=>{errors.push(args.join(' '));oldError(...args);};
 ${code}
+${rainCode}
 const check=(condition,message)=>{if(!condition)throw new Error(message);};
 try {
     const layer=document.getElementById('fxFullscreen');
@@ -432,7 +448,7 @@ try {
     let renderer;
     for(const mode of ['theme-dark','theme-light']) {
         document.body.className=mode;
-        for(const theme of ['space','noel','tet','trungthu','rain','halloween']) {
+        for(const theme of ['space','noel','tet','trungthu','halloween']) {
             layer.dataset.fx=theme;
             check(await ThreeFx.start(layer,theme,2),'scene build failed: '+theme);
             const state=ThreeFx.inspect();
@@ -454,10 +470,27 @@ try {
     }
     ThreeFx.stop();
     check(!ThreeFx.isActive() && !layer.querySelector('canvas'),'stop removes scene');
+    const header = document.createElement('div');header.style.cssText='width:1280px;height:80px;position:relative';document.body.appendChild(header);
+    layer.style.cssText='width:1280px;height:720px;position:relative';
+    for(const mode of ['theme-dark','theme-light']){
+        document.body.className=mode;
+        for(const host of [header,layer])for(const level of [0,1,2]){
+            check(RainFx.start(host,level),'canvas rain starts in '+mode);
+            await new Promise(resolve=>setTimeout(resolve,100));
+            RainFx.draw();
+            check(document.querySelectorAll('.rain-fx-canvas').length===1,'header/fullscreen rain cannot overlap');
+            const canvas=host.querySelector('canvas');
+            check(canvas.width>0&&canvas.height>0,'rain canvas has dimensions');
+            const pixels=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height).data;
+            check(pixels.some((v,i)=>i%4===3&&v>0),'rain paints visible pixels');
+        }
+    }
+    RainFx.stop();header.remove();
+    check(!document.querySelector('.rain-fx-canvas'),'rain cleanup removes canvas');
     // Three.js retains one shared sprite quad with the reusable renderer.
     check(renderer.info.memory.textures===0 && renderer.info.memory.geometries<=1,'scene GPU resources released: '+JSON.stringify(renderer.info.memory));
     check(!errors.some(e=>/WebGLProgram|shader error|VALIDATE_STATUS/i.test(e)),'shader compile errors: '+errors.join(';'));
-    document.body.innerHTML='<pre id="fx-result">PASS: all six high-intensity themes in light/dark, one renderer, owned textures, draw calls '+metrics.join(', ')+'</pre>';
+    document.body.innerHTML='<pre id="fx-result">PASS: shared rain at all levels in header/fullscreen and light/dark; five WebGL themes, one renderer, owned textures, draw calls '+metrics.join(', ')+'</pre>';
 } catch(error) {document.body.innerHTML='<pre id="fx-result">FAIL: '+String(error.stack).replace(/</g,'&lt;')+'</pre>';}
 `;
     const html = `<!doctype html><body><div id="fxFullscreen"></div><script type="module">${script}</script></body>`;

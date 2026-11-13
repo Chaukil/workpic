@@ -1,7 +1,7 @@
-import { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, holidaysForYear, monthPair, personalEventOccurs, checklistFromText, compareScheduleEntries, ADMIN_EMAIL, FEATURES, ACTIONS, PERMISSION_ACTION_LABELS, hasPermission, normalizePolicy, profilePolicy, createAdminStore, adminJobGroup } from './app-data.js';
+import { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, holidaysForYear, monthPair, personalEventOccurs, checklistFromText, compareScheduleEntries, ADMIN_EMAIL, FEATURES, ACTIONS, PERMISSION_ACTION_LABELS, hasPermission, normalizePolicy, profilePolicy, createAdminStore, adminJobGroup, adminJobWeekdays } from './app-data.js';
 // Firebase Configuration - Chỉ sử dụng Firestore
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, getDoc, getDocs, onSnapshot, enableIndexedDbPersistence, query, where, writeBatch, runTransaction, arrayUnion, arrayRemove }
+import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, where, writeBatch, runTransaction, deleteField, limit, startAfter }
     from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, EmailAuthProvider, reauthenticateWithCredential, updatePassword }
     from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -53,7 +53,7 @@ function createAccessControl({ db, auth, notify }) {
     const isAdmin = () => auth.currentUser?.email?.trim().toLowerCase() === ADMIN_EMAIL;
     const can = (feature, action = 'view') => isAdmin() || (!!auth.currentUser && loaded && hasPermission(policy, feature, action));
     const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-    const api = createAdminStore({ db, auth, sdk: { doc, getDoc, getDocs, collection, query, where, runTransaction, writeBatch } });
+    const api = createAdminStore({ db, auth, sdk: { doc, getDoc, getDocs, collection, query, where, runTransaction, writeBatch, deleteField, limit, startAfter } });
     function requireAccess(feature, action = 'view') {
         if (can(feature, action)) return true;
         notify('Không có quyền', 'Tài khoản chưa được cấp quyền thực hiện thao tác này.', false, 'warning');
@@ -204,6 +204,7 @@ function createAccessControl({ db, auth, notify }) {
     }
     async function busy(task) {
         const panel = document.getElementById('adminModal');
+        if (panel.getAttribute('aria-busy') === 'true') return;
         panel.setAttribute('aria-busy', 'true');
         const controls = [...panel.querySelectorAll('button, input, select, textarea')];
         const disabled = controls.map(n => n.disabled);
@@ -249,7 +250,7 @@ function createAccessControl({ db, auth, notify }) {
             <label class="d-block my-3"><input type="checkbox" id="adminDisabled" ${matrix.disabled ? 'checked' : ''} ${root ? 'disabled' : ''}> Khóa tài khoản</label>
             <div class="admin-pane-actions"><span id="adminPermissionsHint">Thay đổi chỉ có hiệu lực sau khi lưu.</span><button class="btn btn-primary" id="adminSavePermissions" ${root ? 'disabled' : ''}><i class="bi bi-check2"></i> Lưu phước lành</button></div>
             <p class="small text-muted mt-2">Bỏ Xem sẽ tắt toàn bộ quyền của chức năng. Tích quyền để hiện nút; bỏ tích để ẩn nút tương ứng. User chưa được cấp quyền sẽ không thấy các chức năng.</p>
-            </section><section id="adminPane-advanced" role="tabpanel" aria-labelledby="adminTab-advanced"><div id="adminAdvancedData"></div><div class="admin-danger-zone"><h6><i class="bi bi-exclamation-triangle"></i> Xóa thành viên khỏi ứng dụng</h6><p>Xóa các job và dữ liệu liên quan. Bạn sẽ được yêu cầu xác nhận email trước khi xóa.</p><button class="btn btn-outline-danger" id="adminDeleteUser" ${root ? 'disabled' : ''}>Xóa thành viên…</button></div></section>
+            </section><section id="adminPane-advanced" role="tabpanel" aria-labelledby="adminTab-advanced"><div class="admin-form-section"><h6><i class="bi bi-database-down"></i> Tiết kiệm Firebase</h6><p class="small text-muted">Lịch sử thay đổi và trạng thái đã đọc lưu trên trình duyệt. Dọn nhật ký Firebase cũ của mọi thành viên, thông báo và yêu cầu đã xử lý trên 30 ngày. Giữ job, tiến độ, lịch, quyền và yêu cầu đang chờ. Dọn một lần sau khi quota hoạt động lại; thao tác này cũng tốn lượt đọc/ghi/xóa.</p><button type="button" class="btn btn-outline-secondary" id="adminCleanupHistory">Dọn dữ liệu phụ cũ</button></div><div id="adminAdvancedData"></div><div class="admin-danger-zone"><h6><i class="bi bi-exclamation-triangle"></i> Xóa thành viên khỏi ứng dụng</h6><p>Xóa các job và dữ liệu liên quan. Bạn sẽ được yêu cầu xác nhận email trước khi xóa.</p><button class="btn btn-outline-danger" id="adminDeleteUser" ${root ? 'disabled' : ''}>Xóa thành viên…</button></div></section>
             <div id="adminUserData" hidden></div>
             <div class="admin-editor-overlay" id="adminEditorOverlay" hidden><button type="button" class="admin-editor-backdrop" data-admin-close-editor aria-label="Đóng form chỉnh sửa"></button><section class="admin-editor-drawer" role="dialog" aria-modal="true" aria-labelledby="adminEditorTitle"><header><div><span class="admin-eyebrow" id="adminEditorSubtitle"></span><h5 id="adminEditorTitle">Chỉnh sửa công việc</h5></div><button type="button" class="admin-icon-button" data-admin-close-editor aria-label="Đóng"><i class="bi bi-x-lg"></i></button></header><div id="adminDocumentEditor"></div><footer id="adminEditorActions"></footer></section></div>`;
         selectTab(activeTab);
@@ -272,7 +273,7 @@ function createAccessControl({ db, auth, notify }) {
             const status = { open: 'Chờ nhận', invited: 'Đã chỉ định', claimed: 'Đang làm', completed: 'Hoàn thành' }[value.status] || '';
             const day = value.date || value.dateKey || '';
             const displayDay = /^\d{4}-\d{2}-\d{2}$/.test(day) ? day.split('-').reverse().join('/') : day;
-            return `<div class="admin-data-row" data-admin-record-row data-admin-search="${escape([value.title, value.content, textDescription(value.description), day, value.time].filter(Boolean).join(' '))}"><span class="admin-record-icon"><i class="bi ${name === 'quickJobs' ? 'bi-chat-square-text' : 'bi-calendar2-check'}"></i></span><div class="admin-record-title"><strong>${escape(value.title || value.content || value.date || value.displayName || record.id)}</strong><small>${escape([displayDay, value.time, value.duration ? `${value.duration} phút` : '', value.isPaused ? 'Tạm dừng' : ''].filter(Boolean).join(' · '))}</small></div>${status ? `<span class="admin-job-status status-${escape(value.status)}">${status}</span>` : ''}<button class="admin-row-edit" data-edit-collection="${name}" data-record="${records[name].indexOf(record)}"><i class="bi bi-pencil"></i> Sửa</button><button class="admin-row-delete" data-delete-collection="${name}" data-record="${records[name].indexOf(record)}" aria-label="Xóa ${escape(value.title || value.content || record.id)}" title="Xóa"><i class="bi bi-trash3"></i></button></div>`;
+            return `<div class="admin-data-row" data-admin-record-row data-admin-weekdays="${adminJobWeekdays(value).join(',')}" data-admin-repeat="${escape(value.type || 'quick')}" data-admin-search="${escape([value.title, value.content, textDescription(value.description), day, value.time].filter(Boolean).join(' '))}"><span class="admin-record-icon"><i class="bi ${name === 'quickJobs' ? 'bi-chat-square-text' : 'bi-calendar2-check'}"></i></span><div class="admin-record-title"><strong>${escape(value.title || value.content || value.date || value.displayName || record.id)}</strong><small>${escape([({daily: 'Hằng ngày', weekly: 'Hằng tuần', biweekly: '2 tuần/lần', monthly: 'Hằng tháng', once: 'Một lần'})[value.type], value.type === 'monthly' ? 'Thứ thay đổi theo tháng' : adminJobWeekdays(value).map(day => ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][day]).join(', '), displayDay, value.time, value.duration ? `${value.duration} phút` : '', value.isPaused ? 'Tạm dừng' : ''].filter(Boolean).join(' · '))}</small></div>${status ? `<span class="admin-job-status status-${escape(value.status)}">${status}</span>` : ''}<button class="admin-row-edit" data-edit-collection="${name}" data-record="${records[name].indexOf(record)}"><i class="bi bi-pencil"></i> Sửa</button><button class="admin-row-delete" data-delete-collection="${name}" data-record="${records[name].indexOf(record)}" aria-label="Xóa ${escape(value.title || value.content || record.id)}" title="Xóa"><i class="bi bi-trash3"></i></button></div>`;
         };
         const section = (title, name, docs, extra = '') => `<section class="admin-job-section"><div class="admin-section-heading"><h6>${title} <span class="badge text-bg-secondary">${docs.length}</span></h6>${extra}</div>${result.errors?.[name] ? `<p class="text-danger">Không tải được: ${escape(result.errors[name])}</p>` : docs.map(d => row(name, d)).join('') || '<p class="text-muted small mb-0">Chưa có job trong nhóm này.</p>'}</section>`;
         const jobs = records.jobs || [];
@@ -301,7 +302,7 @@ function createAccessControl({ db, auth, notify }) {
             }
         } else profile.remove();
         const jobsPane = document.getElementById('adminPane-jobs');
-        jobsPane.innerHTML = '<div class="admin-pane-heading"><h5>Công việc của thành viên</h5><p>Tìm nhanh, chọn đúng job, chỉnh sửa ngay.</p></div><div class="admin-job-toolbar"><label class="admin-job-search"><i class="bi bi-search"></i><input type="search" id="adminJobSearch" placeholder="Tìm tên hoặc nội dung job…" aria-label="Tìm công việc"></label><select id="adminJobFilter" class="form-select" aria-label="Loại công việc"><option value="all">Tất cả loại job</option><option value="fixed">Lịch cố định</option><option value="once">Một lần</option><option value="outside">Ngoài lịch</option><option value="quick">Trong ngày</option></select></div>';
+        jobsPane.innerHTML = '<div class="admin-pane-heading"><h5>Công việc của thành viên</h5><p>Tìm nhanh, chọn đúng job, chỉnh sửa ngay.</p></div><div class="admin-job-toolbar"><label class="admin-job-search"><i class="bi bi-search"></i><input type="search" id="adminJobSearch" placeholder="Tìm tên hoặc nội dung job…" aria-label="Tìm công việc"></label><select id="adminJobFilter" class="form-select" aria-label="Loại công việc"><option value="all">Tất cả loại job</option><option value="fixed">Lịch cố định</option><option value="once">Một lần</option><option value="outside">Ngoài lịch</option><option value="quick">Trong ngày</option></select><select id="adminRepeatFilter" class="form-select" aria-label="Lọc lịch lặp"><option value="all">Tất cả lịch lặp</option><option value="daily">Hằng ngày (daily)</option><option value="weekly">Hằng tuần (weekly)</option><option value="biweekly">2 tuần/lần</option><option value="monthly">Hằng tháng</option><option value="once">Một lần</option></select><select id="adminWeekdayFilter" class="form-select" aria-label="Lọc công việc theo thứ"><option value="all">Tất cả các thứ</option><option value="1">Thứ Hai</option><option value="2">Thứ Ba</option><option value="3">Thứ Tư</option><option value="4">Thứ Năm</option><option value="5">Thứ Sáu</option><option value="6">Thứ Bảy</option><option value="0">Chủ Nhật</option></select></div><p class="small text-muted">Lọc theo lịch gốc, không tính ngày được dời riêng hoặc lịch off. Job hằng tháng có thứ thay đổi theo tháng.</p>';
         const addButtons = staging.firstElementChild;
         if (addButtons) { addButtons.classList.add('admin-add-actions'); jobsPane.appendChild(addButtons); }
         ['fixed', 'once', 'outside', 'quick'].forEach(group => {
@@ -317,12 +318,14 @@ function createAccessControl({ db, auth, notify }) {
         const normalize = value => value.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').replace(/đ/g, 'd');
         const text = normalize(document.getElementById('adminJobSearch')?.value || '');
         const group = document.getElementById('adminJobFilter')?.value || 'all';
+        const weekday = document.getElementById('adminWeekdayFilter')?.value || 'all';
+        const repeat = document.getElementById('adminRepeatFilter')?.value || 'all';
         document.querySelectorAll('#adminPane-jobs [data-admin-group]').forEach(section => {
             let matches = 0;
             section.querySelectorAll('[data-admin-record-row]').forEach(row => {
-                row.hidden = !normalize(row.dataset.adminSearch || row.textContent).includes(text); if (!row.hidden) matches++;
+                row.hidden = !normalize(row.dataset.adminSearch || row.textContent).includes(text) || (weekday !== 'all' && !row.dataset.adminWeekdays.split(',').includes(weekday)) || (repeat !== 'all' && row.dataset.adminRepeat !== repeat); if (!row.hidden) matches++;
             });
-            section.hidden = (group !== 'all' && section.dataset.adminGroup !== group) || (!!text && !matches);
+            section.hidden = (group !== 'all' && section.dataset.adminGroup !== group) || ((!!text || weekday !== 'all' || repeat !== 'all') && !matches);
         });
     }
     const localDay = () => {
@@ -427,7 +430,7 @@ function createAccessControl({ db, auth, notify }) {
         });
         const panel = document.getElementById('adminPanelContent');
         const trackChanges = e => {
-            if (e.target.id === 'adminJobSearch' || e.target.id === 'adminJobFilter') { filterJobs(); return; }
+            if (['adminJobSearch', 'adminJobFilter', 'adminWeekdayFilter', 'adminRepeatFilter'].includes(e.target.id)) { filterJobs(); return; }
             if (e.target.closest('#adminDocumentEditor')) {
                 dirtyEditor = true;
                 const hint = document.getElementById('adminEditorHint'); if (hint) hint.textContent = 'Có thay đổi chưa lưu';
@@ -528,7 +531,12 @@ function createAccessControl({ db, auth, notify }) {
                 setStatus('Bấm Lưu phước lành để ban hoặc thu hồi quyền.'); return;
             }
             busy(async () => {
-                if (button.id === 'adminSavePermissions') {
+                if (button.id === 'adminCleanupHistory') {
+                    if (!await confirmAction({ title: 'Dọn dữ liệu phụ cũ của mọi thành viên?', description: 'Xóa nhật ký thay đổi/chuyển/copy cũ; thông báo và yêu cầu đã xử lý trên 30 ngày. Dữ liệu đã xóa không khôi phục được. Giữ nguyên công việc và yêu cầu đang chờ.', label: 'Dọn dữ liệu', destructive: true })) return;
+                    const result = await api('cleanupHistory');
+                    const c = result.counts;
+                    setStatus('Đã dọn: ' + c.profiles + ' hồ sơ, ' + c.jobs + ' nhật ký job, ' + c.notifications + ' thông báo, ' + c.requests + ' yêu cầu cũ.');
+                } else if (button.id === 'adminSavePermissions') {
                     const value = { disabled: document.getElementById('adminDisabled').checked, features: {} };
                     document.querySelectorAll('#adminPanelContent [data-feature]').forEach(n => {
                         (value.features[n.dataset.feature] ||= {})[n.dataset.action] = n.checked;
@@ -743,8 +751,8 @@ let currentUser = null;
 let unsubscribeJobs = null;
 let authMode = 'login';
 let currentViewingJobId = null;
-let migrateLegacyJobsModal;
-let legacyJobs = [];
+
+
 let viewDataModal;
 let checkDueModal;
 let presenterSpinModal;
@@ -762,7 +770,7 @@ let workHoursMap = {};           // { 'YYYY-MM-DD': { date, motion, station, ...
 let scheduleWorkHoursMap = {};
 let unsubscribeWorkHours = null;
 let workHoursParsed = [];        // kết quả phân tích ô dán
-let editingWhDate = null;
+
 const WORKHOURS_COLLECTION = 'workHours';
 let workHoursAll = [];           // toàn bộ document giờ làm việc (mọi bộ phận)
 
@@ -811,8 +819,8 @@ let userProfileModal;
 let changePasswordConfirmModal;
 let settingsModal = null;
 let transferConfirmModal;
-let pendingTransferJob = null;
-let pendingTransferFromUser = null;
+
+
 let pendingTransferRequestId = null;
 let pendingTransferRequestData = null;
 let currentJobIsPaused = false;
@@ -874,8 +882,8 @@ const DEFAULT_JOB_DURATION = 30;  // phút
 const WORK_HOURS_PER_DAY = 8;
 
 // Morning digest email
-const MORNING_DIGEST_STORAGE_KEY = 'workpic_morning_digest_sent';
-const MORNING_DIGEST_HOURS = { from: 6, to: 10 };  // Chỉ gửi mail trong khung 6h–10h
+
+  // Chỉ gửi mail trong khung 6h–10h
 
 function applyTheme(theme) {
     // Bật "chế độ tắt transition" để hàng trăm element cùng lúc
@@ -920,7 +928,7 @@ function applyTheme(theme) {
 // ============================================================
 const TOPBAR_THEMES = [
     { id: 'default', name: 'Mặc định', emoji: '☀️', desc: 'Trời sáng/tối tự nhiên' },
-    { id: 'tet', name: 'Tết', emoji: '🌸', desc: 'Hoa đào, rồng bay, phụng múa, pháo nổ' },
+    { id: 'tet', name: 'Tết', emoji: '🌸', desc: 'Hoa đào, rồng bay, lì xì và kim tuyến' },
     { id: 'trungthu', name: 'Trung Thu', emoji: '🌕', desc: 'Trăng rằm, đèn lồng trôi' },
     { id: 'noel', name: 'Noel', emoji: '🎄', desc: 'Tuyết rơi, ông già Noel chạy ngang' },
     { id: 'rain', name: 'Mưa', emoji: '🌧️', desc: 'Mưa rơi, mây đen, chớp' },
@@ -937,10 +945,98 @@ const FX_CONFIG = {
     tet: { glyphs: ['🌸', '🌸', '💮', '🌺'], count: 26, size: [8, 14], dur: [9, 16] },
     trungthu: { glyphs: ['⭐', '✨', '🌟', '⭐'], count: 28, size: [12, 22], dur: [8, 15] },
     noel: { glyphs: ['❄\uFE0E', '❅', '❆', '•'], count: 50, size: [10, 22], dur: [7, 14] },
-    rain: { rain: true, count: 80, dur: [0.7, 1.3] },
+    rain: { rain: true },
     space: { galaxy: true, count: 24, dur: [22, 40] },
     halloween: { glyphs: ['🎃', '👻', '🦇', '🕷️', '🕸️', '💀'], count: 32, size: [14, 26], dur: [8, 15] }
 };
+
+// One rain renderer for the header and the whole screen; never run both at once.
+const RainFx = (() => {
+    const profiles = [
+        { density: 0.00034, speed: 290, length: 12, wind: -0.08, alpha: 0.32 },
+        { density: 0.00068, speed: 540, length: 22, wind: -0.23, alpha: 0.48 },
+        { density: 0.001, speed: 820, length: 32, wind: -0.4, alpha: 0.6 }
+    ];
+    let state = null;
+    function stop() {
+        if (!state) return;
+        const s = state; state = null;
+        cancelAnimationFrame(s.raf);
+        s.observer?.disconnect();
+        window.removeEventListener('resize', s.fit);
+        document.removeEventListener('visibilitychange', s.resume);
+        document.removeEventListener('shown.bs.modal', s.resume);
+        document.removeEventListener('hidden.bs.modal', s.resume);
+        s.canvas.remove();
+    }
+    function start(host, level) {
+        stop();
+        if (!host || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
+        const canvas = document.createElement('canvas');
+        const g = canvas.getContext('2d');
+        if (!g) return false;
+        canvas.className = 'rain-fx-canvas'; canvas.setAttribute('aria-hidden', 'true');
+        host.prepend(canvas);
+        const s = { canvas, raf: 0, last: 0, time: 0, width: 0, height: 0, drops: [], profile: profiles[level] || profiles[1] };
+        state = s;
+        s.fit = () => {
+            const rect = host.getBoundingClientRect();
+            s.width = Math.max(1, rect.width); s.height = Math.max(1, rect.height);
+            const pixel = Math.min(window.devicePixelRatio || 1, 1.5, Math.sqrt(1500000 / (s.width * s.height)));
+            canvas.width = Math.ceil(s.width * pixel); canvas.height = Math.ceil(s.height * pixel);
+            g.setTransform(pixel, 0, 0, pixel, 0, 0);
+            const lowEnd = (navigator.hardwareConcurrency || 4) <= 4 || s.width < 700;
+            const count = Math.min(lowEnd ? 420 : 1000, Math.max(18, Math.round(s.width * s.height * s.profile.density)));
+            s.drops = Array.from({ length: count }, () => ({ x: Math.random() * (s.width + 100), y: Math.random() * s.height, depth: 0.35 + Math.random() * 0.65 }));
+        };
+        const frame = now => {
+            if (state !== s) return;
+            s.raf = 0;
+            if (document.hidden || document.body.classList.contains('modal-open')) return;
+            s.raf = requestAnimationFrame(frame);
+            if (s.last && now - s.last < 32) return;
+            const dt = s.last ? Math.min(0.05, (now - s.last) / 1000) : 0.033;
+            s.last = now; s.time += dt;
+            const light = document.body.classList.contains('theme-light');
+            const p = s.profile;
+            g.clearRect(0, 0, s.width, s.height);
+            if (level === 2) {
+                g.fillStyle = light ? 'rgba(42,60,80,.06)' : 'rgba(4,12,24,.1)';
+                g.fillRect(0, 0, s.width, s.height);
+            }
+            const wind = p.wind + (level === 2 ? Math.sin(s.time * 0.7) * 0.1 : 0);
+            for (const drop of s.drops) {
+                const travel = p.speed * (0.55 + drop.depth) * dt;
+                drop.x += travel * wind; drop.y += travel;
+                if (drop.y > s.height + p.length) { drop.y = -p.length; drop.x = Math.random() * (s.width + 100); }
+                if (drop.x < -50) drop.x = s.width + 50;
+                const length = p.length * drop.depth;
+                g.strokeStyle = light ? `rgba(55,92,130,${p.alpha * drop.depth})` : `rgba(174,213,245,${p.alpha * drop.depth})`;
+                g.lineWidth = 0.65 + drop.depth * 0.65;
+                g.beginPath(); g.moveTo(drop.x, drop.y); g.lineTo(drop.x - length * wind, drop.y - length); g.stroke();
+            }
+            // A single clock drives lightning, including the portion over the header.
+            const phase = s.time % (level === 2 ? 8 : 14);
+            if (level > 0 && ((phase > 5 && phase < 5.08) || (phase > 5.2 && phase < 5.26))) {
+                g.fillStyle = light ? 'rgba(220,237,255,.12)' : 'rgba(220,237,255,.2)';
+                g.fillRect(0, 0, s.width, s.height);
+            }
+        };
+        s.resume = () => {
+            if (document.hidden || document.body.classList.contains('modal-open')) { cancelAnimationFrame(s.raf); s.raf = 0; }
+            else if (!s.raf) { s.last = 0; s.raf = requestAnimationFrame(frame); }
+        };
+        s.fit();
+        window.addEventListener('resize', s.fit);
+        if (typeof ResizeObserver !== 'undefined') { s.observer = new ResizeObserver(s.fit); s.observer.observe(host); }
+        document.addEventListener('visibilitychange', s.resume);
+        document.addEventListener('shown.bs.modal', s.resume);
+        document.addEventListener('hidden.bs.modal', s.resume);
+        s.resume();
+        return true;
+    }
+    return { start, stop };
+})();
 
 // Thiên hà xoắn ốc (SVG): 2 nhánh xoắn logarit, bụi sao rải dọc nhánh, lõi sáng ấm — xoay rất chậm
 function buildGalaxySvg() {
@@ -993,7 +1089,7 @@ function buildGalaxySvg() {
 //   space    : thiên hà xoắn ốc rất lớn (~90.000 hạt) + sao nền, nằm SAU nội dung trang
 //   noel     : tuyết nhiều dạng tinh thể thật (nhỏ / vừa / lớn)
 //   tet      : hoa đào, hoa mai nguyên bông + cánh hoa lật 3D + lì xì + kim tuyến vàng
-//   trungthu : đèn lồng bay lên + sao rơi (trăng, Chị Hằng, Chú Cuội, thỏ, múa lân nằm ở lớp DOM)
+//   trungthu : đèn lồng bay lên + sao rơi (trăng, Chị Hằng, Chú Cuội, thỏ, nằm ở lớp DOM)
 //   rain     : mưa nhỏ / mưa lớn / bão (gió giật, chớp)
 // Three.js chỉ tải khi bật hiệu ứng (import động từ CDN). Lỗi / không có WebGL → tự dùng bản CSS nhẹ.
 // Dừng vẽ khi tab ẩn hoặc đang mở hộp thoại; ~30fps để đỡ tốn pin.
@@ -1091,29 +1187,6 @@ const ThreeFx = (() => {
         }`;
 
     // (3) mưa: đoạn thẳng, đầu sáng đuôi mờ
-    const RAIN_VERT = `
-        attribute float aEnd;
-        attribute vec3 aRand;      // x: tốc độ, y: độ dài, z: độ sáng
-        uniform float uTime, uTan, uAspect, uSlant, uCamZ;
-        varying float vA;
-        void main() {
-            float d = uCamZ - position.z;
-            float hh = d * uTan * 1.06;
-            float hw = hh * uAspect * 1.25;
-            float y = position.y * hh - uTime * aRand.x;
-            y = mod(y + hh, 2.0 * hh) - hh;
-            float x = position.x * hw - uSlant * y;
-            x = mod(x + hw, 2.0 * hw) - hw;
-            y += aEnd * aRand.y;
-            x -= uSlant * aEnd * aRand.y;
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(x, y, position.z, 1.0);
-            vA = aRand.z * (1.0 - aEnd);
-        }`;
-    const RAIN_FRAG = `
-        uniform vec3 uColor;
-        uniform float uAlpha;
-        varying float vA;
-        void main() { gl_FragColor = vec4(uColor, vA * uAlpha); }`;
 
     // ---------------------------------------------------------- texture vẽ bằng canvas
     const R = (a, b) => a + Math.random() * (b - a);
@@ -1371,45 +1444,6 @@ const ThreeFx = (() => {
             if (mat.blending !== b) { mat.blending = b; mat.needsUpdate = true; }
         });
         return pts;
-    }
-
-    function rainLines(ctx, o) {
-        const { THREE } = ctx;
-        const n = Math.max(1, Math.round(o.count));
-        const pos = new Float32Array(n * 6), end = new Float32Array(n * 2), rnd = new Float32Array(n * 6);
-        for (let i = 0; i < n; i++) {
-            const x = R(-1, 1), y = R(-1, 1), z = R(o.z[0], o.z[1]);
-            const sp = R(o.speed[0], o.speed[1]), len = R(o.len[0], o.len[1]), br = R(0.35, 1);
-            for (let k = 0; k < 2; k++) {
-                const j = i * 2 + k;
-                pos[j * 3] = x; pos[j * 3 + 1] = y; pos[j * 3 + 2] = z;
-                end[j] = k;
-                rnd[j * 3] = sp; rnd[j * 3 + 1] = len; rnd[j * 3 + 2] = br;
-            }
-        }
-        const geo = new THREE.BufferGeometry();
-        geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-        geo.setAttribute('aEnd', new THREE.BufferAttribute(end, 1));
-        geo.setAttribute('aRand', new THREE.BufferAttribute(rnd, 3));
-        const mat = new THREE.ShaderMaterial({
-            vertexShader: RAIN_VERT, fragmentShader: RAIN_FRAG,
-            transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-            uniforms: {
-                uTime: { value: 0 }, uTan: { value: TAN }, uAspect: { value: 1.7 }, uCamZ: { value: CAM_Z },
-                uSlant: { value: o.slant }, uColor: { value: new THREE.Color(o.color) }, uAlpha: { value: o.alpha }
-            }
-        });
-        const lines = new THREE.LineSegments(geo, mat);
-        lines.frustumCulled = false;
-        ctx.scene.add(lines);
-        ctx.own(geo, mat);
-        ctx.aspectMats.push(mat); ctx.timeMats.push(mat);
-        ctx.lightFns.push(light => {
-            mat.uniforms.uColor.value.set(light ? o.lightColor : o.color);
-            const b = light ? THREE.NormalBlending : THREE.AdditiveBlending;
-            if (mat.blending !== b) { mat.blending = b; mat.needsUpdate = true; }
-        });
-        return mat;
     }
 
     // sao nền nhấp nháy (đứng yên, hơi xoay chậm)
@@ -1736,25 +1770,6 @@ const ThreeFx = (() => {
             colors: ['#fff6c8', '#ffffff', '#ffe9a0'],
             blend: THREE.AdditiveBlending, lightMul: [0.8, 0.6, 0.1], lightBlend: THREE.NormalBlending
         });
-    }
-
-    function buildRain(ctx) {
-        const { cnt, lvl } = ctx;
-        // 0: mưa nhỏ · 1: mưa lớn · 2: bão (gió giật xiên, mưa dày)
-        const P = [
-            { count: 150, speed: [8, 12], len: [0.3, 0.6], slant: 0.08, alpha: 0.4 },
-            { count: 1100, speed: [16, 26], len: [0.6, 1.3], slant: 0.25, alpha: 0.7 },
-            { count: 2800, speed: [28, 45], len: [1.0, 2.3], slant: 0.7, alpha: 0.95 }
-        ][lvl];
-        const mat = rainLines(ctx, {
-            count: cnt(P.count), z: [-10, 4], speed: P.speed, len: P.len, slant: P.slant,
-            color: '#a8c4f0', lightColor: '#3b4f7a', alpha: P.alpha
-        });
-        if (lvl === 2) {                                   // gió giật: góc xiên dao động
-            ctx.updaters.push((dt, t) => {
-                mat.uniforms.uSlant.value = P.slant + Math.sin(t * 0.35) * 0.16 + Math.max(0, Math.sin(t * 0.9)) * 0.14;
-            });
-        }
     }
 
     // ============================================================
@@ -2194,104 +2209,7 @@ const ThreeFx = (() => {
     }
 
     // Bí ngô Jack-o'-lantern: thân bí cam có khía, cuống xanh, mắt/miệng sáng phát quang
-    function drawPumpkinJack(g, S) {
-        g.clearRect(0, 0, S, S);
-        const cx = S * 0.5, cy = S * 0.58;
-        const rx = S * 0.32, ry = S * 0.26;
-
-        // Cuống xanh
-        g.save();
-        g.translate(cx, cy - ry * 0.95);
-        g.rotate(-0.18);
-        g.fillStyle = '#3f6212';
-        g.beginPath();
-        g.moveTo(-S * 0.018, 0);
-        g.quadraticCurveTo(-S * 0.04, -S * 0.09, S * 0.02, -S * 0.13);
-        g.quadraticCurveTo(S * 0.07, -S * 0.11, S * 0.045, -S * 0.02);
-        g.quadraticCurveTo(S * 0.03, S * 0.02, S * 0.018, 0);
-        g.closePath();
-        g.fill();
-        g.strokeStyle = '#1a2e05';
-        g.lineWidth = S * 0.004;
-        g.stroke();
-        g.restore();
-
-        // Thân bí: 6 múi (ellipse lệch nhau để trông có khía)
-        const ribs = 6;
-        for (let i = 0; i < ribs; i++) {
-            const t = i / (ribs - 1);           // 0..1
-            const off = (t - 0.5) * rx * 1.15;
-            const scaleY = 1 - Math.abs(t - 0.5) * 0.28;
-            const grad = g.createRadialGradient(cx + off - rx * 0.25, cy - ry * 0.4, rx * 0.1, cx + off, cy, rx);
-            grad.addColorStop(0, '#ffd08a');
-            grad.addColorStop(0.45, '#ff9f3a');
-            grad.addColorStop(1, '#c2410c');
-            g.fillStyle = grad;
-            g.beginPath();
-            g.ellipse(cx + off, cy, rx * 0.34, ry * scaleY, 0, 0, Math.PI * 2);
-            g.fill();
-            // vạch khía tối
-            g.strokeStyle = 'rgba(80, 25, 0, 0.35)';
-            g.lineWidth = S * 0.006;
-            g.stroke();
-        }
-
-        // Đường viền ngoài đậm hơn cho rõ silhouette
-        g.strokeStyle = 'rgba(60, 15, 0, 0.55)';
-        g.lineWidth = S * 0.009;
-        g.beginPath();
-        g.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-        g.stroke();
-
-        // Mắt + mũi + miệng phát sáng
-        const eyeY = cy - ry * 0.22;
-        const eyeDX = rx * 0.42;
-        const eyeSize = S * 0.065;
-
-        // vẽ 1 mắt hình tam giác cong
-        function eye(ex) {
-            g.beginPath();
-            g.moveTo(ex - eyeSize, eyeY + eyeSize * 0.3);
-            g.quadraticCurveTo(ex, eyeY - eyeSize * 1.1, ex + eyeSize, eyeY + eyeSize * 0.3);
-            g.quadraticCurveTo(ex, eyeY + eyeSize * 0.6, ex - eyeSize, eyeY + eyeSize * 0.3);
-            g.closePath();
-        }
-
-        // Halo vàng
-        g.save();
-        g.shadowColor = 'rgba(255, 220, 100, 0.95)';
-        g.shadowBlur = S * 0.06;
-        g.fillStyle = '#fff2b0';
-        eye(cx - eyeDX); g.fill();
-        eye(cx + eyeDX); g.fill();
-
-        // Mũi tam giác
-        g.beginPath();
-        g.moveTo(cx, cy - S * 0.005);
-        g.lineTo(cx - S * 0.03, cy + S * 0.045);
-        g.lineTo(cx + S * 0.03, cy + S * 0.045);
-        g.closePath();
-        g.fill();
-
-        // Miệng cười răng cưa
-        const mouthY = cy + ry * 0.42;
-        const mouthW = rx * 0.72;
-        const toothH = S * 0.045;
-        g.beginPath();
-        g.moveTo(cx - mouthW / 2, mouthY);
-        const teeth = 5;
-        for (let i = 0; i < teeth; i++) {
-            const x1 = cx - mouthW / 2 + (i + 0.5) * (mouthW / teeth);
-            const x2 = cx - mouthW / 2 + (i + 1) * (mouthW / teeth);
-            g.lineTo(x1, mouthY + toothH * 0.95);
-            g.lineTo(x2, mouthY);
-        }
-        // cằm cong lên
-        g.quadraticCurveTo(cx, mouthY + toothH * 1.6, cx - mouthW / 2, mouthY);
-        g.closePath();
-        g.fill();
-        g.restore();
-    }
+    
 
     // Scene chính Halloween
     function buildHalloween(ctx) {
@@ -2474,7 +2392,7 @@ const ThreeFx = (() => {
         });
     }
 
-    const BUILDERS = { space: buildSpace, noel: buildNoel, tet: buildTet, trungthu: buildTrungThu, rain: buildRain, halloween: buildHalloween };
+    const BUILDERS = { space: buildSpace, noel: buildNoel, tet: buildTet, trungthu: buildTrungThu, halloween: buildHalloween };
     // ---------------------------------------------------------- khung chung
     function build(THREE, layer, theme, lvl) {
         const lowEnd = (navigator.hardwareConcurrency || 4) <= 4 || window.innerWidth < 700;
@@ -2625,7 +2543,7 @@ const FX_LEVEL_INFO = {
         hints: [
             'Trăng rằm sáng với Chị Hằng, Chú Cuội, thỏ ngọc; vài đèn lồng bay lên.',
             'Đèn lồng ấm áp và sao vàng nhiều lớp trên nền trăng rằm.',
-            'Rước đèn với nhiều đèn lồng, sao vàng và một đoàn múa lân dưới chân trang.'
+            'Rước đèn với nhiều đèn lồng và sao vàng trên nền trăng rằm.'
         ]
     },
     rain: {
@@ -3014,7 +2932,7 @@ const SnowPile = (() => {
 })();
 
 // ============================================================
-// TRUNG THU — trăng rằm + Chị Hằng + Chú Cuội + thỏ ngọc (lớp nền SAU nội dung), múa lân + thỏ trắng (lớp trước)
+// TRUNG THU — trăng rằm, Chị Hằng, Chú Cuội và thỏ ngọc sau nội dung
 // ============================================================
 function buildTrungThuScene() {
     const craters = [[130, 150, 16], [230, 120, 11], [150, 245, 12], [250, 200, 20], [90, 235, 9], [205, 290, 13], [300, 150, 8]]
@@ -3070,109 +2988,8 @@ function buildTrungThuScene() {
     </div>`;
 }
 
-function buildLionSvg() {
-    const mane = Array.from({ length: 16 }, (_, i) => {
-        const a = (i / 16) * Math.PI * 2;
-        return `<circle cx="${(56 + Math.cos(a) * 46).toFixed(1)}" cy="${(66 + Math.sin(a) * 42).toFixed(1)}" r="11" fill="#fff"/>`;
-    }).join('');
-    return `
-    <svg viewBox="0 0 270 150" aria-hidden="true">
-        <g class="tt-lion-body">
-            <g class="tt-leg lb1"><rect x="196" y="100" width="14" height="38" rx="5" fill="#2b2b3a"/><ellipse cx="204" cy="140" rx="12" ry="5" fill="#111"/></g>
-            <g class="tt-leg lb2"><rect x="216" y="104" width="14" height="34" rx="5" fill="#343448"/><ellipse cx="224" cy="140" rx="12" ry="5" fill="#111"/></g>
-            <path d="M70 62 C110 40 190 44 238 72 C248 92 244 104 236 112 C190 122 120 120 76 106 Z" fill="#d62828"/>
-            <path d="M98 66 q10 14 0 34 M124 62 q10 16 0 38 M152 60 q10 18 0 42 M180 62 q10 18 0 42 M208 68 q8 14 0 32" stroke="#ffd54f" stroke-width="4" fill="none" stroke-linecap="round"/>
-            <path class="tt-tail" d="M238 78 q24 -16 18 -46 q-12 14 -26 24 z" fill="#fff" stroke="#ffd54f" stroke-width="3"/>
-            <g class="tt-leg lf1"><rect x="84" y="104" width="14" height="34" rx="5" fill="#2b2b3a"/><ellipse cx="92" cy="140" rx="12" ry="5" fill="#111"/></g>
-            <g class="tt-leg lf2"><rect x="108" y="106" width="14" height="32" rx="5" fill="#343448"/><ellipse cx="116" cy="140" rx="12" ry="5" fill="#111"/></g>
-        </g>
-        <g class="tt-lion-head">
-            ${mane}
-            <path d="M52 24 q4 -18 12 -2 q-4 8 -12 2z" fill="#ffd54f" stroke="#c99a00" stroke-width="1.2"/>
-            <ellipse cx="56" cy="66" rx="40" ry="38" fill="#d62828" stroke="#ffd54f" stroke-width="4"/>
-            <path d="M28 48 q28 -24 56 0 q-28 12 -56 0z" fill="#ffd54f"/>
-            <circle cx="56" cy="40" r="5" fill="#ff5252" stroke="#ffd54f" stroke-width="1.5"/>
-            <circle cx="40" cy="60" r="11" fill="#fff" stroke="#222" stroke-width="2"/><circle cx="42" cy="61" r="5.2" fill="#111"/><circle cx="43.6" cy="59" r="1.6" fill="#fff"/>
-            <circle cx="72" cy="60" r="11" fill="#fff" stroke="#222" stroke-width="2"/><circle cx="74" cy="61" r="5.2" fill="#111"/><circle cx="75.6" cy="59" r="1.6" fill="#fff"/>
-            <ellipse cx="56" cy="76" rx="8" ry="6" fill="#ffd54f" stroke="#c99a00" stroke-width="1"/>
-            <g class="tt-jaw"><path d="M28 86 q28 26 56 0 q-4 22 -28 24 q-24 -2 -28 -24z" fill="#8e1018" stroke="#ffd54f" stroke-width="2"/><path d="M38 90 l4 8 l4 -8 M64 90 l4 8 l4 -8" fill="#fff" stroke="#fff" stroke-width="1"/></g>
-            <path d="M20 78 q-10 8 -16 22 M24 86 q-8 12 -10 26 M92 78 q10 8 16 22 M88 86 q8 12 10 26" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round"/>
-        </g>
-    </svg>`;
-}
-
 // ============================================================
-// TẾT — Phụng múa chạy dọc đáy màn hình (giống múa lân của Trung Thu) + pháo nổ (mức cao nhất)
 // ============================================================
-function buildPhoenixSvg() {
-    const cols = ['#e53935', '#ff7043', '#ffb300', '#26a69a', '#d81b60'];
-    const ends = [[262, 10], [268, 40], [266, 72], [258, 104], [244, 130]];
-    const sx = 192, sy = 80;
-    const feathers = ends.map(([ex, ey], i) => {
-        const dx = ex - sx, dy = ey - sy, len = Math.hypot(dx, dy);
-        const px = -dy / len, py = dx / len, w = 13;
-        const mx = sx + dx * 0.5, my = sy + dy * 0.5;
-        const ux = sx + dx * 0.88, uy = sy + dy * 0.88;
-        return `<path d="M${sx} ${sy - 3} Q${(mx + px * w).toFixed(1)} ${(my + py * w).toFixed(1)} ${ex} ${ey} Q${(mx - px * w).toFixed(1)} ${(my - py * w).toFixed(1)} ${sx} ${sy + 3} Z" fill="${cols[i % cols.length]}" stroke="#fff3c4" stroke-width="1" stroke-opacity=".7"/>` +
-            `<circle cx="${ux.toFixed(1)}" cy="${uy.toFixed(1)}" r="3.6" fill="#fff8e1" stroke="${cols[(i + 2) % cols.length]}" stroke-width="1.6"/>`;
-    }).join('');
-    return `
-    <svg viewBox="0 0 270 150" aria-hidden="true">
-        <g class="tp-body">
-            <g class="tt-leg lb1"><path d="M140 104 L138 134" stroke="#f59e0b" stroke-width="5" stroke-linecap="round"/><path d="M127 139 q11 -7 24 0" stroke="#f59e0b" stroke-width="4" fill="none" stroke-linecap="round"/></g>
-            <g class="tt-leg lb2"><path d="M164 104 L166 134" stroke="#d97706" stroke-width="5" stroke-linecap="round"/><path d="M153 139 q11 -7 24 0" stroke="#d97706" stroke-width="4" fill="none" stroke-linecap="round"/></g>
-            <g class="tp-tail">${feathers}</g>
-            <ellipse cx="150" cy="82" rx="52" ry="30" fill="#e53935" stroke="#ffd54f" stroke-width="3"/>
-            <ellipse cx="140" cy="92" rx="34" ry="17" fill="#ffd54f"/>
-            <path d="M116 88 q8 8 16 0 M134 92 q8 8 16 0 M152 90 q8 8 16 0 M126 98 q8 7 16 0 M144 100 q8 7 16 0" stroke="#f59e0b" stroke-width="2" fill="none" stroke-linecap="round" opacity=".8"/>
-            <g class="tp-wing">
-                <path d="M128 78 C122 52 140 24 190 12 C184 24 186 30 192 36 C182 34 176 40 174 46 C182 52 178 58 172 62 C166 60 160 66 158 74 Z" fill="#ffb300" stroke="#c2410c" stroke-width="1.5"/>
-                <path d="M132 74 C130 56 146 36 176 24 C162 40 152 56 150 74 Z" fill="#ffe082" opacity=".75"/>
-                <path d="M134 74 L184 18 M142 76 L180 42 M150 76 L172 58" stroke="#c2410c" stroke-width=".8" fill="none" opacity=".6" stroke-linecap="round"/>
-            </g>
-            <path d="M118 84 C100 80 88 66 82 52" stroke="#e53935" stroke-width="20" stroke-linecap="round" fill="none"/>
-            <path d="M116 90 C100 86 92 72 88 60" stroke="#ffd54f" stroke-width="7" stroke-linecap="round" fill="none" opacity=".85"/>
-        </g>
-        <g class="tp-head">
-            <path d="M66 30 C58 12 70 -2 80 2 C72 10 74 20 76 30 Z" fill="#ffb300" stroke="#c2410c" stroke-width="1"/>
-            <path d="M72 28 C70 8 84 0 94 8 C84 12 82 20 82 30 Z" fill="#ff7043" stroke="#c2410c" stroke-width="1"/>
-            <path d="M60 32 C48 20 52 6 62 4 C58 14 62 22 66 30 Z" fill="#26a69a" stroke="#00695c" stroke-width="1"/>
-            <circle cx="72" cy="44" r="18" fill="#e53935" stroke="#7f1d1d" stroke-width="1.5"/>
-            <ellipse cx="77" cy="52" rx="5" ry="3.2" fill="#ff8a80" opacity=".85"/>
-            <circle cx="68" cy="40" r="5.2" fill="#fff" stroke="#222" stroke-width="1.4"/><circle cx="67" cy="40.5" r="2.6" fill="#111"/><circle cx="66" cy="39.5" r=".9" fill="#fff"/>
-            <path d="M56 40 L32 47 L56 49 Z" fill="#ffd54f" stroke="#c99a00" stroke-width="1.2" stroke-linejoin="round"/>
-            <g class="tt-jaw"><path d="M56 49 L36 51 L54 57 Z" fill="#f59e0b" stroke="#c99a00" stroke-width="1.2" stroke-linejoin="round"/></g>
-            <path d="M78 56 q6 8 0 14 q-4 -6 -2 -12 Z" fill="#d81b60"/>
-        </g>
-    </svg>`;
-}
-
-// Pháo hoa trên trời + dây bánh pháo nổ (chỉ ở mức cao nhất). Thuần CSS animation, không dùng timer.
-function buildTetPaoHtml() {
-    const rnd = (a, b) => a + Math.random() * (b - a);
-    const colors = ['#ffd54f', '#ff5252', '#ff9800', '#fff59d', '#ff80ab', '#80d8ff', '#b9f6ca'];
-    const sparks = (n, rMin, rMax) => {
-        let s = '';
-        for (let k = 0; k < n; k++) {
-            const a = (k / n) * Math.PI * 2 + rnd(-0.15, 0.15);
-            const r = rnd(rMin, rMax);
-            s += `<i style="--dx:${(Math.cos(a) * r).toFixed(0)}px;--dy:${(Math.sin(a) * r).toFixed(0)}px"></i>`;
-        }
-        return s;
-    };
-    let html = '';
-    [[12, 18], [30, 32], [50, 14], [68, 28], [86, 16], [92, 44]].forEach(([x, y], i) => {
-        const p = rnd(4.5, 7.5);
-        html += `<div class="tet-boom tet-boom-sky" style="left:${(x + rnd(-4, 4)).toFixed(1)}%;top:${(y + rnd(-4, 6)).toFixed(1)}%;` +
-            `--c:${colors[i % colors.length]};--p:${p.toFixed(1)}s;--d:${(-rnd(0, p)).toFixed(2)}s">${sparks(14, 55, 100)}</div>`;
-    });
-    let items = '';
-    for (let i = 0; i < 8; i++) {
-        items += `<div class="tet-fc-item" style="--p:6s;--d:${(i * 0.32).toFixed(2)}s;--c:#ffb300"><span class="tet-boom">${sparks(6, 22, 42)}</span></div>`;
-    }
-    html += `<div class="tet-fc">${items}</div>`;
-    return html;
-}
 
 function renderBackdropScene(on, theme) {
     let el = document.getElementById('fxBackdrop');
@@ -3378,15 +3195,12 @@ function cssFxFallbackHtml(theme, cfg, lvl) {
     for (let i = 0; i < count; i++) {
         const dur = rnd(cfg.dur[0], cfg.dur[1]) * (lvl === 2 ? 0.75 : 1);
         const delay = (-rnd(0, cfg.dur[1])).toFixed(2);
-        if (cfg.rain) {
-            html += `<i class="fx-drop" style="left:${rnd(0, 118).toFixed(1)}%;height:${rnd(14, 30).toFixed(0)}px;` +
-                `animation-duration:${dur.toFixed(2)}s;animation-delay:${delay}s;opacity:${rnd(0.35, 0.8).toFixed(2)}"></i>`;
-        } else {
+        
             const g = cfg.glyphs[Math.floor(Math.random() * cfg.glyphs.length)];
             html += `<span class="fx-p" style="left:${rnd(0, 100).toFixed(1)}%;font-size:${rnd(cfg.size[0], cfg.size[1]).toFixed(0)}px;` +
                 `--sway:${rnd(-90, 90).toFixed(0)}px;--rot:${rnd(-360, 360).toFixed(0)}deg;` +
                 `animation-duration:${dur.toFixed(2)}s;animation-delay:${delay}s;opacity:${rnd(0.55, 0.95).toFixed(2)}">${g}</span>`;
-        }
+        
     }
     return html;
 }
@@ -3418,13 +3232,14 @@ function commitFullscreenFx() {
     const backdrop = active && (!!cfg.galaxy || theme === 'trungthu' || theme === 'halloween' || theme === 'tet');
     document.body.classList.toggle('fx-space-full', active && !!cfg.galaxy);   // topbar hoà vào nền vũ trụ
     document.body.classList.toggle('fx-backdrop-on', backdrop);                // khung nội dung thành kính mờ để thấy nền phía sau
+    RainFx.stop();
     ThreeFx.stop();                                                           // innerHTML bên dưới sẽ xoá canvas cũ
     SnowPile.stop();
     document.querySelectorAll('.hl-spider-rig').forEach(el => el.remove());
-    document.querySelectorAll('.tet-front-fx').forEach(el => el.remove());   // phụng múa + pháo nổ của Tết
     renderBackdropScene(active && (theme === 'trungthu' || theme === 'tet'), theme);
     if (!active) {
         if (layer) layer.remove();
+        if (theme === 'rain' && !reduced) RainFx.start(document.querySelector('.theme-deco-rain'), lvl);
         return;
     }
     if (!layer) {
@@ -3450,13 +3265,9 @@ function commitFullscreenFx() {
             html += `<i class="fx-comet" style="left:${rnd(35, 100).toFixed(0)}%;top:${rnd(0, 40).toFixed(0)}%;` +
                 `animation-duration:${rnd(7, 15).toFixed(1)}s;animation-delay:${(-rnd(0, 14)).toFixed(1)}s"></i>`;
         }
-    } else if (cfg.rain) {
-        if (lvl >= 1) html += `<div class="fx-lightning lv${lvl}"></div>`;     // chớp
-        if (lvl === 2) html += '<div class="fx-storm-dim"></div>';             // bão: trời tối sầm
-    } else if (theme === 'trungthu') {
-        if (lvl === 2) html += `<div class="tt-lion-wrap"><div class="tt-lion-flip">${buildLionSvg()}</div></div>`;   // múa lân
     }
     layer.innerHTML = html;
+    if (theme === 'rain') { RainFx.start(layer, lvl); return; }
 
     if (theme === 'noel' && lvl === 2) SnowPile.start(layer);                  // tuyết lớn: có đống tuyết
 
@@ -3817,7 +3628,7 @@ async function handleAuthenticatedUser(user) {
     if (auth.currentUser?.uid !== user.uid) return;
     currentUser.personalCalendarEvents = Array.isArray(userData?.personalCalendarEvents) ? userData.personalCalendarEvents : [];
     currentUser.holidayPolicy = userData?.holidayPolicy || {};
-    currentUser.changeHistory = userData?.changeHistory || [];
+    currentUser.changeHistory = readLocalChangeHistory(currentUser.uid);
 
     if (userData && userData.displayName) {
         // Store displayName in currentUser for easy access
@@ -4150,8 +3961,7 @@ function handleSignedOut() {
         [userProfileModal, jobModal, viewJobModal, dayOffModal,
             workHoursModal, salaryCalcModal, statisticsModal,
             presenterSpinModal, guideModal, viewDataModal, checkDueModal,
-            transferConfirmModal, quickJobInviteModal, quickJobTransferConfirmModal,
-            migrateLegacyJobsModal
+            transferConfirmModal, quickJobInviteModal, quickJobTransferConfirmModal
         ].forEach(m => { try { m && m.hide(); } catch (_) { } });
     } catch (_) { }
     document.body.classList.remove('modal-open');
@@ -4280,7 +4090,6 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     changePasswordConfirmModal = new bootstrap.Modal(document.getElementById('changePasswordConfirmModal'));
     settingsModal = new bootstrap.Modal(document.getElementById('settingsModal'));
-    migrateLegacyJobsModal = new bootstrap.Modal(document.getElementById('migrateLegacyJobsModal'));
     viewDataModal = new bootstrap.Modal(document.getElementById('viewDataModal'));
     checkDueModal = new bootstrap.Modal(document.getElementById('checkDueModal'));
     checkEtaDirectModal = new bootstrap.Modal(document.getElementById('checkEtaDirectModal'));
@@ -4443,7 +4252,6 @@ document.addEventListener('DOMContentLoaded', function () {
         } catch (e) { /* modal chưa init thì bỏ qua */ }
         try { await signOut(auth); } catch (e) { console.error(e); }
     });
-    document.getElementById('confirmMigrateLegacyJobsBtn').addEventListener('click', migrateLegacyJobs);
     document.getElementById('viewDataBtn').addEventListener('click', openViewDataModal);
     let todayTimelineTimer;
     const todayModal = document.getElementById('viewDataModal');
@@ -5211,21 +5019,6 @@ function renderOutOfScheduleJobs() {
         card.addEventListener('click', () => openViewJobModal(job));
         container.appendChild(card);
     });
-}
-
-async function toggleOutOfScheduleJob(job) {
-    if (!accessControl.requireAccess('jobs', 'edit')) return;
-    try {
-        const jobRef = doc(db, 'jobs', job.id);
-        await updateDoc(jobRef, {
-            isPaused: !job.isPaused,
-            updatedAt: new Date().toISOString()
-        });
-        showNotification(job.isPaused ? 'Đã bật lại job' : 'Đã dừng job', job.isPaused ? `Job "${job.title}" đã được bật lại.` : `Job "${job.title}" đã được dừng.`, false, job.isPaused ? 'success' : 'warning');
-    } catch (error) {
-        console.error('❌ Lỗi khi đổi trạng thái job ngoài lịch:', error);
-        showNotification('Lỗi', 'Không thể đổi trạng thái job.', false, 'danger');
-    }
 }
 
 // Render Schedule Calendar (2 tuần tới) - FIXED PAST/TODAY/FUTURE LOGIC
@@ -6085,7 +5878,7 @@ function escapeHtml(value) {
 // ============================================================
 
 const CHECK_DUE_MO_REGEX = /^(MX|MY)/i;
-const CHECK_DUE_DUE_REGEX = /^1\d{6}(\.0)?$/;
+
 const CHECK_DUE_MONTH_MAP = {
     jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
     jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12
@@ -6242,10 +6035,7 @@ function scheduleCheckDuePasteBadgeUpdate() {
  * Giống VBA FormatDue: chuyển chuỗi "1yymmdd" (7 ký tự) -> "mm/dd/yy".
  * Nếu không đúng format thì trả nguyên chuỗi gốc.
  */
-function formatDue(dueStr) {
-    const parsed = parseDueDate(dueStr);
-    return parsed ? parsed.display : String(dueStr ?? '').trim();
-}
+
 
 /**
  * Tách phần LINE (token đầu tiên) khỏi cell "LINE MSS" (vd "S226 093026" -> "S226").
@@ -6646,95 +6436,11 @@ async function copyCheckDueResult() {
     }
 }
 
-function getWeekdayLabel(dateValue) {
-    const weekdayIndex = getWeekdayIndex(dateValue);
-    if (weekdayIndex < 0) return '-';
-    return ['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật'][weekdayIndex];
-}
-
 function getWeekdayIndex(dateValue) {
     const [year, month, day] = String(dateValue || '').split('-').map(Number);
     if (!year || !month || !day) return -1;
     const sundayFirstIndex = new Date(year, month - 1, day).getDay();
     return sundayFirstIndex === 0 ? 6 : sundayFirstIndex - 1;
-}
-
-async function openLegacyMigrationModal() {
-    const targetSelect = document.getElementById('legacyTargetUser');
-    const countLabel = document.getElementById('legacyJobCount');
-    targetSelect.innerHTML = '<option value="">Đang tải user...</option>';
-    countLabel.textContent = 'Đang kiểm tra...';
-    migrateLegacyJobsModal.show();
-
-    try {
-        const [jobsSnapshot, usersSnapshot] = await Promise.all([
-            getDocs(collection(db, 'jobs')),
-            getDocs(collection(db, 'users'))
-        ]);
-        legacyJobs = [];
-        jobsSnapshot.forEach(jobDoc => {
-            const data = jobDoc.data();
-            if (!data.ownerId) legacyJobs.push({ id: jobDoc.id, ...data });
-        });
-        countLabel.textContent = legacyJobs.length;
-
-        const users = [];
-        usersSnapshot.forEach(userDoc => {
-            const user = userDoc.data();
-            if (user.appDeleted) return;
-            if (user.uid) users.push(user);
-        });
-        users.sort((a, b) => (a.displayName || a.email).localeCompare(b.displayName || b.email));
-        targetSelect.innerHTML = users.length
-            ? '<option value="">Chọn user nhận job...</option>'
-            : '<option value="">Chưa có user nào</option>';
-        users.forEach(user => {
-            const option = document.createElement('option');
-            option.value = user.uid;
-            option.textContent = user.displayName ? `${user.displayName} (${user.email})` : user.email;
-            targetSelect.appendChild(option);
-        });
-    } catch (error) {
-        console.error('Lỗi tải job cũ:', error);
-        countLabel.textContent = 'Không tải được';
-        targetSelect.innerHTML = '<option value="">Kiểm tra lại Firestore Rules</option>';
-    }
-}
-
-async function migrateLegacyJobs() {
-    const targetUid = document.getElementById('legacyTargetUser').value;
-    if (!targetUid) {
-        showNotification('Thiếu thông tin', 'Hãy chọn user nhận job.', false, 'warning');
-        return;
-    }
-    if (!legacyJobs.length) {
-        showNotification('Không có dữ liệu', 'Không còn job nào chưa có user.', false, 'info');
-        migrateLegacyJobsModal.hide();
-        return;
-    }
-
-    const button = document.getElementById('confirmMigrateLegacyJobsBtn');
-    button.disabled = true;
-    try {
-        for (let index = 0; index < legacyJobs.length; index += 500) {
-            const batch = writeBatch(db);
-            legacyJobs.slice(index, index + 500).forEach(job => {
-                batch.update(doc(db, 'jobs', job.id), {
-                    ownerId: targetUid,
-                    updatedAt: new Date().toISOString()
-                });
-            });
-            await batch.commit();
-        }
-        showNotification('Đã gán job cũ', `Đã chuyển ${legacyJobs.length} job cho user được chọn.`, false, 'success');
-        legacyJobs = [];
-        migrateLegacyJobsModal.hide();
-    } catch (error) {
-        console.error('Lỗi gán job cũ:', error);
-        showNotification('Lỗi', 'Không thể gán job cũ. Hãy kiểm tra Firestore Rules tạm thời.', false, 'danger');
-    } finally {
-        button.disabled = false;
-    }
 }
 
 async function transferJob() {
@@ -6873,12 +6579,6 @@ async function acceptTransfer() {
             const jobRef = doc(db, 'jobs', pendingTransferRequestData.jobId);
             await updateDoc(jobRef, {
                 ownerId: currentUser.uid,
-                transferHistory: arrayUnion({
-                    from: pendingTransferRequestData.fromUid,
-                    to: currentUser.uid,
-                    mode: 'transfer',
-                    timestamp: new Date().toISOString()
-                }),
                 updatedAt: new Date().toISOString()
             });
 
@@ -6896,14 +6596,10 @@ async function acceptTransfer() {
                 ownerId: currentUser.uid,
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
-                copiedFrom: pendingTransferRequestData.jobId,
-                copyHistory: [{
-                    from: pendingTransferRequestData.fromUid,
-                    to: currentUser.uid,
-                    timestamp: new Date().toISOString()
-                }]
+                copiedFrom: pendingTransferRequestData.jobId
             };
 
+            delete newJobData.transferHistory; delete newJobData.copyHistory;
             await addDoc(collection(db, 'jobs'), newJobData);
 
             // Gửi notification cho người copy rằng đã thành công
@@ -7053,12 +6749,6 @@ async function acceptQuickJobTransfer() {
                 assigneeUid: currentUser.uid,
                 assigneeName: currentUser.displayName || currentUser.email,
                 status: 'claimed',
-                transferHistory: arrayUnion({
-                    from: request.fromUid,
-                    to: currentUser.uid,
-                    mode: 'transfer',
-                    timestamp: new Date().toISOString()
-                }),
                 updatedAt: new Date().toISOString()
             });
 
@@ -7081,12 +6771,7 @@ async function acceptQuickJobTransfer() {
                 createdByName: currentUser.displayName || currentUser.email,
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
-                copiedFromQuickJobId: request.quickJobId,
-                copyHistory: [{
-                    from: request.fromUid,
-                    to: currentUser.uid,
-                    timestamp: new Date().toISOString()
-                }]
+                copiedFromQuickJobId: request.quickJobId
             });
 
             await pushNotification(
@@ -7609,22 +7294,20 @@ function toggleNotifDropdown() {
     }
 }
 
-async function markAllNotificationsRead() {
-    const unread = notificationsList.filter(n => !n.read);
-    if (unread.length === 0) return;
+function localNotificationReads(uid) {
     try {
-        for (let i = 0; i < unread.length; i += 500) {
-            const batch = writeBatch(db);
-            unread.slice(i, i + 500).forEach(n => {
-                batch.update(doc(db, 'notifications', n.id), { read: true });
-            });
-            await batch.commit();
-        }
-        unread.forEach(n => { n.read = true; });
-        renderNotifDropdown();
-    } catch (error) {
-        console.error('Lỗi đánh dấu đã đọc:', error);
-    }
+        const value = JSON.parse(localStorage.getItem('workpic_notification_reads_' + uid) || '[]');
+        return new Set(Array.isArray(value) ? value.slice(-500) : []);
+    } catch { return new Set(); }
+}
+
+async function markAllNotificationsRead() {
+    if (!currentUser) return;
+    const ids = localNotificationReads(currentUser.uid);
+    notificationsList.forEach(n => { ids.add(n.id); n.read = true; });
+    try { localStorage.setItem('workpic_notification_reads_' + currentUser.uid, JSON.stringify([...ids].slice(-500))); }
+    catch { /* Keep this session's read state when browser storage is unavailable. */ }
+    renderNotifDropdown();
 }
 
 function listenUserNotifications() {
@@ -7639,7 +7322,8 @@ function listenUserNotifications() {
 
     if (unsubscribeNotifications) unsubscribeNotifications();
     unsubscribeNotifications = onSnapshot(q, (snapshot) => {
-        notificationsList = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+        const readIds = localNotificationReads(currentUser.uid);
+        notificationsList = snapshot.docs.map(d => ({ id: d.id, ...d.data(), read: d.data().read === true || readIds.has(d.id) }));
 
         if (notifInitialLoadDone) {
             snapshot.docChanges().forEach(change => {
@@ -11760,98 +11444,9 @@ function workHoursDocId(dept, date) {
 }
 
 // "9.75" | "9,75" | "9.75h" -> 9.75 ; sai định dạng -> NaN
-function parseWorkHoursNumber(raw) {
-    let t = String(raw == null ? '' : raw).trim().replace(/h$/i, '').replace(/\s/g, '');
-    if (!t) return null;
-    if (t.includes(',') && !t.includes('.')) t = t.replace(',', '.');
-    else t = t.replace(/,/g, '');
-    if (!/^\d+(\.\d+)?$/.test(t)) return NaN;
-    return parseFloat(t);
-}
+
 
 const isValidWhNumber = (v) => typeof v === 'number' && !Number.isNaN(v);
-
-// Map viết tắt tên tháng tiếng Anh → số tháng
-const WORK_HOURS_MONTH_MAP = {
-    jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
-    jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12
-};
-
-// Không ghi năm → suy năm: nếu ngày đã qua > 180 ngày thì coi như năm sau
-function inferWorkHoursYear(mm, dd) {
-    const now = new Date();
-    const guess = new Date(now.getFullYear(), mm - 1, dd);
-    if (guess.getTime() - now.getTime() < -180 * 86400000) return now.getFullYear() + 1;
-    return now.getFullYear();
-}
-
-// Validate & tạo key 'YYYY-MM-DD'
-function buildWorkHoursKey(yyyy, mm, dd) {
-    if (!yyyy || !mm || !dd) return null;
-    if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
-    const dt = new Date(yyyy, mm - 1, dd);
-    if (dt.getFullYear() !== yyyy || dt.getMonth() !== mm - 1 || dt.getDate() !== dd) return null;
-    return `${yyyy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
-}
-
-/**
- * Parse ngày cho "Update giờ làm việc" — TẤT CẢ ưu tiên THÁNG trước.
- * Chấp nhận:
- *   1yymmdd           → 1 + yy + mm + dd (vd 1261007 = 10/07/2026)
- *   mm/dd/yyyy        → 10/07/2026
- *   mm/dd/yy          → 10/07/26
- *   mm/dd             → 10/07   (năm suy theo hôm nay)
- *   yyyy-mm-dd        → 2026-10-07
- *   d-Mon / d/Mon     → 5-Oct, 5/October
- *   Mon-d / Mon d     → Oct-5, October 5
- * Trả về 'YYYY-MM-DD' hoặc null nếu không parse được.
- */
-function parseWorkHoursDate(raw) {
-    const s = String(raw == null ? '' : raw).trim().replace(/\.0$/, '');
-    if (!s) return null;
-    let m;
-
-    // 1) 1yymmdd — 7 chữ số bắt đầu bằng 1
-    m = s.match(/^1(\d{2})(\d{2})(\d{2})$/);
-    if (m) return buildWorkHoursKey(2000 + +m[1], +m[2], +m[3]);
-
-    // 2) yyyy-mm-dd — phải check TRƯỚC mm/dd/yyyy để không nhầm
-    m = s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/);
-    if (m) return buildWorkHoursKey(+m[1], +m[2], +m[3]);
-
-    // 3) mm/dd/yyyy
-    m = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/);
-    if (m) return buildWorkHoursKey(+m[3], +m[1], +m[2]);
-
-    // 4) mm/dd/yy  (2 chữ số năm → 2000 + yy)
-    m = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2})$/);
-    if (m) return buildWorkHoursKey(2000 + +m[3], +m[1], +m[2]);
-
-    // 5) mm/dd  (không có năm → suy từ hôm nay)
-    m = s.match(/^(\d{1,2})[-\/.](\d{1,2})$/);
-    if (m) {
-        const mm = +m[1], dd = +m[2];
-        return buildWorkHoursKey(inferWorkHoursYear(mm, dd), mm, dd);
-    }
-
-    // 6) d-Mon / d/Mon / d Mon  (vd 5-Oct, 5/October)
-    m = s.match(/^(\d{1,2})[\s\/\-.]?([A-Za-z]{3,9})$/);
-    if (m) {
-        const dd = +m[1];
-        const mm = WORK_HOURS_MONTH_MAP[m[2].slice(0, 3).toLowerCase()];
-        if (mm) return buildWorkHoursKey(inferWorkHoursYear(mm, dd), mm, dd);
-    }
-
-    // 7) Mon-d / Mon-d / Mon d  (vd Oct-5, October 5)
-    m = s.match(/^([A-Za-z]{3,9})[\s\/\-.]?(\d{1,2})$/);
-    if (m) {
-        const mm = WORK_HOURS_MONTH_MAP[m[1].slice(0, 3).toLowerCase()];
-        const dd = +m[2];
-        if (mm) return buildWorkHoursKey(inferWorkHoursYear(mm, dd), mm, dd);
-    }
-
-    return null;
-}
 
 function formatWorkHoursDateLabel(key) {
     const [y, m, d] = key.split('-');
@@ -11859,38 +11454,7 @@ function formatWorkHoursDateLabel(key) {
 }
 
 // Phân tích text dán: mỗi dòng "ngày | Motion | Station"
-function parseWorkHoursText(text) {
-    const lines = String(text || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-    const rows = [];
 
-    lines.forEach((line, idx) => {
-        const cols = (line.includes('\t') ? line.split('\t') : line.split(/[;\s|]+/))
-            .map(c => c.trim())
-            .filter((c, i, arr) => c !== '' || arr.length <= 3);
-
-        const date = parseWorkHoursDate(cols[0]);
-        const motion = parseWorkHoursNumber(cols[1]);
-        const station = parseWorkHoursNumber(cols[2]);
-
-        // Dòng tiêu đề (dòng đầu, không có ngày và không có số hợp lệ nào ở 2 cột sau)
-        if (!date && idx === 0 && !isValidWhNumber(motion) && !isValidWhNumber(station)) return;
-
-        const row = { line, date, motion, station, error: '', skipped: false };
-
-        if (!date) row.error = 'Ngày không hợp lệ';
-        else if (motion === null && station === null) row.error = 'Cần nhập ít nhất Motion hoặc Station';
-        else if (Number.isNaN(motion)) row.error = 'Giờ Motion không hợp lệ';
-        else if (Number.isNaN(station)) row.error = 'Giờ Station không hợp lệ';
-
-        rows.push(row);
-    });
-
-    const lastIdx = {};
-    rows.forEach((r, i) => { if (!r.error) lastIdx[r.date] = i; });
-    rows.forEach((r, i) => { if (!r.error && lastIdx[r.date] !== i) r.skipped = true; });
-
-    return rows;
-}
 
 function renderWorkHoursPreview() {
     document.getElementById('whPreviewCount').textContent = workHoursParsed.length;
@@ -12189,10 +11753,6 @@ function buildScheduleEntries(rangeStart, rangeEnd, jobList, offMap = getMyOffMa
     return map;
 }
 
-function isJobScheduledOnDate(job, date) {
-    return !!getScheduleEntryOnDate(job, date);
-}
-
 // Entry của job hiển thị ở ngày `date` (đã tính off / dời ngày / đổi giờ), hoặc null
 function getScheduleEntryOnDate(job, date) {
     const day = new Date(date);
@@ -12325,11 +11885,6 @@ function initTimelineView() {
     });
 
     updateScheduleViewUI();
-}
-
-function toggleScheduleView() {
-    const views = ['calendar', 'timeline'];
-    setScheduleView(views[(views.indexOf(scheduleView) + 1) % views.length]);
 }
 
 function updateScheduleViewUI() {
@@ -14287,7 +13842,7 @@ function computeStatistics(mode) {
             byUser[uid] = { uid, name, totalMinutes: 0, jobs: [] };
         }
         byUser[uid].totalMinutes += totalForJob;
-        byUser[uid].jobs.push({ job, occurrences: occurrences.length, minutes: totalForJob });
+        byUser[uid].jobs.push({ job, occurrences: occurrences.length, occurrenceDates: occurrences.map(date => localDateKey(date)), minutes: totalForJob });
     });
 
     const totalAvailable = WORK_HOURS_PER_DAY * 60 * totalDays;
@@ -14389,14 +13944,20 @@ function renderStatistics() {
                     row.classList.add('hidden-user');
                 }
                 saveStatsHiddenUsers();
+                renderStatisticsDetails(stats);
             });
         });
     }
 
     // ----- Table chi tiết -----
+    renderStatisticsDetails(stats);
+}
+
+function renderStatisticsDetails(stats) {
     const tableEl = document.getElementById('statsTable');
-    if (stats.users.length === 0) {
-        tableEl.innerHTML = '<div class="empty-state"><i class="bi bi-inbox"></i><br>Chưa có dữ liệu</div>';
+    const visibleUsers = stats.users.filter(user => !statsHiddenUsers.has(user.uid));
+    if (visibleUsers.length === 0) {
+        tableEl.innerHTML = `<div class="empty-state"><i class="bi bi-inbox"></i><br>${stats.users.length ? 'Tích chọn user để xem chi tiết job.' : 'Chưa có dữ liệu'}</div>`;
         return;
     }
 
@@ -14407,17 +13968,17 @@ function renderStatistics() {
                 <th>Job</th>
                 <th>Loại</th>
                 <th>Số lần</th>
+                <th>Thứ thực hiện</th>
                 <th>Thời gian/lần</th>
                 <th>Tổng (giờ)</th>
             </tr>
         </thead><tbody>`;
 
-    stats.users.forEach(u => {
+    visibleUsers.forEach(u => {
         u.jobs.sort((a, b) => b.minutes - a.minutes);
         u.jobs.forEach((j, idx) => {
-            const isHiddenUser = statsHiddenUsers.has(u.uid);
             const userCell = idx === 0
-                ? `<td rowspan="${u.jobs.length}" style="vertical-align: top; font-weight: 700; ${isHiddenUser ? 'opacity:.4;' : ''}">${escapeHtml(u.name)}</td>`
+                ? `<td rowspan="${u.jobs.length}" style="vertical-align: top; font-weight: 700;">${escapeHtml(u.name)}</td>`
                 : '';
             html += `
                 <tr>
@@ -14425,6 +13986,7 @@ function renderStatistics() {
                     <td>${escapeHtml(j.job.title)}</td>
                     <td><span class="job-type-label ${escapeHtml(j.job.type)}">${escapeHtml(getTypeLabel(j.job.type))}</span></td>
                     <td>${j.occurrences}</td>
+                    <td><div class="stats-occurrence-dates">${j.occurrenceDates.map(date => `<time datetime="${escapeHtml(date)}">${['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'][new Date(date + 'T00:00:00').getDay()]}</time>`).join('')}</div></td>
                     <td>${getJobDuration(j.job)} phút</td>
                     <td><strong>${(j.minutes / 60).toFixed(1)}h</strong></td>
                 </tr>`;
@@ -15328,6 +14890,14 @@ function describeJobChanges(before = {}, after = {}) {
     return changes.join('\n') || 'Lưu thông tin job';
 }
 
+function readLocalChangeHistory(uid) {
+    try {
+        const entries = JSON.parse(localStorage.getItem('workpic_history_' + uid) || '[]');
+        const cutoff = Date.now() - 7 * 86400000;
+        return Array.isArray(entries) ? entries.filter(e => e && Date.parse(e.at) >= cutoff).slice(-50) : [];
+    } catch { return []; }
+}
+
 async function recordChange(kind, action, title, detail = '', user = currentUser) {
     if (!user) return;
     const entry = {
@@ -15335,22 +14905,10 @@ async function recordChange(kind, action, title, detail = '', user = currentUser
         detail: String(detail).slice(0, 1200), actor: user.displayName || user.email || user.uid,
         actorId: user.uid, at: new Date().toISOString()
     };
-    try {
-        const snapshot = await getDocs(query(collection(db, 'users'), where('uid', '==', user.uid)));
-        if (snapshot.empty) throw new Error('Không tìm thấy tài khoản.');
-        let latest = [];
-        await runTransaction(db, async transaction => {
-            const documents = await Promise.all(snapshot.docs.map(d => transaction.get(d.ref)));
-            documents.forEach(d => {
-                latest = [...(d.data().changeHistory || []), entry].slice(-200);
-                transaction.update(d.ref, { changeHistory: latest });
-            });
-        });
-        if (currentUser?.uid === user.uid) user.changeHistory = latest;
-    } catch (error) {
-        console.error('Không ghi được lịch sử:', error);
-        showNotification('Lịch sử chưa được lưu', 'Thay đổi đã được lưu, nhưng chưa ghi được lịch sử. ' + error.message, false, 'warning');
-    }
+    const latest = [...readLocalChangeHistory(user.uid), entry].slice(-50);
+    if (currentUser?.uid === user.uid) user.changeHistory = latest;
+    try { localStorage.setItem('workpic_history_' + user.uid, JSON.stringify(latest)); }
+    catch { /* Optional local history must never interrupt a saved job. */ }
 }
 
 function renderChangeHistory() {
@@ -15374,15 +14932,8 @@ function setupProductivityFeatures() {
         if (!user) return;
         const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('changeHistoryModal'));
         modal.show();
-        document.getElementById('changeHistoryList').textContent = 'Đang tải lịch sử…';
-        try {
-            const data = await getUserData(user.uid);
-            if (currentUser?.uid !== user.uid) return;
-            user.changeHistory = data?.changeHistory || [];
-            renderChangeHistory();
-        } catch (error) {
-            document.getElementById('changeHistoryList').textContent = 'Không tải được lịch sử. Hãy đóng và mở lại để thử.';
-        }
+        user.changeHistory = readLocalChangeHistory(user.uid);
+        renderChangeHistory();
     });
     document.getElementById('personalEventRepeat').addEventListener('change', e => {
         const until = document.getElementById('personalEventUntil');

@@ -140,11 +140,6 @@
                     </div>
                 </div>
                 <div class="theme-deco theme-deco-rain">
-                    <span class="rain-cloud c1">☁️</span>
-                    <span class="rain-cloud c2">☁️</span>
-                    <span class="rain-cloud c3">☁️</span>
-                    <span class="rain-drops"></span>
-                    <span class="rain-flash"></span>
                 </div>
                 <div class="theme-deco theme-deco-space">
                     <span class="space-nebula"></span>
@@ -627,41 +622,6 @@
     </div>
 
     <!-- Migrate Legacy Jobs Modal -->
-    <div class="modal fade workpic-dialog" id="migrateLegacyJobsModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header modern-header modern-header-warning">
-                    <div class="modern-header-inner">
-                        <div class="modern-header-icon">
-                            <i class="bi bi-person-plus-fill"></i>
-                        </div>
-                        <div class="modern-header-text">
-                            <h5 class="modal-title mb-0">Gán job cũ</h5>
-                            <p class="modern-header-subtitle mb-0">Chuyển job chưa có user sang tài khoản mới</p>
-                        </div>
-                    </div>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
-                </div>
-                <div class="modal-body">
-                    <p>Chuyển toàn bộ job chưa có user cho tài khoản được chọn.</p>
-                    <p class="mb-3">Số job chưa có user: <strong id="legacyJobCount">Đang kiểm tra...</strong></p>
-                    <label class="form-label fw-bold" for="legacyTargetUser">User nhận job</label>
-                    <select class="form-select" id="legacyTargetUser">
-                        <option value="">Đang tải user...</option>
-                    </select>
-                    <p class="form-text">Chức năng này chỉ dùng một lần để xử lý dữ liệu cũ.</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-cancel" data-bs-dismiss="modal">Hủy</button>
-                    <button type="button" class="btn btn-save" id="confirmMigrateLegacyJobsBtn">
-                        <i class="bi bi-check-circle-fill"></i> Gán toàn bộ
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- View Data Modal -->
     <div class="modal fade workpic-dialog" id="viewDataModal" tabindex="-1">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
@@ -1138,7 +1098,7 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
         <div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">
             <div class="modal-header modern-header"><div class="modern-header-inner"><div class="modern-header-icon"><i class="bi bi-clock-history"></i></div><div><h5 class="modal-title" id="changeHistoryTitle">Lịch sử thay đổi của tôi</h5><p class="modern-header-subtitle mb-0">Theo dõi những cập nhật trong công việc của bạn</p></div></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div>
             <div class="modal-body">
-                <p class="small text-muted">200 thay đổi gần nhất từ khi có chức năng này: job, checklist, lịch off, lịch lễ và sự kiện cá nhân.</p>
+                <p class="small text-muted">Tối đa 50 thay đổi trong 7 ngày, chỉ lưu trên trình duyệt này để tiết kiệm Firebase. Không đồng bộ giữa các máy.</p>
                 <div class="d-flex gap-2 mb-3 history-toolbar"><input id="changeHistorySearch" class="form-control" placeholder="Tìm tên, nội dung thay đổi…" aria-label="Tìm lịch sử"><select id="changeHistoryFilter" class="form-select w-auto" aria-label="Loại thay đổi"><option value="all">Tất cả</option><option value="job">Job</option><option value="off">Lịch off</option><option value="holiday">Lịch lễ</option><option value="event">Sự kiện</option></select></div>
                 <div id="changeHistoryList" aria-live="polite"></div>
             </div>
@@ -2036,7 +1996,7 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
                                     <div class="ia-item">Hiện / ẩn Chủ Nhật<span>Toggle ở tiêu đề Lịch làm việc</span>
                                     </div>
                                     <div class="ia-item">Xem job hôm nay<span>Bấm Xem dữ liệu để xem Timeline và danh sách job theo ca ngày 07:00–20:00 hoặc ca đêm 20:00–07:00. Vạch đỏ chỉ giờ hiện tại, viền cầu vồng chỉ job đang chạy; bấm job để mở chi tiết.</span></div>
-                                    <div class="ia-item">Lịch sử thay đổi<span>Bấm Lịch sử ở tiêu đề lịch để xem tối đa 200 thay đổi gần nhất của job, checklist, lịch off, lịch lễ và sự kiện. Có tìm kiếm và lọc theo loại.</span></div>
+                                    <div class="ia-item">Lịch sử thay đổi<span>Bấm Lịch sử để xem tối đa 50 thay đổi trong 7 ngày trên trình duyệt đang dùng. Có tìm kiếm và lọc; lịch sử không ghi Firebase và không đồng bộ giữa các máy.</span></div>
                                     <div class="ia-item">Tạo job bằng AI<span>Mở công cụ AI, cấu hình khóa API theo hộp thoại rồi dán tin nhắn/email/ghi chú. Kiểm tra và sửa tên, lịch, giờ, thời lượng trước khi tạo các job đã chọn.</span></div>
                                     <div class="ia-item">Hồ sơ cá nhân<span>Đổi avatar, tên hiển thị, bộ phận và ca làm việc. Khi đổi ca, có thể chuyển giờ các job hiện tại hoặc giữ nguyên.</span></div>
                                     <div class="ia-item">Mở folder nhanh<span>Bấm vào đường dẫn trong nội dung Job để
