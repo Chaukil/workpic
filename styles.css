@@ -15037,3 +15037,98 @@ body.theme-dark .btn-close { filter: invert(1) grayscale(1); }
 body .daily-exclude-chip.active { background: var(--primary-soft); color: var(--primary); border-color: var(--primary); }
 body .daily-exclude-chip:not(.active) { opacity: 1; color: var(--muted); }
 body :is(button, input, select, textarea):focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+/* Dialog controls use the same palette in every form. */
+body .modal .btn-close {
+    color: var(--text) !important;
+    background-image: none !important;
+    background-color: var(--surface-strong) !important;
+    border: 1px solid var(--border) !important;
+    filter: none !important;
+    opacity: 1 !important;
+    display: inline-grid; place-items: center;
+}
+body .modal .btn-close::before {
+    content: ''; width: 13px; height: 13px; background: currentColor;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m3 3 10 10M13 3 3 13' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m3 3 10 10M13 3 3 13' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+body .modal .btn-close:hover { background-color: var(--primary-soft) !important; border-color: var(--primary) !important; }
+body .modal .modal-header :is(.modern-header-subtitle, .check-due-header-subtitle) {
+    color: var(--muted) !important; opacity: 1 !important; text-shadow: none;
+    font-size: .9rem; font-weight: 500; line-height: 1.6;
+}
+body .schedule-view-tabs { background: var(--surface-muted); border: 1px solid var(--border); padding: 4px; border-radius: 11px; }
+body .schedule-view-tab { color: var(--muted); background: transparent; border: 1px solid transparent; font-size: .85rem; padding: 8px 12px; }
+body .schedule-view-tab:hover:not(.active) { color: var(--text); background: var(--surface-strong); }
+body .schedule-view-tab.active { color: var(--primary); background: var(--surface); border-color: var(--border); box-shadow: none; }
+
+/* Once is violet; monthly keeps its amber identity in every view. */
+:root { --once-color: #8b5cf6; }
+body :is(.schedule-item, .timeline-job).once:not(.shifted):not(.moved) {
+    background: linear-gradient(135deg, #7c3aed, #a78bfa); border-color: #8b5cf6; color: #fff;
+}
+body .schedule-item.once:not(.shifted):not(.moved) :is(h6, small) { color: #fff; text-shadow: none; }
+body .job-type-label.once { color: #7c3aed; background: var(--primary-soft); }
+body.theme-dark .job-type-label.once { color: #c4b5fd; }
+
+/* Event cards stay readable on holidays and days off, including long notes. */
+body .calendar-personal-event,
+body #dayOffCalendars .calendar-personal-event {
+    --event-accent: #047857;
+    position: relative; display: flex; flex-direction: column; gap: 8px;
+    width: 100%; min-width: 0; max-width: 100%; height: auto; max-height: none;
+    padding: 14px; margin: 9px 0; border: 1px solid color-mix(in srgb, var(--event-accent) 45%, var(--border));
+    border-left: 4px solid var(--event-accent); border-radius: 12px;
+    color: var(--text); background: color-mix(in srgb, #10b981 9%, var(--surface));
+    text-align: left; white-space: normal; overflow: visible; text-overflow: clip;
+    overflow-wrap: anywhere; line-height: 1.55; font-size: .95rem;
+    animation: none; box-shadow: none; isolation: isolate;
+}
+body.theme-dark .calendar-personal-event,
+body.theme-dark #dayOffCalendars .calendar-personal-event { --event-accent: #6ee7b7; background: color-mix(in srgb, #10b981 12%, var(--surface)); }
+body .calendar-personal-event::after {
+    content: ''; position: absolute; inset: -2px; border: 2px solid var(--event-accent); border-radius: inherit;
+    pointer-events: none; animation: event-card-glow 2.8s ease-in-out infinite; opacity: .2;
+}
+body .calendar-personal-event:hover { border-color: var(--event-accent); background: color-mix(in srgb, #10b981 15%, var(--surface)); }
+.event-card-meta { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 7px; }
+.event-card-kind { color: var(--event-accent); font-size: .75rem; font-weight: 650; line-height: 1.5; }
+.event-card-time { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 7px; background: var(--surface); border: 1px solid var(--border); color: var(--text); font-size: .85rem; font-weight: 750; white-space: nowrap; }
+.event-card-title { display: block; color: var(--text); font-size: 1rem; font-weight: 750; line-height: 1.5; white-space: pre-wrap; }
+.event-card-notes { display: block; color: var(--text); font-size: .9rem; line-height: 1.65; white-space: pre-wrap; }
+.timeline-day-label:has(.calendar-personal-event) { align-items: stretch; }
+.timeline-day-label .calendar-personal-event { text-align: left; }
+@keyframes event-card-glow { 0%, 100% { opacity: .12; } 50% { opacity: .75; } }
+@media (prefers-reduced-motion: reduce) { body .calendar-personal-event::after { animation: none; opacity: .4; } }
+
+.dayoff-details-toggle { display: none; }
+@media (max-width: 992px) {
+    .dayoff-details-toggle { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 11px 13px; margin: 10px 0; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-muted); color: var(--text); font: inherit; font-weight: 650; }
+    .dayoff-details-toggle[aria-expanded='false'] + #dayOffDetailList { display: none; }
+    .dayoff-details-toggle[aria-expanded='true'] + #dayOffDetailList { display: block; }
+    .dayoff-details-toggle[aria-expanded='false'] .toggle-hide,
+    .dayoff-details-toggle[aria-expanded='true'] .toggle-show { display: none; }
+    .dayoff-details-toggle[aria-expanded='true'] i { transform: rotate(180deg); }
+}
+body .job-type-label.once { background: color-mix(in srgb, #8b5cf6 15%, var(--surface)); }
+.timeline-row:has(.timeline-row-events) { flex-wrap: wrap; }
+.timeline-row-events { flex: 0 0 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 10px; padding: 10px; background: var(--surface); border-top: 1px solid var(--border); }
+.timeline-row-events .calendar-personal-event { margin: 0; }
+#dayOffModal .dayoff-day:has(.calendar-personal-event) { height: auto; max-height: none; overflow: visible; }
+@media (max-width: 760px) {
+    body #dayOffCalendars .calendar-personal-event { padding: 8px; }
+    #dayOffCalendars .event-card-meta { flex-direction: column; }
+}
+@media (prefers-reduced-motion: reduce) {
+    body .calendar-personal-event::after { animation: none; opacity: .4; }
+}
+body .topbar-subtitle { color: var(--muted); opacity: 1; }
+body .legend-event { color: #047857; }
+body.theme-dark .legend-event { color: #6ee7b7; }
+@media (max-width: 992px) {
+    #dayOffCalendars:has(.calendar-personal-event) { overflow-x: auto; }
+    #dayOffCalendars .dayoff-month:has(.calendar-personal-event) { min-width: 770px; }
+}
+body .modal .modal-header { background: var(--surface) !important; color: var(--text); border-bottom-color: var(--border); }
+body .modal .modal-header .modal-title { color: var(--text) !important; text-shadow: none; }

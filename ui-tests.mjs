@@ -14,8 +14,8 @@ const extract = (start, end) => source.slice(source.indexOf(start), source.index
 const markup = fs.readFileSync('index.html', 'utf8').replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '').replace(/<link\b[^>]*>/gi, '');
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'workpic-ui-'));
 const script = `
-import { personalEventOccurs } from '${pathToFileURL(path.resolve('app-data.js'))}';
-import { vietnameseLunar, holidaysForYear, monthPair } from '${pathToFileURL(path.resolve('app-data.js'))}';
+${source.split('// BEGIN SHARED HELPERS\n')[1].split('// END SHARED HELPERS')[0]}
+
 const check = (value, message) => { if (!value) throw new Error(message); };
 const currentUser = { uid: 'me', personalCalendarEvents: [{id:'event',date:'2026-11-05',title:'Weekly appointment',repeat:'weekly',until:'2026-12-01'}], changeHistory: [{kind:'event',action:'Added',title:'Meeting',actor:'Me',detail:'Weekly',at:'2026-11-05T10:00:00Z'}] };
 const accessControl = { can: () => true, requireAccess: () => true };

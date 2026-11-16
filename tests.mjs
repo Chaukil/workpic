@@ -1,4 +1,6 @@
-import { createScheduleCache, reconcileChildren, reconcileMarkup } from './render-utils.js';
+const helperSource = fs.readFileSync('app.js', 'utf8').split('// BEGIN SHARED HELPERS\n')[1].split('// END SHARED HELPERS')[0];
+const helperModule = helperSource + '\nexport { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache };';
+const { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache } = await import('data:text/javascript;base64,' + Buffer.from(helperModule).toString('base64'));
 import assert from 'node:assert/strict';
 import fs, { readFileSync } from 'node:fs';
 import vm from 'node:vm';
@@ -88,7 +90,6 @@ test('signed-in accounts have equal access without reading legacy permissions', 
     assert.equal(context.session.isAdmin, undefined);
     assert.doesNotMatch(source, /createAdminStore|profilePolicy|ADMIN_EMAIL|auth\.signOut\(/);
 });
-import { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries } from './app-data.js';
 test('saving an account name updates duplicate profiles, keeps the dialog open and reports failures inline', async () => {
     const source = fs.readFileSync('app.js', 'utf8');
     const code = source.slice(source.indexOf('async function saveUserProfile('), source.indexOf('function handleChangePassword('));
@@ -836,7 +837,7 @@ console.log('Calendar duration passed: start/end boundaries, default duration, o
 
 // ===== work-hours-data checks =====
 await (async function () {
-const code = readFileSync(new URL('./app-data.js', import.meta.url), 'utf8');
+const code = helperModule;
 const { convertWorkHoursRows: convert } = await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64'));
 const row = { ETD: '2026-11-28', MSS: 'MSS1125', KIND: 'MOTION', LINE: 'M151', THU: 11.5, FRI: 11.5, SAT: 9.75, SUN: 8, MON: 11.5, TUE: 0, WED: 9.75 };
 const station = { ...row, KIND: 'STATION', LINE: 'O100' };

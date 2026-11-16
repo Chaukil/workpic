@@ -12,7 +12,7 @@ Run `npm.cmd ci` and `npm.cmd run build` to regenerate `dist/`.
 Publish only `dist/index.html` and `dist/sw.js` when using the bundled version.
 Do not upload `node_modules/` or `.artifacts/` to GitHub or hosting.
 
-The source version requires `index.html`, `app.js`, `app-data.js`, `styles.css` and `sw.js` together.
+The source version requires `index.html`, `app.js`, `styles.css` and `sw.js` together.
 Keep `start-server.pyw` and `serve-work-hours.ps1` for the local IBM work-hours service.
 
 ## Verification
@@ -24,5 +24,5 @@ These checks do not sign into the live Firebase project.
 Excel and PDF libraries load only when importing a spreadsheet or exporting PDF.
 Those actions require internet access to their existing CDN.
 
-See `firestore.rules` for the current rules. All signed-in accounts use the same application features.
+All signed-in accounts use the same application features.
 No administrator email or application permission gate remains.
