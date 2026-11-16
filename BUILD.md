@@ -26,3 +26,7 @@ Those actions require internet access to their existing CDN.
 
 All signed-in accounts use the same application features.
 No administrator email or application permission gate remains.
+
+Build and all verification code live in `tools.mjs`. Use the npm commands above;
+`npm.cmd run test:performance` runs browser rendering/performance checks.
+The runtime files remain `app.js` and `sw.js`; no extra JS files are needed for publishing.

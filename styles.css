@@ -13056,7 +13056,7 @@ body.theme-dark #settingsModal .form-control {
 #settingsModal .job-switch-card .form-check-input {
     width: 2.4em;
     height: 1.3em;
-    margin-left: -2.2rem;
+    margin-left: 0;
     margin-top: 0.05rem;
     cursor: pointer;
     background-color: rgba(148, 163, 184, 0.35);
@@ -15132,3 +15132,93 @@ body.theme-dark .legend-event { color: #6ee7b7; }
 }
 body .modal .modal-header { background: var(--surface) !important; color: var(--text); border-bottom-color: var(--border); }
 body .modal .modal-header .modal-title { color: var(--text) !important; text-shadow: none; }
+
+/* Complete holiday names and a full-width all-day timeline lane. */
+.schedule-table .calendar-holiday-label {
+ white-space: normal; overflow: visible; text-overflow: clip;
+ overflow-wrap: anywhere; font-size: .8rem; line-height: 1.5;
+}
+.timeline-holiday {
+ position: absolute; left: 0; right: 0; top: 3px; min-height: 38px;
+ display: flex; align-items: center; gap: 10px; padding: 6px 12px;
+ box-sizing: border-box; border: 1px solid rgba(245,158,11,.6);
+ border-radius: 6px; background: color-mix(in srgb, #f59e0b 18%, var(--surface));
+ color: #925500; font-size: .85rem; line-height: 1.5; overflow-wrap: anywhere;
+}
+.timeline-holiday > span { flex-shrink: 0; font-weight: 500; }
+body.theme-dark .timeline-holiday { color: #fcd34d; }
+
+/* Calendar bands share the time axis; jobs remain above their backgrounds. */
+.timeline-row .timeline-track { isolation: isolate; }
+.timeline-row .timeline-holiday, .timeline-calendar-event {
+ position: absolute; top: 0; bottom: 0; min-height: 0; padding: 0;
+ display: block; border-radius: 5px; z-index: 0; overflow: hidden;
+}
+.timeline-calendar-event {
+ background: color-mix(in srgb, #10b981 15%, transparent);
+ border: 1px solid rgba(16,185,129,.65); color: #047857;
+ box-sizing: border-box;
+}
+.timeline-calendar-caption {
+ position: absolute; left: 0; right: 0; min-height: 38px;
+ padding: 8px 10px; box-sizing: border-box; font-size: .8rem; line-height: 1.5;
+ overflow-wrap: anywhere;
+}
+.timeline-calendar-caption > span { margin-right: 8px; }
+.timeline-row .timeline-job { z-index: 2; }
+body.theme-dark .timeline-calendar-event { color: #6ee7b7; }
+
+/* Events occupy only their annotation lane below the jobs. */
+.timeline-calendar-event { bottom: auto; }
+.timeline-calendar-event .timeline-calendar-caption { position: static; padding: 8px 10px; }
+/* Size settings rows by their contents so scrolling never clips the cards. */
+#settingsModal.modal .modal-body { grid-auto-rows: max-content; align-items: start; }
+#settingsModal.modal .settings-section { min-width: 0; }
+@media (min-width: 761px) and (max-width: 1440px), (min-width: 761px) and (max-height: 800px) {
+ html { font-size: 14px; }
+ .timeline-job-time { font-size: .58rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
+ .timeline-job-title { font-size: .72rem; }
+ #settingsModal.modal .modal-dialog[class] { width: 94vw; max-width: 1200px; height: 94dvh; max-height: 94dvh; margin: 3dvh auto; }
+ #settingsModal.modal .modal-content[class] { height: 94dvh; max-height: 94dvh; }
+ #settingsModal.modal .modal-header, #settingsModal.modal .modal-footer { padding: 12px 18px; }
+ #settingsModal.modal .modal-body { padding: 16px 18px; gap: 12px; }
+ #settingsModal.modal .settings-section { padding: 14px; }
+ #settingsModal.modal .settings-section-head { gap: 10px; margin-bottom: 12px; }
+ #settingsModal.modal .settings-section-head > i { width: 30px; height: 30px; flex-shrink: 0; font-size: 1rem; }
+ #settingsModal.modal .modern-header-icon { width: 38px; height: 38px; font-size: 1.2rem; }
+ #settingsModal.modal .form-select, #settingsModal.modal .job-switch-card { padding: 9px 12px; }
+ #settingsModal.modal .theme-card { padding: 9px 4px; }
+ #settingsModal.modal .theme-card-emoji { font-size: 1.4rem; }
+}
+
+/* Keep the switch and its label inside the same padded card. */
+#settingsModal.modal .job-switch-card {
+ display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+}
+#settingsModal.modal .job-switch-card .form-check-input {
+ float: none; flex: 0 0 2.4em; margin: 0;
+}
+#settingsModal.modal .job-switch-card .form-check-label { min-width: 0; }
+/* Animate actual column widths together, without a flex-basis jump or slide. */
+@media (min-width: 769px) {
+ .container-fluid > .row:has(> #sidebar) { flex-wrap: nowrap; }
+ #sidebar {
+  flex: 0 0 auto; width: 33.333333%; min-width: 0; max-width: none;
+  transform: none; opacity: 1;
+  transition: width 360ms cubic-bezier(.22,1,.36,1), padding 360ms cubic-bezier(.22,1,.36,1), opacity 280ms ease;
+ }
+ #sidebar.hidden { transform: none; max-width: none !important; }
+ #mainContent, #mainContent.expanded {
+  flex: 1 1 0% !important; width: 0 !important; min-width: 0; max-width: none !important;
+  transition: none;
+ }
+}
+@media (min-width: 992px) { #sidebar { width: 25%; } }
+@media (prefers-reduced-motion: reduce) { #sidebar { transition: none; } }
+
+/* Keep the job header and tools intact; give the remaining space to the list. */
+#sidebar .job-list-card { height: 100%; min-height: 0; flex: 1 0 100%; }
+#sidebar .job-list-card > .card-header { flex: 0 0 auto; }
+#sidebar .job-list-card > .card-body { overflow-y: auto; }
+#sidebar .job-list-card > .card-body > :not(.job-list) { flex: 0 0 auto; }
+#sidebar .job-list { flex: 1 0 120px; min-height: 120px; }

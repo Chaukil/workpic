@@ -4776,7 +4776,7 @@ function renderSchedule() {
             if (holiday) {
                 const note = document.createElement('div');
                 note.className = 'calendar-holiday-label';
-                note.textContent = compactCalendarLabel(holiday);
+                note.textContent = holiday;
                 note.title = holiday;
                 cell.appendChild(note);
             }
@@ -11922,7 +11922,20 @@ function renderTimeline({ todayOnly = false, containerId = 'timelineView' } = {}
             const sCount = shiftedLanes.length > 0 ? Math.max(...shiftedLanes.map(j => j.laneIndex + 1)) : 0;
             const totalLanes = Math.max(1, nCount + sCount);
 
-            const trackHeight = totalLanes * LANE_HEIGHT + GAP;
+            const holidayLabel = getHolidayName(currentDate);
+            const holidayOffset = 0;
+            const timelineEvents = getPersonalEvents(dateStr).map(entry => {
+                const [hour, minute] = (entry.time || '00:00').split(':').map(Number);
+                const startMinute = hour * 60 + minute;
+                // A calendar event ends at midnight, even in the overnight view.
+                const endMinute = 24 * 60;
+                const left = Math.max(startMinute, START_HOUR * 60);
+                const right = Math.min(endMinute, END_HOUR * 60);
+                return { entry, left, right };
+            }).filter(event => event.right > event.left);
+            const annotationCount = timelineEvents.length + (holidayLabel ? 1 : 0);
+            const annotationTop = (nCount + sCount) * LANE_HEIGHT;
+            const trackHeight = Math.max(1, nCount + sCount + annotationCount) * LANE_HEIGHT + GAP;
 
             const overlapSet = new Set();
             for (let i = 0; i < normalLanes.length; i++) {
@@ -11952,7 +11965,7 @@ function renderTimeline({ todayOnly = false, containerId = 'timelineView' } = {}
                 const tooltip = `${title} · ${displayTime} · ${dur} phút${isOverlap ? ' · ⚠ TRÙNG GIỜ' : ''}${p.stateClass === 'active' ? ' · 🔴 ĐANG CHẠY' : ''}`;
 
                 const baseTop = isShiftedGroup ? nCount * LANE_HEIGHT : 0;
-                const topPx = baseTop + (p.laneIndex * LANE_HEIGHT) + (GAP / 2);
+                const topPx = holidayOffset + baseTop + (p.laneIndex * LANE_HEIGHT) + (GAP / 2);
                 const heightPx = LANE_HEIGHT - GAP;
 
                 // Sử dụng % cho left/width
@@ -11992,23 +12005,27 @@ function renderTimeline({ todayOnly = false, containerId = 'timelineView' } = {}
 
             const dow = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][currentDate.getDay()];
             const overlapPairCount = Math.floor(overlapSet.size / 2);
-            const holidayLabel = getHolidayName(currentDate);
-            const personalLabels = getPersonalEvents(dateStr).map(entry =>
-                `<span class="calendar-personal-event" title="${escapeHtml([entry.time, entry.title, entry.notes].filter(Boolean).join('\n'))}">${personalEventCardContent(entry)}</span>`).join('');
+            const personalLabels = timelineEvents.map(({ entry, left, right }, index) => {
+                const leftPct = (left - START_HOUR * 60) / TOTAL_MINS * 100;
+                const widthPct = (right - left) / TOTAL_MINS * 100;
+                const labelTop = annotationTop + (index + (holidayLabel ? 1 : 0)) * LANE_HEIGHT;
+                return `<div class="timeline-calendar-event" style="left:${leftPct}%;width:${widthPct}%;top:${labelTop + GAP / 2}px;height:${LANE_HEIGHT - GAP}px;" title="${escapeHtml([entry.time, entry.title, entry.notes].filter(Boolean).join('\n'))}"><div class="timeline-calendar-caption"><span>${escapeHtml(entry.time || 'Cả ngày')}</span> <strong>${escapeHtml(entry.title)}</strong></div></div>`;
+            }).join('');
+
 
             rowsHtml += `
                 <div class="${rowClasses.join(' ')}">
                     <div class="timeline-day-label">
                         <span class="timeline-day-dow">${dow}</span>
                         <span class="timeline-day-date">${currentDate.getDate()}/${currentDate.getMonth() + 1}</span>
-                        ${holidayLabel ? `<span class="calendar-holiday-label" title="${escapeHtml(holidayLabel)}">${escapeHtml(compactCalendarLabel(holidayLabel))}</span>` : ''}
                         ${overlapPairCount ? `<span class="timeline-overlap-badge" title="${overlapPairCount} cặp job chồng giờ">⚠ ${overlapPairCount}</span>` : ''}
                         ${isOff ? '<span class="timeline-overlap-badge" style="background:rgba(239,68,68,.18);color:#b91c1c">OFF</span>' : ''}
                     </div>
                     <div class="timeline-track" style="height:${trackHeight}px; --cols:${HOURS};" data-render-key="${dateStr}" data-date="${dateStr}">
+                        ${holidayLabel ? `<div class="timeline-holiday" title="${escapeHtml(holidayLabel)}"><div class="timeline-calendar-caption" style="top:${annotationTop}px"><span>Cả ngày</span> <strong>${escapeHtml(holidayLabel)}</strong></div></div>` : ''}
+                        ${personalLabels}
                         ${blocksHtml}
                     </div>
-                    ${personalLabels ? `<div class="timeline-row-events">${personalLabels}</div>` : ''}
                 </div>`;
         }
     }

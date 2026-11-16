@@ -3,10 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node build.mjs",
-    "test": "node --test --test-isolation=none tests.mjs",
-    "test:ui": "node ui-tests.mjs",
-    "test:performance": "node perf-ui-tests.mjs"
+    "build": "node tools.mjs build",
+    "test": "node --test --test-isolation=none tools.mjs",
+    "test:ui": "node tools.mjs test:ui",
+    "test:performance": "node tools.mjs test:performance"
   },
   "devDependencies": {
     "@rollup/wasm-node": "^4.68.0",
