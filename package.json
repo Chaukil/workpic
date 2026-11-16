@@ -1,0 +1,15 @@
+{
+  "name": "workpic",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test --test-isolation=none tests.mjs",
+    "test:ui": "node ui-tests.mjs",
+    "test:performance": "node perf-ui-tests.mjs"
+  },
+  "devDependencies": {
+    "@rollup/wasm-node": "^4.68.0",
+    "terser": "^5.51.2"
+  }
+}

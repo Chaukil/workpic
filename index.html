@@ -1,0 +1,2231 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Schedule Manager</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap"
+        rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>📅</text></svg>">
+</head>
+
+<body class="app-intro">
+    <div id="authScreen" class="auth-screen">
+        <div class="auth-panel">
+            <div class="topbar-sky auth-sky" aria-hidden="true">
+                <div class="sky-layer sky-day"></div>
+                <div class="sky-layer sky-night"></div>
+                <div class="sky-clouds"><span class="cloud c1"></span><span class="cloud c2"></span><span
+                        class="cloud c3"></span></div>
+                <div class="sky-stars"><i class="shoot s1"></i><i class="shoot s2"></i><i class="shoot s3"></i></div>
+                <div class="sky-body sky-sun"><span class="sun-rays"></span><span class="sun-core"></span></div>
+                <div class="sky-body sky-moon"><span class="moon-core"></span></div>
+            </div>
+            <button type="button" class="auth-theme-btn" id="authThemeBtn" title="Đổi chế độ sáng / tối"
+                aria-label="Đổi chế độ sáng / tối">
+                <i class="bi bi-moon-fill"></i>
+            </button>
+            <button type="button" class="auth-torch-btn" id="authTorchBtn" title="Bật / tắt đèn pin"
+                aria-label="Bật đèn pin" aria-pressed="false">
+                <svg class="pw-torch" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M8.2 1.5h7.6l-1.3 5.2H9.5z" fill="currentColor" />
+                    <rect x="9.4" y="7.6" width="5.2" height="13.4" rx="1.6" fill="currentColor" opacity=".9" />
+                </svg>
+            </button>
+            <p class="topbar-eyebrow">WorkPIC</p>
+            <h1>Job Schedule Manager</h1>
+            <p class="auth-subtitle" id="authSubtitle">Đăng nhập để quản lý lịch công việc của bạn.</p>
+            <div class="auth-tabs" role="tablist" id="authTabs">
+                <button type="button" class="auth-tab active" id="loginTab">Đăng nhập</button>
+                <button type="button" class="auth-tab" id="registerTab">Đăng ký</button>
+            </div>
+            <form id="authForm">
+                <label class="form-label" for="authEmail">Email</label>
+                <input class="form-control" type="email" id="authEmail" autocomplete="email" required>
+                <div id="authPasswordBlock">
+                    <label class="form-label mt-3" for="authPassword">Mật khẩu</label>
+                    <div class="auth-pw-wrap">
+                        <input class="form-control" type="password" id="authPassword" autocomplete="current-password"
+                            minlength="6" required>
+                        <div class="auth-pw-reveal" id="authPwReveal" aria-hidden="true"></div>
+                        <button type="button" class="auth-pw-toggle" id="authPwToggle" aria-label="Hiện mật khẩu"
+                            aria-pressed="false" title="Hiện mật khẩu">
+                            <i class="bi bi-eye-fill pw-eye"></i>
+                            <svg class="pw-torch" viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M8.2 1.5h7.6l-1.3 5.2H9.5z" fill="currentColor" />
+                                <rect x="9.4" y="7.6" width="5.2" height="13.4" rx="1.6" fill="currentColor"
+                                    opacity=".9" />
+                                <rect x="11.1" y="11" width="1.8" height="3" rx=".9" fill="#0f172a" opacity=".55" />
+                            </svg>
+                        </button>
+                    </div>
+                    <button type="button" class="auth-forgot" id="authForgotBtn">Quên mật khẩu?</button>
+                </div>
+                <label class="form-label mt-3 d-none" id="authNameLabel" for="authName">Tên hiển thị</label>
+                <input class="form-control d-none" type="text" id="authName" autocomplete="name">
+                <button class="btn btn-save w-100 mt-4" type="submit" id="authSubmitBtn">Đăng nhập</button>
+                <button type="button" class="auth-back d-none" id="authBackBtn"><i class="bi bi-arrow-left"></i> Quay
+                    lại đăng nhập</button>
+                <p class="auth-error" id="authError" role="alert"></p>
+                <p class="auth-info" id="authInfo" role="status"></p>
+            </form>
+        </div>
+        <div class="flash-beam" id="flashBeam" aria-hidden="true"></div>
+    </div>
+
+    <div id="notificationContainer" class="notification-container"></div>
+
+    <div id="confirmModal" class="confirm-modal-backdrop" aria-hidden="true">
+        <div class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
+            <div class="confirm-modal-icon">
+                <i class="bi bi-question-circle-fill"></i>
+            </div>
+            <div class="confirm-modal-body">
+                <h5 id="confirmModalTitle">Xác nhận</h5>
+                <p id="confirmModalMessage">Bạn có chắc chắn muốn tiếp tục?</p>
+            </div>
+            <div class="confirm-modal-actions">
+                <button type="button" class="btn btn-cancel btn-sm" id="confirmCancelBtn">Hủy</button>
+                <!-- Nút phụ (dùng cho "Chuyển tạm" / "Không chuyển job") -->
+                <button type="button" class="btn btn-primary btn-sm d-none" id="confirmExtraBtn">Tùy chọn</button>
+                <button type="button" class="btn btn-save btn-sm" id="confirmOkBtn">Xác nhận</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="app-shell">
+        <header class="topbar">
+            <div class="topbar-sky" aria-hidden="true">
+                <div class="sky-layer sky-day"></div>
+                <div class="sky-layer sky-night"></div>
+                <div class="sky-clouds"><span class="cloud c1"></span><span class="cloud c2"></span><span
+                        class="cloud c3"></span></div>
+                <div class="sky-stars"><i class="shoot s1"></i><i class="shoot s2"></i><i class="shoot s3"></i></div>
+                <div class="sky-body sky-sun"><span class="sun-rays"></span><span class="sun-core"></span></div>
+                <div class="sky-body sky-moon"><span class="moon-core"></span></div>
+                <!-- Chủ đề topbar (chỉ 1 cái hiện theo body[data-topbar-theme]) -->
+                <div class="theme-deco theme-deco-tet">
+                    <span class="tet-flower f1">🌸</span>
+                    <span class="tet-flower f2">🌸</span>
+                    <span class="tet-flower f3">🌸</span>
+                    <span class="tet-flower f4">🌸</span>
+                    <span class="tet-lantern l1">🏮</span>
+                    <span class="tet-lantern l2">🏮</span>
+                    <span class="tet-petals"></span>
+                    <span class="tet-moon"></span>
+                </div>
+                <div class="theme-deco theme-deco-trongthu">
+                    <span class="tt-moon"></span>
+                    <span class="tt-lantern l1">🏮</span>
+                    <span class="tt-lantern l2">⭐</span>
+                    <span class="tt-lantern l3">🏮</span>
+                    <span class="tt-lantern l4">🌟</span>
+                </div>
+                <div class="theme-deco theme-deco-noel">
+                    <span class="noel-snow"></span>
+                    <span class="noel-tree tl">🎄</span>
+                    <span class="noel-tree tr">🎄</span>
+                    <div class="noel-sleigh">
+                        <span>🦌</span><span>🦌</span><span>🎅</span><span>🛷</span>
+                    </div>
+                </div>
+                <div class="theme-deco theme-deco-rain">
+                </div>
+                <div class="theme-deco theme-deco-space">
+                    <span class="space-nebula"></span>
+                    <span class="space-stars"></span>
+                    <span class="space-stars s2"></span>
+                    <span class="space-planet p1">🪐</span>
+                    <span class="space-planet p2">🌍</span>
+                    <span class="space-sat">🛰️</span>
+                    <span class="space-ufo">🛸</span>
+                    <span class="space-rocket">🚀</span>
+                </div>
+                <div class="theme-deco theme-deco-halloween">
+                    <span class="hl-moon"></span>
+                    <span class="hl-bat b1">🦇</span>
+                    <span class="hl-bat b2">🦇</span>
+                    <span class="hl-bat b3">🦇</span>
+                    <span class="hl-ghost g1">👻</span>
+                    <span class="hl-spider">🕷️</span>
+                    <span class="hl-fog"></span>
+                </div>
+            </div>
+            <div class="topbar-left">
+                <div class="topbar-logo">
+                    <i class="bi bi-calendar2-week-fill"></i>
+                </div>
+                <div>
+                    <p class="topbar-eyebrow">WorkPIC</p>
+                    <h1>Job Schedule Manager</h1>
+                    <p class="topbar-subtitle">Quản lý lịch công việc rõ ràng, gọn gàng và nhất quán</p>
+                </div>
+            </div>
+            <div class="topbar-badges">
+                <div class="user-menu">
+                    <button type="button" class="notif-bell-btn" id="guideBtn" title="Hướng dẫn sử dụng">
+                        <i class="bi bi-info-circle-fill"></i>
+                    </button>
+                    <div class="notif-menu">
+                        <button type="button" class="notif-bell-btn" id="notifBellBtn" title="Thông báo">
+                            <i class="bi bi-bell-fill"></i>
+                            <span class="notif-badge d-none" id="notifBadge">0</span>
+                        </button>
+                        <div class="notif-dropdown" id="notifDropdown">
+                            <div class="notif-pending-section d-none" id="notifPendingSection">
+                                <div class="notif-pending-title"><i class="bi bi-exclamation-triangle-fill"></i> Chờ bạn
+                                    xác nhận</div>
+                                <div id="notifPendingList"></div>
+                            </div>
+                            <div class="notif-dropdown-header">
+                                <span><i class="bi bi-bell-fill"></i> Thông báo (30 ngày gần nhất)</span>
+                            </div>
+                            <div class="notif-dropdown-list" id="notifList">
+                                <p class="text-muted text-center p-3 mb-0">Không có thông báo</p>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="notif-bell-btn" id="settingsBtn" title="Cài đặt">
+                        <i class="bi bi-gear-fill"></i>
+                    </button>
+                    <button class="user-profile-btn" id="userProfileBtn" title="Thông tin tài khoản">
+                        <img id="userAvatar" class="user-avatar" src="" alt="Avatar">
+                        <span id="userDisplayName" class="user-name"></span>
+                        <i class="bi bi-chevron-down"></i>
+                    </button>
+                </div>
+                <button type="button" class="theme-toggle" id="themeToggleBtn" aria-pressed="false">
+                    <i class="bi bi-moon-fill"></i>
+                    <span>Chế độ tối</span>
+                </button>
+            </div>
+        </header>
+
+        <div class="container-fluid p-2">
+            <div class="row">
+                <div class="col-lg-3 col-md-4" id="sidebar">
+                    <div class="card shadow-sm job-list-card">
+                        <div class="card-header modern-card-header modern-card-header-primary">
+                            <div class="modern-card-header-inner">
+                                <div class="modern-card-header-icon">
+                                    <i class="bi bi-list-task"></i>
+                                </div>
+                                <div class="modern-card-header-text">
+                                    <h6 class="mb-0">Danh Sách Jobs</h6>
+                                    <small>Quản lý tất cả job của bạn</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body p-2">
+                            <div class="mb-2">
+                                <input type="search" class="form-control form-control-sm" id="searchJob"
+                                    name="job-search-q" autocomplete="off" autocorrect="off" autocapitalize="off"
+                                    spellcheck="false" placeholder="🔍 Tìm kiếm job...">
+                            </div>
+
+                            <div class="row g-2 mb-2">
+                                <div class="col-6">
+                                    <button class="btn btn-add-job w-100" id="addJobBtn">
+                                        <i class="bi bi-plus-circle-fill"></i>
+                                        <span>Thêm Job</span>
+                                        <div class="btn-shine"></div>
+                                    </button>
+                                </div>
+                                <div class="col-6">
+                                    <div class="dropdown w-100">
+                                        <button class="btn btn-layout-menu w-100" id="layoutMenuBtn" type="button"
+                                            aria-expanded="false" aria-haspopup="true">
+                                            <i class="bi bi-grid-3x3-gap-fill"></i>
+                                            <span>Layout</span>
+                                            <div class="btn-shine"></div>
+                                        </button>
+                                        <ul class="dropdown-menu layout-dropdown-menu" aria-labelledby="layoutMenuBtn">
+                                            <li>
+                                                <button class="layout-dropdown-item" id="checkDueBtn" type="button">
+                                                    <span class="layout-item-ic"><i
+                                                            class="bi bi-calendar2-check-fill"></i></span>
+                                                    <span class="layout-item-text">
+                                                        <span class="layout-item-title">Check Change Due</span>
+                                                        <span class="layout-item-sub">So sánh dữ liệu due</span>
+                                                    </span>
+                                                </button>
+                                            </li>
+                                            <li>
+                                                <button class="layout-dropdown-item" id="checkEtaDirectBtn"
+                                                    type="button">
+                                                    <span class="layout-item-ic layout-item-ic-eta">
+                                                        <i class="bi bi-calendar2-range-fill"></i>
+                                                    </span>
+                                                    <span class="layout-item-text">
+                                                        <span class="layout-item-title">Check ETA &amp; Direct</span>
+                                                        <span class="layout-item-sub">Ràng buộc vật tư · ngày giao
+                                                            hàng</span>
+                                                    </span>
+                                                </button>
+                                            </li>
+                                            <li>
+                                                <button class="layout-dropdown-item" id="presenterSpinBtn"
+                                                    type="button">
+                                                    <span class="layout-item-ic layout-item-ic-spin"><i
+                                                            class="bi bi-dice-5-fill"></i></span>
+                                                    <span class="layout-item-text">
+                                                        <span class="layout-item-title">Quay số thuyết trình</span>
+                                                        <span class="layout-item-sub">Chọn ngẫu nhiên người thuyết
+                                                            trình</span>
+                                                    </span>
+                                                </button>
+                                            </li>
+                                            <li>
+                                                <button class="layout-dropdown-item" id="dayOffBtn" type="button">
+                                                    <span class="layout-item-ic layout-item-ic-dayoff"><i
+                                                            class="bi bi-calendar-x-fill"></i></span>
+                                                    <span class="layout-item-text">
+                                                        <span class="layout-item-title">Đăng ký lịch off</span>
+                                                        <span class="layout-item-sub">Chọn ngày nghỉ, xem lịch off của
+                                                            mọi người</span>
+                                                    </span>
+                                                </button>
+                                            </li>
+                                            <li>
+                                                <button class="layout-dropdown-item" id="statisticsBtn" type="button">
+                                                    <span class="layout-item-ic layout-item-ic-stats"><i
+                                                            class="bi bi-bar-chart-fill"></i></span>
+                                                    <span class="layout-item-text">
+                                                        <span class="layout-item-title">Thống kê job</span>
+                                                        <span class="layout-item-sub">Xem user nào đang chiếm nhiều thời
+                                                            gian</span>
+                                                    </span>
+                                                </button>
+                                            </li>
+                                            <li>
+                                                <button class="layout-dropdown-item" id="workHoursBtn" type="button">
+                                                    <span class="layout-item-ic layout-item-ic-workhours"><i
+                                                            class="bi bi-clock-history"></i></span>
+                                                    <span class="layout-item-text">
+                                                        <span class="layout-item-title">Update giờ làm việc</span>
+                                                        <span class="layout-item-sub">Nhập giờ Motion / Station theo
+                                                            ngày</span>
+                                                    </span>
+                                                </button>
+                                            </li>
+                                            <li>
+                                                <button class="layout-dropdown-item" id="salaryCalcBtn" type="button">
+                                                    <span class="layout-item-ic layout-item-ic-salary"><i
+                                                            class="bi bi-cash-coin"></i></span>
+                                                    <span class="layout-item-text">
+                                                        <span class="layout-item-title">Tính lương</span>
+                                                        <span class="layout-item-sub">Ước tính thu nhập &amp; thực lãnh
+                                                            trong tháng</span>
+                                                    </span>
+                                                </button>
+                                            </li>
+                                            <li>
+                                                <hr class="dropdown-divider">
+                                            </li>
+                                            <li><span class="layout-item-note"><i class="bi bi-stars"></i> Sẽ có thêm
+                                                    lựa chọn khác tại đây</span></li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <button class="btn btn-view-data w-100" id="viewDataBtn" type="button" title="Xem toàn bộ job hôm nay theo thời gian thực">
+                                        <i class="bi bi-eye-fill"></i>
+                                        <span>Job hiện tại</span>
+                                    </button>
+                                </div>
+                                <div class="col-6">
+                                    <button class="btn btn-export-pdf w-100" id="exportPdfBtn">
+                                        <i class="bi bi-file-earmark-pdf-fill"></i>
+                                        <span>Xuất PDF</span>
+                                        <div class="btn-shine"></div>
+                                    </button>
+                                </div>
+                                <div class="col-12 mt-2">
+                                    <button class="btn btn-ai-parse w-100" id="aiParseBtn" type="button"
+                                        title="Dán tin nhắn / email / ghi chú — AI tự tách thành job">
+                                        <i class="bi bi-stars"></i>
+                                        <span>✨ Dán → Tạo Job (AI)</span>
+                                        <div class="btn-shine"></div>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div id="jobList" class="job-list"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-9 col-md-8" id="mainContent">
+                    <div class="card shadow-sm">
+                        <div
+                            class="card-header modern-card-header modern-card-header-success d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <div class="modern-card-header-inner">
+                                <button class="btn btn-toggle-sidebar" id="toggleSidebarBtn" title="Ẩn/Hiện Sidebar">
+                                    <i class="bi bi-layout-sidebar-inset"></i>
+                                </button>
+                                <div class="modern-card-header-icon">
+                                    <i class="bi bi-calendar3" id="scheduleHeaderIcon"></i>
+                                </div>
+                                <div class="modern-card-header-text">
+                                    <h6 class="mb-0" id="scheduleHeaderTitle">Lịch Làm Việc</h6>
+                                    <small id="scheduleHeaderSub">2 tuần tới · công việc định kỳ</small>
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <button class="btn btn-sm btn-outline-light" id="changeHistoryBtn" type="button"><i class="bi bi-clock-history"></i> Lịch sử</button>
+                                <div class="schedule-view-tabs" role="group" aria-label="Chế độ xem lịch">
+                                    <button class="schedule-view-tab active" type="button" data-view="calendar" aria-pressed="true"><i class="bi bi-calendar3"></i> Lịch cố định</button>
+                                    <button class="schedule-view-tab" type="button" data-view="timeline" aria-pressed="false"><i class="bi bi-bar-chart-steps"></i> Timeline</button>
+                                </div>
+                                <div class="form-check form-switch mb-0">
+                                    <input class="form-check-input" type="checkbox" id="showSunday" checked>
+                                    <label class="form-check-label switch-label small" for="showSunday">CN</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body p-1">
+                            <div id="calendarView" class="table-responsive">
+                                <table class="table table-bordered schedule-table mb-0">
+                                    <thead>
+                                        <tr id="scheduleHeader"></tr>
+                                    </thead>
+                                    <tbody id="scheduleBody"></tbody>
+                                </table>
+                            </div>
+                            <div id="timelineView" class="timeline-view d-none"></div>
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm mt-3">
+                        <div
+                            class="card-header modern-card-header modern-card-header-warning d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <div class="modern-card-header-inner">
+                                <div class="modern-card-header-icon">
+                                    <i class="bi bi-lightning-charge-fill"></i>
+                                </div>
+                                <div class="modern-card-header-text">
+                                    <h6 class="mb-0">Job Ngoài Lịch</h6>
+                                    <small>Công việc phát sinh không cố định</small>
+                                </div>
+                            </div>
+                            <button class="btn btn-sm btn-outline-light" id="addOutOfScheduleBtn" type="button">
+                                <i class="bi bi-plus-circle"></i> Thêm
+                            </button>
+                        </div>
+                        <div class="card-body p-3">
+                            <div id="outOfScheduleList" class="out-of-schedule-list"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Job Modal -->
+    <div class="modal fade workpic-dialog" id="jobModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content job-modal-content">
+                <div class="modal-header modern-header modern-header-primary">
+                    <div class="modern-header-inner">
+                        <div class="modern-header-icon">
+                            <i class="bi bi-plus-circle-fill"></i>
+                        </div>
+                        <div class="modern-header-text">
+                            <h5 class="modal-title mb-0" id="modalTitle">Thêm Job Mới</h5>
+                            <p class="modern-header-subtitle mb-0">Tạo job mới cho lịch công việc của bạn</p>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="jobForm">
+                        <input type="hidden" id="jobId">
+
+                        <div class="job-form-section">
+                            <div class="row align-items-end g-3">
+                                <div class="col-md-7">
+                                    <label class="form-label fw-bold">Tiêu Đề Job *</label>
+                                    <input type="text" class="form-control" id="jobTitle" required>
+                                </div>
+
+                                <div class="col-md-5">
+                                    <div class="form-check form-switch job-switch-card">
+                                        <input class="form-check-input" type="checkbox" id="isOutOfSchedule">
+                                        <label class="form-check-label fw-bold" for="isOutOfSchedule">
+                                            <i class="bi bi-lightning-charge-fill"></i> Job ngoài lịch
+                                        </label>
+                                    </div>
+                                    <div class="form-text">Dùng cho công việc phát sinh, không cố định theo lịch lặp.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="job-form-section">
+                            <div class="job-form-section-title"><i class="bi bi-calendar-week"></i> Lịch lặp</div>
+                            <div id="scheduleFields" class="row g-3">
+                                <div class="col-md-3 mb-3">
+                                    <label class="form-label fw-bold">Loại Job *</label>
+                                    <select class="form-select" id="jobType" required>
+                                        <option value="once">Once (Một lần)</option>
+                                        <option value="daily">Daily (Hàng ngày)</option>
+                                        <option value="weekly">Weekly (Hàng tuần)</option>
+                                        <option value="biweekly">Biweekly (2 tuần/lần)</option>
+                                        <option value="monthly">Monthly (Hàng tháng)</option>
+                                    </select>
+                                    <div id="dailyExcludeWrap" class="daily-exclude-wrap d-none">
+                                        <div class="daily-exclude-label"><i class="bi bi-calendar-minus"></i> Bỏ bớt
+                                            ngày (mặc định chạy tất cả)</div>
+                                        <div class="daily-exclude-days" id="dailyExcludeDays">
+                                            <button type="button" class="daily-exclude-chip active"
+                                                data-dow="1">T2</button>
+                                            <button type="button" class="daily-exclude-chip active"
+                                                data-dow="2">T3</button>
+                                            <button type="button" class="daily-exclude-chip active"
+                                                data-dow="3">T4</button>
+                                            <button type="button" class="daily-exclude-chip active"
+                                                data-dow="4">T5</button>
+                                            <button type="button" class="daily-exclude-chip active"
+                                                data-dow="5">T6</button>
+                                            <button type="button" class="daily-exclude-chip active"
+                                                data-dow="6">T7</button>
+                                            <button type="button" class="daily-exclude-chip active"
+                                                data-dow="0">CN</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label class="form-label fw-bold">Ngày Bắt Đầu *</label>
+                                    <input type="date" class="form-control" id="jobDate" required>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label class="form-label fw-bold">Giờ Thực Hiện *</label>
+                                    <input type="time" class="form-control" id="jobTime" required>
+                                </div>
+                                <div class="col-md-3 mb-3">
+                                    <label class="form-label fw-bold">Thời Gian (phút)</label>
+                                    <input type="number" class="form-control" id="jobDuration" min="1" max="1440"
+                                        placeholder="30">
+                                    <div class="form-text">Trống = 30 phút</div>
+                                </div>
+                                <div class="col-md-12">
+                                    <div class="form-check form-switch job-switch-card">
+                                        <input class="form-check-input" type="checkbox" id="workOnSunday">
+                                        <label class="form-check-label fw-bold" for="workOnSunday">
+                                            <i class="bi bi-sun-fill"></i> Có làm vào Chủ Nhật
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="job-form-section">
+                            <div class="job-form-section-title"><i class="bi bi-card-text"></i> Nội dung chi tiết</div>
+                            <div class="editor-toolbar mb-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary"
+                                    onclick="formatText('bold')">
+                                    <i class="bi bi-type-bold"></i> Bold
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary"
+                                    onclick="formatText('italic')">
+                                    <i class="bi bi-type-italic"></i> Italic
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary"
+                                    onclick="formatText('underline')">
+                                    <i class="bi bi-type-underline"></i> Underline
+                                </button>
+                                <label class="btn btn-sm btn-outline-secondary">
+                                    <i class="bi bi-palette-fill"></i> Màu chữ
+                                    <input type="color" id="textColor" value="#e74c3c" style="display:none;">
+                                </label>
+                                <label class="btn btn-sm btn-outline-secondary">
+                                    <i class="bi bi-brush-fill"></i> Màu nền
+                                    <input type="color" id="highlightColor" value="#fff176" style="display:none;">
+                                </label>
+                                <button type="button" class="btn btn-sm btn-outline-secondary"
+                                    onclick="removeHighlightColor()">
+                                    <i class="bi bi-eraser-fill"></i> Xóa màu nền
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="insertTable()">
+                                    <i class="bi bi-table"></i> Bảng
+                                </button>
+                            </div>
+                            <div id="jobDescription" class="form-control editor-content" contenteditable="true"
+                                style="min-height: 180px;"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="jobChecklistText" class="form-label fw-bold">Checklist</label>
+                            <textarea id="jobChecklistText" class="form-control" rows="3" maxlength="8000" placeholder="Mỗi dòng một bước công việc (tối đa 50 bước)"></textarea>
+                            <small class="text-muted">Đánh dấu tiến độ trong chi tiết job. Mỗi lần xuất hiện có checklist riêng.</small>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-cancel" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Hủy
+                    </button>
+                    <button type="button" class="btn btn-pause" id="pauseJobBtn" style="display:none;">
+                        <i class="bi bi-pause-circle-fill"></i> <span id="pauseJobBtnText">Tạm dừng</span>
+                        <div class="btn-shine"></div>
+                    </button>
+                    <button type="button" class="btn btn-delete" id="deleteJobBtn" style="display:none;">
+                        <i class="bi bi-trash-fill"></i> Xóa Job
+                        <div class="btn-shine"></div>
+                    </button>
+                    <button type="button" class="btn btn-save" id="saveJobBtn">
+                        <i class="bi bi-check-circle-fill"></i> Lưu Job
+                        <div class="btn-shine"></div>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Job Modal -->
+    <div class="modal fade workpic-dialog" id="viewJobModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header modern-header modern-header-info">
+                    <div class="modern-header-inner">
+                        <div class="modern-header-icon">
+                            <i class="bi bi-eye-fill"></i>
+                        </div>
+                        <div class="modern-header-text">
+                            <h5 class="modal-title mb-0" id="viewModalTitle">Chi Tiết Job</h5>
+                            <p class="modern-header-subtitle mb-0">Xem và quản lý thông tin job</p>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
+                <div class="modal-body" id="viewModalBody">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-cancel" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Đóng
+                    </button>
+                    <button type="button" class="btn btn-primary" id="toggleTransferSectionBtn" style="display:none;">
+                        <i class="bi bi-arrow-left-right"></i> Chuyển/Copy Job
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Migrate Legacy Jobs Modal -->
+    <div class="modal fade workpic-dialog" id="viewDataModal" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header modern-header modern-header-info">
+                    <div class="modern-header-inner">
+                        <div class="modern-header-icon">
+                            <i class="bi bi-bar-chart-fill"></i>
+                        </div>
+                        <div class="modern-header-text">
+                            <h5 class="modal-title mb-0">Timeline hôm nay</h5>
+                            <p class="modern-header-subtitle mb-0" id="todayJobsSummary" aria-live="polite"></p>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="todayWorkHours" class="alert alert-info py-2 mb-3" aria-live="polite"></div>
+                    <p class="text-muted small">Vạch đỏ: thời gian hiện tại · Viền cầu vồng: đang chạy · Mờ: đã qua giờ · Màu theo loại job như Timeline.</p>
+                    <div id="todayTimelineView" class="timeline-view"></div>
+                    <div id="todayJobsList" class="today-jobs-list mt-3"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Check Due Modal -->
+    <div class="modal fade workpic-dialog" id="checkDueModal" tabindex="-1" aria-labelledby="checkDueTitle" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content check-due-modal-content">
+                <div class="modal-header modern-header modern-header-primary check-due-header">
+                    <div class="check-due-header-inner modern-header-inner">
+                        <div class="check-due-header-icon modern-header-icon">
+                            <i class="bi bi-shuffle"></i>
+                        </div>
+                        <div>
+                            <h5 class="modal-title mb-0" id="checkDueTitle">Check Change Due</h5>
+                            <p class="check-due-header-subtitle mb-0">
+                                So sánh <strong>FG_MO</strong> giữa system và mong muốn để phát hiện thay đổi
+                                <strong>FG_JOBNO</strong> &amp; <strong>FG_DUE</strong>
+                            </p>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
+
+                <div class="modal-body check-due-body">
+                    <div class="check-due-steps" id="checkDueSteps">
+                        <div class="check-due-step active" data-step="1">
+                            <span class="check-due-step-num"><i class="bi bi-1-circle-fill"></i></span>
+                            <span class="check-due-step-text">Nhập dữ liệu</span>
+                        </div>
+                        <div class="check-due-step-line"></div>
+                        <div class="check-due-step" data-step="2">
+                            <span class="check-due-step-num"><i class="bi bi-2-circle"></i></span>
+                            <span class="check-due-step-text">So sánh</span>
+                        </div>
+                        <div class="check-due-step-line"></div>
+                        <div class="check-due-step" data-step="3">
+                            <span class="check-due-step-num"><i class="bi bi-3-circle"></i></span>
+                            <span class="check-due-step-text">Kết quả</span>
+                        </div>
+                    </div>
+
+                    <div id="checkDueInputSection">
+                    <div class="check-due-mode-tabs" role="tablist" aria-label="Cách nhập dữ liệu">
+                        <button class="check-due-mode-tab active" id="checkDuePasteTab" data-bs-toggle="tab"
+                            data-bs-target="#checkDuePastePane" type="button" role="tab" aria-controls="checkDuePastePane" aria-selected="true">
+                            <i class="bi bi-clipboard-data-fill"></i> Dán dữ liệu
+                        </button>
+                        <button class="check-due-mode-tab" id="checkDueFileTab" data-bs-toggle="tab"
+                            data-bs-target="#checkDueFilePane" type="button" role="tab" aria-controls="checkDueFilePane" aria-selected="false">
+                            <i class="bi bi-cloud-arrow-up-fill"></i> Tải file lên
+                        </button>
+                    </div>
+
+                    <div class="tab-content check-due-tab-content">
+                        <div class="tab-pane fade show active" id="checkDuePastePane" role="tabpanel">
+                            <div class="check-due-grid">
+                                <div class="check-due-source-card">
+                                    <div class="check-due-source-head">
+                                        <div class="check-due-source-icon check-due-source-icon-old">
+                                            <i class="bi bi-file-earmark-text-fill"></i>
+                                        </div>
+                                        <div class="check-due-source-info">
+                                            <h6>Dữ liệu system</h6>
+                                        </div>
+                                        <span class="check-due-source-badge" id="checkDueOldPasteBadge">0 dòng</span>
+                                    </div>
+                                    <textarea class="check-due-textarea" id="checkDueOldPaste" aria-label="Dữ liệu system" rows="10" placeholder="Dán dữ liệu vào đây...
+
+Hệ thống tự nhận diện cột theo NỘI DUNG:
+  • FG_MO     → MX* hoặc MY*
+  • FG_DUE    → 1yymmdd | mm/dd/yyyy | mm/dd/yy | mm/dd | 5-Oct | Oct 5
+  • FG_JOBNO  → LINE MSS
+
+Không cần đúng thứ tự hay tên cột."></textarea>
+                                </div>
+                                <div class="check-due-source-card">
+                                    <div class="check-due-source-head">
+                                        <div class="check-due-source-icon check-due-source-icon-new">
+                                            <i class="bi bi-file-earmark-diff-fill"></i>
+                                        </div>
+                                        <div class="check-due-source-info">
+                                            <h6>Dữ liệu mong muốn</h6>
+                                        </div>
+                                        <span class="check-due-source-badge" id="checkDueNewPasteBadge">0 dòng</span>
+                                    </div>
+                                    <textarea class="check-due-textarea" id="checkDueNewPaste" aria-label="Dữ liệu mong muốn" rows="10" placeholder="Dán dữ liệu vào đây...
+
+Tự động nhận diện cột giống bên trái — có thể khác tên cột và thứ tự cột."></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="tab-pane fade" id="checkDueFilePane" role="tabpanel">
+                            <div class="check-due-grid">
+                                <div class="check-due-source-card">
+                                    <div class="check-due-source-head">
+                                        <div class="check-due-source-icon check-due-source-icon-old">
+                                            <i class="bi bi-file-earmark-text-fill"></i>
+                                        </div>
+                                        <div class="check-due-source-info">
+                                            <h6>Dữ liệu system</h6>
+                                            <span>Excel · CSV · ODS</span>
+                                        </div>
+                                        <span class="check-due-source-badge" id="checkDueOldFileBadge">0 dòng</span>
+                                    </div>
+                                    <label class="check-due-dropzone" for="checkDueOldFile">
+                                        <i class="bi bi-cloud-arrow-up-fill"></i>
+                                        <span class="check-due-dropzone-title">Kéo thả hoặc bấm để chọn file</span>
+                                        <span class="check-due-dropzone-hint">.xlsx · .xls · .xlsb · .xlsm · .ods ·
+                                            .csv</span>
+                                        <input type="file" id="checkDueOldFile"
+                                            accept=".xlsx,.xls,.xlsm,.xlsb,.xltx,.xltm,.ods,.csv,.txt,.prn,.dif,.sylk"
+                                            hidden>
+                                    </label>
+                                    <div class="check-due-file-info" id="checkDueOldFileInfo">Chưa chọn file</div>
+                                </div>
+                                <div class="check-due-source-card">
+                                    <div class="check-due-source-head">
+                                        <div class="check-due-source-icon check-due-source-icon-new">
+                                            <i class="bi bi-file-earmark-diff-fill"></i>
+                                        </div>
+                                        <div class="check-due-source-info">
+                                            <h6>Dữ liệu mong muốn</h6>
+                                            <span>Excel · CSV · ODS</span>
+                                        </div>
+                                        <span class="check-due-source-badge" id="checkDueNewFileBadge">0 dòng</span>
+                                    </div>
+                                    <label class="check-due-dropzone" for="checkDueNewFile">
+                                        <i class="bi bi-cloud-arrow-up-fill"></i>
+                                        <span class="check-due-dropzone-title">Kéo thả hoặc bấm để chọn file</span>
+                                        <span class="check-due-dropzone-hint">Chỉ cần nếu Dữ liệu system &amp; Dữ liệu
+                                            mong muốn ở 2 file riêng</span>
+                                        <input type="file" id="checkDueNewFile"
+                                            accept=".xlsx,.xls,.xlsm,.xlsb,.xltx,.xltm,.ods,.csv,.txt,.prn,.dif,.sylk"
+                                            hidden>
+                                    </label>
+                                    <div class="check-due-file-info" id="checkDueNewFileInfo">Chưa chọn file</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    </div>
+                    <div class="check-due-toolbar">
+                        <div class="check-due-status" id="checkDueStatus" role="status" aria-live="polite">
+                            <i class="bi bi-info-circle"></i> Sẵn sàng so sánh
+                        </div>
+                        <div class="check-due-toolbar-actions">
+                            <button type="button" class="btn btn-outline-secondary btn-sm d-none" id="checkDueEditBtn"
+                                aria-controls="checkDueInputSection" aria-expanded="false">
+                                <i class="bi bi-pencil-square"></i> Sửa dữ liệu
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="checkDueClearBtn">
+                                <i class="bi bi-eraser-fill"></i> Xóa dữ liệu
+                            </button>
+                            <button type="button" class="btn btn-compare" id="checkDueCompareBtn">
+                                <i class="bi bi-arrow-left-right"></i> So sánh dữ liệu
+                                <div class="btn-shine"></div>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="check-due-loading" id="checkDueLoading">
+                        <div class="cd-cube-wrap">
+                            <div class="cd-cube">
+                                <div class="cd-face cd-face-front"></div>
+                                <div class="cd-face cd-face-back"></div>
+                                <div class="cd-face cd-face-right"></div>
+                                <div class="cd-face cd-face-left"></div>
+                                <div class="cd-face cd-face-top"></div>
+                                <div class="cd-face cd-face-bottom"></div>
+                            </div>
+                        </div>
+                        <p class="cd-loading-text mb-0">Đang so sánh dữ liệu...</p>
+                    </div>
+
+                    <section class="check-due-result" id="checkDueResultSection" style="display:none;">
+                        <div class="check-due-result-header">
+                            <div class="check-due-result-title">
+                                <i class="bi bi-clipboard-data-fill"></i>
+                                <div>
+                                    <h6 class="mb-0">Kết quả so sánh</h6>
+                                    <span>Phát hiện <strong id="checkDueResultCount">0</strong> thay đổi giữa 2
+                                        nguồn</span>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-copy-result" id="checkDueCopyBtn">
+                                <i class="bi bi-clipboard-check"></i> Copy kết quả
+                            </button>
+                        </div>
+
+                        <div class="check-due-stat-row">
+                            <div class="check-due-stat">
+                                <div class="check-due-stat-icon"><i class="bi bi-list-ul"></i></div>
+                                <div>
+                                    <div class="check-due-stat-value" id="checkDueStatTotal">0</div>
+                                    <div class="check-due-stat-label">Tổng thay đổi</div>
+                                </div>
+                            </div>
+                            <div class="check-due-stat">
+                                <div class="check-due-stat-icon check-due-stat-icon-line"><i
+                                        class="bi bi-diagram-3-fill"></i></div>
+                                <div>
+                                    <div class="check-due-stat-value" id="checkDueStatLine">0</div>
+                                    <div class="check-due-stat-label">Đổi FG_JOBNO</div>
+                                </div>
+                            </div>
+                            <div class="check-due-stat">
+                                <div class="check-due-stat-icon check-due-stat-icon-due"><i
+                                        class="bi bi-calendar-event-fill"></i></div>
+                                <div>
+                                    <div class="check-due-stat-value" id="checkDueStatDue">0</div>
+                                    <div class="check-due-stat-label">Đổi FG_DUE</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="checkDueResultTable" class="check-due-result-table"></div>
+                    </section>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Check ETA & Direct Modal -->
+    <div class="modal fade workpic-dialog" id="checkEtaDirectModal" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header modern-header modern-header-eta">
+                    <div class="modern-header-inner">
+                        <div class="modern-header-icon"><i class="bi bi-calendar2-range-fill"></i></div>
+                        <div class="modern-header-text">
+                            <h5 class="modal-title mb-0">Check ETA &amp; Direct</h5>
+                            <p class="modern-header-subtitle mb-0">Ràng buộc LINE ALLOCATED · DIRECT · ETA · PICK UP ·
+                                ASHTON</p>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
+                <div class="modal-body">
+
+                    <!-- Thanh luôn hiện: trạng thái + nút ẩn/hiện vùng nhập (Dán dữ liệu → Phân tích) -->
+                    <div class="eta-topbar" id="etaDirectTopBar">
+                        <div class="check-due-status" id="etaDirectStatus">
+                            <i class="bi bi-info-circle"></i> Sẵn sàng phân tích
+                        </div>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="etaDirectToggleInputBtn"
+                            title="Ẩn/hiện vùng dán dữ liệu">
+                            <i class="bi bi-eye-slash-fill"></i> <span>Ẩn dán dữ liệu</span>
+                        </button>
+                    </div>
+
+                    <!-- VÙNG CÓ THỂ ẨN: từ mode tabs → toolbar (chứa nút Phân tích) -->
+                    <div id="etaDirectInputWrap">
+
+                        <!-- Mode tabs -->
+                        <div class="check-due-mode-tabs" role="tablist">
+                            <button class="check-due-mode-tab active" id="etaDirectPasteTab" data-bs-toggle="tab"
+                                data-bs-target="#etaDirectPastePane" type="button" role="tab">
+                                <i class="bi bi-clipboard-data-fill"></i> Dán dữ liệu
+                            </button>
+                            <button class="check-due-mode-tab" id="etaDirectFileTab" data-bs-toggle="tab"
+                                data-bs-target="#etaDirectFilePane" type="button" role="tab">
+                                <i class="bi bi-cloud-arrow-up-fill"></i> Tải file Excel
+                            </button>
+                        </div>
+
+                        <div class="tab-content">
+                            <!-- Paste pane -->
+                            <div class="tab-pane fade show active" id="etaDirectPastePane" role="tabpanel">
+                                <div class="eta-input-block">
+                                    <div class="eta-input-head">
+                                        <div class="eta-input-icon"><i class="bi bi-clipboard-data-fill"></i></div>
+                                        <div class="eta-input-info">
+                                            <h6>Dán dữ liệu từ Excel</h6>
+                                            <span>Dòng 1: ngày/đêm (mm/dd) · Dòng 2: header · Các dòng sau: dữ
+                                                liệu</span>
+                                        </div>
+                                        <span class="eta-input-badge" id="etaDirectPasteBadge">0 dòng</span>
+                                    </div>
+                                    <textarea class="check-due-textarea eta-textarea-full" id="etaDirectPaste" rows="12"
+                                        placeholder="Dán dữ liệu vào đây...
+
+Cấu trúc cần có:
+  · Dòng đầu tiên: các mốc ngày/đêm dạng mm/dd (VD: 10/8  10/8  10/9  10/9 ...)
+  · Dòng header: STYLE | LINE ALLOCATED | ... | ITEM | LINE | 1..14 | TOTAL | ... | ASHTON | DIRECT | ETA | PICK UP
+  · Các dòng dữ liệu bên dưới
+
+Hệ thống tự nhận diện cột theo tên header, không cần đúng thứ tự."></textarea>
+                                </div>
+                            </div>
+
+                            <!-- File pane -->
+                            <div class="tab-pane fade" id="etaDirectFilePane" role="tabpanel">
+                                <div class="eta-input-block">
+                                    <label class="check-due-dropzone" for="etaDirectFile">
+                                        <i class="bi bi-cloud-arrow-up-fill"></i>
+                                        <span class="check-due-dropzone-title">Kéo thả hoặc bấm để chọn file
+                                            Excel</span>
+                                        <span class="check-due-dropzone-hint">.xlsx · .xls · .xlsm · .xlsb · .csv</span>
+                                        <input type="file" id="etaDirectFile" accept=".xlsx,.xls,.xlsm,.xlsb,.csv"
+                                            hidden>
+                                    </label>
+                                    <div class="check-due-file-info" id="etaDirectFileInfo">Chưa chọn file</div>
+                                    <div class="eta-file-hint">
+                                        <i class="bi bi-info-circle"></i>
+                                        Tool tự dò tìm bảng dữ liệu: tự nhận diện dòng chứa ngày (mm/dd) và dòng header
+                                        (STYLE, LINE ALLOCATED, ITEM, DIRECT, ETA, PICK UP…), không cần đặt bảng ở A1.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Toolbar (chứa nút Phân tích) -->
+                        <div class="eta-toolbar-row">
+                            <div class="check-due-toolbar-actions ms-auto">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="etaDirectClearBtn">
+                                    <i class="bi bi-eraser-fill"></i> Xóa
+                                </button>
+                                <button type="button" class="btn btn-compare" id="etaDirectAnalyzeBtn">
+                                    <i class="bi bi-search"></i> Phân tích
+                                    <div class="btn-shine"></div>
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+                    <!-- /#etaDirectInputWrap -->
+
+                    <section class="eta-result" id="etaDirectResultSection" style="display:none;">
+                        <div class="eta-stat-row" id="etaDirectStats"></div>
+                        <div class="eta-result-filters">
+                            <div class="eta-filter-controls">
+                                <label class="eta-filter-toggle">
+                                    <input type="checkbox" id="etaDirectOnlyIssues" checked>
+                                    <span>Chỉ hiện dòng có vi phạm</span>
+                                </label>
+                                <label class="eta-filter-toggle"
+                                    title="Chỉ hiện các item xuất hiện ở nhiều dòng (nhiều line / nhiều ngày), xếp sát nhau">
+                                    <input type="checkbox" id="etaDirectOnlyDup">
+                                    <span>Chỉ item trùng</span>
+                                </label>
+                                <select class="form-select form-select-sm eta-filter-select" id="etaDirectLineFilter"
+                                    title="Lọc theo LINE">
+                                    <option value="">Tất cả line</option>
+                                </select>
+                                <select class="form-select form-select-sm eta-filter-select" id="etaDirectProblemFilter"
+                                    title="Lọc theo vấn đề">
+                                    <option value="all">Tất cả vấn đề</option>
+                                    <option value="LINE">Sai LINE ALLOCATED</option>
+                                    <option value="ETA">Chạy trước ETA</option>
+                                    <option value="DIRECT">Thiếu DIRECT</option>
+                                    <option value="ASHTON">Thiếu ASHTON</option>
+                                    <option value="ETA_PICKUP">Trễ DIRECT</option>
+                                </select>
+                                <div class="eta-search-box">
+                                    <i class="bi bi-search"></i>
+                                    <input type="search" class="form-control form-control-sm" id="etaDirectSearch"
+                                        placeholder="Tìm item / frame..." autocomplete="off">
+                                </div>
+                                <select class="form-select form-select-sm eta-filter-select" id="etaDirectSort"
+                                    title="Sắp xếp">
+                                    <option value="date" selected>Sắp xếp: Ngày lên hàng (nối ca)</option>
+                                    <option value="severity">Sắp xếp: Mức độ vi phạm</option>
+                                </select>
+                                <span class="eta-count" id="etaDirectCount"></span>
+                            </div>
+                            <div class="eta-legend">
+                                <span class="eta-legend-chip item-chip"><i class="bi bi-x-octagon-fill"></i> Vấn đề
+                                    ITEM</span>
+                                <span class="eta-legend-chip row-chip"><i class="bi bi-x-circle-fill"></i> Vấn đề
+                                    DÒNG</span>
+                                <span class="eta-legend-chip"><i class="bi bi-square-fill"></i> Ô vi phạm</span>
+                                <span class="eta-legend-chip direct-chip"><i class="bi bi-square-fill"></i> Ô chứa
+                                    DIRECT</span>
+                                <span class="eta-legend-chip dup-chip"><i class="bi bi-square-fill"></i> Item lặp nhiều
+                                    dòng</span>
+                            </div>
+                        </div>
+                        <div class="eta-grid-wrap" id="etaDirectGrid"></div>
+                    </section>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Presenter Spin Modal -->
+    <div class="modal fade workpic-dialog" id="presenterSpinModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content spin-modal-content">
+                <div class="modal-header modern-header modern-header-spin">
+                    <div class="modern-header-inner">
+                        <div class="modern-header-icon"><i class="bi bi-dice-5-fill"></i></div>
+                        <div class="modern-header-text">
+                            <h5 class="modal-title mb-0">Quay Số Người Thuyết Trình</h5>
+                            <p class="modern-header-subtitle mb-0">Ngẫu nhiên & công bằng — tự động xếp lịch thứ 2 tuần
+                            </p>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="spin-layout">
+                        <div class="spin-wheel-col">
+                            <div class="spin-wheel-wrap" id="spinWheelWrap">
+                                <div class="spin-wheel-pointer"><i class="bi bi-caret-down-fill"></i></div>
+                                <svg id="spinWheelSvg" class="spin-wheel-svg" viewBox="0 0 300 300"></svg>
+                                <div class="spin-wheel-hub"><i class="bi bi-mic-fill"></i></div>
+                            </div>
+                            <button type="button" class="btn btn-spin" id="spinNowBtn">
+                                <i class="bi bi-shuffle"></i> Quay Số
+                                <div class="btn-shine"></div>
+                            </button>
+
+                            <div class="spin-result-card" id="spinResultCard" style="display:none;">
+                                <div class="spin-result-badge"><i class="bi bi-trophy-fill"></i> Kết quả</div>
+                                <div class="spin-result-name" id="spinResultName">—</div>
+                                <div class="spin-result-date" id="spinResultDate">—</div>
+                                <button type="button" class="btn btn-confirm-spin" id="confirmSpinBtn">
+                                    <i class="bi bi-check-circle-fill"></i> Xác nhận chỉ định
+                                    <div class="btn-shine"></div>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="spin-users-col">
+                            <div class="spin-users-title">
+                                <i class="bi bi-people-fill"></i> Danh sách quay số
+                                <span class="spin-users-count" id="spinUsersCount">0</span>
+                            </div>
+                            <div class="dept-filter">
+                                <label for="spinDeptSelect"><i class="bi bi-diagram-3-fill"></i> Bộ phận</label>
+                                <select class="form-select form-select-sm" id="spinDeptSelect"></select>
+                            </div>
+                            <div class="spin-users-hint">Bỏ chọn để loại người đó khỏi lượt quay. Bấm
+                                <strong>+</strong>/<strong>−</strong> để thêm/bớt ô (trùng tên); mỗi ô trên vòng quay có
+                                xác suất trúng như nhau.
+                            </div>
+                            <div class="spin-users-list" id="spinUsersList">
+                                <div class="empty-state"><i class="bi bi-hourglass-split"></i><br>Đang tải danh sách
+                                    user...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Day Off Modal -->
+    <div class="modal fade workpic-dialog" id="changeHistoryModal" tabindex="-1" aria-labelledby="changeHistoryTitle">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">
+            <div class="modal-header modern-header"><div class="modern-header-inner"><div class="modern-header-icon"><i class="bi bi-clock-history"></i></div><div><h5 class="modal-title" id="changeHistoryTitle">Lịch sử thay đổi của tôi</h5><p class="modern-header-subtitle mb-0">Theo dõi những cập nhật trong công việc của bạn</p></div></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div>
+            <div class="modal-body">
+                <p class="small text-muted">Tối đa 50 thay đổi trong 7 ngày, chỉ lưu trên trình duyệt này để tiết kiệm Firebase. Không đồng bộ giữa các máy.</p>
+                <div class="d-flex gap-2 mb-3 history-toolbar"><input id="changeHistorySearch" class="form-control" placeholder="Tìm tên, nội dung thay đổi…" aria-label="Tìm lịch sử"><select id="changeHistoryFilter" class="form-select w-auto" aria-label="Loại thay đổi"><option value="all">Tất cả</option><option value="job">Job</option><option value="off">Lịch off</option><option value="holiday">Lịch lễ</option><option value="event">Sự kiện</option></select></div>
+                <div id="changeHistoryList" aria-live="polite"></div>
+            </div>
+        </div></div>
+    </div>
+    <div class="modal fade workpic-dialog" id="dayOffModal" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header modern-header modern-header-dayoff">
+                    <div class="modern-header-inner">
+                        <div class="modern-header-icon"><i class="bi bi-calendar-x-fill"></i></div>
+                        <div class="modern-header-text">
+                            <h5 class="modal-title mb-0">Đăng ký lịch off</h5>
+                            <p class="modern-header-subtitle mb-0">Hai tháng liền nhau · job ngày off và ngày lễ sẽ dời lên
+                                ngày làm việc liền trước</p>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="dayoff-layout">
+                        <aside class="dayoff-users-col">
+                            <div class="spin-users-title">
+                                <i class="bi bi-people-fill"></i> Thành viên
+                                <span class="spin-users-count" id="dayOffUsersCount">0</span>
+                            </div>
+                            <div class="dept-filter">
+                                <label for="dayOffDeptSelect"><i class="bi bi-diagram-3-fill"></i> Bộ phận</label>
+                                <select class="form-select form-select-sm" id="dayOffDeptSelect"></select>
+                            </div>
+                            <div class="spin-users-hint">Bấm tên để xem riêng lịch off của người đó. Lịch của người khác
+                                chỉ để xem.</div>
+                            <div class="dayoff-users-list" id="dayOffUsersList"></div>
+                        </aside>
+
+                        <section class="dayoff-main">
+                            <div class="dayoff-toolbar dayoff-calendar-controls">
+                                <div class="dayoff-period-picker" role="group" aria-label="Khoảng tháng hiển thị">
+                                    <i class="bi bi-calendar3 dayoff-period-icon" aria-hidden="true"></i>
+                                    <label for="dayOffYear"><span>Năm</span><select id="dayOffYear" class="form-select form-select-sm"></select></label>
+                                    <label for="dayOffMonth"><span>Tháng bắt đầu</span><select id="dayOffMonth" class="form-select form-select-sm"></select></label>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-primary" id="dayOffToday"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> Tháng hiện tại</button>
+                            <details class="dayoff-holiday-settings">
+                                <summary>Điều chỉnh lịch lễ của tôi theo năm</summary>
+                                <div class="dayoff-holiday-panel">
+                                <p class="small text-muted">Tết mặc định mùng 1–5 tháng Giêng (5 ngày). Có thể đổi ngày bắt đầu theo lịch của đơn vị. Không tự cộng ngày nghỉ bù hoặc hoán đổi.</p>
+                                <div class="dayoff-toolbar">
+                                    <label for="holidayTetStart">Ngày bắt đầu 5 ngày Tết <input type="date" id="holidayTetStart" class="form-control form-control-sm"></label>
+                                    <label for="holidayNationalDay">Ngày liền kề 02/09 <select id="holidayNationalDay" class="form-select form-select-sm"><option value="1">01/09</option><option value="3">03/09</option></select></label>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" id="saveHolidayPolicy">Lưu lịch lễ của năm</button>
+                                </div>
+                                <div id="holidayPolicyStatus" class="small" role="status"></div>
+                                </div>
+                            </details>
+                            <div class="dayoff-legend"><span class="legend-off">● Off đã đăng ký</span><span class="legend-holiday">● Nghỉ lễ</span><span class="legend-event">● Sự kiện cá nhân</span></div>
+                            </div>
+                            <p class="small text-muted mt-2">Chuột phải vào ngày để thêm lịch trình/sự kiện cá nhân. Sự kiện không đăng ký off.</p>
+                            <div class="dayoff-calendars" id="dayOffCalendars"></div>
+                            <form id="personalEventForm" class="dayoff-form personal-event-popover d-none" role="dialog" aria-label="Lịch trình / sự kiện cá nhân">
+                                <div class="dayoff-form-head">Lịch trình / sự kiện cá nhân</div>
+                                <input type="hidden" id="personalEventId">
+                                <div class="dayoff-toolbar">
+                                    <label for="personalEventDate">Ngày <input type="date" id="personalEventDate" class="form-control" required></label>
+                                    <label for="personalEventTime">Giờ (không bắt buộc) <input type="time" id="personalEventTime" class="form-control"></label>
+                                </div>
+                                <label class="form-label mt-2" for="personalEventTitle">Tên sự kiện</label>
+                                <input id="personalEventTitle" class="form-control" maxlength="120" required placeholder="VD: Sinh nhật, khám sức khỏe…">
+                                <label class="form-label mt-2" for="personalEventNotes">Ghi chú</label>
+                                <textarea id="personalEventNotes" class="form-control" maxlength="1000" rows="2"></textarea>
+                                <label class="form-label mt-2" for="personalEventScope">Áp dụng cho</label>
+                                <select id="personalEventScope" class="form-select form-select-sm">
+                                    <option value="private">Chỉ mình tôi</option>
+                                    <option value="department">Cả bộ phận của tôi</option>
+                                </select>
+                                <small class="text-muted">Sự kiện chung hiển thị cho người cùng bộ phận; chỉ người tạo được sửa/xóa.</small>
+                                <div class="dayoff-toolbar mt-2">
+                                    <label for="personalEventRepeat">Lặp lại <select id="personalEventRepeat" class="form-select form-select-sm"><option value="none">Không lặp</option><option value="weekly">Hằng tuần</option><option value="monthly">Hằng tháng</option><option value="yearly">Hằng năm (dương lịch)</option><option value="lunar-yearly">Hằng năm (âm lịch)</option></select></label>
+                                    <label for="personalEventUntil">Đến hết ngày <input type="date" id="personalEventUntil" class="form-control form-control-sm"></label>
+                                </div>
+                                <small class="text-muted">Sửa/xóa áp dụng cho cả chuỗi. Tháng thiếu ngày sẽ bỏ qua; lặp âm lịch dùng tháng thường.</small>
+                                <div class="d-flex gap-2 mt-3 flex-wrap">
+                                    <button type="submit" id="savePersonalEvent" class="btn btn-primary">Lưu sự kiện</button>
+                                    <button type="button" id="deletePersonalEvent" class="btn btn-outline-danger d-none">Xóa sự kiện</button>
+                                    <button type="button" id="cancelPersonalEvent" class="btn btn-outline-secondary">Đóng</button>
+                                </div>
+                                <div id="personalEventStatus" class="small mt-2" role="status"></div>
+                            </form>
+
+                            <div class="dayoff-form">
+                                <div class="dayoff-form-head"><i class="bi bi-pencil-square"></i> Đăng ký của tôi</div>
+                                <div class="dayoff-summary" id="dayOffSummary"></div>
+                                <div id="dayOffJobPreview" class="dayoff-job-preview" aria-live="polite"></div>
+                                <div id="dayOffReasonWrap" class="d-none">
+                                    <label class="form-label fw-bold mt-2" for="dayOffReason">Lý do off *</label>
+                                    <input type="text" class="form-control" id="dayOffReason" maxlength="120"
+                                        placeholder="VD: Nghỉ phép, việc cá nhân...">
+                                    <div class="dayoff-reason-presets" id="dayOffReasonPresets">
+                                        <button type="button" data-reason="Nghỉ phép">Nghỉ phép</button>
+                                        <button type="button" data-reason="Việc cá nhân">Việc cá nhân</button>
+                                        <button type="button" data-reason="Nghỉ ốm">Nghỉ ốm</button>
+                                        <button type="button" data-reason="Đi công tác">Đi công tác</button>
+                                        <button type="button" data-reason="SO">SO</button>
+                                    </div>
+                                </div>
+                                <div class="d-flex justify-content-end mt-3">
+                                    <button type="button" class="btn btn-save" id="saveDayOffBtn" disabled>
+                                        <i class="bi bi-check-circle-fill"></i> Lưu lịch off
+                                        <div class="btn-shine"></div>
+                                    </button>
+                                </div>
+                            </div>
+                        </section>
+
+                        <aside class="dayoff-detail-col">
+                            <div class="dayoff-detail">
+                                <div class="dayoff-form-head"><i class="bi bi-clock-history"></i> <span
+                                        id="dayOffDetailTitle">Lịch off sắp tới của mọi người</span></div>
+                                <div class="dayoff-detail-list" id="dayOffDetailList"></div>
+                            </div>
+                        </aside>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Work Hours Modal -->
+    <div class="modal fade workpic-dialog" id="workHoursModal" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header modern-header modern-header-teal">
+                    <div class="modern-header-inner">
+                        <div class="modern-header-icon"><i class="bi bi-clock-history"></i></div>
+                        <div class="modern-header-text">
+                            <h5 class="modal-title mb-0">Update giờ làm việc</h5>
+                            <p class="modern-header-subtitle mb-0">Tự động lấy giờ Motion &amp; Station từ dữ liệu sản xuất</p>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="wh-sync-toolbar">
+                    <div class="dept-filter wh-dept-row">
+                        <label for="whDeptSelect"><i class="bi bi-diagram-3-fill"></i> Bộ phận</label>
+                        <select class="form-select form-select-sm" id="whDeptSelect"></select>
+                        <span class="wh-dept-hint">Cập nhật giờ làm việc cho bộ phận đang chọn</span>
+                    </div>
+                    <button type="button" class="btn btn-save" id="whSaveBtn"><i class="bi bi-arrow-repeat"></i> <span id="whSaveBtnText">Update dữ liệu</span></button>
+                    </div>
+                    <div class="wh-sync-info"><i class="bi bi-info-circle-fill"></i><span>Lấy giờ Motion và Station từ dữ liệu sản xuất. Ngày đã có dữ liệu sẽ được hỏi xác nhận trước khi cập nhật.</span></div>
+                    <pre id="whSyncError" class="alert alert-danger small" role="alert" hidden style="white-space:pre-wrap; overflow-wrap:anywhere; user-select:text;"></pre>
+                    <div class="wh-layout">
+                        <div class="wh-input-col"><div class="wh-block"><div class="wh-block-title"><i class="bi bi-table"></i> Dữ liệu vừa lấy <span class="wh-count" id="whPreviewCount">0</span></div><div class="wh-preview" id="whPreview" aria-live="polite"></div></div></div>
+                        <aside class="wh-saved-col"><div class="wh-block"><div class="wh-block-title"><i class="bi bi-calendar-check-fill"></i> Đã cập nhật</div><div class="wh-saved-list" id="whSavedList"></div></div></aside>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Salary Calculator Modal -->
+    <div class="modal fade workpic-dialog" id="salaryCalcModal" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable modal-dialog-centered">
+            <div class="modal-content salary-modal-content">
+                <div class="modal-header modern-header modern-header-salary">
+                    <div class="modern-header-inner">
+                        <div class="modern-header-icon"><i class="bi bi-cash-coin"></i></div>
+                        <div class="modern-header-text">
+                            <h5 class="modal-title mb-0">Tính lương</h5>
+                            <p class="modern-header-subtitle mb-0">Nhập số liệu để ước tính lương thực lãnh</p>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="salary-lcb-card">
+                        <div class="salary-lcb-row">
+                            <label for="salLCB"><i class="bi bi-cash-stack"></i> Lương cơ bản (LCB)</label>
+                            <input type="text" inputmode="numeric" class="salary-input salary-input-lcb" id="salLCB"
+                                placeholder="0">
+                        </div>
+                        <div class="salary-lcb-row salary-lcb-row-sm">
+                            <label for="salStandardDays"><i class="bi bi-calendar-range"></i> Ngày công
+                                chuẩn/tháng</label>
+                            <input type="text" inputmode="numeric" class="salary-input salary-input-sm"
+                                id="salStandardDays" placeholder="26">
+                        </div>
+                        <div class="salary-lcb-hint"><i class="bi bi-info-circle"></i> Đơn giá ngày = LCB ÷ Ngày công
+                            chuẩn. Các mục bên dưới chỉ cần nhập số ngày/giờ, tiền sẽ tự tính.</div>
+                    </div>
+
+                    <div class="salary-grid">
+                        <div class="salary-card salary-card-income">
+                            <div class="salary-card-head salary-head-income">
+                                <i class="bi bi-plus-circle-fill"></i> Mục A: Thu nhập
+                            </div>
+                            <div class="salary-card-body" id="salaryIncomeRows">
+                                <div class="salary-row salary-row-auto">
+                                    <label for="salWorkDay"><i class="bi bi-briefcase-fill"></i> Ngày làm việc<span
+                                            class="salary-formula">× 1 LCB/ngày</span></label>
+                                    <input type="text" inputmode="decimal" class="salary-count-input" id="salWorkDay"
+                                        data-unit="ngày" placeholder="0"><span class="salary-unit">ngày</span>
+                                    <span class="salary-line-value" id="salWorkDayValue">0 VNĐ</span>
+                                </div>
+                                <div class="salary-row salary-row-auto">
+                                    <label for="salHoliday"><i class="bi bi-flag-fill"></i> Ngày lễ<span
+                                            class="salary-formula">× 1 LCB/ngày</span></label>
+                                    <input type="text" inputmode="decimal" class="salary-count-input" id="salHoliday"
+                                        data-unit="ngày" placeholder="0"><span class="salary-unit">ngày</span>
+                                    <span class="salary-line-value" id="salHolidayValue">0 VNĐ</span>
+                                </div>
+                                <div class="salary-row salary-row-auto">
+                                    <label for="salAnnualLeave"><i class="bi bi-umbrella-fill"></i> Phép năm<span
+                                            class="salary-formula">× 1 LCB/ngày</span></label>
+                                    <input type="text" inputmode="decimal" class="salary-count-input"
+                                        id="salAnnualLeave" data-unit="ngày" placeholder="0"><span
+                                        class="salary-unit">ngày</span>
+                                    <span class="salary-line-value" id="salAnnualLeaveValue">0 VNĐ</span>
+                                </div>
+                                <div class="salary-row salary-row-auto">
+                                    <label for="salPaidLeave"><i class="bi bi-house-heart-fill"></i> Nghỉ hưởng
+                                        lương<span class="salary-formula">× 1 LCB/ngày</span></label>
+                                    <input type="text" inputmode="decimal" class="salary-count-input" id="salPaidLeave"
+                                        data-unit="ngày" placeholder="0"><span class="salary-unit">ngày</span>
+                                    <span class="salary-line-value" id="salPaidLeaveValue">0 VNĐ</span>
+                                </div>
+                                <div class="salary-row salary-row-auto">
+                                    <label for="salOtNormal"><i class="bi bi-clock-fill"></i> Tăng ca thường<span
+                                            class="salary-formula">× 1.5 LCB/8</span></label>
+                                    <input type="text" inputmode="decimal" class="salary-count-input" id="salOtNormal"
+                                        data-unit="giờ" placeholder="0"><span class="salary-unit">giờ</span>
+                                    <span class="salary-line-value" id="salOtNormalValue">0 VNĐ</span>
+                                </div>
+                                <div class="salary-row salary-row-auto">
+                                    <label for="salOtSunday"><i class="bi bi-gear-fill"></i> Tăng ca CN<span
+                                            class="salary-formula">× 2 LCB/8</span></label>
+                                    <input type="text" inputmode="decimal" class="salary-count-input" id="salOtSunday"
+                                        data-unit="giờ" placeholder="0"><span class="salary-unit">giờ</span>
+                                    <span class="salary-line-value" id="salOtSundayValue">0 VNĐ</span>
+                                </div>
+                                <div class="salary-row salary-row-auto">
+                                    <label for="salOtHoliday"><i class="bi bi-award-fill"></i> Tăng ca ngày lễ<span
+                                            class="salary-formula">× 3 LCB/8</span></label>
+                                    <input type="text" inputmode="decimal" class="salary-count-input" id="salOtHoliday"
+                                        data-unit="giờ" placeholder="0"><span class="salary-unit">giờ</span>
+                                    <span class="salary-line-value" id="salOtHolidayValue">0 VNĐ</span>
+                                </div>
+                                <div class="salary-row salary-row-auto">
+                                    <label for="salNightShift"><i class="bi bi-moon-stars-fill"></i> Ca đêm<span
+                                            class="salary-formula">× 0.3 LCB/8 + 10K/8h</span></label>
+                                    <input type="text" inputmode="decimal" class="salary-count-input" id="salNightShift"
+                                        data-unit="giờ" placeholder="0"><span class="salary-unit">giờ</span>
+                                    <span class="salary-line-value" id="salNightShiftValue">0 VNĐ</span>
+                                </div>
+                                <div class="salary-row salary-total-row">
+                                    <label>Tổng Thu Nhập:</label>
+                                    <span class="salary-total-value" id="salaryIncomeTotal">0 VNĐ</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="salary-card salary-card-deduct">
+                            <div class="salary-card-head salary-head-deduct">
+                                <i class="bi bi-dash-circle-fill"></i> Mục B: Khấu trừ
+                            </div>
+                            <div class="salary-card-body" id="salaryDeductRows">
+                                <div class="salary-row salary-row-readonly">
+                                    <label for="salInsurance"><i class="bi bi-shield-fill-check"></i>
+                                        BHXH/BHYT/BHTN<span class="salary-formula">10.5% LCB</span></label>
+                                    <span class="salary-line-value salary-line-value-deduct" id="salInsuranceValue">0
+                                        VNĐ</span>
+                                </div>
+                                <div class="salary-row salary-row-readonly">
+                                    <label for="salUnionFee"><i class="bi bi-people-fill"></i> Phí công đoàn<span
+                                            class="salary-formula">cố định</span></label>
+                                    <span class="salary-line-value salary-line-value-deduct" id="salUnionFeeValue">0
+                                        VNĐ</span>
+                                </div>
+                                <div class="salary-row salary-total-row salary-total-row-deduct">
+                                    <label>Tổng Khấu Trừ:</label>
+                                    <span class="salary-total-value" id="salaryDeductTotal">0 VNĐ</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="salary-card salary-card-tax">
+                            <div class="salary-card-head salary-head-tax">
+                                <i class="bi bi-receipt"></i> Thuế TNCN (theo biểu thuế lũy tiến 2026)
+                            </div>
+                            <div class="salary-card-body">
+                                <div class="salary-row">
+                                    <label for="salDependents"><i class="bi bi-people-fill"></i> Số người phụ thuộc<span
+                                            class="salary-formula">6,2 triệu/người</span></label>
+                                    <input type="text" inputmode="decimal" class="salary-count-input" id="salDependents"
+                                        placeholder="0"><span class="salary-unit">người</span>
+                                </div>
+                                <div class="salary-row salary-row-readonly">
+                                    <label><i class="bi bi-dash-square"></i> Giảm trừ bản thân</label>
+                                    <span class="salary-line-value salary-line-value-reduce"
+                                        id="salSelfDeductValue">15.500.000 VNĐ</span>
+                                </div>
+                                <div class="salary-row salary-row-readonly">
+                                    <label><i class="bi bi-dash-square"></i> Giảm trừ người phụ thuộc</label>
+                                    <span class="salary-line-value salary-line-value-reduce"
+                                        id="salDependentDeductValue">0 VNĐ</span>
+                                </div>
+                                <div class="salary-row salary-row-readonly">
+                                    <label><i class="bi bi-dash-square"></i> Bảo hiểm bắt buộc (đã trừ ở trên)</label>
+                                    <span class="salary-line-value salary-line-value-reduce" id="salInsuranceRefValue">0
+                                        VNĐ</span>
+                                </div>
+                                <div class="salary-row salary-total-row">
+                                    <label>Thu nhập tính thuế:</label>
+                                    <span class="salary-total-value" id="salTaxableIncomeValue">0 VNĐ</span>
+                                </div>
+                                <div class="salary-row salary-total-row salary-total-row-deduct">
+                                    <label>Thuế TNCN phải nộp (<span id="salTaxRateLabel">0%</span>):</label>
+                                    <span class="salary-total-value" id="salTaxValue">0 VNĐ</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="salary-result">
+                        <div class="salary-result-icon"><i class="bi bi-wallet2"></i></div>
+                        <div class="salary-result-text">
+                            <div class="salary-result-label">Thực Lãnh (sau BH &amp; thuế TNCN)</div>
+                            <div class="salary-result-value" id="salaryNetTotal">0 VNĐ</div>
+                            <div class="salary-result-sub">Lương thực tế sau khấu trừ &amp; thuế</div>
+                        </div>
+                    </div>
+
+                    <div class="salary-note">
+                        <i class="bi bi-info-circle"></i> Chỉ dùng để ước tính, số liệu không được lưu lại. Form sẽ tự
+                        xóa khi đóng.
+                    </div>
+
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Profile Modal -->
+    <div class="modal fade" id="userProfileModal" tabindex="-1" aria-labelledby="profileModalTitle">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header account-modal-header">
+                    <div><span class="account-eyebrow">WORKPIC · TÀI KHOẢN</span><h5 class="modal-title" id="profileModalTitle">Thông tin tài khoản</h5></div>
+                    <button type="button" class="account-icon-button" data-bs-dismiss="modal" aria-label="Đóng thông tin tài khoản"><i class="bi bi-x-lg"></i></button>
+                </div>
+                <div class="modal-body account-modal-body">
+                    <section class="account-identity" aria-label="Hồ sơ của bạn">
+                        <div class="profile-avatar-container">
+                            <img id="profileAvatar" class="profile-avatar-img" src="" alt="Ảnh đại diện">
+                            <button type="button" class="btn-avatar-edit" id="changeAvatarBtn" title="Đổi ảnh đại diện" aria-label="Đổi ảnh đại diện"><i class="bi bi-camera"></i></button>
+                            <input type="file" id="avatarFileInput" accept="image/*" hidden>
+                        </div>
+                        <div class="account-identity-text"><span class="account-role" id="profileRoleBadge">Thành viên</span><h4 id="profileHeroName">Tài khoản của bạn</h4><p id="profileEmail">---</p><small><i class="bi bi-shield-check"></i> Hồ sơ được đồng bộ theo tài khoản</small></div>
+                    </section>
+                    <section class="account-section">
+                        <div class="account-section-heading"><span class="account-section-icon"><i class="bi bi-person-badge"></i></span><div><h6>Hồ sơ cá nhân</h6><p>Một vài thông tin để mọi người nhận ra bạn.</p></div></div>
+                        <label class="form-label" for="profileDisplayName">Tên hiển thị</label>
+                        <div class="input-group account-name-field">
+                            <input type="text" class="form-control" id="profileDisplayName" maxlength="120" placeholder="Tên mọi người sẽ nhìn thấy" autocomplete="nickname">
+                            <button type="button" class="btn account-save-name" id="saveProfileBtn"><i class="bi bi-check2"></i> Lưu tên</button>
+                        </div>
+                        <div class="account-field-grid">
+                            <div><label class="form-label" for="profileDepartment">Bộ phận làm việc</label><div class="input-group"><select class="form-select" id="profileDepartment"></select><button class="btn account-add-department" type="button" id="profileAddDeptBtn" title="Thêm bộ phận" aria-label="Thêm bộ phận"><i class="bi bi-plus-lg"></i></button></div></div>
+                            <div><label class="form-label" for="profileWorkShift">Ca làm việc</label><select class="form-select" id="profileWorkShift"><option value="day">Ca ngày · 07:00–20:00</option><option value="night">Ca đêm · 20:00–07:00</option></select></div>
+                        </div>
+                        <div class="input-group mt-3 d-none" id="profileNewDeptRow"><input type="text" class="form-control" id="profileNewDeptName" maxlength="40" placeholder="Tên bộ phận mới" aria-label="Tên bộ phận mới"><button class="btn account-save-name" type="button" id="profileNewDeptSaveBtn"><i class="bi bi-plus-lg"></i> Thêm</button></div>
+                        <p class="account-inline-note"><i class="bi bi-check-circle"></i> Bộ phận và ca làm việc được lưu khi bạn thay đổi.</p>
+                        <p id="profileSaveStatus" class="account-save-status" role="status" aria-live="polite"></p>
+                    </section>
+                    <details class="account-section account-security">
+                        <summary class="account-section-heading"><span class="account-section-icon"><i class="bi bi-shield-lock"></i></span><span><strong>Bảo mật tài khoản</strong><small>Đổi mật khẩu bằng xác nhận an toàn.</small></span><i class="bi bi-chevron-down"></i></summary>
+                        <div class="account-security-fields"><label class="form-label" for="profileNewPassword">Mật khẩu mới</label><div class="input-group account-password-field"><input type="password" class="form-control" id="profileNewPassword" placeholder="Ít nhất 6 ký tự" minlength="6" autocomplete="new-password"><button type="button" class="btn account-password-toggle" id="profileTogglePassword" aria-label="Hiện mật khẩu mới" aria-pressed="false"><i class="bi bi-eye"></i></button></div><div class="account-security-actions"><span><i class="bi bi-lock"></i> Cần mật khẩu hiện tại để xác nhận.</span><button class="btn account-secondary-button" id="changePasswordBtn" type="button"><i class="bi bi-key"></i> Đổi mật khẩu</button></div></div>
+                    </details>
+                </div>
+                <div class="modal-footer account-modal-footer"><button type="button" class="account-logout" id="logoutBtn"><i class="bi bi-box-arrow-left"></i> Đăng xuất</button><button type="button" class="btn account-done-button" data-bs-dismiss="modal">Đóng <i class="bi bi-check2"></i></button></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Change Password Confirm Modal -->
+    <div class="modal fade workpic-dialog" id="changePasswordConfirmModal" tabindex="-1">
+        <div class="modal-dialog modal-md modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header modern-header modern-header-teal">
+                    <div class="modern-header-inner">
+                        <div class="modern-header-icon"><i class="bi bi-shield-lock-fill"></i></div>
+                        <div class="modern-header-text">
+                            <h5 class="modal-title mb-0">Xác nhận đổi mật khẩu</h5>
+                            <p class="modern-header-subtitle mb-0">Nhập mật khẩu hiện tại để xác nhận</p>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label fw-bold" for="confirmCurrentPassword">Mật khẩu hiện tại *</label>
+                    <input type="password" class="form-control" id="confirmCurrentPassword"
+                        autocomplete="current-password" placeholder="Nhập mật khẩu hiện tại">
+                    <p class="auth-error mb-0 mt-2" id="changePasswordError" role="alert"></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-cancel" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Hủy
+                    </button>
+                    <button type="button" class="btn btn-save" id="confirmChangePasswordBtn">
+                        <i class="bi bi-check-circle-fill"></i> Xác nhận đổi
+                        <div class="btn-shine"></div>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade workpic-dialog" id="settingsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header modern-header modern-header-primary">
+                    <div class="modern-header-inner">
+                        <div class="modern-header-icon"><i class="bi bi-gear-fill"></i></div>
+                        <div class="modern-header-text">
+                            <h5 class="modal-title mb-0">Cài đặt</h5>
+                            <p class="modern-header-subtitle mb-0">Tùy chỉnh trải nghiệm sử dụng</p>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
+                <div class="modal-body">
+                    <section class="settings-section">
+                        <div class="settings-section-head">
+                            <i class="bi bi-bell-fill"></i>
+                            <div>
+                                <h6>Nhắc job trước</h6>
+                                <small>Thông báo desktop sẽ xuất hiện sớm hơn giờ job</small>
+                            </div>
+                        </div>
+                        <select class="form-select" id="settingsNotifyLead">
+                            <option value="0">Đúng giờ (không nhắc trước)</option>
+                            <option value="5">5 phút</option>
+                            <option value="10">10 phút</option>
+                            <option value="15">15 phút</option>
+                            <option value="30">30 phút</option>
+                            <option value="60">1 giờ</option>
+                            <option value="120">2 giờ</option>
+                        </select>
+                    </section>
+
+                    <section class="settings-section">
+                        <div class="settings-section-head">
+                            <i class="bi bi-check2-square"></i>
+                            <div>
+                                <h6>Tích hoàn thành job</h6>
+                                <small>Tự bấm hoàn thành trên ô job trong lịch</small>
+                            </div>
+                        </div>
+                        <div class="form-check form-switch job-switch-card">
+                            <input class="form-check-input" type="checkbox" id="settingsCompletionToggle">
+                            <label class="form-check-label fw-bold" for="settingsCompletionToggle">Bật chức năng tích
+                                hoàn thành</label>
+                        </div>
+
+                    </section>
+
+                    <!-- ===== CHỦ ĐỀ TOPBAR ===== -->
+                    <section class="settings-section">
+                        <div class="settings-section-head">
+                            <i class="bi bi-palette-fill"></i>
+                            <div>
+                                <h6>Chủ đề thanh Header</h6>
+                                <small>Bấm vào chủ đề để mở bảng chọn cường độ hiệu ứng</small>
+                            </div>
+                        </div>
+                        <div class="theme-grid theme-grid-compact" id="themeGrid"></div>
+                    </section>
+
+                    <section class="settings-section">
+                        <div class="settings-section-head">
+                            <i class="bi bi-feather"></i>
+                            <div>
+                                <h6 id="mascotCountTitle">🦉 Số lượng cú</h6>
+                                <small id="mascotCountSub">Cú đứng trên các nút của trang · tối đa 10 · chỉ hiện ở chế
+                                    độ tối</small>
+                            </div>
+                        </div>
+                        <div class="owl-count-row">
+                            <input type="range" class="form-range" id="settingsOwlCount" min="0" max="10" step="1"
+                                value="1">
+                            <span class="owl-count-badge" id="settingsOwlCountValue">1</span>
+                        </div>
+                        <div class="form-text" id="mascotCountHint">Con đầu tiên đậu trên chữ "Lịch Làm Việc", các con
+                            thêm vào sẽ đậu trên nút Thêm Job, Layout, Xem, Xuất PDF... Bấm vào cú để "bắn".</div>
+                    </section>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-cancel" data-bs-dismiss="modal">Đóng</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transfer Confirmation Modal -->
+    <div class="modal fade workpic-dialog" id="transferConfirmModal" tabindex="-1">
+        <div class="modal-dialog modal-md">
+            <div class="modal-content">
+                <div class="modal-header modern-header modern-header-warning">
+                    <div class="modern-header-inner">
+                        <div class="modern-header-icon">
+                            <i class="bi bi-arrow-left-right"></i>
+                        </div>
+                        <div class="modern-header-text">
+                            <h5 class="modal-title mb-0">Xác nhận chuyển job</h5>
+                            <p class="modern-header-subtitle mb-0">Có người muốn chuyển/copy job cho bạn</p>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="transferConfirmMessage" class="mb-3">Bạn có muốn nhận job này không?</p>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-success flex-grow-1" id="transferAcceptBtn">
+                            <i class="bi bi-check-circle-fill"></i> Nhận
+                        </button>
+                        <button class="btn btn-danger flex-grow-1" id="transferRejectBtn">
+                            <i class="bi bi-x-circle-fill"></i> Từ chối
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Job Transfer/Copy Confirmation Modal -->
+    <div class="modal fade workpic-dialog" id="quickJobTransferConfirmModal" tabindex="-1">
+        <div class="modal-dialog modal-md">
+            <div class="modal-content">
+                <div class="modal-header modern-header modern-header-warning">
+                    <div class="modern-header-inner">
+                        <div class="modern-header-icon">
+                            <i class="bi bi-arrow-left-right"></i>
+                        </div>
+                        <div class="modern-header-text">
+                            <h5 class="modal-title mb-0">Chuyển/copy job trong ngày</h5>
+                            <p class="modern-header-subtitle mb-0">Xác nhận nhận job phát sinh</p>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="quickJobTransferConfirmMessage" class="mb-3">Bạn có muốn nhận job này không?</p>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-success flex-grow-1" id="quickJobTransferAcceptBtn">
+                            <i class="bi bi-check-circle-fill"></i> Nhận
+                        </button>
+                        <button class="btn btn-danger flex-grow-1" id="quickJobTransferRejectBtn">
+                            <i class="bi bi-x-circle-fill"></i> Từ chối
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Job Parser Modal -->
+    <div class="modal fade workpic-dialog" id="aiJobParserModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content ai-parser-modal-content">
+                <div class="modal-header modern-header modern-header-ai">
+                    <div class="modern-header-inner">
+                        <div class="modern-header-icon"><i class="bi bi-stars"></i></div>
+                        <div class="modern-header-text">
+                            <h5 class="modal-title mb-0">✨ Dán → Tạo Job (AI)</h5>
+                            <p class="modern-header-subtitle mb-0">Dán tin nhắn, email, ghi chú — AI tự tách thành job
+                            </p>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
+                <div class="modal-body">
+
+                    <!-- Step 1: API key setup -->
+                    <div id="aiKeyStep" class="ai-step d-none">
+                        <div class="ai-setup-card">
+                            <h6><i class="bi bi-key-fill"></i> Bước 1: Nhập Gemini API key</h6>
+                            <p class="small text-muted mb-2">
+                                Lấy key <strong>miễn phí</strong> tại
+                                <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Google
+                                    AI Studio</a>.
+                                Key chỉ lưu trên máy bạn (localStorage), không gửi đi đâu khác.
+                            </p>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="aiKeyInput" placeholder="AIzaSy...">
+                                <button class="btn btn-save" type="button" id="aiKeySaveBtn">
+                                    <i class="bi bi-check-circle-fill"></i> Lưu &amp; Tiếp tục
+                                </button>
+                            </div>
+                            <div class="form-text mt-2">
+                                <i class="bi bi-shield-exclamation"></i>
+                                Key API: AQ.Ab8RN6JaefJinv1fKF7LFRu0yOxNkogFEgRkzVq54yeBBl2Qeg
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Paste textarea -->
+                    <div id="aiPasteStep" class="ai-step d-none">
+                        <label class="form-label fw-bold" for="aiPasteText">
+                            <i class="bi bi-clipboard-data-fill"></i> Dán văn bản vào đây
+                        </label>
+                        <textarea class="form-control ai-parse-textarea" id="aiPasteText" rows="8" placeholder="VD:
+Mai 9h họp review Q4 với Marketing, 90 phút.
+Chiều 2h chuẩn bị slide cho khách Nhật.
+Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
+                        <div class="ai-paste-hints">
+                            <span><i class="bi bi-check2"></i> Tin nhắn / email</span>
+                            <span><i class="bi bi-check2"></i> Ghi chú họp</span>
+                            <span><i class="bi bi-check2"></i> Danh sách task</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mt-3 gap-2 flex-wrap">
+                            <div class="small text-muted">
+                                <i class="bi bi-shield-check"></i> Không có mạng / lo privacy?
+                                <button type="button" class="btn btn-link btn-sm p-0" id="aiFallbackBtn">Dùng parser cơ
+                                    bản</button>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="aiChangeKeyBtn">
+                                    <i class="bi bi-key"></i> Đổi key
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="aiCheckModelsBtn">
+                                    <i class="bi bi-list-check"></i> Kiểm tra model
+                                </button>
+                                <button type="button" class="btn btn-ai-analyze" id="aiAnalyzeBtn">
+                                    <i class="bi bi-magic"></i> Phân tích
+                                    <div class="btn-shine"></div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Loading -->
+                    <div id="aiLoading" class="ai-loading d-none">
+                        <div class="ai-loading-bounce">
+                            <span></span><span></span><span></span>
+                        </div>
+                        <p class="ai-loading-text">AI đang đọc và phân tích...</p>
+                    </div>
+
+                    <!-- Step 3: Results -->
+                    <div id="aiResultStep" class="ai-step d-none">
+                        <div class="ai-result-header">
+                            <div>
+                                <h6 class="mb-1"><i class="bi bi-list-check"></i> Job tìm được</h6>
+                                <small class="text-muted" id="aiResultCount">0 job</small>
+                            </div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="aiBackToPasteBtn">
+                                <i class="bi bi-arrow-left"></i> Dán lại
+                            </button>
+                        </div>
+                        <div id="aiResultList" class="ai-result-list"></div>
+                    </div>
+
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-cancel" data-bs-dismiss="modal">Hủy</button>
+                    <button type="button" class="btn btn-save d-none" id="aiCreateJobsBtn">
+                        <i class="bi bi-check-circle-fill"></i> Tạo <span id="aiCreateCount">0</span> job
+                        <div class="btn-shine"></div>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Guide Modal -->
+    <div class="modal fade workpic-dialog" id="guideModal" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header modern-header modern-header-primary">
+                    <div class="modern-header-inner">
+                        <div class="modern-header-icon">
+                            <i class="bi bi-info-circle-fill"></i>
+                        </div>
+                        <div class="modern-header-text">
+                            <h5 class="modal-title mb-0">Hướng dẫn sử dụng</h5>
+                            <p class="modern-header-subtitle mb-0">Cập nhật 12/11/2026 · Lịch làm việc, phân quyền và các công cụ hiện tại</p>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="ia-diagram">
+                        <div class="ia-center">
+                            <div class="ia-top-node">
+                                <span class="ia-top-t1"><i class="bi bi-box-arrow-in-right"></i> Đăng nhập / Đăng
+                                    ký</span>
+                                <span class="ia-top-t2">Email &amp; mật khẩu · Avatar đồng bộ qua Firestore</span>
+                            </div>
+                            <div class="ia-arrow-down"></div>
+                            <div class="ia-sub-node">
+                                <span class="ia-top-t1">Trang chính</span>
+                                <span class="ia-top-t2">Topbar · Sidebar · Lịch làm việc 2 tuần</span>
+                            </div>
+                            <div class="ia-arrow-down"></div>
+                        </div>
+
+                        <div class="ia-cols">
+
+                            <!-- ===== CỘT 1: LỊCH LÀM VIỆC ===== -->
+                            <div class="ia-col ia-c-biweekly">
+                                <div class="ia-col-head">
+                                    <i class="bi bi-calendar2-week-fill"></i>
+                                    <div>
+                                        <div class="ia-h1">Lịch làm việc</div>
+                                        <div class="ia-h2">Quản lý job định kỳ</div>
+                                    </div>
+                                </div>
+                                <div class="ia-col-body">
+                                    <div class="ia-item">Thêm / Sửa / Xóa Job<span>Một lần · hằng ngày · hằng tuần · 2 tuần/lần · hằng tháng. Nhập giờ bắt đầu và thời lượng theo phút; mặc định 30 phút. Job hằng ngày có thể loại trừ các ngày trong tuần.</span></div>
+                                    <div class="ia-item">Lịch cố định / Timeline<span>Chọn tab trên lịch để đổi cách xem. Timeline hiển thị thời lượng, job đang chạy và cảnh báo trùng giờ; kéo job để đổi giờ sau khi xác nhận.</span></div>
+                                    <div class="ia-item">Job đang làm vẫn sáng<span>Job chỉ mờ khi đến giờ kết thúc = giờ bắt đầu + thời lượng, kể cả qua nửa đêm hoặc có giờ tùy chỉnh. Ví dụ: 09:00, thời lượng 120 phút → sáng đến 11:00.</span></div>
+                                    <div class="ia-item">Checklist theo từng lần làm<span>Nhập mỗi dòng một bước khi tạo/sửa job (tối đa 50 bước). Mở chi tiết từ lịch để tích tiến độ; mỗi lần xuất hiện có checklist riêng.</span></div>
+                                    <div class="ia-item">Tạm dừng job<span>Job tạm dừng không hiện trên lịch &amp; không
+                                            nhắc</span></div>
+                                    <div class="ia-item">Kéo-thả đổi ngày<span>Chỉ ảnh hưởng ngày đó, giữ nguyên
+                                            giờ</span></div>
+                                    <div class="ia-item">Tùy chỉnh cạnh giờ<span>Đổi giờ / dời ngày / ghi chú nhanh cho riêng lần xuất hiện đó.</span></div>
+                                    <div class="ia-item">Tích hoàn thành ✓<span>Bật trong Cài đặt · bấm ✓ trên ô job ·
+                                            hết thời lượng mà chưa tích sẽ được đánh dấu chưa xong. Tắt chế độ này thì không cần tích thủ công.</span></div>
+                                    <div class="ia-item">Chuyển / Copy Job<span>Chỉ gửi được cho người cùng bộ phận ·
+                                            người nhận cần xác nhận</span></div>
+                                    <div class="ia-item">Job ngoài lịch<span>Việc phát sinh, không lặp lại</span></div>
+                                    <div class="ia-item">Tìm kiếm job<span>Lọc theo tiêu đề / nội dung</span></div>
+                                    <div class="ia-item">Xuất PDF<span>Danh sách job đang hoạt động</span></div>
+                                </div>
+                            </div>
+
+                            <!-- ===== CỘT 2: JOB TRONG NGÀY ===== -->
+                            <div class="ia-col ia-c-weekly">
+                                <div class="ia-col-head">
+                                    <i class="bi bi-chat-dots-fill"></i>
+                                    <div>
+                                        <div class="ia-h1">Job trong ngày</div>
+                                        <div class="ia-h2">Khung chat real-time</div>
+                                    </div>
+                                </div>
+                                <div class="ia-col-body">
+                                    <div class="ia-item">Báo job phát sinh<span>Kèm hạn chót tùy chọn · chỉ người cùng
+                                            bộ phận thấy</span></div>
+                                    <div class="ia-item">Nhận job / Chỉ định người nhận<span>Người được chỉ định có thể
+                                            nhận hoặc từ chối</span></div>
+                                    <div class="ia-item">Chuyển / Copy job trong ngày<span>Cần người nhận xác
+                                            nhận</span></div>
+                                    <div class="ia-item">Cảnh báo quá hạn / trễ hạn<span>Tô đỏ khi trễ</span></div>
+                                    <div class="ia-item">Hoàn thành job trong ngày<span>Người đang nhận job bấm Hoàn thành. Kết quả hiển thị thời gian làm, sớm/trễ so với hạn chót và báo cho người tạo, người chỉ định.</span></div>
+                                    <div class="ia-item">Tab "Chung" / "Của tôi"<span>Xem job của mình đang làm &amp; đã
+                                            xong</span></div>
+                                    <div class="ia-item">Tìm kiếm &amp; lọc<span>Trạng thái · người phụ trách</span>
+                                    </div>
+                                    <div class="ia-item">Sửa / Xóa job<span>Chỉ người tạo job</span></div>
+                                </div>
+                            </div>
+
+                            <!-- ===== CỘT 3: LỊCH OFF ===== -->
+                            <div class="ia-col ia-c-monthly">
+                                <div class="ia-col-head">
+                                    <i class="bi bi-calendar-x-fill"></i>
+                                    <div>
+                                        <div class="ia-h1">Lịch off</div>
+                                        <div class="ia-h2">Đăng ký ngày nghỉ</div>
+                                    </div>
+                                </div>
+                                <div class="ia-col-body">
+                                    <div class="ia-item">Chọn ngày off<span>Chọn năm và tháng bắt đầu để xem hai tháng liền nhau; bấm Tháng hiện tại để quay về. Chỉ chỉnh sửa lịch của mình.</span></div>
+                                    <div class="ia-item">Nhập lý do off<span>Có gợi ý nhanh: Nghỉ phép, Việc cá
+                                            nhân…</span></div>
+                                    <div class="ia-item">Xem lịch off mọi người<span>Bấm tên thành viên để lọc
+                                            riêng</span></div>
+                                    <div class="ia-item">Job tự động dời<span>Job rơi vào ngày off hoặc ngày lễ → dời lên ngày làm việc liền trước (màu hồng). Xem trước các job bị ảnh hưởng trước khi lưu off.</span></div>
+                                    <div class="ia-item">Xóa lịch off<span>Job tự trở về ngày bình thường</span></div>
+                                    <div class="ia-item">Lịch lễ theo năm<span>Điều chỉnh ngày bắt đầu 5 ngày Tết và ngày nghỉ liền kề 02/09 trong lịch off. Không tự cộng ngày nghỉ bù hoặc hoán đổi.</span></div>
+                                    <div class="ia-item">Sự kiện cá nhân / bộ phận<span>Chuột phải vào ngày để thêm sự kiện, giờ và ghi chú; chọn Chỉ mình tôi hoặc Cả bộ phận của tôi. Chỉ người tạo được sửa/xóa, thành viên cùng bộ phận được xem sự kiện chung. Hỗ trợ lặp theo tuần, tháng, năm dương lịch hoặc năm âm lịch và ngày kết thúc. Sự kiện hiển thị nhãn xanh dương, không đăng ký off.</span></div>
+                                </div>
+                            </div>
+
+                            <!-- ===== CỘT 4: CÔNG CỤ LAYOUT ===== -->
+                            <div class="ia-col ia-c-yearly">
+                                <div class="ia-col-head">
+                                    <i class="bi bi-grid-3x3-gap-fill"></i>
+                                    <div>
+                                        <div class="ia-h1">Công cụ Layout</div>
+                                        <div class="ia-h2">Menu Layout ở Sidebar</div>
+                                    </div>
+                                </div>
+                                <div class="ia-col-body">
+                                    <div class="ia-item">Check Due<span>So sánh FG_MO / FG_JOBNO / FG_DUE giữa 2 nguồn
+                                            dữ liệu — hỗ trợ dán hoặc tải file Excel/CSV</span></div>
+                                    <div class="ia-item">Check ETA &amp; Direct<span>Ràng buộc LINE ALLOCATED · DIRECT ·
+                                            ETA · PICK UP · ASHTON</span></div>
+                                    <div class="ia-item">Quay số thuyết trình<span>Ngẫu nhiên công bằng · thêm/bớt ô
+                                            trùng tên · tự xếp lịch Thứ 2</span></div>
+                                    <div class="ia-item">Đăng ký lịch off<span>Xem &amp; quản lý ngày nghỉ</span></div>
+                                    <div class="ia-item">Thống kê job<span>Xem user nào đang có nhiều job và chiếm nhiều
+                                            thời gian</span></div>
+                                    <div class="ia-item">Update giờ làm việc<span>Trên Windows, mở start-server.pyw, nhập tài khoản IBM rồi bật server. Sau đó dùng Update giờ làm việc để lấy giờ Motion/Station; M/S hiện ở góc ngày, có xác nhận khi trùng ngày.</span></div>
+                                    <div class="ia-item">Tính lương<span>Ước tính thu nhập &amp; thực lãnh trong tháng
+                                            theo LCB</span></div>
+                                </div>
+                            </div>
+
+                            <!-- ===== CỘT 5: THÔNG BÁO & CÀI ĐẶT ===== -->
+                            <div class="ia-col ia-c-quarterly">
+                                <div class="ia-col-head">
+                                    <i class="bi bi-bell-fill"></i>
+                                    <div>
+                                        <div class="ia-h1">Thông báo &amp; Cài đặt</div>
+                                        <div class="ia-h2">Tùy chỉnh trải nghiệm</div>
+                                    </div>
+                                </div>
+                                <div class="ia-col-body">
+                                    <div class="ia-item">Chuông thông báo<span>Tổng hợp 30 ngày gần nhất + số chưa
+                                            đọc</span></div>
+                                    <div class="ia-item">Chờ bạn xác nhận<span>Lời mời / chuyển-copy job bị lỡ — bấm
+                                            "Xem lại"</span></div>
+                                    <div class="ia-item">Nhắc job trên desktop<span>Bật khi mở app lần đầu · nhắc trước
+                                            N phút hoặc đúng giờ</span></div>
+                                    <div class="ia-item">Nút trong thông báo<span>Hoàn thành · Đợi tí = nhắc lại sau 10
+                                            phút</span></div>
+                                    <div class="ia-item">Tích hoàn thành job<span>Bật/tắt yêu cầu tích hoàn thành thủ công. Khi bật, chỉ các lần job từ ngày bật trở đi cần tích.</span></div>
+                                    <div class="ia-item">Quyền sử dụng<span>Đấng tối cao có thể cấp quyền Xem / Thêm / Sửa / Xóa theo từng chức năng. Chức năng không có quyền xem sẽ bị ẩn; chỉ các nút đã được tích quyền mới hiển thị. User chưa được cấp quyền sẽ không thấy chức năng; thay đổi quyền sẽ có thông báo ban hoặc thu hồi phước lành, kèm các quyền cụ thể. Mở form thông báo riêng trong Thông tin tài khoản → Phước lành của tôi; Đấng tối cao có trạng thái Toàn quyền riêng.</span></div>
+                                    <div class="ia-item">Quản lý thành viên của Đấng tối cao<span>Vào Thông tin tài khoản → Đấng tối cao → chọn thành viên. Chuyển tab Hồ sơ / Công việc / Phước lành / Tùy chọn. Tìm hoặc lọc job, bấm Sửa để mở form riêng rồi Lưu hoặc Hủy. Xóa có hộp xác nhận rõ tên job; đổi thành viên khi chưa lưu sẽ được nhắc. Đấng tối cao có thể sửa hoặc xóa job của người khác.</span></div>
+                                    <div class="ia-item">Chủ đề Header<span>Mặc định, Tết, Trung Thu, Noel, Halloween...
+                                            kèm hiệu ứng rơi toàn màn hình</span></div>
+                                    <div class="ia-item">Linh vật (Mascot)<span>Cú, Rồng, Thỏ, Tuần lộc, Ma... đậu trên
+                                            thanh công cụ (ở chế độ tối)</span></div>
+                                </div>
+                            </div>
+
+                            <!-- ===== CỘT 6: TIỆN ÍCH KHÁC ===== -->
+                            <div class="ia-col ia-c-daily">
+                                <div class="ia-col-head">
+                                    <i class="bi bi-magic"></i>
+                                    <div>
+                                        <div class="ia-h1">Tiện ích khác</div>
+                                        <div class="ia-h2">Trải nghiệm nhanh hơn</div>
+                                    </div>
+                                </div>
+                                <div class="ia-col-body">
+                                    <div class="ia-item">Chế độ tối / sáng<span>Nút ở góc phải Topbar</span></div>
+                                    <div class="ia-item">Ẩn / hiện Sidebar<span>Nút ở tiêu đề Lịch làm việc</span></div>
+                                    <div class="ia-item">Hiện / ẩn Chủ Nhật<span>Toggle ở tiêu đề Lịch làm việc</span>
+                                    </div>
+                                    <div class="ia-item">Xem job hôm nay<span>Bấm Xem dữ liệu để xem Timeline và danh sách job theo ca ngày 07:00–20:00 hoặc ca đêm 20:00–07:00. Vạch đỏ chỉ giờ hiện tại, viền cầu vồng chỉ job đang chạy; bấm job để mở chi tiết.</span></div>
+                                    <div class="ia-item">Lịch sử thay đổi<span>Bấm Lịch sử để xem tối đa 50 thay đổi trong 7 ngày trên trình duyệt đang dùng. Có tìm kiếm và lọc; lịch sử không ghi Firebase và không đồng bộ giữa các máy.</span></div>
+                                    <div class="ia-item">Tạo job bằng AI<span>Mở công cụ AI, cấu hình khóa API theo hộp thoại rồi dán tin nhắn/email/ghi chú. Kiểm tra và sửa tên, lịch, giờ, thời lượng trước khi tạo các job đã chọn.</span></div>
+                                    <div class="ia-item">Hồ sơ cá nhân<span>Đổi avatar, tên hiển thị, bộ phận và ca làm việc. Khi đổi ca, có thể chuyển giờ các job hiện tại hoặc giữ nguyên.</span></div>
+                                    <div class="ia-item">Mở folder nhanh<span>Bấm vào đường dẫn trong nội dung Job để
+                                            copy path</span></div>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <!-- ===== LUỒNG XỬ LÝ JOB ===== -->
+                        <div class="ia-flow-title">Luồng xử lý Job</div>
+                        <div class="ia-flow-box">
+                            <div class="ia-flow-row">
+                                <div class="ia-flow-step">
+                                    <div class="n">1. Tạo Job</div>
+                                    <div class="d">Định kỳ hoặc phát sinh</div>
+                                </div>
+                                <div class="ia-flow-arrow"><i class="bi bi-arrow-right"></i></div>
+                                <div class="ia-flow-step">
+                                    <div class="n">2. Giao việc</div>
+                                    <div class="d">Chuyển · copy · chỉ định</div>
+                                </div>
+                                <div class="ia-flow-arrow"><i class="bi bi-arrow-right"></i></div>
+                                <div class="ia-flow-step">
+                                    <div class="n">3. Xác nhận</div>
+                                    <div class="d">Nhận hoặc từ chối</div>
+                                </div>
+                            </div>
+                            <div class="ia-flow-row">
+                                <div class="ia-flow-step">
+                                    <div class="n">4. Thực hiện</div>
+                                    <div class="d">Nhắc nhở · đổi giờ · dời ngày</div>
+                                </div>
+                                <div class="ia-flow-arrow"><i class="bi bi-arrow-right"></i></div>
+                                <div class="ia-flow-step">
+                                    <div class="n">5. Cảnh báo</div>
+                                    <div class="d">Trễ hạn · quá hạn</div>
+                                </div>
+                                <div class="ia-flow-arrow"><i class="bi bi-arrow-right"></i></div>
+                                <div class="ia-flow-step">
+                                    <div class="n">6. Hoàn thành</div>
+                                    <div class="d">Job trong ngày: báo người tạo / chỉ định</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ===== CHÚ THÍCH MÀU ===== -->
+                        <div class="ia-flow-title">Chú thích màu loại job</div>
+                        <div class="ia-flow-box">
+                            <div class="ia-legend-grid">
+                                <div class="ia-legend-item">
+                                    <span class="ia-legend-color once"></span>
+                                    <div>
+                                        <div class="ia-legend-name">Once</div>
+                                        <div class="ia-legend-desc">Job một lần</div>
+                                    </div>
+                                </div>
+                                <div class="ia-legend-item">
+                                    <span class="ia-legend-color daily"></span>
+                                    <div>
+                                        <div class="ia-legend-name">Daily</div>
+                                        <div class="ia-legend-desc">Hàng ngày</div>
+                                    </div>
+                                </div>
+                                <div class="ia-legend-item">
+                                    <span class="ia-legend-color weekly"></span>
+                                    <div>
+                                        <div class="ia-legend-name">Weekly</div>
+                                        <div class="ia-legend-desc">Hàng tuần</div>
+                                    </div>
+                                </div>
+                                <div class="ia-legend-item">
+                                    <span class="ia-legend-color biweekly"></span>
+                                    <div>
+                                        <div class="ia-legend-name">Biweekly</div>
+                                        <div class="ia-legend-desc">2 tuần/lần</div>
+                                    </div>
+                                </div>
+                                <div class="ia-legend-item">
+                                    <span class="ia-legend-color monthly"></span>
+                                    <div>
+                                        <div class="ia-legend-name">Monthly</div>
+                                        <div class="ia-legend-desc">Hàng tháng</div>
+                                    </div>
+                                </div>
+                                <div class="ia-legend-item">
+                                    <span class="ia-legend-color shifted"></span>
+                                    <div>
+                                        <div class="ia-legend-name">Dời / Off</div>
+                                        <div class="ia-legend-desc">Job dời do off hoặc kéo-thả</div>
+                                    </div>
+                                </div>
+                                <div class="ia-legend-item">
+                                    <span class="ia-legend-color presenter"></span>
+                                    <div>
+                                        <div class="ia-legend-name">Thuyết trình</div>
+                                        <div class="ia-legend-desc">Job chỉ định qua quay số</div>
+                                    </div>
+                                </div>
+                                <div class="ia-legend-item">
+                                    <span class="ia-legend-color day-off"></span>
+                                    <div>
+                                        <div class="ia-legend-name">Ngày off</div>
+                                        <div class="ia-legend-desc">Ngày bạn đã đăng ký nghỉ</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div><!-- /.ia-diagram -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-cancel" data-bs-dismiss="modal">Đã hiểu</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Job Invite Modal -->
+    <div class="modal fade workpic-dialog" id="quickJobInviteModal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-md">
+            <div class="modal-content">
+                <div class="modal-header modern-header modern-header-primary">
+                    <div class="modern-header-inner">
+                        <div class="modern-header-icon">
+                            <i class="bi bi-person-plus-fill"></i>
+                        </div>
+                        <div class="modern-header-text">
+                            <h5 class="modal-title mb-0">Bạn được chỉ định nhận job</h5>
+                            <p class="modern-header-subtitle mb-0">Xác nhận nhận job trong ngày</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-body">
+                    <p id="quickJobInviteMessage" class="mb-3">Bạn có muốn nhận job này không?</p>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-success flex-grow-1" id="quickJobInviteAcceptBtn">
+                            <i class="bi bi-check-circle-fill"></i> Nhận
+                        </button>
+                        <button class="btn btn-danger flex-grow-1" id="quickJobInviteRejectBtn">
+                            <i class="bi bi-x-circle-fill"></i> Từ chối
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Modal -->
+    <div class="modal fade workpic-dialog" id="statisticsModal" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header modern-header modern-header-info">
+                    <div class="modern-header-inner">
+                        <div class="modern-header-icon"><i class="bi bi-bar-chart-fill"></i></div>
+                        <div class="modern-header-text">
+                            <h5 class="modal-title mb-0">Thống kê thời gian làm việc</h5>
+                            <p class="modern-header-subtitle mb-0">Xem user nào đang có nhiều job và chiếm nhiều thời
+                                gian</p>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="stats-toolbar">
+                        <div class="stats-mode-tabs" role="tablist">
+                            <button class="stats-mode-tab active" data-mode="today" type="button">
+                                <i class="bi bi-sun-fill"></i> Hôm nay
+                            </button>
+                            <button class="stats-mode-tab" data-mode="week" type="button">
+                                <i class="bi bi-calendar-week-fill"></i> Tuần này
+                            </button>
+                        </div>
+                        <div class="dept-filter">
+                            <label for="statsDeptSelect"><i class="bi bi-diagram-3-fill"></i> Bộ phận</label>
+                            <select class="form-select form-select-sm" id="statsDeptSelect"></select>
+                        </div>
+                    </div>
+
+                    <div class="stats-summary" id="statsSummary"></div>
+
+                    <div class="stats-chart-section">
+                        <div class="stats-chart-header">
+                            <h6><i class="bi bi-bar-chart-line-fill"></i> Thời gian theo user</h6>
+                            <small class="text-muted">Bấm vào tên để ẩn/hiện user — trạng thái được lưu lại</small>
+                        </div>
+                        <div id="statsChart" class="stats-chart"></div>
+                    </div>
+
+                    <div class="stats-table-section">
+                        <h6><i class="bi bi-list-ul"></i> Chi tiết job theo user</h6>
+                        <div id="statsTable" class="table-responsive"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <button type="button" class="quick-chat-toggle" id="quickChatToggleBtn" title="Job trong ngày">
+        <i class="bi bi-chat-dots-fill"></i>
+        <span class="quick-chat-badge d-none" id="quickChatBadge">0</span>
+    </button>
+
+    <aside class="quick-chat-panel" id="quickChatPanel">
+        <div class="quick-chat-header">
+            <div class="quick-chat-header-title">
+                <i class="bi bi-lightning-charge-fill"></i>
+                <div>
+                    <h6>Job trong ngày</h6>
+                    <small id="quickChatDateLabel">Hôm nay</small>
+                </div>
+            </div>
+            <button type="button" class="quick-chat-close" id="quickChatCloseBtn" aria-label="Đóng">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <div class="quick-chat-tabs">
+            <button type="button" class="quick-chat-tab active" id="quickChatTabAll" data-tab="all">
+                <i class="bi bi-people-fill"></i> Chung
+            </button>
+            <button type="button" class="quick-chat-tab" id="quickChatTabMine" data-tab="mine">
+                <i class="bi bi-person-fill"></i> Của tôi
+            </button>
+        </div>
+        <div class="quick-chat-filter-bar">
+            <div class="quick-chat-filter-row-top">
+                <input type="search" id="quickChatSearchInput" class="quick-chat-search-input" name="quickchat-search-q"
+                    autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+                    placeholder="🔍 Tìm nội dung job...">
+                <button type="button" class="quick-chat-filter-toggle" id="quickChatFilterToggle"
+                    title="Bộ lọc nâng cao" aria-expanded="false" aria-controls="quickChatFilterExtra">
+                    <i class="bi bi-funnel-fill"></i>
+                    <span class="quick-chat-filter-badge d-none" id="quickChatFilterBadge">0</span>
+                </button>
+            </div>
+            <div class="quick-chat-filter-extra" id="quickChatFilterExtra">
+                <select id="quickChatStatusFilter" class="quick-chat-filter-select">
+                    <option value="all">Tất cả trạng thái</option>
+                    <option value="open">Chưa nhận</option>
+                    <option value="invited">Đã chỉ định</option>
+                    <option value="claimed">Đang làm</option>
+                    <option value="completed">Hoàn thành</option>
+                </select>
+                <select id="quickChatAssigneeFilter" class="quick-chat-filter-select">
+                    <option value="all">Tất cả người phụ trách</option>
+                </select>
+            </div>
+        </div>
+        <div class="quick-chat-messages" id="quickChatMessages">
+            <p class="quick-chat-empty">Chưa có job phát sinh nào trong hôm nay. Hãy nhập bên dưới để báo cho mọi người!
+            </p>
+        </div>
+        <div class="quick-chat-input-row">
+            <div class="quick-chat-input-col">
+                <textarea id="quickChatInput" class="quick-chat-input" rows="1"
+                    placeholder="Nhập nội dung job phát sinh trong ngày..."></textarea>
+                <div class="quick-chat-deadline-row">
+                    <i class="bi bi-alarm"></i>
+                    <span>Hạn chót (tùy chọn):</span>
+                    <input type="time" id="quickChatDeadlineInput" class="quick-chat-deadline-input">
+                </div>
+            </div>
+            <button type="button" class="quick-chat-send-btn" id="quickChatSendBtn" title="Gửi">
+                <i class="bi bi-send-fill"></i>
+            </button>
+        </div>
+    </aside>
+
+
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module" src="app.js"></script>
+</body>
+
+</html>
+
+<!-- Shift + Alt + F -->
