@@ -13146,7 +13146,7 @@ function renderDayOffCalendars() {
                 <span class="dayoff-day-num">${d}</span>
                 <span class="dayoff-lunar">${lunar.day}/${lunar.month}${lunar.leap ? ' nhuận' : ''} ÂL</span>
                 ${holiday ? `<span class="calendar-holiday-label" title="${escapeHtml(holiday)}">${escapeHtml(compactCalendarLabel(holiday))}</span>` : ''}
-                ${personal.map(e => `<button type="button" class="calendar-personal-event" data-personal-event="${escapeHtml(e.id)}" title="${escapeHtml([e.time, e.title, e.notes].filter(Boolean).join('\n'))}">${personalEventCardContent(e)}</button>`).join('')}
+                ${personal.map(e => `<button type="button" class="calendar-personal-event" data-personal-event="${escapeHtml(e.id)}" title="${escapeHtml([e.time, e.title, e.notes].filter(Boolean).join('\n'))}">${escapeHtml(e.title)}</button>`).join('')}
                 <span class="dayoff-chips">${chips}</span>
             </div>`;
         }

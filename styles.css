@@ -15127,8 +15127,8 @@ body .topbar-subtitle { color: var(--muted); opacity: 1; }
 body .legend-event { color: #047857; }
 body.theme-dark .legend-event { color: #6ee7b7; }
 @media (max-width: 992px) {
-    #dayOffCalendars:has(.calendar-personal-event) { overflow-x: auto; }
-    #dayOffCalendars .dayoff-month:has(.calendar-personal-event) { min-width: 770px; }
+    #dayOffCalendars:has(.calendar-personal-event) { overflow-x: visible; }
+    #dayOffCalendars .dayoff-month:has(.calendar-personal-event) { min-width: 0; }
 }
 body .modal .modal-header { background: var(--surface) !important; color: var(--text); border-bottom-color: var(--border); }
 body .modal .modal-header .modal-title { color: var(--text) !important; text-shadow: none; }
@@ -15222,3 +15222,11 @@ body.theme-dark .timeline-calendar-event { color: #6ee7b7; }
 #sidebar .job-list-card > .card-body { overflow-y: auto; }
 #sidebar .job-list-card > .card-body > :not(.job-list) { flex: 0 0 auto; }
 #sidebar .job-list { flex: 1 0 120px; min-height: 120px; }
+
+/* Compact event titles only in the off-registration calendar. */
+body #dayOffCalendars .calendar-personal-event {
+ display: block; padding: 3px 5px; margin: 3px 0; border-left-width: 2px;
+ border-radius: 5px; font-size: .7rem; font-weight: 600; line-height: 1.35;
+ white-space: normal; overflow-wrap: anywhere; overflow: hidden;
+}
+body #dayOffCalendars .calendar-personal-event::after { display: none; }
