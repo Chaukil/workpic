@@ -3852,7 +3852,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const chip = e.target.closest('.daily-exclude-chip');
         if (chip) chip.classList.toggle('active');
     });
-    document.getElementById('exportPdfBtn').addEventListener('click', exportToPDF);
+    document.getElementById('userJobsBtn').addEventListener('click', openUserJobs);
     document.getElementById('showSunday').addEventListener('change', toggleSunday);
     document.getElementById('toggleSidebarBtn').addEventListener('click', toggleSidebar);
     document.getElementById('themeToggleBtn').addEventListener('click', () => {
@@ -4224,228 +4224,96 @@ function handleSearch(e) {
     renderJobList();
 }
 
-// Export to PDF - Enhanced Version (EXCLUDE PAUSED JOBS)
-async function exportToPDF() {
-    const activeJobs = jobs.filter(job =>
-        currentUser &&
-        job.ownerId === currentUser.uid &&
-        job.isPaused !== true &&
-        job.isOutOfSchedule !== true
-    ).sort((firstJob, secondJob) => {
-        const weekdayDifference = getWeekdayIndex(firstJob.date) - getWeekdayIndex(secondJob.date);
-        if (weekdayDifference !== 0) return weekdayDifference;
-        return String(firstJob.time || '').localeCompare(String(secondJob.time || ''));
-    });
-
-    if (activeJobs.length === 0) {
-        alert('📋 Không có job đang hoạt động để xuất PDF!');
-        return;
+function getUserJobMetrics(job, now = new Date()) {
+    const weekStart = new Date(now);
+    weekStart.setHours(0, 0, 0, 0);
+    weekStart.setDate(weekStart.getDate() - (weekStart.getDay() + 6) % 7);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 7);
+    weekEnd.setMilliseconds(-1);
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    monthEnd.setMilliseconds(-1);
+    const weekDates = getJobOccurrences(job, weekStart, weekEnd);
+    const monthly = job.type === 'monthly';
+    const dates = monthly ? getJobOccurrences(job, monthStart, monthEnd) : weekDates;
+    const weekdayNames = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+    let weekdays;
+    if (job.type === 'daily') {
+        weekdays = [1, 2, 3, 4, 5, 6, 0].filter(day =>
+            !(job.excludedWeekdays || []).includes(day) && (day !== 0 || job.workOnSunday !== false));
+    } else if (job.type === 'weekly' || job.type === 'biweekly') {
+        weekdays = [parseJobDate(job.date).getDay()];
+    } else {
+        weekdays = [...new Set(dates.map(date => date.getDay()))].sort((a, b) => (a + 6) % 7 - (b + 6) % 7);
     }
-
-    try {
-        // Show loading
-        const exportBtn = document.getElementById('exportPdfBtn');
-        const originalHTML = exportBtn.innerHTML;
-        exportBtn.innerHTML = '<span class="loading"></span> Đang xuất...';
-        exportBtn.disabled = true;
-
-        // Access jsPDF from window object
-        await loadOptionalScript('jspdf', 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
-        const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF({
-            orientation: 'portrait',
-            unit: 'mm',
-            format: 'a4'
-        });
-
-        // Colors
-        const primaryColor = [102, 126, 234];
-        const headerColor = [67, 97, 238];
-        const textColor = [33, 33, 33];
-        const lightGray = [245, 245, 245];
-
-        // Page dimensions
-        const pageWidth = pdf.internal.pageSize.getWidth();
-        const pageHeight = pdf.internal.pageSize.getHeight();
-        const margin = 15;
-        const contentWidth = pageWidth - (margin * 2);
-
-        // Header Background
-        pdf.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-        pdf.rect(0, 0, pageWidth, 45, 'F');
-
-        // Title
-        pdf.setFontSize(28);
-        pdf.setTextColor(255, 255, 255);
-        pdf.setFont('helvetica', 'bold');
-        pdf.text('DANH SACH JOB', pageWidth / 2, 20, { align: 'center' });
-
-        // Subtitle
-        pdf.setFontSize(12);
-        pdf.setFont('helvetica', 'normal');
-        const today = new Date();
-        pdf.text(`Ngay xuat: ${formatDateVN(today)}`, pageWidth / 2, 30, { align: 'center' });
-
-        // Total jobs (ACTIVE ONLY)
-        pdf.setFontSize(10);
-        pdf.text(`Tong so: ${activeJobs.length} jobs dang hoat dong`, pageWidth / 2, 38, { align: 'center' });
-
-        // Table start position
-        let yPos = 55;
-
-        // Table header
-        const headerHeight = 12;
-        pdf.setFillColor(headerColor[0], headerColor[1], headerColor[2]);
-        pdf.rect(margin, yPos, contentWidth, headerHeight, 'F');
-
-        pdf.setFontSize(11);
-        pdf.setTextColor(255, 255, 255);
-        pdf.setFont('helvetica', 'bold');
-
-        const colWidths = {
-            stt: 15,
-            title: 85,
-            type: 40,
-            time: 30
-        };
-
-        pdf.text('STT', margin + 5, yPos + 8);
-        pdf.text('Tieu de', margin + colWidths.stt + 5, yPos + 8);
-        pdf.text('Loai Job', margin + colWidths.stt + colWidths.title + 5, yPos + 8);
-        pdf.text('Gio thuc hien', margin + colWidths.stt + colWidths.title + colWidths.type + 5, yPos + 8);
-
-        yPos += headerHeight + 2;
-
-        // Table content (ONLY ACTIVE JOBS)
-        pdf.setFont('helvetica', 'normal');
-        const rowHeight = 10;
-
-        // Type colors
-        const typeColors = {
-            daily: [255, 107, 107],
-            weekly: [78, 205, 196],
-            biweekly: [69, 183, 209],
-            monthly: [247, 183, 49],
-        };
-
-        activeJobs.forEach((job, index) => {
-            // Check if need new page
-            if (yPos > pageHeight - 30) {
-                pdf.addPage();
-                yPos = 20;
-            }
-
-            // Row background (alternating colors)
-            if (index % 2 === 0) {
-                pdf.setFillColor(lightGray[0], lightGray[1], lightGray[2]);
-                pdf.rect(margin, yPos - 2, contentWidth, rowHeight, 'F');
-            }
-
-            // Row border
-            pdf.setDrawColor(220, 220, 220);
-            pdf.rect(margin, yPos - 2, contentWidth, rowHeight, 'S');
-
-            // STT
-            pdf.setTextColor(textColor[0], textColor[1], textColor[2]);
-            pdf.setFontSize(10);
-            pdf.text((index + 1).toString(), margin + 5, yPos + 5);
-
-            // Title (with truncation)
-            let title = job.title;
-            if (title.length > 45) {
-                title = title.substring(0, 42) + '...';
-            }
-            pdf.text(title, margin + colWidths.stt + 5, yPos + 5);
-
-            // Job type with color badge
-            const typeColor = typeColors[job.type] || [150, 150, 150];
-            const typeX = margin + colWidths.stt + colWidths.title + 5;
-
-            // Type badge background
-            pdf.setFillColor(typeColor[0], typeColor[1], typeColor[2]);
-            const typeLabels = {
-                daily: 'Daily',
-                weekly: 'Weekly',
-                biweekly: 'Biweekly',
-                monthly: 'Monthly',
-            };
-            const typeLabel = typeLabels[job.type] || job.type;
-            const badgeWidth = pdf.getTextWidth(typeLabel) + 6;
-            pdf.roundedRect(typeX, yPos + 1, badgeWidth, 6, 2, 2, 'F');
-
-            // Type text
-            pdf.setTextColor(255, 255, 255);
-            pdf.setFontSize(9);
-            pdf.setFont('helvetica', 'bold');
-            pdf.text(typeLabel, typeX + 3, yPos + 5);
-
-            // Time
-            pdf.setFont('helvetica', 'normal');
-            pdf.setTextColor(textColor[0], textColor[1], textColor[2]);
-            pdf.setFontSize(10);
-            const timeX = margin + colWidths.stt + colWidths.title + colWidths.type + 5;
-            pdf.text(job.time, timeX, yPos + 5);
-
-            yPos += rowHeight;
-        });
-
-        // Footer on all pages
-        const pageCount = pdf.internal.getNumberOfPages();
-        for (let i = 1; i <= pageCount; i++) {
-            pdf.setPage(i);
-
-            // Footer line
-            pdf.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-            pdf.setLineWidth(0.5);
-            pdf.line(margin, pageHeight - 20, pageWidth - margin, pageHeight - 20);
-
-            // Footer text
-            pdf.setFontSize(9);
-            pdf.setTextColor(120, 120, 120);
-            pdf.setFont('helvetica', 'italic');
-            pdf.text(
-                `Trang ${i} / ${pageCount}`,
-                pageWidth / 2,
-                pageHeight - 12,
-                { align: 'center' }
-            );
-
-            // Generated by
-            pdf.setFontSize(8);
-            pdf.text(
-                'Job Schedule Manager',
-                pageWidth / 2,
-                pageHeight - 7,
-                { align: 'center' }
-            );
-        }
-
-        // Save PDF
-        const fileName = `Job_Schedule_${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}.pdf`;
-        pdf.save(fileName);
-
-        // Reset button
-        exportBtn.innerHTML = originalHTML;
-        exportBtn.disabled = false;
-
-        showNotification('Thành công', `Đã xuất ${activeJobs.length} jobs đang hoạt động ra file PDF!`);
-    } catch (error) {
-        console.error('Lỗi khi xuất PDF:', error);
-        alert('❌ Có lỗi xảy ra khi xuất PDF: ' + error.message);
-
-        const exportBtn = document.getElementById('exportPdfBtn');
-        exportBtn.innerHTML = '<i class="bi bi-file-earmark-pdf-fill"></i> <span>Xuất PDF</span>';
-        exportBtn.disabled = false;
-    }
+    return {
+        weekdays: weekdays.map(day => weekdayNames[day]).join(', ') || '—',
+        count: dates.length,
+        period: monthly ? 'tháng này' : 'tuần này',
+        weekHours: job.isPaused ? 0 : weekDates.length * getJobDuration(job) / 60
+    };
 }
 
+function openUserJobs() {
+    if (!currentUser) return;
+    let modal = document.getElementById('userJobsModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'userJobsModal';
+        modal.className = 'modal fade workpic-dialog';
+        modal.tabIndex = -1;
+        modal.innerHTML = `<div class="modal-dialog modal-dialog-scrollable"><div class="modal-content">
+            <div class="modal-header"><div><h5 class="modal-title">Job của tôi</h5><p class="text-muted mb-0">Toàn bộ job hiện có · Job đã tắt nằm cuối danh sách</p></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div>
+            <div class="modal-body"></div><div class="modal-footer"><button type="button" class="btn btn-cancel" data-bs-dismiss="modal">Đóng</button></div>
+        </div></div>`;
+        document.body.appendChild(modal);
+        modal.querySelector('.modal-body').addEventListener('input', () => filterUserJobs(modal));
+        modal.querySelector('.modal-body').addEventListener('change', () => filterUserJobs(modal));
+        modal.querySelector('.modal-body').addEventListener('click', event => {
+            const button = event.target.closest('[data-user-job]');
+            if (!button) return;
+            const job = jobs.find(job => job.id === button.dataset.userJob && job.ownerId === currentUser.uid);
+            if (!job) return;
+            modal.addEventListener('hidden.bs.modal', () => openViewJobModal(job), { once: true });
+            bootstrap.Modal.getOrCreateInstance(modal).hide();
+        });
+    }
+    const order = { daily: 0, weekly: 1, biweekly: 2, monthly: 3, once: 4 };
+    const ownJobs = jobs.filter(job => job.ownerId === currentUser.uid).sort((a, b) =>
+        Number(!!a.isPaused) - Number(!!b.isPaused)
+        || (order[a.type] ?? 9) - (order[b.type] ?? 9)
+        || (['weekly', 'biweekly'].includes(a.type) ? getWeekdayIndex(a.date) - getWeekdayIndex(b.date) : 0)
+        || String(a.time || '').localeCompare(String(b.time || ''))
+        || String(a.title || '').localeCompare(String(b.title || ''), 'vi'));
+    modal.querySelector('.modal-body').innerHTML = ownJobs.length ? `<p class="text-muted">${ownJobs.length} job · ${ownJobs.filter(job => job.isPaused).length} đã tắt</p><p class="text-muted user-jobs-period">Số lần theo tuần/tháng hiện tại, từ lịch lặp. Job đã tắt vẫn hiện lịch dự kiến, tổng giờ tuần tính 0.</p><div class="table-responsive"><table class="stats-table"><thead><tr><th>Job</th><th>Loại</th><th>Lịch bắt đầu</th><th>Giờ</th><th>Thời lượng</th><th>Thứ thực hiện</th><th>Số lần</th><th>Tổng giờ/tuần</th><th>Trạng thái</th></tr></thead><tbody>${ownJobs.map(job => { const metrics = getUserJobMetrics(job); return `<tr class="${job.isPaused ? 'user-job-paused' : ''}"><td><button type="button" class="user-job-link" data-user-job="${escapeHtml(job.id)}">${escapeHtml(job.title)}</button></td><td>${escapeHtml(getTypeLabel(job.type))}</td><td>${escapeHtml(formatDate(job.date))}</td><td>${escapeHtml(job.time || '—')}</td><td>${getJobDuration(job)} phút</td><td>${escapeHtml(metrics.weekdays)}</td><td>${metrics.count} lần/${metrics.period}</td><td><strong>${metrics.weekHours.toLocaleString('vi-VN', {maximumFractionDigits: 2})} h</strong></td><td><span class="user-job-status ${job.isPaused ? 'paused' : 'active'}">${job.isPaused ? 'Đã tắt' : 'Đang bật'}</span></td></tr>`; }).join('')}</tbody></table></div>` : '<p class="text-muted">Bạn chưa có job nào.</p>';
+    const catalogBody = modal.querySelector('.modal-body');
+    catalogBody.innerHTML = `<div class="user-jobs-filters">
+        <label>Tìm job<input type="search" class="form-control" data-job-filter="search" placeholder="Nhập tên job…"></label>
+        <label>Loại<select class="form-select" data-job-filter="type"><option value="">Tất cả</option>${['daily','weekly','biweekly','monthly','once'].map(type => `<option value="${type}">${escapeHtml(getTypeLabel(type))}</option>`).join('')}</select></label>
+        <label>Trạng thái<select class="form-select" data-job-filter="status"><option value="">Tất cả</option><option value="active">Đang bật</option><option value="paused">Đã tắt</option></select></label>
+        <label>Thứ<select class="form-select" data-job-filter="weekday"><option value="">Tất cả</option>${['Thứ Hai','Thứ Ba','Thứ Tư','Thứ Năm','Thứ Sáu','Thứ Bảy','Chủ nhật'].map(day => `<option>${day}</option>`).join('')}</select></label>
+        <p class="text-muted user-jobs-filter-count" aria-live="polite">Hiển thị ${ownJobs.length} job</p>
+    </div>${catalogBody.innerHTML}`;
+    bootstrap.Modal.getOrCreateInstance(modal).show();
+}
 
-// Helper function for Vietnamese date format
-function formatDateVN(date) {
-    const day = date.getDate().toString().padStart(2, '0');
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}/${month}/${year}`;
+function filterUserJobs(modal) {
+    const value = name => modal.querySelector(`[data-job-filter="${name}"]`).value;
+    const search = value('search').trim().toLocaleLowerCase('vi');
+    const type = value('type'), status = value('status'), weekday = value('weekday');
+    let shown = 0;
+    modal.querySelectorAll('tbody tr').forEach(row => {
+        const button = row.querySelector('[data-user-job]');
+        const job = jobs.find(job => job.id === button?.dataset.userJob && job.ownerId === currentUser.uid);
+        const visible = job && (!search || String(job.title).toLocaleLowerCase('vi').includes(search))
+            && (!type || job.type === type)
+            && (!status || (job.isPaused ? 'paused' : 'active') === status)
+            && (!weekday || getUserJobMetrics(job).weekdays.split(', ').includes(weekday));
+        row.hidden = !visible;
+        if (visible) shown++;
+    });
+    modal.querySelector('.user-jobs-filter-count').textContent = `Hiển thị ${shown} job`;
 }
 
 // Test Firestore Connection
@@ -9529,7 +9397,7 @@ function updateMascotSettingsLabel() {
     if (hintEl) {
         hintEl.textContent =
             `Con đầu tiên đậu trên chữ "Lịch Làm Việc", các con thêm vào sẽ đậu trên nút Thêm Job, ` +
-            `Layout, Xem, Xuất PDF... Bấm vào ${label.singular} để "bắn".`;
+            `Layout, Xem, Job của tôi... Bấm vào ${label.singular} để "bắn".`;
     }
 }
 
@@ -10494,7 +10362,7 @@ const OwlFx = (() => {
     // ---------- quản lý nhiều con cú ----------
     // Cú số 1: đậu trên chữ "Lịch Làm Việc". Cú thứ 2 trở đi: mỗi con đậu trên 1 nút có sẵn của trang.
     const BUTTON_TARGETS = [
-        '#addJobBtn', '#layoutMenuBtn', '#viewDataBtn', '#exportPdfBtn',
+        '#addJobBtn', '#layoutMenuBtn', '#viewDataBtn', '#userJobsBtn',
         '#toggleSidebarBtn', '#addOutOfScheduleBtn', '#quickChatToggleBtn',
         '#themeToggleBtn', '#userProfileBtn', '#settingsBtn', '#notifBellBtn', '#guideBtn'
     ];
@@ -11386,6 +11254,7 @@ function listenDayOffs() {
         cleanupMyDuplicateDayOffs();
         renderSchedule();
         if (dayOffModalOpen) renderDayOffModal();
+        if (document.getElementById('statisticsModal')?.classList.contains('show')) renderStatisticsLineChart();
     }, (error) => {
         showNotification('Lỗi', 'Không tải được lịch off. Kiểm tra Firestore rules cho collection "dayOffs".', false, 'danger');
     });
@@ -13715,17 +13584,104 @@ function renderStatistics() {
                 }
                 saveStatsHiddenUsers();
                 renderStatisticsDetails(stats);
+                renderStatisticsLineChart();
             });
         });
     }
 
     // ----- Table chi tiết -----
     renderStatisticsDetails(stats);
+    renderStatisticsLineChart();
+}
+
+function computeWeeklyLineSeries(jobList, offList, now = new Date()) {
+    const start = new Date(now);
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() - (start.getDay() + 6) % 7);
+    const dates = Array.from({ length: 7 }, (_, index) => {
+        const date = new Date(start); date.setDate(date.getDate() + index); return localDateKey(date);
+    });
+    // Include occurrences from beyond Sunday that can move back into this week.
+    const scanEnd = new Date(start);
+    scanEnd.setDate(scanEnd.getDate() + 37);
+    const byUser = new Map();
+    jobList.forEach(job => {
+        const uid = job.ownerId;
+        if (!uid || job.isPaused || job.isOutOfSchedule || !deptMatches(uid, statsDeptFilter)) return;
+        const offMap = Object.fromEntries(offList.filter(off => off.userId === uid).map(off => [off.date, off]));
+        const occurrences = getJobOccurrences(job, start, scanEnd);
+        occurrences.forEach(origin => {
+            const originKey = localDateKey(origin);
+            const holiday = getHolidayName(origin);
+            const off = offMap[originKey];
+            const target = off || holiday ? resolveShiftedDate(job, origin, offMap) : origin;
+            const dayIndex = dates.indexOf(localDateKey(target));
+            if (dayIndex < 0) return;
+            if (!byUser.has(uid)) {
+                const info = usersInfoCache[uid] || {};
+                byUser.set(uid, { uid, name: info.displayName || info.email || `User ${uid.slice(0, 6)}`,
+                    values: Array(7).fill(0), notes: dates.map(date => {
+                        const dayOff = offMap[date];
+                        const holidayName = getHolidayName(new Date(date + 'T00:00:00'));
+                        return [dayOff ? `Off: ${dayOff.reason || 'Không ghi lý do'}` : '', holidayName ? `Nghỉ lễ: ${holidayName}` : ''].filter(Boolean);
+                    }) });
+            }
+            const user = byUser.get(uid);
+            user.values[dayIndex] += getJobDuration(job) / 60;
+            if (originKey !== dates[dayIndex]) {
+                user.notes[dayIndex].push(`${job.title}: dời từ ${originKey} · ${off ? `Off: ${off.reason || 'Không ghi lý do'}` : holiday}`);
+            }
+        });
+    });
+    // Keep users whose entire week moved out of view so their off days remain inspectable.
+    offList.filter(off => dates.includes(off.date) && deptMatches(off.userId, statsDeptFilter)).forEach(off => {
+        if (byUser.has(off.userId)) return;
+        const info = usersInfoCache[off.userId] || {};
+        byUser.set(off.userId, { uid: off.userId, name: info.displayName || info.email || `User ${off.userId.slice(0, 6)}`,
+            values: Array(7).fill(0), notes: dates.map(date => offList.filter(item => item.userId === off.userId && item.date === date).map(item => `Off: ${item.reason || 'Không ghi lý do'}`)) });
+    });
+    const series = [...byUser.values()].sort((a, b) => a.name.localeCompare(b.name, 'vi'))
+        .map((user, index) => ({ ...user, color: `hsl(${index * 137.508 % 360} 72% 55%)` }));
+    return { dates, series };
+}
+
+function renderStatisticsLineChart() {
+    const host = document.getElementById('statsLineChart');
+    if (!host) return;
+    const { dates, series } = computeWeeklyLineSeries(statsAllJobs, dayOffsList);
+    const todayKey = localDateKey(new Date());
+    const visible = series.filter(user => !statsHiddenUsers.has(user.uid));
+    const max = Math.max(1, Math.ceil(Math.max(0, ...visible.flatMap(user => user.values))));
+    const x = index => 60 + index * 140;
+    const y = value => 280 - value / max * 240;
+    const labels = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+    host.innerHTML = series.length ? `<div class="stats-line-legend">${series.map(user => `<button type="button" data-line-user="${escapeHtml(user.uid)}" aria-pressed="${!statsHiddenUsers.has(user.uid)}" style="--line-color:${user.color}"><span></span>${escapeHtml(user.name)}</button>`).join('')}</div>
+        <div class="stats-line-scroll"><svg viewBox="0 0 960 330" class="stats-line-svg" role="img" aria-label="Số giờ làm từng ngày trong tuần"><title>Số giờ làm theo lịch job, tuần bắt đầu ${dates[0]}</title>
+        ${Array.from({length: 5}, (_, i) => { const value = max * i / 4; return `<line x1="60" x2="900" y1="${y(value)}" y2="${y(value)}" class="stats-line-grid"/><text x="50" y="${y(value) + 4}" text-anchor="end">${value.toLocaleString('vi-VN', { maximumFractionDigits: 2 })} h</text>`; }).join('')}
+        ${dates.map((date, index) => `<text x="${x(index)}" y="305" text-anchor="middle">${labels[index]} · ${date.slice(8)}/${date.slice(5,7)}</text>`).join('')}
+        ${visible.map(user => `<polyline fill="none" stroke="${user.color}" stroke-width="2.5" points="${user.values.map((value, index) => `${x(index)},${y(value)}`).join(' ')}"/>${user.values.map((value, index) => {
+            const description = `${user.name} · ${dates[index]}: ${value.toLocaleString('vi-VN', {maximumFractionDigits: 2})} giờ${user.notes[index].length ? '\n' + user.notes[index].join('\n') : ''}`;
+            return `<circle class="${dates[index] === todayKey ? 'stats-point-today' : ''}" cx="${x(index)}" cy="${y(value)}" r="${user.notes[index].length ? 6 : 5}" fill="${user.color}" stroke="${user.notes[index].length ? 'var(--text)' : 'none'}" tabindex="0" role="button" data-point-info="${escapeHtml(description)}" aria-label="${escapeHtml(description)}${dates[index] === todayKey ? ' · Hôm nay' : ''}"><title>${escapeHtml(description)}${dates[index] === todayKey ? ' · Hôm nay' : ''}</title></circle>`;
+        }).join('')}`).join('')}</svg></div><p class="stats-point-detail text-muted" aria-live="polite">Bấm hoặc rê vào điểm để xem số giờ, lịch off và lý do dời job.</p>
+        ${visible.length ? '' : '<p class="text-muted">Chọn user để hiện đường biểu đồ.</p>'}` : '<p class="text-muted">Chưa có dữ liệu trong tuần này.</p>';
+    host.querySelectorAll('[data-line-user]').forEach(button => button.addEventListener('click', () => {
+        const uid = button.dataset.lineUser;
+        if (statsHiddenUsers.has(uid)) statsHiddenUsers.delete(uid); else statsHiddenUsers.add(uid);
+        saveStatsHiddenUsers();
+        renderStatistics();
+    }));
+    host.querySelectorAll('[data-point-info]').forEach(point => {
+        const showDetails = () => { host.querySelector('.stats-point-detail').textContent = point.dataset.pointInfo; };
+        ['click', 'focus', 'mouseenter'].forEach(event => point.addEventListener(event, showDetails));
+        point.addEventListener('keydown', event => {
+            if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); showDetails(); }
+        });
+    });
 }
 
 function renderStatisticsDetails(stats) {
     const tableEl = document.getElementById('statsTable');
-    const visibleUsers = stats.users.filter(user => !statsHiddenUsers.has(user.uid));
+    const visibleUsers = stats.users.filter(user => !statsHiddenUsers.has(user.uid)).sort((a, b) => a.name.localeCompare(b.name, 'vi', { numeric: true }));
     if (visibleUsers.length === 0) {
         tableEl.innerHTML = `<div class="empty-state"><i class="bi bi-inbox"></i><br>${stats.users.length ? 'Tích chọn user để xem chi tiết job.' : 'Chưa có dữ liệu'}</div>`;
         return;
@@ -13745,7 +13701,13 @@ function renderStatisticsDetails(stats) {
         </thead><tbody>`;
 
     visibleUsers.forEach(u => {
-        u.jobs.sort((a, b) => b.minutes - a.minutes);
+        const typeOrder = { daily: 0, weekly: 1, biweekly: 2, monthly: 3, once: 4 };
+        const weekday = entry => Math.min(...entry.occurrenceDates.map(date => (new Date(date + 'T00:00:00').getDay() + 6) % 7), 7);
+        u = { ...u, jobs: [...u.jobs].sort((a, b) =>
+            (typeOrder[a.job.type] ?? 9) - (typeOrder[b.job.type] ?? 9)
+            || (['weekly', 'biweekly'].includes(a.job.type) ? weekday(a) - weekday(b) : 0)
+            || String(a.job.time || '').localeCompare(String(b.job.time || ''))
+            || String(a.job.title || '').localeCompare(String(b.job.title || ''), 'vi')) };
         u.jobs.forEach((j, idx) => {
             const userCell = idx === 0
                 ? `<td rowspan="${u.jobs.length}" style="vertical-align: top; font-weight: 700;">${escapeHtml(u.name)}</td>`

@@ -21,7 +21,7 @@ Keep `start-server.pyw` and `serve-work-hours.ps1` for the local IBM work-hours 
 `npm.cmd run test:ui` checks the forms in Chrome/Edge.
 These checks do not sign into the live Firebase project.
 
-Excel and PDF libraries load only when importing a spreadsheet or exporting PDF.
+Excel libraries load only when importing a spreadsheet.
 Those actions require internet access to their existing CDN.
 
 All signed-in accounts use the same application features.

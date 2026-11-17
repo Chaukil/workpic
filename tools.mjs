@@ -619,7 +619,7 @@ test('statistics hide unchecked users and list dates matching occurrence counts'
     fields.statsChart.querySelectorAll = () => controls;
     class StatsDate extends Date { constructor(...args) { super(...(args.length ? args : ['2026-11-13T12:00:00'])); } }
     const ctx = vm.createContext({
-        Date: StatsDate, currentUser: { uid: 'a' }, statsMode: 'week', statsDeptFilter: '', WORK_HOURS_PER_DAY: 8,
+        Date: StatsDate, dayOffsList: [], getHolidayName: () => '', currentUser: { uid: 'a' }, statsMode: 'week', statsDeptFilter: '', WORK_HOURS_PER_DAY: 8,
         statsHiddenUsers: new Set(['b']), usersInfoCache: { a: { displayName: 'Alice' }, b: { displayName: 'Bob' } },
         statsAllJobs: [
             { ownerId: 'a', title: 'Alice job', type: 'daily', duration: 30, dates: ['2026-11-09', '2026-11-13'] },
@@ -631,12 +631,30 @@ test('statistics hide unchecked users and list dates matching occurrence counts'
         escapeHtml: value => String(value), getTypeLabel: type => type, getUserAvatarUrl: () => '', getStatsUserColor: () => '#123', avatarInitial: () => 'A',
         saveStatsHiddenUsers: () => { saved++; }
     });
+    fields.statsLineChart = { innerHTML: '', querySelectorAll: () => [] };
     vm.runInContext(code, ctx); vm.runInContext('renderStatistics()', ctx);
+    assert.equal((fields.statsLineChart.innerHTML.match(/<circle /g)||[]).length,7,'one visible user has seven day points');
+    assert.equal((fields.statsLineChart.innerHTML.match(/class="stats-point-today"/g)||[]).length,1,'only today pulses on each visible line');
+    assert.match(fields.statsLineChart.innerHTML,/Alice.*2026-11-09: 0,5/);
+    assert.match(fields.statsLineChart.innerHTML,/Alice.*2026-11-13: 0,5/);
+    assert.match(fields.statsLineChart.innerHTML,/data-line-user="b" aria-pressed="false"/);
     assert.match(fields.statsTable.innerHTML, /<th>Số lần<\/th>\s*<th>Thứ thực hiện<\/th>/);
     assert.match(fields.statsTable.innerHTML, /Alice job/);
     assert.doesNotMatch(fields.statsTable.innerHTML, /Bob job/);
     assert.match(fields.statsTable.innerHTML, />Thứ Hai<\/time>/);
     assert.match(fields.statsTable.innerHTML, />Thứ Sáu<\/time>/);
+    const shiftStart=source.indexOf('function resolveShiftedDate(');
+    vm.runInContext(source.slice(shiftStart,source.indexOf('\n}',shiftStart)+2),ctx);
+    ctx.shiftJobs=[{ownerId:'a',title:'Tuesday shift',duration:60,dates:['2026-11-10']},{ownerId:'b',title:'No shift',duration:60,dates:['2026-11-10']},{ownerId:'a',title:'Next week shift',duration:120,workOnSunday:false,dates:['2026-11-16']}];
+    ctx.shiftOffs=[{userId:'a',date:'2026-11-10',reason:'Annual leave'},{userId:'a',date:'2026-11-16',reason:'Personal leave'}];
+    const shifted=vm.runInContext('computeWeeklyLineSeries(shiftJobs,shiftOffs)',ctx);
+    const alice=shifted.series.find(user=>user.uid==='a'),bob=shifted.series.find(user=>user.uid==='b');
+    assert.equal(alice.values[0],1,'Tuesday off moves work to Monday');
+    assert.equal(alice.values[1],0,'off day has no original workload');
+    assert.match(alice.notes[0].join(' '),/2026-11-10.*Annual leave/);
+    assert.match(alice.notes[1].join(' '),/Annual leave/);
+    assert.equal(alice.values[5],2,'next Monday off shifts into this Saturday when Sunday is excluded');
+    assert.equal(bob.values[1],1,'another user does not inherit Alice off');
     const stats = vm.runInContext("computeStatistics('week')", ctx);
     assert.equal(stats.users[0].jobs[0].occurrences, stats.users[0].jobs[0].occurrenceDates.length);
     controls[0].checked = false; controls[0].handler({ target: controls[0] });
@@ -649,6 +667,40 @@ test('statistics hide unchecked users and list dates matching occurrence counts'
     ctx.statsMode = 'today'; vm.runInContext('renderStatistics()', ctx);
     assert.match(fields.statsTable.innerHTML, />Thứ Sáu<\/time>/);
     assert.doesNotMatch(fields.statsTable.innerHTML, /Thứ Hai|Bob job/);
+});
+
+test('job catalog keeps paused jobs last and statistics sort types and weekdays', () => {
+    const source = fs.readFileSync('app.js', 'utf8');
+    const fn = name => { const start = source.indexOf('function ' + name + '('); return source.slice(start, source.indexOf('\n}', start) + 2); };
+    const body = { innerHTML: '' };
+    const modal = { querySelector: () => body };
+    const job = (id, type, date, isPaused = false, ownerId = 'me') => ({ id, title: id, type, date, time: '09:00', ownerId, isPaused });
+    const ctx = vm.createContext({currentUser:{uid:'me'},jobs:[job('paused','daily','2026-11-16',true),job('fri','weekly','2026-11-20'),job('mon','weekly','2026-11-16'),job('daily','daily','2026-11-16'),job('other','daily','2026-11-16',false,'other')],document:{getElementById:()=>modal},bootstrap:{Modal:{getOrCreateInstance:()=>({show(){}})}},getWeekdayIndex:date=>(new Date(date+'T00:00:00').getDay()+6)%7,escapeHtml:String,formatDate:String,getTypeLabel:String,getJobDuration:()=>30});
+    ctx.getUserJobMetrics = () => ({weekdays:'Monday',count:1,period:'week',weekHours:0.5});
+    vm.runInContext(fn('openUserJobs')+';openUserJobs()',ctx);
+    assert.ok(body.innerHTML.indexOf('data-user-job="daily"') < body.innerHTML.indexOf('data-user-job="mon"'));
+    assert.ok(body.innerHTML.indexOf('data-user-job="mon"') < body.innerHTML.indexOf('data-user-job="fri"'));
+    assert.ok(body.innerHTML.indexOf('data-user-job="fri"') < body.innerHTML.indexOf('data-user-job="paused"'));
+    assert.doesNotMatch(body.innerHTML,/data-user-job="other"/);
+    ctx.parseJobDate = date => new Date(date+'T00:00:00');
+    vm.runInContext(fn('getJobOccurrences')+';'+fn('getUserJobMetrics'),ctx);
+    const metrics = job => { ctx.metricJob = job; return vm.runInContext("getUserJobMetrics(metricJob, new Date(2026,10,17))",ctx); };
+    const dailyMetrics=metrics({...job('daily','daily','2026-11-01'),workOnSunday:false,excludedWeekdays:[6]});
+    assert.equal(dailyMetrics.count,5);
+    assert.equal(dailyMetrics.weekHours,2.5);
+    assert.equal(metrics(job('weekly','weekly','2026-11-02')).count,1);
+    assert.equal(metrics(job('monthly','monthly','2026-11-17')).count,1);
+    assert.equal(metrics(job('monthly','monthly','2026-11-17')).weekHours,0.5);
+    assert.equal(metrics(job('monthly','monthly','2026-11-24')).weekHours,0);
+    assert.equal(metrics(job('paused','daily','2026-11-01',true)).weekHours,0);
+    const table = {innerHTML:''};
+    ctx.document={getElementById:()=>table};ctx.statsHiddenUsers=new Set();
+    const entries=ctx.jobs.filter(j=>j.ownerId==='me'&&!j.isPaused).map(job=>({job,minutes:30,occurrences:1,occurrenceDates:[job.date]}));
+    ctx.input={users:[{uid:'z',name:'Zed',jobs:entries},{uid:'a',name:'Alice',jobs:entries}]};
+    vm.runInContext(fn('renderStatisticsDetails')+';renderStatisticsDetails(input)',ctx);
+    assert.ok(table.innerHTML.indexOf('Alice') < table.innerHTML.indexOf('Zed'));
+    const titles=[...table.innerHTML.matchAll(/<td>(daily|mon|fri)<\/td>/g)].map(m=>m[1]);
+    assert.deepEqual(titles,['daily','mon','fri','daily','mon','fri']);
 });
 
 test('shared rain renderer keeps one canvas/loop and releases listeners across header and fullscreen modes', () => {

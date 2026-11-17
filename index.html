@@ -342,9 +342,9 @@
                                     </button>
                                 </div>
                                 <div class="col-6">
-                                    <button class="btn btn-export-pdf w-100" id="exportPdfBtn">
-                                        <i class="bi bi-file-earmark-pdf-fill"></i>
-                                        <span>Xuất PDF</span>
+                                    <button class="btn btn-user-jobs w-100" id="userJobsBtn">
+                                        <i class="bi bi-list-check"></i>
+                                        <span>Job của tôi</span>
                                         <div class="btn-shine"></div>
                                     </button>
                                 </div>
@@ -1593,7 +1593,7 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
                             <span class="owl-count-badge" id="settingsOwlCountValue">1</span>
                         </div>
                         <div class="form-text" id="mascotCountHint">Con đầu tiên đậu trên chữ "Lịch Làm Việc", các con
-                            thêm vào sẽ đậu trên nút Thêm Job, Layout, Xem, Xuất PDF... Bấm vào cú để "bắn".</div>
+                            thêm vào sẽ đậu trên nút Thêm Job, Layout, Xem, Job của tôi... Bấm vào cú để "bắn".</div>
                     </section>
                 </div>
                 <div class="modal-footer">
@@ -1833,7 +1833,7 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
                                             người nhận cần xác nhận</span></div>
                                     <div class="ia-item">Job ngoài lịch<span>Việc phát sinh, không lặp lại</span></div>
                                     <div class="ia-item">Tìm kiếm job<span>Lọc theo tiêu đề / nội dung</span></div>
-                                    <div class="ia-item">Xuất PDF<span>Danh sách job đang hoạt động</span></div>
+                                    <div class="ia-item">Job của tôi<span>Danh sách job đang hoạt động</span></div>
                                 </div>
                             </div>
 
@@ -2142,6 +2142,10 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
                         <div id="statsChart" class="stats-chart"></div>
                     </div>
 
+                    <div class="stats-chart-section">
+                        <div class="stats-chart-header"><h6>Giờ làm từng ngày trong tuần</h6><small class="text-muted">Thứ Hai–Chủ nhật · Theo lịch job · Bấm tên để ẩn/hiện user</small></div>
+                        <div id="statsLineChart"></div>
+                    </div>
                     <div class="stats-table-section">
                         <h6><i class="bi bi-list-ul"></i> Chi tiết job theo user</h6>
                         <div id="statsTable" class="table-responsive"></div>
