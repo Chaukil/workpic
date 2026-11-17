@@ -38,26 +38,17 @@ It shows the latest 100 notes in real time. Image attachments are resized to at 
 1400 pixels and embedded as JPEG; a note is limited to 750 KB and 20,000 text characters.
 The sender and server timestamp are saved with each note. No job is created.
 
-Live Firestore rules are not included in this workspace. Add this match inside the
-existing `/databases/{database}/documents` rules if sharedNotes is not already allowed;
-keep the rest of the application's rules intact:
+All signed-in users share the same notes feed. The requested policy gives every
+signed-in user read/write access to sharedNotes, with no role or department filter.
+
+Live Firestore rules are not included in this workspace and have not been deployed.
+Open https://console.firebase.google.com/project/workpic-eb555/firestore/rules,
+add this match inside the existing /databases/{database}/documents block and Publish.
+Replace an existing sharedNotes block if present; keep all other rules intact:
 
 ```text
 match /sharedNotes/{noteId} {
-  allow read: if request.auth != null;
-  allow create: if request.auth != null
-    && request.resource.data.keys().hasAll(['senderId', 'senderName', 'content', 'createdAt', 'clientCreatedAt'])
-    && request.resource.data.keys().hasOnly(['senderId', 'senderName', 'content', 'createdAt', 'clientCreatedAt'])
-    && request.resource.data.senderId == request.auth.uid
-    && request.resource.data.senderName is string
-    && request.resource.data.senderName.size() > 0
-    && request.resource.data.senderName.size() <= 500
-    && request.resource.data.content is string
-    && request.resource.data.content.size() > 0
-    && request.resource.data.content.size() <= 750000
-    && request.resource.data.createdAt == request.time
-    && request.resource.data.clientCreatedAt is string
-    && request.resource.data.clientCreatedAt.size() <= 40;
+  allow read, write: if request.auth != null;
 }
 ```
 
