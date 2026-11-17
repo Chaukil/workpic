@@ -1548,6 +1548,8 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
                             <option value="60">1 giờ</option>
                             <option value="120">2 giờ</option>
                         </select>
+                        <button type="button" class="btn btn-outline-primary mt-2" id="testDesktopNotificationBtn"><i class="bi bi-bell"></i> Bật / thử thông báo desktop</button>
+                        <small class="form-text d-block" id="desktopNotificationStatus" role="status"></small>
                     </section>
 
                     <section class="settings-section">
@@ -2159,6 +2161,24 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
         <i class="bi bi-chat-dots-fill"></i>
         <span class="quick-chat-badge d-none" id="quickChatBadge">0</span>
     </button>
+
+    <button type="button" class="quick-chat-toggle shared-notes-toggle" id="sharedNotesToggle" title="Ghi chú chung" aria-label="Ghi chú chung" aria-expanded="false" aria-controls="sharedNotesPanel" hidden>
+        <i class="bi bi-journal-text"></i><span class="quick-chat-badge d-none" id="sharedNotesBadge">0</span>
+    </button>
+    <aside class="quick-chat-panel shared-notes-panel" id="sharedNotesPanel" aria-label="Ghi chú chung" inert>
+        <div class="quick-chat-header"><div><h6>Ghi chú chung</h6><small>Chia sẻ thông tin với mọi người</small></div><button type="button" class="quick-chat-close" id="sharedNotesClose" aria-label="Đóng"><i class="bi bi-x-lg"></i></button></div>
+        <div id="sharedNotesList" class="quick-chat-messages" aria-live="polite"></div>
+        <form id="sharedNotesForm" class="shared-notes-form">
+            <div class="shared-notes-toolbar" role="group" aria-label="Soạn ghi chú">
+                <button type="button" id="sharedNotesImage" class="btn btn-sm btn-outline-secondary"><i class="bi bi-image"></i> Ảnh</button>
+                <button type="button" id="sharedNotesTable" class="btn btn-sm btn-outline-secondary"><i class="bi bi-table"></i> Bảng</button>
+                <span class="text-muted">Có thể dán bảng từ Excel</span>
+                <input type="file" id="sharedNotesFile" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+            </div>
+            <div id="sharedNotesEditor" class="shared-notes-editor" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Nội dung ghi chú" data-placeholder="Nhập ghi chú, dán ảnh hoặc bảng…"></div>
+            <div class="shared-notes-send"><small id="sharedNotesStatus" role="status"></small><button type="submit" id="sharedNotesSend" class="btn btn-primary"><i class="bi bi-send-fill"></i> Gửi ghi chú</button></div>
+        </form>
+    </aside>
 
     <aside class="quick-chat-panel" id="quickChatPanel">
         <div class="quick-chat-header">

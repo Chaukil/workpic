@@ -288,7 +288,7 @@ function createScheduleCache() {
 
 // Firebase Configuration - Chỉ sử dụng Firestore
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, getDocs, onSnapshot, query, where, writeBatch, runTransaction }
+import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, getDocs, onSnapshot, query, where, writeBatch, runTransaction, orderBy, limit, serverTimestamp }
     from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, EmailAuthProvider, reauthenticateWithCredential, updatePassword }
     from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -3607,6 +3607,7 @@ function handleSignedOut() {
         unsubscribeQuickJobs();
         unsubscribeQuickJobs = null;
     }
+    stopSharedNotes();
     if (unsubscribeQuickJobTransferRequests) {
         unsubscribeQuickJobTransferRequests();
         unsubscribeQuickJobTransferRequests = null;
@@ -3680,6 +3681,7 @@ function initializeAuthenticatedApp() {
         listenTransferRequests();
         listenUserNotifications();
         listenQuickJobs();
+        listenSharedNotes();
         listenQuickJobTransferRequests();
         listenDayOffs();
         listenDepartments();
@@ -3829,6 +3831,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     initQuickChatUi();
+    initSharedNotesUi();
     initLayoutDropdown();
 
     // Event Listeners
@@ -3931,6 +3934,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     document.getElementById('settingsBtn').addEventListener('click', openSettingsModal);
+    document.getElementById('testDesktopNotificationBtn').addEventListener('click', testDesktopNotification);
 
     const _snl = document.getElementById('settingsNotifyLead');
     if (_snl) _snl.addEventListener('change', (e) => saveNotifyLead(e.target.value));
@@ -4057,7 +4061,7 @@ function requestNotificationPermission() {
                 } else if (permission === 'denied') {
                     console.warn('⚠️ Người dùng từ chối thông báo desktop');
                 }
-            });
+            }).catch(error => console.warn('Không yêu cầu được quyền thông báo:', error));
         } else if (Notification.permission === 'granted') {
         } else {
             console.warn('❌ Notification permission bị từ chối');
@@ -4065,6 +4069,35 @@ function requestNotificationPermission() {
     } else {
         console.warn('❌ Browser không hỗ trợ Notifications API');
     }
+}
+
+async function testDesktopNotification() {
+    const status = document.getElementById('desktopNotificationStatus');
+    const button = document.getElementById('testDesktopNotificationBtn');
+    if (!('Notification' in window)) { status.textContent = 'Trình duyệt này không hỗ trợ thông báo desktop.'; return; }
+    button.disabled = true;
+    try {
+        // Request directly from this click: browsers can reject permission prompts from timers.
+        const permission = Notification.permission === 'default' ? await Notification.requestPermission() : Notification.permission;
+        if (permission !== 'granted') {
+            status.textContent = 'Thông báo chưa được cho phép. Mở quyền của trang tại biểu tượng cạnh thanh địa chỉ và cho phép Thông báo.';
+            return;
+        }
+        const options = { body: 'Thông báo nhắc giờ job đã sẵn sàng.', tag: 'workpic-desktop-test' };
+        const registration = await getSwRegistration();
+        let sent = false;
+        if (registration) {
+            try { await showTimedDesktopNotification(registration, 'Workpic · Thông báo thử', options); sent = true; }
+            catch (error) { console.warn('Thông báo thử qua service worker lỗi:', error); }
+        }
+        if (!sent) {
+            const notification = new Notification('Workpic · Thông báo thử', options);
+            setTimeout(() => notification.close(), 15000);
+        }
+        status.textContent = 'Đã gửi thông báo thử. Nếu chưa thấy, kiểm tra quyền thông báo của trình duyệt trong Windows và chế độ Không làm phiền.';
+        checkNotifications();
+    } catch (error) { status.textContent = 'Không gửi được thông báo desktop. Kiểm tra quyền thông báo của trang và thử lại.'; console.warn(error); }
+    finally { button.disabled = false; }
 }
 
 function toggleDailyExcludeWrap() {
@@ -4375,6 +4408,7 @@ function loadJobs() {
             renderSchedule();
             renderOutOfScheduleJobs();
             jobsLoadedOnce = true;
+            checkNotifications();
             flushPendingNotifAction();
         },
         (error) => {
@@ -7932,12 +7966,14 @@ async function quickChatDeleteJob(jobId) {
 }
 
 function openQuickChatPanel() {
+    if (sharedNotesOpen) setSharedNotesOpen(false);
     if (!accessControl.requireAccess('quickJobs', 'view')) return;
     const panel = document.getElementById('quickChatPanel');
     const toggle = document.getElementById('quickChatToggleBtn');
     if (!panel) return;
     quickChatPanelOpen = true;
     panel.classList.add('show');
+    document.getElementById('sharedNotesToggle')?.classList.add('d-none');
     if (toggle) {
         toggle.classList.add('active');
         toggle.classList.add('d-none');
@@ -7956,6 +7992,7 @@ function closeQuickChatPanel() {
     if (!panel) return;
     quickChatPanelOpen = false;
     panel.classList.remove('show');
+    document.getElementById('sharedNotesToggle')?.classList.toggle('d-none', sharedNotesOpen);
     if (toggle) {
         toggle.classList.remove('active');
         toggle.classList.remove('d-none');
@@ -7968,6 +8005,196 @@ function toggleQuickChatPanel() {
     } else {
         openQuickChatPanel();
     }
+}
+
+let sharedNotesUnsubscribe = null;
+let sharedNotesItems = [];
+let sharedNotesOpen = false;
+let sharedNotesSending = false;
+let sharedNotesReadingImage = false;
+let sharedNotesGeneration = 0;
+
+function sanitizeSharedNote(html) {
+    const parsed = new DOMParser().parseFromString(String(html || ''), 'text/html');
+    const output = document.createElement('div');
+    const allowed = new Set(['P', 'DIV', 'BR', 'B', 'STRONG', 'I', 'EM', 'U', 'UL', 'OL', 'LI', 'TABLE', 'THEAD', 'TBODY', 'TFOOT', 'TR', 'TD', 'TH', 'SPAN']);
+    const copy = (node, parent) => {
+        if (node.nodeType === 3) { parent.appendChild(document.createTextNode(node.textContent)); return; }
+        if (node.nodeType !== 1 || ['SCRIPT', 'STYLE', 'IFRAME', 'OBJECT', 'SVG', 'FORM', 'INPUT', 'BUTTON'].includes(node.tagName)) return;
+        if (node.tagName === 'IMG') {
+            if (/^data:image\/(png|jpeg|webp|gif);base64,[a-z0-9+/=\s]+$/i.test(node.getAttribute('src') || '')) {
+                const img = document.createElement('img'); img.src = node.getAttribute('src'); img.alt = 'Ảnh ghi chú'; img.loading = 'lazy'; parent.appendChild(img);
+            }
+            return;
+        }
+        const target = allowed.has(node.tagName) ? document.createElement(node.tagName.toLowerCase()) : parent;
+        if (['TD', 'TH'].includes(node.tagName)) {
+            ['colspan', 'rowspan'].forEach(name => {
+                const value = Number(node.getAttribute(name));
+                if (Number.isInteger(value) && value > 1 && value <= 100) target.setAttribute(name, String(value));
+            });
+        }
+        if (target !== parent) parent.appendChild(target);
+        Array.from(node.childNodes).forEach(child => copy(child, target));
+    };
+    Array.from(parsed.body.childNodes).forEach(node => copy(node, output));
+    return output.innerHTML;
+}
+
+function sharedNoteTime(note) {
+    const value = note.createdAt?.toDate?.() || new Date(note.clientCreatedAt || 0);
+    return Number.isFinite(value.getTime()) ? value : new Date(0);
+}
+
+function setSharedNotesOpen(open) {
+    sharedNotesOpen = open && !!currentUser;
+    const panel = document.getElementById('sharedNotesPanel');
+    panel.classList.toggle('show', sharedNotesOpen);
+    panel.inert = !sharedNotesOpen;
+    document.getElementById('sharedNotesToggle').setAttribute('aria-expanded', String(sharedNotesOpen));
+    document.getElementById('sharedNotesToggle').classList.toggle('d-none', sharedNotesOpen || quickChatPanelOpen);
+    if (sharedNotesOpen) {
+        closeQuickChatPanel();
+        document.getElementById('quickChatToggleBtn')?.classList.add('d-none');
+        document.getElementById('sharedNotesEditor').focus();
+    } else if (!quickChatPanelOpen) {
+        document.getElementById('quickChatToggleBtn')?.classList.remove('d-none');
+    }
+    renderSharedNotes();
+}
+
+function renderSharedNotes() {
+    const list = document.getElementById('sharedNotesList');
+    if (!list || !currentUser) return;
+    const seenKey = `sharedNotesSeen:${currentUser.uid}`;
+    let seen = 0;
+    try { seen = Number(localStorage.getItem(seenKey)) || 0; } catch {}
+    const newest = Math.max(seen, ...sharedNotesItems.map(note => sharedNoteTime(note).getTime()));
+    if (sharedNotesOpen) { try { localStorage.setItem(seenKey, String(newest)); } catch {} }
+    const unread = sharedNotesOpen ? 0 : sharedNotesItems.filter(note => note.senderId !== currentUser.uid && sharedNoteTime(note).getTime() > seen).length;
+    const badge = document.getElementById('sharedNotesBadge');
+    badge.textContent = unread > 99 ? '99+' : String(unread);
+    badge.classList.toggle('d-none', !unread);
+    list.innerHTML = sharedNotesItems.length ? sharedNotesItems.map(note => `<article class="shared-note">
+        <header><strong>${escapeHtml(note.senderName || 'Người dùng')}</strong><time datetime="${sharedNoteTime(note).toISOString()}">${escapeHtml(sharedNoteTime(note).toLocaleString('vi-VN'))}</time></header>
+        <div class="shared-note-content">${sanitizeSharedNote(note.content)}</div></article>`).join('') : '<p class="quick-chat-empty">Chưa có ghi chú. Chia sẻ thông tin đầu tiên bên dưới.</p>';
+}
+
+function listenSharedNotes() {
+    stopSharedNotes();
+    if (!currentUser) return;
+    const uid = currentUser.uid;
+    const generation = sharedNotesGeneration;
+    document.getElementById('sharedNotesToggle').hidden = false;
+    document.getElementById('sharedNotesStatus').textContent = '';
+    sharedNotesUnsubscribe = onSnapshot(query(collection(db, 'sharedNotes'), orderBy('createdAt', 'desc'), limit(100)), snapshot => {
+        if (currentUser?.uid !== uid || generation !== sharedNotesGeneration) return;
+        sharedNotesItems = snapshot.docs.map(item => ({ ...item.data(), id: item.id }));
+        renderSharedNotes();
+    }, error => {
+        if (currentUser?.uid !== uid || generation !== sharedNotesGeneration) return;
+        document.getElementById('sharedNotesStatus').textContent = error.code === 'permission-denied'
+            ? 'Tài khoản chưa được cấp quyền đọc ghi chú chung. Liên hệ người quản lý ứng dụng.'
+            : 'Không tải được ghi chú. Vui lòng thử lại sau.';
+    });
+}
+
+function stopSharedNotes() {
+    sharedNotesUnsubscribe?.(); sharedNotesUnsubscribe = null;
+    sharedNotesItems = []; sharedNotesOpen = false; sharedNotesGeneration++;
+    sharedNotesSending = false;
+    sharedNotesReadingImage = false;
+    const panel = document.getElementById('sharedNotesPanel');
+    if (!panel) return;
+    panel.classList.remove('show'); panel.inert = true;
+    document.getElementById('sharedNotesToggle').hidden = true;
+    document.getElementById('sharedNotesToggle').classList.remove('d-none');
+    document.getElementById('sharedNotesToggle').setAttribute('aria-expanded', 'false');
+    document.getElementById('sharedNotesList').replaceChildren();
+    document.getElementById('sharedNotesEditor').replaceChildren();
+    document.getElementById('sharedNotesEditor').contentEditable = 'true';
+    document.getElementById('sharedNotesSend').disabled = false;
+    document.getElementById('sharedNotesStatus').textContent = '';
+    document.getElementById('sharedNotesFile').value = '';
+    document.getElementById('sharedNotesBadge').classList.add('d-none');
+}
+
+async function addSharedNoteImage(file) {
+    if (!file || sharedNotesReadingImage || sharedNotesSending || !currentUser) return;
+    const generation = sharedNotesGeneration;
+    const status = document.getElementById('sharedNotesStatus');
+    sharedNotesReadingImage = true;
+    let url;
+    try {
+        if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type) || file.size > 15 * 1024 * 1024) throw new Error('Chọn ảnh PNG, JPG, WebP hoặc GIF dưới 15 MB.');
+        url = URL.createObjectURL(file);
+        const img = new Image(); img.src = url; await img.decode();
+        const ratio = Math.min(1, 1400 / Math.max(img.naturalWidth, img.naturalHeight));
+        const canvas = document.createElement('canvas'); canvas.width = Math.max(1, Math.round(img.naturalWidth * ratio)); canvas.height = Math.max(1, Math.round(img.naturalHeight * ratio));
+        const context = canvas.getContext('2d'); context.fillStyle = '#fff'; context.fillRect(0, 0, canvas.width, canvas.height); context.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const image = document.createElement('img'); image.src = canvas.toDataURL('image/jpeg', .7); image.alt = 'Ảnh ghi chú';
+        if (generation !== sharedNotesGeneration) return;
+        const editor = document.getElementById('sharedNotesEditor');
+        if (new Blob([editor.innerHTML, image.outerHTML]).size > 750000) throw new Error('Ghi chú có quá nhiều ảnh. Hãy gửi ảnh trong ghi chú riêng.');
+        editor.append(image, document.createElement('br')); status.textContent = '';
+    } catch (error) { if (generation === sharedNotesGeneration) status.textContent = error.message; }
+    finally { if (url) URL.revokeObjectURL(url); if (generation === sharedNotesGeneration) sharedNotesReadingImage = false; }
+}
+
+function initSharedNotesUi() {
+    const toggle = document.getElementById('sharedNotesToggle');
+    if (!toggle || toggle.dataset.ready) return;
+    toggle.dataset.ready = 'true';
+    document.addEventListener('click', event => {
+        const panel = document.getElementById('sharedNotesPanel');
+        if (sharedNotesOpen && !panel.contains(event.target) && !toggle.contains(event.target)) setSharedNotesOpen(false);
+    }, true);
+    toggle.addEventListener('click', () => setSharedNotesOpen(!sharedNotesOpen));
+    document.getElementById('sharedNotesClose').addEventListener('click', () => { setSharedNotesOpen(false); toggle.focus(); });
+    document.getElementById('quickChatToggleBtn').addEventListener('click', () => setSharedNotesOpen(false));
+    document.getElementById('sharedNotesPanel').addEventListener('keydown', event => { if (event.key === 'Escape') { setSharedNotesOpen(false); toggle.focus(); } });
+    const editor = document.getElementById('sharedNotesEditor');
+    const file = document.getElementById('sharedNotesFile');
+    editor.addEventListener('dragover', event => event.preventDefault());
+    editor.addEventListener('drop', event => {
+        event.preventDefault();
+        const image = Array.from(event.dataTransfer.files).find(file => file.type.startsWith('image/'));
+        if (image) addSharedNoteImage(image);
+    });
+    document.getElementById('sharedNotesImage').addEventListener('click', () => file.click());
+    file.addEventListener('change', async () => { await addSharedNoteImage(file.files[0]); file.value = ''; });
+    document.getElementById('sharedNotesTable').addEventListener('click', () => {
+        if (sharedNotesSending) return;
+        editor.insertAdjacentHTML('beforeend', '<table><tbody><tr><th>Cột 1</th><th>Cột 2</th><th>Cột 3</th></tr><tr><td>…</td><td>…</td><td>…</td></tr><tr><td>…</td><td>…</td><td>…</td></tr></tbody></table><p><br></p>'); editor.focus();
+    });
+    editor.addEventListener('paste', event => {
+        event.preventDefault();
+        if (sharedNotesSending) return;
+        const image = Array.from(event.clipboardData.items).find(item => item.type.startsWith('image/'));
+        if (image) { addSharedNoteImage(image.getAsFile()); return; }
+        const html = event.clipboardData.getData('text/html');
+        const plain = event.clipboardData.getData('text/plain');
+        const content = html ? sanitizeSharedNote(html) : escapeHtml(plain).replace(/\r?\n/g, '<br>');
+        document.execCommand('insertHTML', false, content);
+    });
+    document.getElementById('sharedNotesForm').addEventListener('submit', async event => {
+        event.preventDefault();
+        if (sharedNotesSending || sharedNotesReadingImage || !currentUser) return;
+        const content = sanitizeSharedNote(editor.innerHTML);
+        const check = document.createElement('div'); check.innerHTML = content;
+        const status = document.getElementById('sharedNotesStatus');
+        if (!check.textContent.trim() && !check.querySelector('img')) { status.textContent = 'Nhập nội dung hoặc thêm ảnh trước khi gửi.'; return; }
+        if (check.textContent.length > 20000 || new Blob([content]).size > 750000) { status.textContent = 'Ghi chú quá dài. Hãy chia thành nhiều ghi chú nhỏ hơn.'; return; }
+        const uid = currentUser.uid, generation = sharedNotesGeneration;
+        const button = document.getElementById('sharedNotesSend');
+        sharedNotesSending = true; button.disabled = true; editor.contentEditable = 'false'; status.textContent = 'Đang gửi…';
+        try {
+            await addDoc(collection(db, 'sharedNotes'), { senderId: uid, senderName: currentUser.displayName || currentUser.email || 'Người dùng', content, createdAt: serverTimestamp(), clientCreatedAt: new Date().toISOString() });
+            if (generation === sharedNotesGeneration && currentUser?.uid === uid) { editor.replaceChildren(); status.textContent = 'Đã gửi ghi chú.'; }
+        } catch (error) {
+            if (generation === sharedNotesGeneration) status.textContent = error.code === 'permission-denied' ? 'Tài khoản chưa được cấp quyền gửi ghi chú chung. Nội dung vẫn được giữ lại.' : 'Gửi chưa thành công. Nội dung vẫn được giữ lại để thử lại.';
+        } finally { if (generation === sharedNotesGeneration) { sharedNotesSending = false; button.disabled = false; editor.contentEditable = 'true'; } }
+    });
 }
 
 function initQuickChatUi() {
@@ -8582,12 +8809,17 @@ let swRegistrationPromise = null;
 function getSwRegistration() {
     if (!('serviceWorker' in navigator)) return Promise.resolve(null);
     if (!swRegistrationPromise) {
-        swRegistrationPromise = navigator.serviceWorker.register('sw.js')
-            .then(() => navigator.serviceWorker.ready)
-            .catch(err => {
-                console.warn('Không đăng ký được service worker — thông báo sẽ không có nút bấm nhanh:', err);
-                return null;
-            });
+        swRegistrationPromise = new Promise(resolve => {
+            const timer = setTimeout(() => { swRegistrationPromise = null; resolve(null); }, 4000);
+            Promise.resolve().then(() => navigator.serviceWorker.register('sw.js'))
+                .then(reg => reg.active ? reg : navigator.serviceWorker.ready)
+                .then(reg => { clearTimeout(timer); resolve(reg); })
+                .catch(err => {
+                    clearTimeout(timer); swRegistrationPromise = null;
+                    console.warn('Không đăng ký được service worker — dùng thông báo thường:', err);
+                    resolve(null);
+                });
+        });
     }
     return swRegistrationPromise;
 }
@@ -8651,16 +8883,27 @@ async function handleJobNotificationAction(d) {
 
 // ---------------- Kiểm tra & hiển thị nhắc nhở ----------------
 const notificationClaims = new Set();
+const notificationToastClaims = new Set();
 function notifyOnce(key, send) {
     const claim = () => {
-        if (notificationClaims.has(key) || localStorage.getItem(key)) return;
+        let alreadySent = false;
+        try { alreadySent = !!localStorage.getItem(key); } catch {}
+        if (notificationClaims.has(key) || alreadySent) return;
         notificationClaims.add(key);
-        localStorage.setItem(key, 'true');
-        send();
+        const finish = success => {
+            if (success !== false) {
+                try { localStorage.setItem(key, 'true'); } catch {}
+            } else notificationClaims.delete(key);
+        };
+        try {
+            const result = send();
+            if (result?.then) return result.then(finish).catch(error => { notificationClaims.delete(key); console.warn('Không gửi được thông báo desktop:', error); });
+            finish(result);
+        } catch (error) { notificationClaims.delete(key); console.warn('Không gửi được thông báo desktop:', error); }
     };
     if (navigator.locks?.request) {
-        navigator.locks.request(key, claim).catch(error => console.warn('Notification claim failed:', error));
-    } else claim();
+        return navigator.locks.request(key, claim).catch(error => { console.warn('Notification claim failed:', error); return claim(); });
+    } else return claim();
 }
 
 async function showTimedDesktopNotification(reg, title, options) {
@@ -8679,6 +8922,7 @@ async function showTimedDesktopNotification(reg, title, options) {
 }
 
 function checkNotifications() {
+    if (!currentUser) return;
     const now = new Date();
     const lead = notifyLeadMinutes;
 
@@ -8699,25 +8943,25 @@ function checkNotifications() {
             const [hh, mm] = String(timeStr).split(':').map(Number);
             if (!Number.isFinite(hh) || !Number.isFinite(mm)) continue;
             const dueAt = new Date(day.getFullYear(), day.getMonth(), day.getDate(), hh, mm);
-            if (dueAt.getTime() < now.getTime() - 120000) continue;
+            if (dueAt.getTime() < now.getTime() - 900000) continue;
 
             const dateKey = localDateKey(day);
             const slots = [{ at: new Date(dueAt.getTime() - Math.max(0, lead) * 60000), kind: lead > 0 ? 'lead' : 'due' }];
+            if (lead > 0) slots.push({ at: dueAt, kind: 'due' });
 
             slots.forEach(({ at, kind }) => {
                 const elapsed = now.getTime() - at.getTime();
-                if (elapsed < 0 || elapsed >= 120000) return;   // chỉ nhắc trong 2 phút kể từ mốc
+                if (elapsed < 0 || elapsed >= 900000) return; // Bù khi tab nền bị trì hoãn, tối đa 15 phút.
                 // Đã bấm "Đợi tí" qua mốc này → bỏ nhắc ở mốc này, sẽ nhắc lại đúng lúc hết thời gian chờ
                 if (entry.snoozeUntil && new Date(entry.snoozeUntil).getTime() > at.getTime()) return;
-                const key = `notified_once_${currentUser?.uid || ''}_${job.id}_${entry.originDate || dateKey}_${dateKey}_${timeStr}`;
-                if (localStorage.getItem(`notified_${job.id}_${dateKey}_${timeStr}_due`) ||
-                    localStorage.getItem(`notified_${job.id}_${dateKey}_${timeStr}_lead${lead}`)) return;
-                const message = kind === 'lead'
-                    ? `Còn ${lead} phút nữa (${timeStr}): ${job.title}`
+                const key = `notified_desktop_v2_${currentUser.uid}_${job.id}_${entry.originDate || dateKey}_${dateKey}_${timeStr}`;
+                const displayKind = now >= dueAt ? 'due' : kind;
+                const message = displayKind === 'lead'
+                    ? `Còn ${Math.ceil((dueAt - now) / 60000)} phút nữa (${timeStr}): ${job.title}`
                     : `Đã đến giờ thực hiện: ${job.title}`;
                 notifyOnce(key, () => {
-                    showNotification('🔔 Nhắc nhở Job', message, false);
-                    showDesktopNotification(job, { kind, originDate: entry.originDate, time: timeStr });
+                    if (!notificationToastClaims.has(key)) { showNotification('🔔 Nhắc nhở Job', message, false); notificationToastClaims.add(key); }
+                    return showDesktopNotification(job, { kind: displayKind, originDate: entry.originDate, time: timeStr });
                 });
             });
         }
@@ -8730,35 +8974,31 @@ function checkNotifications() {
         const at = new Date(o.snoozeUntil);
         if (isNaN(at.getTime())) return;
         const elapsed = now.getTime() - at.getTime();
-        if (elapsed < 0 || elapsed >= 120000) return;
+        if (elapsed < 0 || elapsed >= 900000) return;
         const job = jobs.find(j => j.id === o.jobId);
         if (!job || job.isPaused === true || job.isOutOfSchedule === true || job.enableNotification === false) return;
         const key = `notified_snooze_${o.id}_${o.snoozeUntil}`;
         notifyOnce(key, () => {
-            showNotification('⏳ Nhắc lại Job', `Hết thời gian chờ: ${job.title}`, false, 'warning');
-            showDesktopNotification(job, { kind: 'snooze', originDate: o.occurrenceDate, time: o.overrideTime || job.time });
+            if (!notificationToastClaims.has(key)) { showNotification('⏳ Nhắc lại Job', `Hết thời gian chờ: ${job.title}`, false, 'warning'); notificationToastClaims.add(key); }
+            return showDesktopNotification(job, { kind: 'snooze', originDate: o.occurrenceDate, time: o.overrideTime || job.time });
         });
     });
 }
 
 // Show Desktop Notification - Works across all apps
-function showDesktopNotification(job, ctx = {}) {
+async function showDesktopNotification(job, ctx = {}) {
     // Check if browser supports notifications
     if (!('Notification' in window)) {
         console.warn('Browser không hỗ trợ Desktop Notifications');
-        return;
+        return false;
     }
 
     // Check permission
     if (Notification.permission === 'granted') {
-        createNotification(job, ctx);
-    } else if (Notification.permission !== 'denied') {
-        Notification.requestPermission().then(permission => {
-            if (permission === 'granted') {
-                createNotification(job, ctx);
-            }
-        });
+        try { return await createNotification(job, ctx); }
+        catch (error) { console.warn('Không hiện được thông báo desktop:', error); return false; }
     }
+    return false;
 }
 
 async function createNotification(job, ctx = {}) {
@@ -8798,7 +9038,7 @@ async function createNotification(job, ctx = {}) {
         const reg = await getSwRegistration();
         if (reg) {
             await showTimedDesktopNotification(reg, title, options);
-            return;
+            return true;
         }
     } catch (err) {
         console.warn('showNotification qua service worker lỗi, dùng thông báo thường:', err);
@@ -8815,6 +9055,7 @@ async function createNotification(job, ctx = {}) {
         notification.close();
     };
     setTimeout(() => notification.close(), 15000);
+    return true;
 }
 
 
@@ -8922,7 +9163,7 @@ function refreshUiForCurrentTime() {
 function startNotificationCheck() {
     clearInterval(notificationCheckInterval);
     checkNotifications();
-    notificationCheckInterval = setInterval(checkNotifications, 60000);
+    notificationCheckInterval = setInterval(checkNotifications, 15000);
 }
 
 // Helper Functions

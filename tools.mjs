@@ -445,6 +445,14 @@ vm.runInContext(code, ctx2);
 vm.runInContext('checkNotifications(); checkNotifications()', ctx2);
 assert.equal(sent.length, 2);
 assert.equal(sent[1].kind, 'due');
+instant = new Date(2026, 10, 4, 10, 5);
+ctx2.jobs=[{id:'background',title:'Background job',time:'10:00'}];
+vm.runInContext('checkNotifications()',ctx2);
+assert.equal(sent.at(-1).kind,'due');
+assert.equal(sent.length,3,'background timer delayed five minutes still receives reminder');
+ctx2.jobs=[{id:'missed-lead',title:'Missed lead',time:'10:00'}];ctx2.notifyLeadMinutes=120;
+vm.runInContext('checkNotifications()',ctx2);
+assert.equal(sent.length,4,'missed early reminder falls back to due-time reminder');
 let options;
 let closed = 0;
 ctx.reg = {
@@ -667,6 +675,33 @@ test('statistics hide unchecked users and list dates matching occurrence counts'
     ctx.statsMode = 'today'; vm.runInContext('renderStatistics()', ctx);
     assert.match(fields.statsTable.innerHTML, />Thứ Sáu<\/time>/);
     assert.doesNotMatch(fields.statsTable.innerHTML, /Thứ Hai|Bob job/);
+});
+
+test('desktop reminders retry failed sends and service-worker readiness cannot block fallback', async () => {
+    const source=fs.readFileSync('app.js','utf8');
+    const saved=new Map(), timers=new Map();let nextTimer=0;
+    const ctx=vm.createContext({console,navigator:{serviceWorker:{register:async()=>({active:null}),ready:new Promise(()=>{})}},localStorage:{getItem:key=>saved.get(key),setItem:(key,value)=>saved.set(key,value)},setTimeout:(fn,delay)=>{const id=++nextTimer;timers.set(id,{fn,delay});return id;},clearTimeout:id=>timers.delete(id)});
+    vm.runInContext(source.slice(source.indexOf('const notificationClaims ='),source.indexOf('async function showTimedDesktopNotification(')),ctx);
+    await ctx.notifyOnce('retry',async()=>false);
+    assert.equal(saved.has('retry'),false,'failure must not consume the reminder');
+    let sends=0;
+    await ctx.notifyOnce('retry',async()=>{sends++;return true;});
+    await ctx.notifyOnce('retry',async()=>{sends++;return true;});
+    assert.equal(sends,1,'successful delivery is persisted and deduplicated');
+    let complete;const delivery=new Promise(resolve=>complete=resolve);
+    const attempt=ctx.notifyOnce('pending',()=>delivery);
+    ctx.notifyOnce('pending',()=>{throw Error('duplicate concurrent send');});
+    assert.equal(saved.has('pending'),false,'do not persist before desktop API succeeds');
+    complete(true);await attempt;
+    assert.equal(saved.has('pending'),true);
+    vm.runInContext(source.slice(source.indexOf('let swRegistrationPromise ='),source.indexOf('function initNotificationActionBridge(')),ctx);
+    const waiting=ctx.getSwRegistration();
+    await Promise.resolve();await Promise.resolve();
+    const timeout=[...timers.values()].find(timer=>timer.delay===4000);
+    assert.ok(timeout,'service worker has a bounded readiness wait');timeout.fn();
+    assert.equal(await waiting,null,'stalled worker allows desktop fallback');
+    const registration={active:{}};ctx.navigator.serviceWorker.register=async()=>registration;
+    assert.equal(await ctx.getSwRegistration(),registration,'later worker registration can retry');
 });
 
 test('job catalog keeps paused jobs last and statistics sort types and weekdays', () => {
@@ -1099,10 +1134,72 @@ ${extract('function escapeHtml(', '// ==========================================
 ${extract('function getHolidayName(', 'function renderDayOffCalendars(')}
 ${extract('function renderChangeHistory(', 'function getDayOffJobPreview(')}
 ${extract('function renderJobChecklist(', "window.addEventListener('beforeunload'")}
+${extract('let sharedNotesUnsubscribe =', 'function initQuickChatUi(')}
+let noteSnapshot, noteWrites = [], noteUnsubscribed = 0, rejectNoteWrite = false;
+const collection = (_, name) => name;
+const query = (...args) => args, orderBy = (...args) => args, limit = value => value;
+const serverTimestamp = () => 'server-timestamp';
+const onSnapshot = (_, callback) => { noteSnapshot = callback; return () => noteUnsubscribed++; };
+const addDoc = async (name, data) => { if (rejectNoteWrite) throw Object.assign(new Error('denied'), {code:'permission-denied'}); noteWrites.push({name,data}); };
+let quickChatPanelOpen = false, quickChatUnreadCount = 0;
+const updateQuickChatBadge = () => {};
+${extract('function openQuickChatPanel(', 'let sharedNotesUnsubscribe =')}
 try {
-    const kept = ['dayOffModal','viewJobModal','changeHistoryModal'].map(id=>document.getElementById(id));
+    const kept = ['dayOffModal','viewJobModal','changeHistoryModal','sharedNotesPanel','sharedNotesToggle','quickChatToggleBtn','quickChatPanel'].map(id=>document.getElementById(id));
     const historyButton = document.getElementById('changeHistoryBtn');
     document.body.replaceChildren(...kept,historyButton);
+    const cleaned = sanitizeSharedNote('<scr'+'ipt>alert(1)</scr'+'ipt><table><tr><td onclick="alert(1)">Cell</td></tr></table><img src="https://example.com/x"><img src="data:image/png;base64,aGVsbG8=" onerror="alert(1)">');
+    check(cleaned.includes('<td>Cell</td>'),'notes preserve pasted table cells');
+    check(!/script|onclick|onerror|https:/.test(cleaned),'notes remove scripts, handlers and remote images');
+    check(cleaned.includes('data:image/png;base64,'),'notes preserve embedded images');
+    initSharedNotesUi(); initSharedNotesUi(); listenSharedNotes();
+    check(!document.getElementById('sharedNotesToggle').hidden,'signed-in user sees notes button');
+    noteSnapshot({docs:[{id:'note',data:()=>({senderId:'other',senderName:'Other user',content:'<b>Hello</b>',createdAt:{toDate:()=>new Date('2099-01-01T12:00:00Z')}})}]});
+    check(document.getElementById('sharedNotesList').textContent.includes('Other user'),'notes show sender');
+    check(document.getElementById('sharedNotesList').querySelector('time').dateTime==='2099-01-01T12:00:00.000Z','notes show server send time');
+    check(document.getElementById('sharedNotesBadge').textContent==='1','new notes have unread badge');
+    document.getElementById('sharedNotesToggle').click();
+    check(document.getElementById('sharedNotesPanel').classList.contains('show'),'notes panel opens');
+    check(document.getElementById('quickChatToggleBtn').classList.contains('d-none'),'opening notes hides chat button');
+    const notesRect=document.getElementById('sharedNotesPanel').getBoundingClientRect();
+    check(notesRect.width<=innerWidth&&notesRect.height<=innerHeight+1,'notes panel fits viewport');
+    check(document.getElementById('sharedNotesBadge').classList.contains('d-none'),'opening notes clears unread');
+    const noteEditor=document.getElementById('sharedNotesEditor');
+    noteEditor.textContent='Draft';noteEditor.click();
+    check(sharedNotesOpen,'clicking inside notes keeps panel open');
+    historyButton.click();
+    check(!sharedNotesOpen&&document.getElementById('sharedNotesPanel').inert,'outside click closes notes');
+    check(!document.getElementById('quickChatToggleBtn').classList.contains('d-none'),'closing notes restores chat button');
+    check(noteEditor.textContent==='Draft','outside dismissal preserves draft');
+    check(!document.getElementById('sharedNotesToggle').classList.contains('d-none'),'outside dismissal restores notes button');
+    openQuickChatPanel();setSharedNotesOpen(false);
+    check(document.getElementById('sharedNotesToggle').classList.contains('d-none'),'job chat hides notes button even after toggle click handlers');
+    closeQuickChatPanel();
+    check(!document.getElementById('sharedNotesToggle').classList.contains('d-none'),'closing job chat restores notes button');
+    document.getElementById('sharedNotesToggle').click();
+    check(sharedNotesOpen,'notes reopen normally');
+    document.getElementById('sharedNotesTable').click();
+    check(noteEditor.querySelectorAll('td').length===6,'insert table once even after repeated initialization');
+    const noteForm=document.getElementById('sharedNotesForm');
+    const submitNote=async()=>{noteForm.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));await new Promise(resolve=>setTimeout(resolve,0));};
+    const imageCanvas=document.createElement('canvas');imageCanvas.width=20;imageCanvas.height=10;
+    imageCanvas.getContext('2d').fillRect(0,0,20,10);
+    const imageBlob=await new Promise(resolve=>imageCanvas.toBlob(resolve,'image/png'));
+    await addSharedNoteImage(new File([imageBlob],'sample.png',{type:'image/png'}));
+    check(noteEditor.querySelector('img')?.src.startsWith('data:image/jpeg;base64,'),'image uploads are compressed and embedded');
+    await submitNote();
+    check(noteWrites.length===1&&noteWrites[0].name==='sharedNotes','notes write to sharedNotes only');
+    check(noteWrites[0].data.senderId==='me'&&noteWrites[0].data.createdAt==='server-timestamp','notes include sender and server time');
+    check(!noteEditor.innerHTML,'successful note clears draft');
+    await submitNote();check(noteWrites.length===1,'empty notes are not sent');
+    rejectNoteWrite=true; noteEditor.innerHTML='<p>Keep draft</p>'; await submitNote();
+    check(noteEditor.textContent==='Keep draft','failed note preserves draft');
+    check(!document.getElementById('sharedNotesSend').disabled,'failed note re-enables send');
+    stopSharedNotes();
+    check(noteUnsubscribed===1&&document.getElementById('sharedNotesToggle').hidden,'sign-out removes shared listener and button');
+    check(!noteEditor.innerHTML&&document.getElementById('sharedNotesPanel').inert,'sign-out clears notes and draft');
+    noteSnapshot({docs:[{id:'late',data:()=>({content:'Late note'})}]});
+    check(sharedNotesItems.length===0,'late snapshot from old session is ignored');
     document.getElementById('dayOffCalendars').innerHTML='<div class="dayoff-day" data-date="2026-11-12">12</div>';
     setupPersonalCalendar(); setupProductivityFeatures();
     const cell=document.querySelector('[data-date]');
@@ -1176,7 +1273,7 @@ try {
     }
     check(document.querySelector('#dayOffReasonPresets [data-reason="SO"]'),'SO reason is available');
     check(document.getElementById('dayOffYear').closest('.dayoff-period-picker')===document.getElementById('dayOffMonth').closest('.dayoff-period-picker'),'year and month share a picker group');
-    document.body.innerHTML='<pre id="smoke-result">PASS: event editor, recurrence fields, history filters, checklist persistence and independent occurrences</pre>';
+    document.body.innerHTML='<pre id="smoke-result">PASS: shared notes (table, image, sanitization, send failures, unread and sign-out), event editor, recurrence, history and checklist</pre>';
 } catch(error) {document.body.innerHTML='<pre id="smoke-result">FAIL: '+escapeHtml(error.stack)+'</pre>';}
 `;
 try {
