@@ -5281,6 +5281,7 @@ window.toggleTransferSection = function () {
             btn.innerHTML = '<i class="bi bi-arrow-left-right"></i> Chuyển/Copy Job';
         } else {
             section.classList.add('show');
+            requestAnimationFrame(() => section.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }));
             btn.innerHTML = '<i class="bi bi-x-circle"></i> Đóng phần chuyển/copy';
         }
     }
@@ -5293,7 +5294,7 @@ function openViewJobModal(job, occurrenceDate = null) {
     currentTransferMode = 'transfer';
 
     document.getElementById('viewModalTitle').innerHTML = `
-        <i class="bi bi-eye-fill"></i> ${job.title}
+        <i class="bi bi-eye-fill"></i> ${escapeHtml(job.title)}
         ${job.isPaused ? '<span class="paused-indicator"><i class="bi bi-pause-circle-fill"></i> Đang tạm dừng</span>' : ''}
     `;
 
@@ -5324,7 +5325,7 @@ function openViewJobModal(job, occurrenceDate = null) {
         <div class="transfer-section" id="transferSection">
             <div class="transfer-section-header">
                 <h6><i class="bi bi-arrow-left-right"></i> Chuyển/Copy Job</h6>
-                <button type="button" class="transfer-section-close" onclick="toggleTransferSection()">
+                <button type="button" class="transfer-section-close" aria-label="Đóng phần chuyển/copy" onclick="toggleTransferSection()">
                     <i class="bi bi-x-lg"></i>
                 </button>
             </div>
@@ -5340,17 +5341,17 @@ function openViewJobModal(job, occurrenceDate = null) {
             
             <div class="mb-3">
                 <label class="form-label fw-bold">Chọn hành động:</label>
-                <div>
+                <div class="transfer-mode-options">
                     <div class="form-check form-check-inline">
                         <input class="form-check-input" type="radio" name="transferMode" id="transferModeTransfer" value="transfer" checked>
                         <label class="form-check-label" for="transferModeTransfer">
-                            <i class="bi bi-arrow-right-circle-fill text-primary"></i> Chuyển job
+                            <span><strong>Chuyển job</strong><small>Chuyển quyền quản lý cho người nhận</small></span>
                         </label>
                     </div>
                     <div class="form-check form-check-inline">
                         <input class="form-check-input" type="radio" name="transferMode" id="transferModeCopy" value="copy">
                         <label class="form-check-label" for="transferModeCopy">
-                            <i class="bi bi-copy text-success"></i> Copy job
+                            <span><strong>Copy job</strong><small>Tạo bản sao và giữ job của bạn</small></span>
                         </label>
                     </div>
                 </div>

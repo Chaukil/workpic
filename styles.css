@@ -15230,3 +15230,37 @@ body #dayOffCalendars .calendar-personal-event {
  white-space: normal; overflow-wrap: anywhere; overflow: hidden;
 }
 body #dayOffCalendars .calendar-personal-event::after { display: none; }
+
+/* Job details use the dialog scroll instead of a short nested content viewport. */
+#viewJobModal .view-job-content { max-height: none; height: auto; overflow-x: auto; overflow-y: visible; overflow-wrap: anywhere; }
+#viewJobModal #viewModalTitle { white-space: normal; overflow-wrap: anywhere; }
+#viewJobModal .modern-header-inner { min-width: 0; flex: 1; }
+#viewJobModal .modern-header-text { min-width: 0; }
+#viewJobModal .modal-header > .btn-close { flex-shrink: 0; }
+#viewJobModal .view-job-meta dt { flex-wrap: wrap; }
+#viewJobModal .transfer-section {
+ padding: 20px; border: 1px solid var(--border); border-radius: 14px;
+ background: var(--surface-muted); scroll-margin-top: 16px;
+}
+#viewJobModal .transfer-section-header { gap: 12px; }
+#viewJobModal .transfer-section-header h6 { line-height: 1.5; overflow-wrap: anywhere; }
+#viewJobModal .transfer-section-close { flex-shrink: 0; padding: 8px; }
+#viewJobModal .transfer-mode-options { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+#viewJobModal .transfer-mode-options .form-check {
+ display: flex; align-items: center; gap: 10px; margin: 0; padding: 12px;
+ border: 1px solid var(--border); border-radius: 10px; background: var(--surface);
+}
+#viewJobModal .transfer-mode-options .form-check:has(input:checked) { border-color: var(--primary); background: var(--primary-soft); }
+#viewJobModal .transfer-mode-options input { float: none; margin: 0; flex-shrink: 0; }
+#viewJobModal .transfer-mode-options label { display: block; padding: 0; min-width: 0; flex: 1; white-space: normal; overflow-wrap: anywhere; }
+#viewJobModal .transfer-mode-options strong { display: block; line-height: 1.5; }
+#viewJobModal .transfer-mode-options small { display: block; margin-top: 4px; color: var(--muted); font-size: .78rem; line-height: 1.5; }
+:is(#viewJobModal,#jobModal) .modal-footer .btn { white-space: normal; height: auto; min-height: 40px; overflow-wrap: anywhere; }
+:is(#viewJobModal,#jobModal) :is(.form-control,.form-select) { height: auto; min-height: 42px; line-height: 1.5; }
+#jobModal .form-label { white-space: normal; overflow-wrap: anywhere; }
+#viewJobModal #transferJobBtn { width: auto; min-width: 150px; justify-self: end; white-space: normal; }
+@media (max-width: 760px) {
+ #viewJobModal .transfer-mode-options { grid-template-columns: minmax(0,1fr); }
+ #viewJobModal .transfer-section { padding: 14px; }
+ #viewJobModal #transferJobBtn { width: 100%; }
+}
