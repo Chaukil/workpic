@@ -15421,3 +15421,10 @@ body :is(.schedule-item,.timeline-job)[style*='--job-custom-color'] :is(h6,small
 #sharedNoteImageFull { display: block; max-width: 100%; max-height: 72dvh; object-fit: contain; height: auto; }
 .shared-note-image-dialog.zoomed .shared-note-image-viewport { display: block; }
 .shared-note-image-dialog.zoomed #sharedNoteImageFull { max-width: none; max-height: none; }
+
+/* Bucket interaction never captures clicks on jobs, controls or modal content. */
+body.storm-bucket-active, body.storm-bucket-active * { cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2236%22%20height%3D%2238%22%20viewBox%3D%220%200%2036%2038%22%3E%3Cpath%20d%3D%22M8%2014C8%201%2028%201%2028%2014%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%223%22%2F%3E%3Cpath%20d%3D%22M5%2014h26l-4%2021H9Z%22%20fill%3D%22%2338bdf8%22%20stroke%3D%22%23f8fafc%22%20stroke-width%3D%222%22%2F%3E%3Cellipse%20cx%3D%2218%22%20cy%3D%2214%22%20rx%3D%2213%22%20ry%3D%224%22%20fill%3D%22%23075985%22%20stroke%3D%22%23e0f2fe%22%20stroke-width%3D%222%22%2F%3E%3Cpath%20d%3D%22m13%2021%201%208m5-8v8%22%20stroke%3D%22%23e0f2fe%22%20stroke-width%3D%222%22%2F%3E%3C%2Fsvg%3E") 18 18, crosshair !important; }
+.storm-water-overlay { position: fixed; left: 0; right: 0; bottom: 0; height: 0; pointer-events: none; z-index: 1000; background: linear-gradient(rgba(68,157,198,.2),rgba(12,62,108,.5)); border-top: 2px solid rgba(169,222,246,.4); transition: height .25s ease-out; }
+.storm-water-overlay::before { content: ''; position: absolute; left: -5%; top: -5px; width: 110%; height: 10px; background: rgba(122,199,229,.2); border-radius: 45%; animation: storm-water-sway 4s ease-in-out infinite alternate; }
+@keyframes storm-water-sway { to { transform: translateX(3%) translateY(3px); } }
+@media (prefers-reduced-motion: reduce) { .storm-water-overlay, .storm-water-overlay::before { animation: none; transition: none; } }

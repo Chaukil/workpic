@@ -50,8 +50,8 @@ console.log(`Deploy dist/: index.html (${((await stat('dist/index.html')).size /
 
     "test": async () => {
 const helperSource = fs.readFileSync('app.js', 'utf8').split('// BEGIN SHARED HELPERS\n')[1].split('// END SHARED HELPERS')[0];
-const helperModule = helperSource + '\nexport { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle };';
-const { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle } = await import('data:text/javascript;base64,' + Buffer.from(helperModule).toString('base64'));
+const helperModule = helperSource + '\nexport { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater };';
+const { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater } = await import('data:text/javascript;base64,' + Buffer.from(helperModule).toString('base64'));
 
 
 
@@ -819,23 +819,34 @@ test('job catalog keeps paused jobs last and statistics sort types and weekdays'
     assert.deepEqual(titles,['daily','mon','fri','daily','mon','fri']);
 });
 
+test('storm water reaches half-screen in 30 minutes and bucket scoops reduce the water', () => {
+    const water={level:0,lastAt:0};
+    assert.equal(advanceStormWater(water,900000),.25);
+    assert.equal(advanceStormWater(water,1800000),.5);
+    assert.equal(advanceStormWater(water,3600000),.5,'water never exceeds half the screen');
+    assert.equal(scoopStormWater(water,3600000),.45,'bucket removes five percent of screen height');
+    for(let i=0;i<20;i++)scoopStormWater(water,3600000);
+    assert.equal(water.level,0,'scooping cannot produce negative water');
+    assert.equal(advanceStormWater(water,4500000),.25,'water rises again after being scooped');
+});
+
 test('shared rain renderer keeps one canvas/loop and releases listeners across header and fullscreen modes', () => {
     const source = fs.readFileSync('app.js', 'utf8');
     const code = source.slice(source.indexOf('const RainFx ='), source.indexOf('// Thiên hà xoắn ốc'));
     const listeners = new Map(), frames = new Map(), canvases = [];
-    let serial = 0, reduced = false;
+    let serial = 0, reduced = false, clock = 0, surfaceY = 0;
     const classes = new Set();
     const add = (name, fn) => { if (!listeners.has(name)) listeners.set(name, new Set()); listeners.get(name).add(fn); };
     const remove = (name, fn) => listeners.get(name)?.delete(fn);
     let waterDraws = 0, largestStroke = 0;
     const g = { setTransform() {}, clearRect() {}, fillRect() {}, beginPath() {}, moveTo() {}, lineTo() {},
         stroke() { largestStroke = Math.max(largestStroke, this.lineWidth || 0); },
-        save() {}, restore() {}, closePath() {}, fill() { waterDraws++; }, ellipse() {}, createLinearGradient: () => ({addColorStop(){}}) };
+        save() {}, restore() {}, closePath() {}, fill() { waterDraws++; }, ellipse() {}, createLinearGradient: (_,y) => {surfaceY=y;return {addColorStop(){}};} };
     const ctx = vm.createContext({
-        navigator: { hardwareConcurrency: 8 },
-        document: { hidden: false, body: { classList: { contains: name => classes.has(name) } }, addEventListener: add, removeEventListener: remove,
-            createElement: () => { const canvas = { getContext: () => g, setAttribute() {}, remove() { this.removed = true; } }; canvases.push(canvas); return canvas; } },
-        window: { devicePixelRatio: 2, matchMedia: () => ({ matches: reduced }), addEventListener: add, removeEventListener: remove },
+        navigator: { hardwareConcurrency: 8 }, advanceStormWater, scoopStormWater, Date:{now:()=>clock},
+        document: { hidden: false, body: { appendChild() {}, classList: { contains: name => classes.has(name), remove:name=>classes.delete(name),toggle:(name,on)=>on?classes.add(name):classes.delete(name) } }, addEventListener: add, removeEventListener: remove,
+            createElement: tag => { const canvas = { style:{}, getContext: () => g, setAttribute() {}, remove() { this.removed = true; } }; if(tag==='canvas')canvases.push(canvas); return canvas; } },
+        window: { innerHeight:1000, devicePixelRatio: 2, matchMedia: () => ({ matches: reduced }), addEventListener: add, removeEventListener: remove },
         requestAnimationFrame: fn => { frames.set(++serial, fn); return serial; }, cancelAnimationFrame: id => frames.delete(id)
     });
     ctx.header = { getBoundingClientRect: () => ({ width: 1440, height: 80 }), prepend() {} };
@@ -852,6 +863,19 @@ test('shared rain renderer keeps one canvas/loop and releases listeners across h
     }
     assert.ok(waterDraws > 0,'storm draws rising water in the fullscreen canvas');
     assert.ok(largestStroke >= 10,'storm draws a large lightning glow');
+    clock=1800000;
+    const stepFrame=time=>{const [id,frame]=frames.entries().next().value;frames.delete(id);frame(time);};
+    stepFrame(4040);assert.equal(surfaceY,500,'real storm renderer reaches half-screen');
+    const bucketEvent={button:0,clientX:600,clientY:750,target:{closest:()=>null}};
+    for(const fn of listeners.get('pointermove'))fn(bucketEvent);
+    assert.ok(classes.has('storm-bucket-active'),'bucket cursor appears over water');
+    for(const fn of listeners.get('pointerdown'))fn(bucketEvent);
+    stepFrame(4080);assert.equal(surfaceY,550,'clicking water reduces the rendered flood level');
+    const controlEvent={...bucketEvent,target:{closest:()=>({})}};
+    for(const fn of listeners.get('pointermove'))fn(controlEvent);
+    assert.ok(!classes.has('storm-bucket-active'),'bucket does not replace cursor over job controls');
+    for(const fn of listeners.get('pointerdown'))fn(controlEvent);
+    stepFrame(4120);assert.equal(surfaceY,550,'normal button clicks do not scoop');
     classes.add('modal-open'); for (const fn of listeners.get('shown.bs.modal')) fn();
     assert.equal(frames.size, 0);
     classes.delete('modal-open'); for (const fn of listeners.get('hidden.bs.modal')) { fn(); fn(); }
@@ -1443,7 +1467,7 @@ const chrome = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Pro
 if (!chrome) { console.log('Theme GPU smoke skipped: Chrome/Edge unavailable.'); process.exit(0); }
 const source = fs.readFileSync('app.js', 'utf8');
 let code = source.slice(source.indexOf('const ThreeFx ='), source.indexOf('// CƯỜNG ĐỘ HIỆU ỨNG'));
-const rainCode = source.slice(source.indexOf('const RainFx ='), source.indexOf('// Thiên hà xoắn ốc'))
+const rainCode = source.slice(source.indexOf('function advanceStormWater('), source.indexOf('function jobColorStyle(')) + source.slice(source.indexOf('const RainFx ='), source.indexOf('// Thiên hà xoắn ốc'))
     .replace('        s.fit();', '        s.frame = frame; s.fit();')
     .replace('return { start, stop };', 'return { draw: () => { cancelAnimationFrame(state.raf); state.frame(performance.now() + 50); }, start, stop };');
 code = code.replace("if (!threePromise) threePromise = import(THREE_URL).catch(err => { threePromise = null; throw err; });", 'if (!threePromise) threePromise = Promise.resolve(THREE);');

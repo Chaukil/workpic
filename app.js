@@ -284,6 +284,19 @@ function createScheduleCache() {
     };
 }
 
+function advanceStormWater(water, now) {
+    const elapsed = Math.max(0, now - water.lastAt);
+    water.level = Math.min(.5, Math.max(0, water.level) + elapsed / 1800000 * .5);
+    water.lastAt = Math.max(water.lastAt, now);
+    return water.level;
+}
+
+function scoopStormWater(water, now) {
+    advanceStormWater(water, now);
+    water.level = Math.max(0, water.level - .05);
+    return water.level;
+}
+
 function jobColorStyle(job) {
     const color = job?.displayColor;
     if (!/^#[0-9a-f]{6}$/i.test(color || '')) return '';
@@ -596,6 +609,10 @@ const RainFx = (() => {
         document.removeEventListener('hidden.bs.modal', s.resume);
         document.removeEventListener('pointerdown', s.armAudio);
         document.removeEventListener('keydown', s.armAudio);
+        document.removeEventListener('pointermove', s.moveBucket);
+        document.removeEventListener('pointerdown', s.scoop);
+        document.body.classList.remove('storm-bucket-active');
+        s.waterOverlay?.remove();
         s.audio?.close().catch(() => {});
         s.canvas.remove();
     }
@@ -607,8 +624,32 @@ const RainFx = (() => {
         if (!g) return false;
         canvas.className = 'rain-fx-canvas'; canvas.setAttribute('aria-hidden', 'true');
         host.prepend(canvas);
-        const s = { canvas, raf: 0, last: 0, time: 0, width: 0, height: 0, drops: [], profile: profiles[level] || profiles[1], nextStrike: 3, bolt: null, audio: null, soundNodes: new Set() };
+        const s = { canvas, raf: 0, last: 0, time: 0, width: 0, height: 0, drops: [], profile: profiles[level] || profiles[1], nextStrike: 3, bolt: null, audio: null, soundNodes: new Set(), water: { level: 0, lastAt: Date.now() }, scoopRipples: [] };
         state = s;
+        const blockedBucketTarget = target => target?.closest?.('button,a,input,select,textarea,[contenteditable],[role="button"],dialog,.modal,.quick-chat-panel,.job-item,.schedule-item,.timeline-job,.out-of-schedule-card');
+        const inWater = event => {
+            advanceStormWater(s.water, Date.now());
+            return s.water.level > 0 && !document.hidden && !document.body.classList.contains('modal-open')
+                && !blockedBucketTarget(event.target) && event.clientY >= window.innerHeight * (1 - s.water.level);
+        };
+        s.moveBucket = event => document.body.classList.toggle('storm-bucket-active', inWater(event));
+        s.scoop = event => {
+            if (event.button !== 0 || !inWater(event)) return;
+            scoopStormWater(s.water, Date.now());
+            const rect = host.getBoundingClientRect();
+            s.scoopRipples.push({ x: event.clientX - rect.left, at: s.time });
+            s.scoopRipples = s.scoopRipples.slice(-8);
+            s.moveBucket(event);
+        };
+        if (level === 2) {
+            s.waterOverlay = document.createElement('div');
+            s.waterOverlay.className = 'storm-water-overlay';
+            s.waterOverlay.setAttribute('aria-hidden', 'true');
+            s.waterOverlay.title = 'Bấm vùng nước trống để tát nước';
+            document.body.appendChild(s.waterOverlay);
+            document.addEventListener('pointermove', s.moveBucket);
+            document.addEventListener('pointerdown', s.scoop);
+        }
         s.armAudio = () => {
             if (level !== 2 || document.hidden || document.body.classList.contains('modal-open')) return;
             const Audio = window.AudioContext || window.webkitAudioContext;
@@ -650,6 +691,11 @@ const RainFx = (() => {
             s.last = now; s.time += dt;
             const light = document.body.classList.contains('theme-light');
             const p = s.profile;
+            if (level === 2) {
+                advanceStormWater(s.water, Date.now());
+                const waterHeight = `${Math.round(s.water.level * 10000) / 100}dvh`;
+                if (s.waterOverlay.style.height !== waterHeight) s.waterOverlay.style.height = waterHeight;
+            }
             g.clearRect(0, 0, s.width, s.height);
             if (level === 2) {
                 g.fillStyle = light ? 'rgba(42,60,80,.06)' : 'rgba(4,12,24,.1)';
@@ -687,7 +733,7 @@ const RainFx = (() => {
             }
             // Rising water shares the rain canvas and disappears when changing themes.
             if (level === 2 && s.height > 200) {
-                const depth = Math.min(90, s.height * .12) * (1 - Math.exp(-s.time / 8));
+                const depth = s.height * s.water.level;
                 const surface = s.height - depth;
                 const water = g.createLinearGradient(0,surface,0,s.height);
                 water.addColorStop(0, light ? 'rgba(72,144,182,.18)' : 'rgba(68,157,198,.2)');
@@ -702,6 +748,13 @@ const RainFx = (() => {
                     g.beginPath(); g.ellipse((i * .137 % 1) * s.width,surface + 9 + i % 3 * depth * .2,4 + age * 22,1 + age * 3,0,0,Math.PI * 2); g.stroke();
                 }
                 g.globalAlpha = 1;
+                s.scoopRipples = s.scoopRipples.filter(ripple => s.time - ripple.at < .8);
+                for (const ripple of s.scoopRipples) {
+                    const age = (s.time - ripple.at) / .8;
+                    g.globalAlpha = (1 - age) * .8;
+                    g.beginPath(); g.ellipse(ripple.x,surface + 4,8 + age * 60,3 + age * 12,0,0,Math.PI * 2); g.stroke();
+                }
+                g.globalAlpha = 1;
             }
             // A single clock drives lightning, including the portion over the header.
             const phase = s.time % (level === 2 ? 8 : 14);
@@ -711,7 +764,7 @@ const RainFx = (() => {
             }
         };
         s.resume = () => {
-            if (document.hidden || document.body.classList.contains('modal-open')) { cancelAnimationFrame(s.raf); s.raf = 0; s.soundNodes.forEach(node => { try { node.stop(); } catch {} }); }
+            if (document.hidden || document.body.classList.contains('modal-open')) { cancelAnimationFrame(s.raf); s.raf = 0; document.body.classList.remove('storm-bucket-active'); s.soundNodes.forEach(node => { try { node.stop(); } catch {} }); }
             else if (!s.raf) { s.last = 0; s.raf = requestAnimationFrame(frame); }
         };
         s.fit();
@@ -2241,7 +2294,7 @@ const FX_LEVEL_INFO = {
     },
     rain: {
         labels: ['Mưa phùn', 'Mưa lớn', 'Bão'],
-        hints: ['Mưa phùn thưa, nhẹ.', 'Mưa lớn xiên, có chớp xa.', 'Bão: mưa dày, tia sét lớn, tiếng sấm trầm và nước dâng dưới màn hình. Âm thanh bật sau khi tương tác với trang.']
+        hints: ['Mưa phùn thưa, nhẹ.', 'Mưa lớn xiên, có chớp xa.', 'Bão: sét lớn, sấm trầm; nước dâng đến nửa màn hình sau 30 phút. Rê chuột vào vùng nước trống và bấm để tát bằng xô. Âm thanh bật sau khi tương tác với trang.']
     },
     space: {
         labels: ['Nhẹ nhàng', 'Bình thường', 'Bão thiên hà'],
