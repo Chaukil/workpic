@@ -284,6 +284,14 @@ function createScheduleCache() {
     };
 }
 
+function jobColorStyle(job) {
+    const color = job?.displayColor;
+    if (!/^#[0-9a-f]{6}$/i.test(color || '')) return '';
+    const rgb = [1,3,5].map(index => parseInt(color.slice(index,index+2),16) / 255)
+        .map(value => value <= .04045 ? value / 12.92 : Math.pow((value + .055) / 1.055, 2.4));
+    const luminance = rgb[0] * .2126 + rgb[1] * .7152 + rgb[2] * .0722;
+    return `--job-custom-color:${color};--job-custom-text:${luminance > .179 ? '#111827' : '#ffffff'};`;
+}
 // END SHARED HELPERS
 
 // Firebase Configuration - Chỉ sử dụng Firestore
@@ -586,6 +594,9 @@ const RainFx = (() => {
         document.removeEventListener('visibilitychange', s.resume);
         document.removeEventListener('shown.bs.modal', s.resume);
         document.removeEventListener('hidden.bs.modal', s.resume);
+        document.removeEventListener('pointerdown', s.armAudio);
+        document.removeEventListener('keydown', s.armAudio);
+        s.audio?.close().catch(() => {});
         s.canvas.remove();
     }
     function start(host, level) {
@@ -596,8 +607,29 @@ const RainFx = (() => {
         if (!g) return false;
         canvas.className = 'rain-fx-canvas'; canvas.setAttribute('aria-hidden', 'true');
         host.prepend(canvas);
-        const s = { canvas, raf: 0, last: 0, time: 0, width: 0, height: 0, drops: [], profile: profiles[level] || profiles[1] };
+        const s = { canvas, raf: 0, last: 0, time: 0, width: 0, height: 0, drops: [], profile: profiles[level] || profiles[1], nextStrike: 3, bolt: null, audio: null, soundNodes: new Set() };
         state = s;
+        s.armAudio = () => {
+            if (level !== 2 || document.hidden || document.body.classList.contains('modal-open')) return;
+            const Audio = window.AudioContext || window.webkitAudioContext;
+            if (!Audio) return;
+            try { s.audio ||= new Audio(); s.audio.resume().catch(() => {}); } catch {}
+        };
+        const thunder = () => {
+            const audio = s.audio;
+            if (!audio || audio.state !== 'running') return;
+            const length = 3.5, buffer = audio.createBuffer(1, Math.ceil(audio.sampleRate * length), audio.sampleRate);
+            const samples = buffer.getChannelData(0);
+            let smooth = 0;
+            for (let i = 0; i < samples.length; i++) { smooth = smooth * .92 + (Math.random() * 2 - 1) * .08; samples[i] = smooth * 4; }
+            const noise = audio.createBufferSource(); noise.buffer = buffer;
+            const filter = audio.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 240;
+            const gain = audio.createGain(), at = audio.currentTime + .3;
+            gain.gain.setValueAtTime(0, at); gain.gain.linearRampToValueAtTime(.38, at + .12); gain.gain.exponentialRampToValueAtTime(.001, at + length);
+            noise.connect(filter); filter.connect(gain); gain.connect(audio.destination);
+            s.soundNodes.add(noise); noise.onended = () => { s.soundNodes.delete(noise); noise.disconnect(); filter.disconnect(); gain.disconnect(); };
+            noise.start(at); noise.stop(at + length);
+        };
         s.fit = () => {
             const rect = host.getBoundingClientRect();
             s.width = Math.max(1, rect.width); s.height = Math.max(1, rect.height);
@@ -634,15 +666,52 @@ const RainFx = (() => {
                 g.lineWidth = 0.65 + drop.depth * 0.65;
                 g.beginPath(); g.moveTo(drop.x, drop.y); g.lineTo(drop.x - length * wind, drop.y - length); g.stroke();
             }
+            if (level === 2 && s.time >= s.nextStrike) {
+                const points = [[s.width * (.2 + Math.random() * .6), 0]];
+                for (let i = 1; i <= 8; i++) points.push([points[i - 1][0] + (Math.random() - .5) * s.width * .14, s.height * i / 10]);
+                s.bolt = { at: s.time, points }; s.nextStrike = s.time + 7 + Math.random() * 6;
+                thunder();
+            }
+            if (level === 2 && s.bolt && s.time - s.bolt.at < .65) {
+                const alpha = Math.pow(1 - (s.time - s.bolt.at) / .65, 2);
+                g.fillStyle = `rgba(204,225,255,${alpha * .16})`; g.fillRect(0, 0, s.width, s.height);
+                g.save(); g.shadowColor = '#a3ccff'; g.shadowBlur = 24;
+                const drawBolt = width => {
+                    g.lineWidth = width; g.beginPath();
+                    s.bolt.points.forEach(([x,y], index) => index ? g.lineTo(x,y) : g.moveTo(x,y));
+                    g.stroke();
+                    [3,5].forEach(index => { const [x,y] = s.bolt.points[index]; g.beginPath(); g.moveTo(x,y); g.lineTo(x + s.width * .06,y + s.height * .06); g.lineTo(x + s.width * .1,y + s.height * .2); g.stroke(); });
+                };
+                g.strokeStyle = `rgba(110,175,255,${alpha * .6})`; drawBolt(10);
+                g.strokeStyle = `rgba(240,249,255,${alpha})`; drawBolt(2.7); g.restore();
+            }
+            // Rising water shares the rain canvas and disappears when changing themes.
+            if (level === 2 && s.height > 200) {
+                const depth = Math.min(90, s.height * .12) * (1 - Math.exp(-s.time / 8));
+                const surface = s.height - depth;
+                const water = g.createLinearGradient(0,surface,0,s.height);
+                water.addColorStop(0, light ? 'rgba(72,144,182,.18)' : 'rgba(68,157,198,.2)');
+                water.addColorStop(1, light ? 'rgba(35,93,137,.34)' : 'rgba(12,62,108,.5)');
+                g.fillStyle = water; g.beginPath(); g.moveTo(0,s.height);
+                for (let x = 0; x <= s.width + 20; x += 20) g.lineTo(x,surface + Math.sin(x * .013 + s.time * 1.5) * 3 + Math.sin(x * .027 - s.time) * 1.8);
+                g.lineTo(s.width,s.height); g.closePath(); g.fill();
+                g.strokeStyle = light ? 'rgba(225,248,255,.55)' : 'rgba(169,222,246,.4)'; g.lineWidth = 1;
+                for (let i = 0; i < 10; i++) {
+                    const age = (s.time * .6 + i * .17) % 1;
+                    g.globalAlpha = (1 - age) * .6;
+                    g.beginPath(); g.ellipse((i * .137 % 1) * s.width,surface + 9 + i % 3 * depth * .2,4 + age * 22,1 + age * 3,0,0,Math.PI * 2); g.stroke();
+                }
+                g.globalAlpha = 1;
+            }
             // A single clock drives lightning, including the portion over the header.
             const phase = s.time % (level === 2 ? 8 : 14);
-            if (level > 0 && ((phase > 5 && phase < 5.08) || (phase > 5.2 && phase < 5.26))) {
+            if (level === 1 && ((phase > 5 && phase < 5.08) || (phase > 5.2 && phase < 5.26))) {
                 g.fillStyle = light ? 'rgba(220,237,255,.12)' : 'rgba(220,237,255,.2)';
                 g.fillRect(0, 0, s.width, s.height);
             }
         };
         s.resume = () => {
-            if (document.hidden || document.body.classList.contains('modal-open')) { cancelAnimationFrame(s.raf); s.raf = 0; }
+            if (document.hidden || document.body.classList.contains('modal-open')) { cancelAnimationFrame(s.raf); s.raf = 0; s.soundNodes.forEach(node => { try { node.stop(); } catch {} }); }
             else if (!s.raf) { s.last = 0; s.raf = requestAnimationFrame(frame); }
         };
         s.fit();
@@ -651,6 +720,11 @@ const RainFx = (() => {
         document.addEventListener('visibilitychange', s.resume);
         document.addEventListener('shown.bs.modal', s.resume);
         document.addEventListener('hidden.bs.modal', s.resume);
+        if (level === 2) {
+            document.addEventListener('pointerdown', s.armAudio);
+            document.addEventListener('keydown', s.armAudio);
+            if (navigator.userActivation?.hasBeenActive) s.armAudio();
+        }
         s.resume();
         return true;
     }
@@ -2167,7 +2241,7 @@ const FX_LEVEL_INFO = {
     },
     rain: {
         labels: ['Mưa phùn', 'Mưa lớn', 'Bão'],
-        hints: ['Mưa phùn thưa, nhẹ.', 'Mưa lớn xiên, có chớp xa.', 'Bão: mưa dày, gió giật xiên, trời tối sầm, sấm chớp liên tục.']
+        hints: ['Mưa phùn thưa, nhẹ.', 'Mưa lớn xiên, có chớp xa.', 'Bão: mưa dày, tia sét lớn, tiếng sấm trầm và nước dâng dưới màn hình. Âm thanh bật sau khi tương tác với trang.']
     },
     space: {
         labels: ['Nhẹ nhàng', 'Bình thường', 'Bão thiên hà'],
@@ -2972,6 +3046,8 @@ function openSettingsModal() {
     updateMascotSettingsLabel();
 
     document.getElementById('settingsNotifyLead').value = String(notifyLeadMinutes);
+    document.getElementById('settingsHideOutOfSchedule').checked = currentUser?.hideOutOfSchedule === true;
+    document.getElementById('desktopNotificationStatus').textContent = desktopNotificationPermissionText();
     const completionToggle = document.getElementById('settingsCompletionToggle');
     if (completionToggle) completionToggle.checked = jobCompletionEnabled;
     const owlRange = document.getElementById('settingsOwlCount');
@@ -3271,6 +3347,9 @@ async function handleAuthenticatedUser(user) {
         : localStorage.getItem(`notifyLead_${user.uid}`);
     notifyLeadMinutes = normalizeLeadMinutes(savedLead);
     loadJobCompletionSetting(user.uid, userData);
+    let hiddenOff = false;
+    try { hiddenOff = localStorage.getItem(`hideOutOfSchedule_${user.uid}`) === 'true'; } catch {}
+    currentUser.hideOutOfSchedule = userData?.hideOutOfSchedule !== undefined ? userData.hideOutOfSchedule === true : hiddenOff;
 
     document.getElementById('authScreen').classList.add('d-none');
     updateUserProfileUI();
@@ -3934,6 +4013,8 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     document.getElementById('settingsBtn').addEventListener('click', openSettingsModal);
+    document.getElementById('settingsHideOutOfSchedule').addEventListener('change', event => saveOutOfScheduleVisibility(event.target.checked));
+    document.getElementById('useJobColor').addEventListener('change', event => { document.getElementById('jobColor').disabled = !event.target.checked; });
     document.getElementById('testDesktopNotificationBtn').addEventListener('click', testDesktopNotification);
 
     const _snl = document.getElementById('settingsNotifyLead');
@@ -4069,6 +4150,28 @@ function requestNotificationPermission() {
     } else {
         console.warn('❌ Browser không hỗ trợ Notifications API');
     }
+}
+
+function desktopNotificationPermissionText() {
+    if (!('Notification' in window)) return 'Trình duyệt không hỗ trợ thông báo desktop.';
+    if (Notification.permission === 'granted') return 'Đã cho phép thông báo. Bấm để gửi thông báo thử.';
+    if (Notification.permission === 'denied') return 'Thông báo đang bị chặn. Bấm biểu tượng cạnh thanh địa chỉ → Cài đặt trang → Thông báo → Cho phép.';
+    return 'Chưa bật thông báo. Bấm nút bên trên để hiện yêu cầu cấp quyền.';
+}
+
+async function saveOutOfScheduleVisibility(hidden) {
+    if (!currentUser) return;
+    const user = currentUser;
+    user.hideOutOfSchedule = hidden;
+    try { localStorage.setItem(`hideOutOfSchedule_${user.uid}`, String(hidden)); } catch {}
+    renderOutOfScheduleJobs();
+    try {
+        const users = await getDocs(query(collection(db, 'users'), where('uid', '==', user.uid)));
+        if (currentUser?.uid !== user.uid) return;
+        const batch = writeBatch(db);
+        users.forEach(item => batch.update(item.ref, { hideOutOfSchedule: hidden }));
+        await batch.commit();
+    } catch (error) { showNotification('Cài đặt', 'Đã lưu trên máy này, chưa đồng bộ được cài đặt lên tài khoản.', false, 'warning'); }
 }
 
 async function testDesktopNotification() {
@@ -4539,6 +4642,8 @@ function renderJobList() {
 }
 
 function renderOutOfScheduleJobs() {
+    const offCard = document.getElementById('outOfScheduleCard');
+    if (offCard) offCard.hidden = currentUser?.hideOutOfSchedule === true;
     const liveContainer = document.getElementById('outOfScheduleList');
     if (!liveContainer) return;
     const container = document.createElement('div');
@@ -4803,6 +4908,7 @@ function renderSchedule() {
                     scheduleItem.dataset.clockSnooze = snoozeDateObj?.getTime() || 0;
                     scheduleItem.dataset.clockTick = tickMode ? '1' : '0';
                     scheduleItem.className = `schedule-item ${job.type} ${timeClass} ${extraClasses.join(' ')}`.trim();
+                    scheduleItem.style.cssText = jobColorStyle(job);
 
                     const timeHtml = entry.overrideTime
                         ? `<small class="schedule-time-override"><i class="bi bi-clock-fill"></i> ${displayTime} <em>(đổi)</em></small>`
@@ -6034,6 +6140,7 @@ async function transferJob() {
                 type: job.type,
                 excludedWeekdays: Array.isArray(job.excludedWeekdays) ? [...job.excludedWeekdays] : [],
                 duration: job.duration ?? DEFAULT_JOB_DURATION,
+                displayColor: job.displayColor || null,
                 date: job.date,
                 time: job.time,
                 description: job.description,
@@ -6499,6 +6606,7 @@ function openAddJobModal(isOutOfSchedule = false) {
         ? '<i class="bi bi-lightning-charge-fill"></i> Thêm Job Ngoài Lịch'
         : '<i class="bi bi-plus-circle-fill"></i> Thêm Job Mới';
     document.getElementById('jobForm').reset();
+    document.getElementById('jobColor').disabled = true;
     document.getElementById('jobDescription').innerHTML = '';
     document.getElementById('jobChecklistText').value = '';
 
@@ -6528,6 +6636,9 @@ function openEditJobModal(job) {
 
     document.getElementById('modalTitle').innerHTML = '<i class="bi bi-pencil-fill"></i> Chỉnh Sửa Job';
     document.getElementById('jobTitle').value = job.title;
+    document.getElementById('useJobColor').checked = !!jobColorStyle(job);
+    document.getElementById('jobColor').value = jobColorStyle(job) ? job.displayColor : '#14b8a6';
+    document.getElementById('jobColor').disabled = !jobColorStyle(job);
     document.getElementById('jobType').value = job.type;
     document.getElementById('jobDate').value = job.date;
     document.getElementById('jobTime').value = job.time;
@@ -6626,6 +6737,7 @@ async function saveJob() {
 
     const jobData = {
         title,
+        displayColor: document.getElementById('useJobColor').checked ? document.getElementById('jobColor').value : null,
         type: effectiveType,
         date: effectiveDate,
         time: effectiveTime,
@@ -8131,9 +8243,9 @@ function renderSharedNotes() {
     const oldScrollTop = list.scrollTop;
     const orderedNotes = [...sharedNotesItems].sort((a, b) => sharedNoteTime(a) - sharedNoteTime(b) || String(a.id).localeCompare(String(b.id)));
     list.innerHTML = orderedNotes.length ? orderedNotes.map(note => `<article class="shared-note">
-        <header><strong>${escapeHtml(note.senderName || 'Người dùng')}</strong><span class="shared-note-times"><time datetime="${sharedNoteTime(note).toISOString()}">${escapeHtml(sharedNoteTime(note).toLocaleString('vi-VN'))}</time>${note.updatedAt ? `<span>· Đã chỉnh sửa <time datetime="${sharedNoteTime(note, 'updatedAt').toISOString()}">${escapeHtml(sharedNoteTime(note, 'updatedAt').toLocaleString('vi-VN'))}</time></span>` : ''}</span></header>
+        <header><span class="shared-note-sender"><strong>${escapeHtml(note.senderName || 'Người dùng')}</strong>${note.senderId === currentUser.uid ? `<div class="shared-note-actions"><button type="button" data-note-edit="${escapeHtml(note.id)}" title="Sửa ghi chú" aria-label="Sửa ghi chú" ${sharedNotesDeleting.has(note.id) ? 'disabled' : ''}><i class="bi bi-pencil" aria-hidden="true"></i></button><button type="button" data-note-delete="${escapeHtml(note.id)}" title="Xóa ghi chú" aria-label="Xóa ghi chú" ${sharedNotesDeleting.has(note.id) ? 'disabled' : ''}><i class="bi ${sharedNotesDeleting.has(note.id) ? 'bi-hourglass-split' : 'bi-trash'}" aria-hidden="true"></i></button></div>` : ''}</span><span class="shared-note-times"><time datetime="${sharedNoteTime(note).toISOString()}">${escapeHtml(sharedNoteTime(note).toLocaleString('vi-VN'))}</time>${note.updatedAt ? `<span class="shared-note-edited">· Đã chỉnh sửa <time datetime="${sharedNoteTime(note, 'updatedAt').toISOString()}">${escapeHtml(sharedNoteTime(note, 'updatedAt').toLocaleString('vi-VN'))}</time></span>` : ''}</span></header>
         <div class="shared-note-content">${sanitizeSharedNote(note.content)}</div>
-        ${note.senderId === currentUser.uid ? `<div class="shared-note-actions"><button type="button" data-note-edit="${escapeHtml(note.id)}" title="Sửa ghi chú" aria-label="Sửa ghi chú" ${sharedNotesDeleting.has(note.id) ? 'disabled' : ''}><i class="bi bi-pencil" aria-hidden="true"></i></button><button type="button" data-note-delete="${escapeHtml(note.id)}" title="Xóa ghi chú" aria-label="Xóa ghi chú" ${sharedNotesDeleting.has(note.id) ? 'disabled' : ''}><i class="bi ${sharedNotesDeleting.has(note.id) ? 'bi-hourglass-split' : 'bi-trash'}" aria-hidden="true"></i></button></div>` : ''}</article>`).join('') : '<p class="quick-chat-empty">Chưa có ghi chú. Chia sẻ thông tin đầu tiên bên dưới.</p>';
+        </article>`).join('') : '<p class="quick-chat-empty">Chưa có ghi chú. Chia sẻ thông tin đầu tiên bên dưới.</p>';
     list.scrollTop = sharedNotesOpen && followLatest ? list.scrollHeight : oldScrollTop;
 }
 
@@ -9040,8 +9152,9 @@ function checkNotifications() {
                 if (elapsed < 0 || elapsed >= 900000) return; // Bù khi tab nền bị trì hoãn, tối đa 15 phút.
                 // Đã bấm "Đợi tí" qua mốc này → bỏ nhắc ở mốc này, sẽ nhắc lại đúng lúc hết thời gian chờ
                 if (entry.snoozeUntil && new Date(entry.snoozeUntil).getTime() > at.getTime()) return;
-                const key = `notified_desktop_v2_${currentUser.uid}_${job.id}_${entry.originDate || dateKey}_${dateKey}_${timeStr}`;
                 const displayKind = now >= dueAt ? 'due' : kind;
+                if (kind === 'lead' && now >= dueAt) return;
+                const key = `notified_desktop_v3_${currentUser.uid}_${job.id}_${entry.originDate || dateKey}_${dateKey}_${timeStr}_${displayKind}`;
                 const message = displayKind === 'lead'
                     ? `Còn ${Math.ceil((dueAt - now) / 60000)} phút nữa (${timeStr}): ${job.title}`
                     : `Đã đến giờ thực hiện: ${job.title}`;
@@ -9112,7 +9225,7 @@ async function createNotification(job, ctx = {}) {
         icon: 'https://cdn-icons-png.flaticon.com/512/2972/2972185.png',
         badge: 'https://cdn-icons-png.flaticon.com/512/2693/2693507.png',
         tag: jobNotificationTag(job.id, originDate),   // cùng job + ngày thì thay thông báo cũ
-        renotify: false,
+        renotify: true,
         requireInteraction: false,
         silent: false,
         actions,
@@ -12166,7 +12279,7 @@ function renderTimeline({ todayOnly = false, containerId = 'timelineView' } = {}
                 const heightPx = LANE_HEIGHT - GAP;
 
                 // Sử dụng % cho left/width
-                const style = `left:${p.leftPct}%; width:${p.widthPct}%; top:${topPx}px; height:${heightPx}px;`;
+                const style = `left:${p.leftPct}%; width:${p.widthPct}%; top:${topPx}px; height:${heightPx}px;${jobColorStyle(e.job)}`;
 
                 return `
                     <div class="timeline-job ${e.job.type || 'once'} ${extraClasses.join(' ')}"

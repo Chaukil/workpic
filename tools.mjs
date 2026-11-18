@@ -50,8 +50,8 @@ console.log(`Deploy dist/: index.html (${((await stat('dist/index.html')).size /
 
     "test": async () => {
 const helperSource = fs.readFileSync('app.js', 'utf8').split('// BEGIN SHARED HELPERS\n')[1].split('// END SHARED HELPERS')[0];
-const helperModule = helperSource + '\nexport { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache };';
-const { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache } = await import('data:text/javascript;base64,' + Buffer.from(helperModule).toString('base64'));
+const helperModule = helperSource + '\nexport { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle };';
+const { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle } = await import('data:text/javascript;base64,' + Buffer.from(helperModule).toString('base64'));
 
 
 
@@ -434,25 +434,25 @@ assert.equal(sent.length, 1);
 assert.equal(sent[0].kind, 'lead');
 instant = new Date(2026, 10, 4, 10, 0);
 check();
-assert.equal(sent.length, 1, 'no second alert at due time when lead is configured');
+assert.equal(sent.length, 2, 'due-time reminder still fires after an early reminder');
 vm.runInContext('notifyLeadMinutes = 0', ctx);
 check();
-assert.equal(sent.length, 1, 'setting changes cannot repeat an already sent reminder');
+assert.equal(sent.length, 2, 'setting changes cannot repeat an already sent due reminder');
 storage.clear();
 const ctx2 = vm.createContext({
     accessControl: { requireAccess: () => true, can: () => true }, ...ctx, jobs: [{ id: 'second', title: 'Test', time: '10:00' }], notifyLeadMinutes: 0 });
 vm.runInContext(code, ctx2);
 vm.runInContext('checkNotifications(); checkNotifications()', ctx2);
-assert.equal(sent.length, 2);
-assert.equal(sent[1].kind, 'due');
+assert.equal(sent.length, 3);
+assert.equal(sent[2].kind, 'due');
 instant = new Date(2026, 10, 4, 10, 5);
 ctx2.jobs=[{id:'background',title:'Background job',time:'10:00'}];
 vm.runInContext('checkNotifications()',ctx2);
 assert.equal(sent.at(-1).kind,'due');
-assert.equal(sent.length,3,'background timer delayed five minutes still receives reminder');
+assert.equal(sent.length,4,'background timer delayed five minutes still receives reminder');
 ctx2.jobs=[{id:'missed-lead',title:'Missed lead',time:'10:00'}];ctx2.notifyLeadMinutes=120;
 vm.runInContext('checkNotifications()',ctx2);
-assert.equal(sent.length,4,'missed early reminder falls back to due-time reminder');
+assert.equal(sent.length,5,'missed early reminder falls back to due-time reminder');
 let options;
 let closed = 0;
 ctx.reg = {
@@ -464,7 +464,7 @@ assert.equal(options.requireInteraction, false);
 assert.equal(timers[0].delay, 15000);
 await timers[0].fn();
 assert.equal(closed, 1);
-console.log('Notifications passed: single lead/due alert, repeated checks, settings changes and 15-second expiry.');
+console.log('Notifications passed: separate lead/due reminders, repeated checks, background catch-up and 15-second expiry.');
 
 })();
 
@@ -677,6 +677,44 @@ test('statistics hide unchecked users and list dates matching occurrence counts'
     assert.doesNotMatch(fields.statsTable.innerHTML, /Thứ Hai|Bob job/);
 });
 
+test('hide outside jobs setting applies immediately and persists per account', async () => {
+    const source=fs.readFileSync('app.js','utf8');
+    const fn=name=>{const start=source.indexOf('function '+name+'(');return source.slice(start,source.indexOf('\n}',start)+2);};
+    const offCard={hidden:false},list={innerHTML:''},stored=new Map(),writes=[];
+    const ctx=vm.createContext({currentUser:{uid:'user',hideOutOfSchedule:false},jobs:[],db:{},document:{getElementById:id=>id==='outOfScheduleCard'?offCard:list,createElement:()=>({innerHTML:''})},localStorage:{setItem:(key,value)=>stored.set(key,value)},collection:()=>({}),query:()=>({}),where:()=>({}),getDocs:async()=>({forEach:callback=>callback({ref:'user-doc'})}),writeBatch:()=>({update:(ref,data)=>writes.push({ref,data}),commit:async()=>{}}),reconcileChildren(){},showNotification(){}});
+    vm.runInContext(fn('renderOutOfScheduleJobs')+';async '+fn('saveOutOfScheduleVisibility'),ctx);
+    await ctx.saveOutOfScheduleVisibility(true);
+    assert.equal(offCard.hidden,true);assert.equal(stored.get('hideOutOfSchedule_user'),'true');
+    assert.equal(writes[0].data.hideOutOfSchedule,true);
+    await ctx.saveOutOfScheduleVisibility(false);assert.equal(offCard.hidden,false);
+});
+
+test('custom job colors preserve defaults and choose readable text', () => {
+    assert.equal(jobColorStyle({}), '');
+    assert.equal(jobColorStyle({displayColor:null}), '');
+    assert.equal(jobColorStyle({displayColor:'red;display:none'}), '');
+    assert.match(jobColorStyle({displayColor:'#ffffff'}), /--job-custom-text:#111827/);
+    assert.match(jobColorStyle({displayColor:'#000000'}), /--job-custom-text:#ffffff/);
+});
+
+test('desktop test requests undecided permission directly from click and reports blocked permission', async () => {
+    const source=fs.readFileSync('app.js','utf8');
+    const start=source.indexOf('async function testDesktopNotification(');
+    let requests=0, delivered=0;
+    const status={textContent:''}, button={disabled:false};
+    function FakeNotification(){delivered++;this.close=()=>{};}
+    FakeNotification.permission='default';
+    FakeNotification.requestPermission=()=>{requests++;FakeNotification.permission='granted';return Promise.resolve('granted');};
+    const ctx=vm.createContext({window:{Notification:FakeNotification},Notification:FakeNotification,console,document:{getElementById:id=>id==='desktopNotificationStatus'?status:button},getSwRegistration:async()=>null,checkNotifications(){},setTimeout(){}});
+    vm.runInContext(source.slice(start,source.indexOf('function toggleDailyExcludeWrap(',start)),ctx);
+    const prompt=ctx.testDesktopNotification();
+    assert.equal(requests,1,'permission prompt occurs synchronously in the button gesture');await prompt;
+    assert.equal(delivered,1);assert.equal(button.disabled,false);
+    FakeNotification.permission='denied';await ctx.testDesktopNotification();
+    assert.equal(delivered,1);assert.equal(requests,1,'blocked permission is not repeatedly prompted');
+    assert.ok(status.textContent.length>0,'blocked state provides recovery instructions');
+});
+
 test('desktop reminders retry failed sends and service-worker readiness cannot block fallback', async () => {
     const source=fs.readFileSync('app.js','utf8');
     const saved=new Map(), timers=new Map();let nextTimer=0;
@@ -746,7 +784,10 @@ test('shared rain renderer keeps one canvas/loop and releases listeners across h
     const classes = new Set();
     const add = (name, fn) => { if (!listeners.has(name)) listeners.set(name, new Set()); listeners.get(name).add(fn); };
     const remove = (name, fn) => listeners.get(name)?.delete(fn);
-    const g = { setTransform() {}, clearRect() {}, fillRect() {}, beginPath() {}, moveTo() {}, lineTo() {}, stroke() {} };
+    let waterDraws = 0, largestStroke = 0;
+    const g = { setTransform() {}, clearRect() {}, fillRect() {}, beginPath() {}, moveTo() {}, lineTo() {},
+        stroke() { largestStroke = Math.max(largestStroke, this.lineWidth || 0); },
+        save() {}, restore() {}, closePath() {}, fill() { waterDraws++; }, ellipse() {}, createLinearGradient: () => ({addColorStop(){}}) };
     const ctx = vm.createContext({
         navigator: { hardwareConcurrency: 8 },
         document: { hidden: false, body: { classList: { contains: name => classes.has(name) } }, addEventListener: add, removeEventListener: remove,
@@ -763,6 +804,11 @@ test('shared rain renderer keeps one canvas/loop and releases listeners across h
     assert.equal(canvases[0].removed, true);
     assert.equal(frames.size, 1);
     assert.ok(canvases[1].width * canvases[1].height < 1504000, 'bounded canvas pixel budget');
+    for (let step = 1; step <= 100; step++) {
+        const [id, frame] = frames.entries().next().value; frames.delete(id); frame(step * 40);
+    }
+    assert.ok(waterDraws > 0,'storm draws rising water in the fullscreen canvas');
+    assert.ok(largestStroke >= 10,'storm draws a large lightning glow');
     classes.add('modal-open'); for (const fn of listeners.get('shown.bs.modal')) fn();
     assert.equal(frames.size, 0);
     classes.delete('modal-open'); for (const fn of listeners.get('hidden.bs.modal')) { fn(); fn(); }
@@ -891,7 +937,7 @@ const ctx = vm.createContext({
     reconcileMarkup: (target, html) => { target.innerHTML = html; },
     document: { getElementById: () => container, createElement: () => ({ style: {} }) },
     localDateKey: key, parseJobDate: s => new Clock(s + 'T00:00:00'), getMyOffMap: () => ({}),
-    getHolidayName: () => '', getPersonalEvents: () => [], compactCalendarLabel: s => s,
+    getHolidayName: () => '', getPersonalEvents: () => [], compactCalendarLabel: s => s, jobColorStyle,
     escapeHtml: s => s, getJobDuration: j => j.duration,
     buildScheduleEntries: (start, end) => {
         range = [key(start), key(end)];
@@ -1148,6 +1194,13 @@ const updateQuickChatBadge = () => {};
 ${extract('function openQuickChatPanel(', 'let sharedNotesUnsubscribe =')}
 try {
     const kept = ['dayOffModal','viewJobModal','changeHistoryModal','sharedNotesPanel','sharedNotesToggle','quickChatToggleBtn','quickChatPanel'].map(id=>document.getElementById(id));
+    check(document.getElementById('scheduleActions').closest('#mainContent'),'job actions are inside schedule area');
+    check(!document.getElementById('sidebar').contains(document.getElementById('addJobBtn')),'job actions leave sidebar');
+    check(document.getElementById('jobColor')&&document.getElementById('settingsHideOutOfSchedule'),'color and hide-outside controls exist');
+    for(const itemClass of ['schedule-item weekly','timeline-job weekly']) {
+        const sample=document.createElement('div');sample.className=itemClass;sample.style.cssText=jobColorStyle({displayColor:'#ffffff'});document.body.appendChild(sample);
+        check(getComputedStyle(sample).backgroundColor==='rgb(255, 255, 255)'&&getComputedStyle(sample).color==='rgb(17, 24, 39)','custom job color is readable in '+itemClass);sample.remove();
+    }
     const historyButton = document.getElementById('changeHistoryBtn');
     document.body.replaceChildren(...kept,historyButton);
     const cleaned = sanitizeSharedNote('<scr'+'ipt>alert(1)</scr'+'ipt><table><tr><td onclick="alert(1)">Cell</td></tr></table><img src="https://example.com/x"><img src="data:image/png;base64,aGVsbG8=" onerror="alert(1)">');
@@ -1207,6 +1260,8 @@ try {
     check(noteEditor.textContent==='Unsent draft'&&noteWrites.length===1,'edit neither creates a new note nor loses the draft');
     const editedArticle=document.querySelector('[data-note-edit="mine"]').closest('article');
     check(editedArticle.querySelector('.shared-note-times').textContent.includes('Đã chỉnh sửa')&&editedArticle.querySelectorAll('header time').length===2,'edit timestamp appears beside original send time');
+    check(editedArticle.querySelector('.shared-note-sender [data-note-edit]')&&editedArticle.querySelector('.shared-note-sender [data-note-delete]'),'edit and delete buttons sit beside the sender name');
+    check(getComputedStyle(editedArticle.querySelector('.shared-note-edited')).color==='rgb(220, 38, 38)'||getComputedStyle(editedArticle.querySelector('.shared-note-edited')).color==='rgb(248, 113, 113)','edited label is red in either theme');
     editSharedNote('mine');noteEditor.innerHTML='<p>Retry edit</p>';rejectNoteWrite=true;await submitNote();
     check(sharedNoteEditingId==='mine'&&noteEditor.textContent==='Retry edit','failed edit preserves current editing content');
     rejectNoteWrite=false;cancelSharedNoteEdit();
@@ -1522,7 +1577,7 @@ try {
         await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
         document.body.className='theme-'+theme;
         const style=getComputedStyle(event);
-        check(style.whiteSpace==='normal'&&style.overflow==='visible'&&parseFloat(style.fontSize)>=14,'event is large and not truncated');
+        check(style.whiteSpace==='normal'&&style.overflow==='visible'&&parseFloat(style.fontSize)>=parseFloat(getComputedStyle(document.documentElement).fontSize)*.9,'event follows responsive type scale and is not truncated');
         for(const close of document.querySelectorAll('.modal .btn-close')) {
             const closeStyle=getComputedStyle(close), glyph=getComputedStyle(close,'::before');
             check(closeStyle.filter==='none'&&closeStyle.backgroundImage==='none','close icon avoids theme inversion');

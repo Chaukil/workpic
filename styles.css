@@ -15375,3 +15375,29 @@ body.fx-fullscreen-on[data-topbar-theme='noel'] .noel-global-lights { display: f
 }
 @media (prefers-reduced-motion: reduce) { .noel-pendant { animation: none; } }
 body.fx-paused :is(.noel-fairy-lights,.noel-room-decor) * { animation-play-state: paused; }
+
+.shared-note-sender { display: inline-flex; align-items: center; gap: 8px; min-width: 0; flex-wrap: wrap; }
+.shared-note-sender .shared-note-actions { display: inline-flex; margin: 0; gap: 4px; }
+.shared-note-sender .shared-note-actions button { width: 25px; height: 25px; font-size: .72rem; }
+.shared-note-times .shared-note-edited, .shared-note-times .shared-note-edited time { color: #dc2626; }
+body.theme-dark .shared-note-times .shared-note-edited, body.theme-dark .shared-note-times .shared-note-edited time { color: #f87171; }
+
+/* Calendar actions share a compact, wrapping toolbar above weekdays. */
+.schedule-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.schedule-actions > [class*='col-'] { flex: 1 1 140px; width: auto; min-width: 0; max-width: 100%; margin: 0 !important; }
+.schedule-actions .btn { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; min-height: 40px; height: 100%; padding: 9px 12px; font-size: .8rem; line-height: 1.4; white-space: normal; overflow-wrap: anywhere; }
+.schedule-actions .dropdown { height: 100%; }
+.schedule-actions .btn > i { flex-shrink: 0; }
+
+.job-color-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.job-color-controls label { display: inline-flex; align-items: center; gap: 8px; }
+.job-color-controls input[type='color'] { width: 54px; height: 36px; border: 1px solid var(--border); border-radius: 6px; padding: 3px; background: var(--surface); }
+.job-color-controls .text-muted { font-size: .8rem; }
+#outOfScheduleCard[hidden] { display: none !important; }
+body :is(.schedule-item,.timeline-job)[style*='--job-custom-color'] {
+ background: var(--job-custom-color) !important; border-color: var(--job-custom-color) !important; color: var(--job-custom-text) !important;
+}
+body :is(.schedule-item,.timeline-job)[style*='--job-custom-color'] :is(h6,small,.timeline-job-time,.timeline-job-title,.out-of-schedule-card-title) {
+ color: var(--job-custom-text) !important; text-shadow: none;
+}
+@media (max-width: 760px) { .schedule-actions { gap: 6px; padding: 8px; } .schedule-actions .btn { font-size: .74rem; padding: 8px 10px; } }
