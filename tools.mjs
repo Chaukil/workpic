@@ -464,7 +464,10 @@ assert.equal(options.requireInteraction, false);
 assert.equal(timers[0].delay, 15000);
 await timers[0].fn();
 assert.equal(closed, 1);
-console.log('Notifications passed: separate lead/due reminders, repeated checks, background catch-up and 15-second expiry.');
+await vm.runInContext("showTimedDesktopNotification(reg, 'Persistent job', {tag:'job',requireInteraction:true})",ctx);
+assert.equal(options.requireInteraction,true,'job reminders request interaction instead of expiring');
+assert.equal(timers.length,1,'persistent job notification has no auto-close timer');
+console.log('Notifications passed: lead/due reminders, background catch-up and persistent job reminders.');
 
 })();
 
@@ -705,7 +708,7 @@ test('desktop test requests undecided permission directly from click and reports
     function FakeNotification(){delivered++;this.close=()=>{};}
     FakeNotification.permission='default';
     FakeNotification.requestPermission=()=>{requests++;FakeNotification.permission='granted';return Promise.resolve('granted');};
-    const ctx=vm.createContext({window:{Notification:FakeNotification},Notification:FakeNotification,console,document:{getElementById:id=>id==='desktopNotificationStatus'?status:button},getSwRegistration:async()=>null,checkNotifications(){},setTimeout(){}});
+    const ctx=vm.createContext({window:{Notification:FakeNotification},Notification:FakeNotification,console,document:{getElementById:id=>id==='desktopNotificationStatus'?status:button},showDesktopNotification:async()=>{delivered++;return true;},todayKey:()=> '2026-11-18',getSwRegistration:async()=>null,checkNotifications(){},setTimeout(){}});
     vm.runInContext(source.slice(start,source.indexOf('function toggleDailyExcludeWrap(',start)),ctx);
     const prompt=ctx.testDesktopNotification();
     assert.equal(requests,1,'permission prompt occurs synchronously in the button gesture');await prompt;
@@ -713,6 +716,46 @@ test('desktop test requests undecided permission directly from click and reports
     FakeNotification.permission='denied';await ctx.testDesktopNotification();
     assert.equal(delivered,1);assert.equal(requests,1,'blocked permission is not repeatedly prompted');
     assert.ok(status.textContent.length>0,'blocked state provides recovery instructions');
+});
+
+test('real due-job pipeline reaches desktop service worker while page is hidden even if web toast fails', async () => {
+ const source=fs.readFileSync('app.js','utf8');let instant=new Date(2026,10,18,10,0),delivered=[];
+ class Clock extends Date { constructor(...args){super(...(args.length?args:[instant]));}static now(){return +instant;} }
+ const storage=new Map(),timers=[];const status={textContent:''};
+ function NativeNotification(){}NativeNotification.permission='granted';
+ const ctx=vm.createContext({Date:Clock,Math,console:{warn(){}},window:{Notification:NativeNotification},Notification:NativeNotification,navigator:{},document:{hidden:true,getElementById:id=>id==='desktopNotificationStatus'?status:null},currentUser:{uid:'me'},notifyLeadMinutes:0,jobCompletionEnabled:false,jobDayOverridesList:[],jobs:[{id:'scheduled',title:'Actual scheduled job',type:'weekly',time:'10:00'}],localDateKey:dateKey,todayKey:()=>dateKey(instant),getScheduleEntryOnDate:(_,day)=>dateKey(day)==='2026-11-18'?{originDate:'2026-11-18'}:null,jobNotificationTag:(id,date)=>'job-'+id+'-'+date,SNOOZE_MINUTES:10,getSwRegistration:async()=>({showNotification:async(title,options)=>delivered.push({title,options})}),localStorage:{getItem:key=>storage.get(key),setItem:(key,value)=>storage.set(key,value),removeItem:key=>storage.delete(key)},showNotification(){throw Error('toast deliberately fails');},setTimeout:(fn,delay)=>{timers.push({fn,delay});return timers.length;},clearTimeout(){},escapeHtml:String});
+ vm.runInContext(source.slice(source.indexOf('const notificationClaims ='),source.indexOf('// Show Desktop Notification'))+source.slice(source.indexOf('async function showDesktopNotification('),source.indexOf('function onUiVisibilityChange(')),ctx);
+ ctx.checkNotifications();for(let i=0;i<10;i++)await Promise.resolve();
+ assert.equal(delivered.length,1,'scheduled job calls actual desktop delivery, not just the web toast');
+ assert.match(delivered[0].options.body,/Actual scheduled job/);
+ assert.match(delivered[0].options.tag,/-due-1000$/);
+ assert.equal(delivered[0].options.requireInteraction,true);
+ ctx.checkNotifications();for(let i=0;i<5;i++)await Promise.resolve();assert.equal(delivered.length,1,'same due event is not repeated');
+ await ctx.startScheduledDesktopTest();
+ assert.ok(timers.some(timer=>timer.delay===10000),'background test schedules a real timer');
+ instant=new Date(2026,10,18,10,0,11);ctx.checkNotifications();for(let i=0;i<10;i++)await Promise.resolve();
+ assert.equal(delivered.length,2,'delayed test follows the same scheduler while tab stays hidden');
+ assert.equal(delivered[1].options.data.kind,'test');
+});
+
+test('job desktop reminders persist, report actual API failures and retry instead of silently consuming them', async () => {
+    const source=fs.readFileSync('app.js','utf8');
+    let options, timerCount=0, notifications=[];
+    const storage=new Map([['retry-key','true']]);
+    const warning={hidden:true,querySelector:()=>({textContent:''})};
+    function FakeNotification(title,value){options=value;this.close=()=>{};notifications.push(this);}
+    FakeNotification.permission='granted';
+    const ctx=vm.createContext({window:{Notification:FakeNotification},Notification:FakeNotification,console:{warn(){}},document:{getElementById:()=>warning},currentUser:{uid:'me'},jobCompletionEnabled:false,SNOOZE_MINUTES:5,todayKey:()=> '2026-11-18',jobNotificationTag:()=> 'job-tag',getSwRegistration:async()=>null,recordDesktopReminderEvent(){},notificationClaims:new Set(['retry-key']),localStorage:{removeItem:key=>storage.delete(key)},jobs:[],setTimeout:()=>{timerCount++;}});
+    const start=source.indexOf('async function showDesktopNotification(');
+    vm.runInContext(source.slice(start,source.indexOf('function onUiVisibilityChange(',start)),ctx);
+    assert.equal(await ctx.showDesktopNotification({id:'job',title:'Test',time:'10:00',type:'daily'},{notificationKey:'retry-key'}),true);
+    assert.equal(options.requireInteraction,true);assert.equal(timerCount,0,'normal desktop fallback never auto-closes scheduled job');
+    notifications[0].onerror();
+    assert.equal(storage.has('retry-key'),false);assert.equal(ctx.notificationClaims.has('retry-key'),false,'late notification error allows another delivery attempt');
+    assert.equal(warning.hidden,false,'failed desktop delivery is visibly reported');
+    FakeNotification.permission='denied';
+    assert.equal(await ctx.showDesktopNotification({id:'job'}),false);
+    assert.equal(notifications.length,1,'blocked desktop permission does not fake a successful send');
 });
 
 test('desktop reminders retry failed sends and service-worker readiness cannot block fallback', async () => {
@@ -1193,7 +1236,7 @@ let quickChatPanelOpen = false, quickChatUnreadCount = 0;
 const updateQuickChatBadge = () => {};
 ${extract('function openQuickChatPanel(', 'let sharedNotesUnsubscribe =')}
 try {
-    const kept = ['dayOffModal','viewJobModal','changeHistoryModal','sharedNotesPanel','sharedNotesToggle','quickChatToggleBtn','quickChatPanel'].map(id=>document.getElementById(id));
+    const kept = ['dayOffModal','viewJobModal','changeHistoryModal','sharedNotesPanel','sharedNotesToggle','quickChatToggleBtn','quickChatPanel','sharedNoteImageDialog'].map(id=>document.getElementById(id));
     check(document.getElementById('scheduleActions').closest('#mainContent'),'job actions are inside schedule area');
     check(!document.getElementById('sidebar').contains(document.getElementById('addJobBtn')),'job actions leave sidebar');
     check(document.getElementById('jobColor')&&document.getElementById('settingsHideOutOfSchedule'),'color and hide-outside controls exist');
@@ -1246,6 +1289,20 @@ try {
     check(noteWrites.length===1&&noteWrites[0].name==='sharedNotes','notes write to sharedNotes only');
     check(noteWrites[0].data.senderId==='me'&&noteWrites[0].data.createdAt==='server-timestamp','notes include sender and server time');
     check(!noteEditor.innerHTML,'successful note clears draft');
+    noteSnapshot({docs:[{id:'image',data:()=>({senderId:'other',senderName:'Image sender',content:noteWrites[0].data.content,clientCreatedAt:'2026-11-18T09:00:00Z'})}]});
+    const thumbnail=document.querySelector('#sharedNotesList .shared-note-content img');thumbnail.click();
+    const imageDialog=document.getElementById('sharedNoteImageDialog'),fullImage=document.getElementById('sharedNoteImageFull');
+    check(imageDialog.open&&fullImage.src===thumbnail.src,'clicking note image opens centered image viewer');
+    await fullImage.decode();
+    document.querySelector('[data-note-image-zoom="in"]').click();
+    check(imageDialog.classList.contains('zoomed')&&parseInt(fullImage.style.width)>fullImage.naturalWidth,'image can be zoomed to inspect details');
+    document.querySelector('[data-note-image-zoom="fit"]').click();
+    check(!imageDialog.classList.contains('zoomed'),'fit resets image to viewport');
+    document.getElementById('sharedNoteImageClose').click();await new Promise(resolve=>setTimeout(resolve,0));
+    check(!imageDialog.open&&sharedNotesOpen&&!fullImage.hasAttribute('src'),'closing viewer keeps notes panel and releases image');
+    thumbnail.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));
+    check(imageDialog.open,'image viewer supports keyboard activation');imageDialog.click();
+    check(!imageDialog.open&&sharedNotesOpen,'clicking backdrop closes only image viewer');
     await submitNote();check(noteWrites.length===1,'empty notes are not sent');
     noteSnapshot({docs:[{id:'mine',data:()=>({senderId:'me',senderName:'Me',content:'<p>Original note</p>',clientCreatedAt:'2026-11-18T09:00:00Z'})},{id:'other',data:()=>({senderId:'other',senderName:'Other',content:'Other note'})}]});
     check(document.querySelectorAll('[data-note-edit]').length===1,'edit actions appear only on own notes');

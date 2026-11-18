@@ -38,7 +38,7 @@ self.addEventListener('notificationclick', (event) => {
         url.searchParams.set('jobAction', action);
         if (data.jobId) url.searchParams.set('jobId', data.jobId);
         if (data.originDate) url.searchParams.set('originDate', data.originDate);
-        if (data.kind === 'quickjob') url.searchParams.set('kind', 'quickjob');
+        if (data.kind) url.searchParams.set('kind', data.kind);
         await self.clients.openWindow(url.href);
     })());
 });

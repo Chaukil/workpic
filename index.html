@@ -257,6 +257,7 @@
                                 </div>
                             </div>
                         </div>
+<div id="desktopNotificationWarning" class="desktop-notification-warning" role="alert" hidden><span data-desktop-warning></span><button type="button" class="btn btn-sm btn-outline-primary" id="desktopNotificationSetup">Bật / kiểm tra thông báo</button></div>
 <div class="schedule-actions" id="scheduleActions" aria-label="Thao tác job">
                                 <div class="col-6">
                                     <button class="btn btn-add-job w-100" id="addJobBtn">
@@ -512,6 +513,7 @@
                                         placeholder="30">
                                     <div class="form-text">Trống = 30 phút</div>
                                 </div>
+                                <div class="col-md-12"><div class="form-check form-switch job-switch-card"><input class="form-check-input" type="checkbox" id="enableNotification" checked><label class="form-check-label fw-bold" for="enableNotification">Nhắc desktop khi đến giờ job</label></div></div>
                                 <div class="col-md-12">
                                     <div class="form-check form-switch job-switch-card">
                                         <input class="form-check-input" type="checkbox" id="workOnSunday">
@@ -1545,7 +1547,15 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
                             <option value="120">2 giờ</option>
                         </select>
                         <button type="button" class="btn btn-outline-primary mt-2" id="testDesktopNotificationBtn"><i class="bi bi-bell"></i> Bật / thử thông báo desktop</button>
+                        <button type="button" class="btn btn-outline-primary mt-2" id="scheduledDesktopTestBtn"><i class="bi bi-alarm"></i> Thử nhắc sau 10 giây</button>
                         <small class="form-text d-block" id="desktopNotificationStatus" role="status"></small>
+                        <div id="desktopNotificationFeedback" class="desktop-notification-feedback" hidden>
+                            <button type="button" class="btn btn-sm btn-outline-success" id="desktopNotificationSeen">Tôi đã thấy thông báo Windows</button>
+                            <button type="button" class="btn btn-sm btn-outline-danger" id="desktopNotificationNotSeen">Chưa thấy thông báo</button>
+                        </div>
+                        <p class="form-text">Để thấy banner khi làm việc ở ứng dụng khác: Windows → Cài đặt → Hệ thống → Thông báo → Chrome/Edge → bật Biểu ngữ thông báo; tắt Không làm phiền.</p>
+                        <a class="btn btn-sm btn-outline-secondary" href="ms-settings:notifications">Mở cài đặt thông báo Windows</a>
+                        <div id="desktopReminderDiagnostics" class="desktop-reminder-diagnostics" aria-live="polite"></div>
                     </section>
 
                     <section class="settings-section">
@@ -2165,6 +2175,10 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
     <button type="button" class="quick-chat-toggle shared-notes-toggle" id="sharedNotesToggle" title="Ghi chú chung" aria-label="Ghi chú chung" aria-expanded="false" aria-controls="sharedNotesPanel" hidden>
         <i class="bi bi-journal-text"></i><span class="quick-chat-badge d-none" id="sharedNotesBadge">0</span>
     </button>
+    <dialog id="sharedNoteImageDialog" class="shared-note-image-dialog" aria-labelledby="sharedNoteImageTitle">
+        <header><h6 id="sharedNoteImageTitle">Ảnh ghi chú</h6><div class="shared-note-image-tools"><button type="button" data-note-image-zoom="out" aria-label="Thu nhỏ">−</button><button type="button" data-note-image-zoom="in" aria-label="Phóng to">+</button><button type="button" data-note-image-zoom="fit">Vừa màn hình</button><button type="button" id="sharedNoteImageClose" aria-label="Đóng ảnh">✕</button></div></header>
+        <div class="shared-note-image-viewport"><img id="sharedNoteImageFull" alt="Ảnh ghi chú phóng lớn"></div>
+    </dialog>
     <aside class="quick-chat-panel shared-notes-panel" id="sharedNotesPanel" aria-label="Ghi chú chung" inert>
         <div class="quick-chat-header"><div><h6>Ghi chú chung</h6><small>Chia sẻ thông tin với mọi người</small></div><button type="button" class="quick-chat-close" id="sharedNotesClose" aria-label="Đóng"><i class="bi bi-x-lg"></i></button></div>
         <div id="sharedNotesList" class="quick-chat-messages" aria-live="polite"></div>

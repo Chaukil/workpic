@@ -3048,6 +3048,7 @@ function openSettingsModal() {
     document.getElementById('settingsNotifyLead').value = String(notifyLeadMinutes);
     document.getElementById('settingsHideOutOfSchedule').checked = currentUser?.hideOutOfSchedule === true;
     document.getElementById('desktopNotificationStatus').textContent = desktopNotificationPermissionText();
+    renderDesktopReminderDiagnostics();
     const completionToggle = document.getElementById('settingsCompletionToggle');
     if (completionToggle) completionToggle.checked = jobCompletionEnabled;
     const owlRange = document.getElementById('settingsOwlCount');
@@ -3649,6 +3650,10 @@ function handleSignedOut() {
     stopUiRefreshLoop();
     clearInterval(notificationCheckInterval);
     notificationCheckInterval = null;
+    clearTimeout(desktopReminderProbeTimer);
+    desktopReminderProbeTimer = null;
+    desktopReminderProbe = null;
+    desktopReminderEvents.length = 0;
     if (unsubscribeTransferRequests) {
         unsubscribeTransferRequests();
         unsubscribeTransferRequests = null;
@@ -4016,6 +4021,18 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('settingsHideOutOfSchedule').addEventListener('change', event => saveOutOfScheduleVisibility(event.target.checked));
     document.getElementById('useJobColor').addEventListener('change', event => { document.getElementById('jobColor').disabled = !event.target.checked; });
     document.getElementById('testDesktopNotificationBtn').addEventListener('click', testDesktopNotification);
+    document.getElementById('scheduledDesktopTestBtn').addEventListener('click', startScheduledDesktopTest);
+    document.getElementById('desktopNotificationSetup').addEventListener('click', () => { openSettingsModal(); testDesktopNotification(); });
+    document.getElementById('desktopNotificationSeen').addEventListener('click', () => {
+        document.getElementById('desktopNotificationStatus').textContent = 'Đã xác nhận thông báo Windows hoạt động. Ứng dụng không tự đóng thông báo nhắc job sau 15 giây nữa.';
+        document.getElementById('desktopNotificationWarning').hidden = true;
+        document.getElementById('desktopNotificationFeedback').hidden = true;
+    });
+    document.getElementById('desktopNotificationNotSeen').addEventListener('click', () => {
+        const message = 'Quyền của trang có thể đã bật nhưng Windows chưa hiện banner. Mở cài đặt thông báo Windows, bật thông báo và biểu ngữ cho Chrome/Edge; tắt Không làm phiền hoặc Focus Assist.';
+        document.getElementById('desktopNotificationStatus').textContent = message;
+        reportDesktopNotificationIssue(message);
+    });
 
     const _snl = document.getElementById('settingsNotifyLead');
     if (_snl) _snl.addEventListener('change', (e) => saveNotifyLead(e.target.value));
@@ -4186,18 +4203,10 @@ async function testDesktopNotification() {
             status.textContent = 'Thông báo chưa được cho phép. Mở quyền của trang tại biểu tượng cạnh thanh địa chỉ và cho phép Thông báo.';
             return;
         }
-        const options = { body: 'Thông báo nhắc giờ job đã sẵn sàng.', tag: 'workpic-desktop-test' };
-        const registration = await getSwRegistration();
-        let sent = false;
-        if (registration) {
-            try { await showTimedDesktopNotification(registration, 'Workpic · Thông báo thử', options); sent = true; }
-            catch (error) { console.warn('Thông báo thử qua service worker lỗi:', error); }
-        }
-        if (!sent) {
-            const notification = new Notification('Workpic · Thông báo thử', options);
-            setTimeout(() => notification.close(), 15000);
-        }
-        status.textContent = 'Đã gửi thông báo thử. Nếu chưa thấy, kiểm tra quyền thông báo của trình duyệt trong Windows và chế độ Không làm phiền.';
+        const sent = await showDesktopNotification({ id: `desktop-test-${Date.now()}`, title: 'Workpic · Thông báo thử', type: 'once', time: new Date().toTimeString().slice(0,5) }, { kind: 'test', originDate: todayKey() });
+        if (!sent) { status.textContent = 'Luồng gửi nhắc job báo lỗi. Xem trạng thái thông báo bên dưới rồi thử lại.'; return; }
+        document.getElementById('desktopNotificationFeedback')?.removeAttribute('hidden');
+        status.textContent = 'Đã chuyển yêu cầu cho trình duyệt, chưa xác nhận Windows đã hiện banner. Hãy kiểm tra thông báo ở góc màn hình rồi chọn kết quả bên dưới.';
         checkNotifications();
     } catch (error) { status.textContent = 'Không gửi được thông báo desktop. Kiểm tra quyền thông báo của trang và thử lại.'; console.warn(error); }
     finally { button.disabled = false; }
@@ -8125,6 +8134,19 @@ let sharedNotesOpen = false;
 let sharedNotesSending = false;
 let sharedNotesReadingImage = false;
 let sharedNotesGeneration = 0;
+let sharedNoteImageScale = 1;
+
+function openSharedNoteImage(image) {
+    const source = image.getAttribute('src') || '';
+    if (!/^data:image\/(png|jpeg|webp|gif);base64,/i.test(source)) return;
+    const dialog = document.getElementById('sharedNoteImageDialog');
+    const full = document.getElementById('sharedNoteImageFull');
+    full.src = source;
+    full.style.width = '';
+    dialog.classList.remove('zoomed');
+    sharedNoteImageScale = 1;
+    if (!dialog.open) dialog.showModal();
+}
 let sharedNoteEditingId = null;
 let sharedNoteDraftBeforeEdit = '';
 const sharedNotesDeleting = new Set();
@@ -8247,6 +8269,9 @@ function renderSharedNotes() {
         <div class="shared-note-content">${sanitizeSharedNote(note.content)}</div>
         </article>`).join('') : '<p class="quick-chat-empty">Chưa có ghi chú. Chia sẻ thông tin đầu tiên bên dưới.</p>';
     list.scrollTop = sharedNotesOpen && followLatest ? list.scrollHeight : oldScrollTop;
+    list.querySelectorAll('.shared-note-content img').forEach(image => {
+        image.tabIndex = 0; image.setAttribute('role', 'button'); image.title = 'Bấm để xem ảnh lớn'; image.setAttribute('aria-label', 'Xem ảnh ghi chú phóng lớn');
+    });
 }
 
 function listenSharedNotes() {
@@ -8269,6 +8294,8 @@ function listenSharedNotes() {
 }
 
 function stopSharedNotes() {
+    const imageDialog = document.getElementById('sharedNoteImageDialog');
+    if (imageDialog?.open) imageDialog.close();
     sharedNotesUnsubscribe?.(); sharedNotesUnsubscribe = null;
     sharedNotesItems = []; sharedNotesOpen = false; sharedNotesGeneration++;
     sharedNotesSending = false;
@@ -8317,7 +8344,20 @@ function initSharedNotesUi() {
     const toggle = document.getElementById('sharedNotesToggle');
     if (!toggle || toggle.dataset.ready) return;
     toggle.dataset.ready = 'true';
+    const imageDialog = document.getElementById('sharedNoteImageDialog');
+    document.getElementById('sharedNoteImageClose').addEventListener('click', () => imageDialog.close());
+    imageDialog.addEventListener('click', event => { if (event.target === imageDialog) imageDialog.close(); });
+    imageDialog.addEventListener('close', () => { document.getElementById('sharedNoteImageFull').removeAttribute('src'); });
+    imageDialog.querySelectorAll('[data-note-image-zoom]').forEach(button => button.addEventListener('click', () => {
+        const full = document.getElementById('sharedNoteImageFull');
+        if (button.dataset.noteImageZoom === 'fit') { full.style.width = ''; imageDialog.classList.remove('zoomed'); sharedNoteImageScale = 1; return; }
+        if (!full.naturalWidth) return;
+        if (!imageDialog.classList.contains('zoomed')) sharedNoteImageScale = full.getBoundingClientRect().width / full.naturalWidth;
+        sharedNoteImageScale = Math.max(.1, Math.min(5, sharedNoteImageScale * (button.dataset.noteImageZoom === 'in' ? 1.3 : 1 / 1.3)));
+        imageDialog.classList.add('zoomed'); full.style.width = `${Math.round(full.naturalWidth * sharedNoteImageScale)}px`;
+    }));
     document.addEventListener('click', event => {
+        if (imageDialog.open) return;
         const panel = document.getElementById('sharedNotesPanel');
         if (sharedNotesOpen && !panel.contains(event.target) && !toggle.contains(event.target)) setSharedNotesOpen(false);
     }, true);
@@ -8335,10 +8375,15 @@ function initSharedNotesUi() {
     });
     document.getElementById('sharedNotesCancelEdit').addEventListener('click', cancelSharedNoteEdit);
     document.getElementById('sharedNotesList').addEventListener('click', event => {
+        const image = event.target.closest('.shared-note-content img');
+        if (image) { openSharedNoteImage(image); return; }
         const edit = event.target.closest('[data-note-edit]');
         const remove = event.target.closest('[data-note-delete]');
         if (edit) editSharedNote(edit.dataset.noteEdit);
         if (remove) deleteSharedNote(remove.dataset.noteDelete);
+    });
+    document.getElementById('sharedNotesList').addEventListener('keydown', event => {
+        if (event.target.matches('.shared-note-content img') && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); openSharedNoteImage(event.target); }
     });
     editor.addEventListener('dragover', event => event.preventDefault());
     editor.addEventListener('drop', event => {
@@ -8997,8 +9042,8 @@ async function closeJobNotification(jobId, originDate) {
     try {
         const reg = await getSwRegistration();
         if (!reg) return;
-        const list = await reg.getNotifications({ tag: jobNotificationTag(jobId, originDate) });
-        list.forEach(n => n.close());
+        const list = await reg.getNotifications();
+        list.filter(n => n.tag === jobNotificationTag(jobId, originDate) || (n.data?.jobId === jobId && n.data?.originDate === originDate)).forEach(n => n.close());
     } catch (e) { /* ignore */ }
 }
 
@@ -9061,6 +9106,7 @@ function flushPendingNotifAction() {
 
 async function handleJobNotificationAction(d) {
     const { action, jobId, originDate } = d;
+    if (d.kind === 'test' || String(jobId || '').startsWith('desktop-test-')) { try { window.focus(); } catch {} return; }
     if (d.kind === 'quickjob') {
         // Bấm vào thông báo job trong ngày → mở khung chat
         try { window.focus(); } catch (e) { /* ignore */ }
@@ -9082,6 +9128,52 @@ async function handleJobNotificationAction(d) {
 // ---------------- Kiểm tra & hiển thị nhắc nhở ----------------
 const notificationClaims = new Set();
 const notificationToastClaims = new Set();
+let desktopReminderProbe = null;
+let desktopReminderProbeTimer = null;
+const desktopReminderEvents = [];
+let lastDesktopReminderCheckAt = null;
+
+function renderDesktopReminderDiagnostics() {
+    if (typeof document === 'undefined') return;
+    const host = document.getElementById('desktopReminderDiagnostics');
+    if (!host) return;
+    const active = jobs.filter(job => !job.isPaused && !job.isOutOfSchedule);
+    const enabled = active.filter(job => job.enableNotification !== false);
+    host.innerHTML = `<p>Kiểm tra lịch gần nhất: ${lastDesktopReminderCheckAt ? lastDesktopReminderCheckAt.toLocaleTimeString('vi-VN') : 'đang chờ'} · ${enabled.length}/${active.length} job đang bật nhắc desktop.</p>`
+        + desktopReminderEvents.map(event => `<p><strong>${escapeHtml(event.title)}</strong> · ${event.at}<br>${escapeHtml(event.result)}</p>`).join('');
+}
+
+function recordDesktopReminderEvent(job, result) {
+    desktopReminderEvents.unshift({ title: job.title, at: new Date().toLocaleTimeString('vi-VN'), result });
+    desktopReminderEvents.length = Math.min(5, desktopReminderEvents.length);
+    renderDesktopReminderDiagnostics();
+}
+
+function dispatchJobReminder(job, ctx, message) {
+    return notifyOnce(ctx.notificationKey, () => {
+        // Desktop delivery must be started even if the in-page toast renderer fails.
+        const delivery = showDesktopNotification(job, ctx);
+        if (!notificationToastClaims.has(ctx.notificationKey)) {
+            notificationToastClaims.add(ctx.notificationKey);
+            try { showNotification('🔔 Nhắc nhở Job', message, false); } catch (error) { console.warn('Không hiện được thông báo trong trang:', error); }
+        }
+        return delivery;
+    });
+}
+
+async function startScheduledDesktopTest() {
+    const status = document.getElementById('desktopNotificationStatus');
+    if (!('Notification' in window)) { status.textContent = desktopNotificationPermissionText(); return; }
+    try {
+        const permission = Notification.permission === 'default' ? await Notification.requestPermission() : Notification.permission;
+        if (permission !== 'granted') { status.textContent = desktopNotificationPermissionText(); return; }
+        clearTimeout(desktopReminderProbeTimer);
+        const id = `desktop-test-${Date.now()}`;
+        desktopReminderProbe = { uid: currentUser?.uid, dueAt: Date.now() + 10000, job: { id, title: 'Workpic · Kiểm tra nhắc giờ khi ở ứng dụng khác', type: 'once', time: new Date(Date.now()+10000).toTimeString().slice(0,5) } };
+        status.textContent = 'Đã hẹn nhắc thử sau 10 giây. Bạn chuyển sang Excel ngay; kết quả gửi sẽ được ghi bên dưới.';
+        desktopReminderProbeTimer = setTimeout(checkNotifications, 10000);
+    } catch (error) { status.textContent = 'Không hẹn được nhắc thử: ' + error.message; }
+}
 function notifyOnce(key, send) {
     const claim = () => {
         let alreadySent = false;
@@ -9108,9 +9200,10 @@ async function showTimedDesktopNotification(reg, title, options) {
     const instanceId = `${Date.now()}-${Math.random()}`;
     await reg.showNotification(title, {
         ...options,
-        requireInteraction: false,
+        requireInteraction: options.requireInteraction === true,
         data: { ...options.data, instanceId }
     });
+    if (options.requireInteraction === true) return;
     setTimeout(async () => {
         try {
             const notifications = await reg.getNotifications({ tag: options.tag });
@@ -9122,6 +9215,12 @@ async function showTimedDesktopNotification(reg, title, options) {
 function checkNotifications() {
     if (!currentUser) return;
     const now = new Date();
+    lastDesktopReminderCheckAt = now;
+    renderDesktopReminderDiagnostics();
+    if (desktopReminderProbe && now.getTime() >= desktopReminderProbe.dueAt) {
+        const probe = desktopReminderProbe; desktopReminderProbe = null;
+        if (probe.uid === currentUser.uid) dispatchJobReminder(probe.job, { kind: 'test', originDate: localDateKey(now), notificationKey: probe.job.id }, 'Nhắc thử khi làm việc ở ứng dụng khác.');
+    }
     const lead = notifyLeadMinutes;
 
     jobs.forEach(job => {
@@ -9154,14 +9253,11 @@ function checkNotifications() {
                 if (entry.snoozeUntil && new Date(entry.snoozeUntil).getTime() > at.getTime()) return;
                 const displayKind = now >= dueAt ? 'due' : kind;
                 if (kind === 'lead' && now >= dueAt) return;
-                const key = `notified_desktop_v3_${currentUser.uid}_${job.id}_${entry.originDate || dateKey}_${dateKey}_${timeStr}_${displayKind}`;
+                const key = `notified_desktop_v4_${currentUser.uid}_${job.id}_${entry.originDate || dateKey}_${dateKey}_${timeStr}_${displayKind}`;
                 const message = displayKind === 'lead'
                     ? `Còn ${Math.ceil((dueAt - now) / 60000)} phút nữa (${timeStr}): ${job.title}`
                     : `Đã đến giờ thực hiện: ${job.title}`;
-                notifyOnce(key, () => {
-                    if (!notificationToastClaims.has(key)) { showNotification('🔔 Nhắc nhở Job', message, false); notificationToastClaims.add(key); }
-                    return showDesktopNotification(job, { kind: displayKind, originDate: entry.originDate, time: timeStr });
-                });
+                dispatchJobReminder(job, { kind: displayKind, originDate: entry.originDate, time: timeStr, notificationKey: key }, message);
             });
         }
     });
@@ -9177,10 +9273,7 @@ function checkNotifications() {
         const job = jobs.find(j => j.id === o.jobId);
         if (!job || job.isPaused === true || job.isOutOfSchedule === true || job.enableNotification === false) return;
         const key = `notified_snooze_${o.id}_${o.snoozeUntil}`;
-        notifyOnce(key, () => {
-            if (!notificationToastClaims.has(key)) { showNotification('⏳ Nhắc lại Job', `Hết thời gian chờ: ${job.title}`, false, 'warning'); notificationToastClaims.add(key); }
-            return showDesktopNotification(job, { kind: 'snooze', originDate: o.occurrenceDate, time: o.overrideTime || job.time });
-        });
+        dispatchJobReminder(job, { kind: 'snooze', originDate: o.occurrenceDate, time: o.overrideTime || job.time, notificationKey: key }, `Hết thời gian chờ: ${job.title}`);
     });
 }
 
@@ -9189,15 +9282,26 @@ async function showDesktopNotification(job, ctx = {}) {
     // Check if browser supports notifications
     if (!('Notification' in window)) {
         console.warn('Browser không hỗ trợ Desktop Notifications');
+        reportDesktopNotificationIssue('Trình duyệt này không hỗ trợ thông báo desktop. Hãy mở Workpic bằng Chrome hoặc Edge.');
         return false;
     }
 
     // Check permission
     if (Notification.permission === 'granted') {
-        try { return await createNotification(job, ctx); }
-        catch (error) { console.warn('Không hiện được thông báo desktop:', error); return false; }
+        try { const sent = await createNotification(job, ctx); recordDesktopReminderEvent(job, sent ? 'Trình duyệt đã nhận lệnh thông báo desktop.' : 'Chưa gửi được thông báo desktop.'); return sent; }
+        catch (error) { console.warn('Không hiện được thông báo desktop:', error); recordDesktopReminderEvent(job, 'Gửi lỗi: ' + error.message); reportDesktopNotificationIssue(`Không gửi được thông báo desktop: ${error.message || 'lỗi trình duyệt'}`); return false; }
     }
+    reportDesktopNotificationIssue(Notification.permission === 'denied'
+        ? 'Thông báo desktop của trang đang bị chặn. Mở quyền của trang và cho phép Thông báo.'
+        : 'Chưa cấp quyền thông báo desktop. Bấm Bật / kiểm tra thông báo để cho phép.');
     return false;
+}
+
+function reportDesktopNotificationIssue(message) {
+    const banner = document.getElementById('desktopNotificationWarning');
+    if (!banner) return;
+    banner.hidden = false;
+    banner.querySelector('[data-desktop-warning]').textContent = message;
 }
 
 async function createNotification(job, ctx = {}) {
@@ -9222,11 +9326,9 @@ async function createNotification(job, ctx = {}) {
     const title = '🔔 Nhắc Nhở Job - Job Schedule Manager';
     const options = {
         body: `${heading}\n⏰ ${timeText} - ${typeLabel}`,
-        icon: 'https://cdn-icons-png.flaticon.com/512/2972/2972185.png',
-        badge: 'https://cdn-icons-png.flaticon.com/512/2693/2693507.png',
-        tag: jobNotificationTag(job.id, originDate),   // cùng job + ngày thì thay thông báo cũ
+        tag: `${jobNotificationTag(job.id, originDate)}-${ctx.kind || 'due'}-${String(timeText || '').replace(':','')}`,
         renotify: true,
-        requireInteraction: false,
+        requireInteraction: true,
         silent: false,
         actions,
         data: { jobId: job.id, originDate, kind: ctx.kind || 'due' }
@@ -9253,7 +9355,14 @@ async function createNotification(job, ctx = {}) {
         if (clickedJob) openViewJobModal(clickedJob);
         notification.close();
     };
-    setTimeout(() => notification.close(), 15000);
+    notification.onerror = () => {
+        // A constructor can return before Chrome reports a display failure.
+        if (ctx.notificationKey) {
+            notificationClaims.delete(ctx.notificationKey);
+            try { localStorage.removeItem(ctx.notificationKey); } catch {}
+        }
+        reportDesktopNotificationIssue('Chrome/Edge báo lỗi hiển thị thông báo desktop. Hãy kiểm tra cài đặt thông báo Windows.');
+    };
     return true;
 }
 

@@ -15401,3 +15401,23 @@ body :is(.schedule-item,.timeline-job)[style*='--job-custom-color'] :is(h6,small
  color: var(--job-custom-text) !important; text-shadow: none;
 }
 @media (max-width: 760px) { .schedule-actions { gap: 6px; padding: 8px; } .schedule-actions .btn { font-size: .74rem; padding: 8px 10px; } }
+
+.desktop-notification-warning { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 12px; border-bottom: 1px solid #d97706; color: var(--text); background: color-mix(in srgb,#f59e0b 15%,var(--surface)); font-size: .85rem; }
+.desktop-notification-warning[hidden], .desktop-notification-feedback[hidden] { display: none; }
+.desktop-notification-feedback { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+
+.desktop-reminder-diagnostics { margin-top: 10px; font-size: .76rem; line-height: 1.5; color: var(--muted); }
+.desktop-reminder-diagnostics p { margin: 0 0 8px; padding: 8px; border: 1px solid var(--border); border-radius: 7px; overflow-wrap: anywhere; }
+
+.shared-note-content img { cursor: zoom-in; }
+.shared-note-content img:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+.shared-note-image-dialog { width: min(94vw,1400px); max-width: 94vw; max-height: 92dvh; padding: 0; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text); overflow: hidden; }
+.shared-note-image-dialog::backdrop { background: rgba(2,6,23,.82); }
+.shared-note-image-dialog > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.shared-note-image-dialog h6 { margin: 0; font-size: .95rem; }
+.shared-note-image-tools { display: flex; flex-wrap: wrap; gap: 6px; }
+.shared-note-image-tools button { min-width: 34px; min-height: 34px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-muted); color: var(--text); font-size: .85rem; }
+.shared-note-image-viewport { display: flex; align-items: center; justify-content: center; overflow: auto; max-height: 76dvh; padding: 12px; }
+#sharedNoteImageFull { display: block; max-width: 100%; max-height: 72dvh; object-fit: contain; height: auto; }
+.shared-note-image-dialog.zoomed .shared-note-image-viewport { display: block; }
+.shared-note-image-dialog.zoomed #sharedNoteImageFull { max-width: none; max-height: none; }
