@@ -8088,8 +8088,9 @@ function sanitizeSharedNote(html) {
     return output.innerHTML;
 }
 
-function sharedNoteTime(note) {
-    const value = note.createdAt?.toDate?.() || new Date(note.clientCreatedAt || 0);
+function sharedNoteTime(note, field = 'createdAt') {
+    const raw = note[field];
+    const value = raw?.toDate?.() || (raw instanceof Date ? raw : new Date(field === 'createdAt' ? note.clientCreatedAt || 0 : typeof raw === 'string' || typeof raw === 'number' ? raw : 0));
     return Number.isFinite(value.getTime()) ? value : new Date(0);
 }
 
@@ -8108,6 +8109,10 @@ function setSharedNotesOpen(open) {
         document.getElementById('quickChatToggleBtn')?.classList.remove('d-none');
     }
     renderSharedNotes();
+    if (sharedNotesOpen) {
+        const list = document.getElementById('sharedNotesList');
+        list.scrollTop = list.scrollHeight;
+    }
 }
 
 function renderSharedNotes() {
@@ -8122,11 +8127,14 @@ function renderSharedNotes() {
     const badge = document.getElementById('sharedNotesBadge');
     badge.textContent = unread > 99 ? '99+' : String(unread);
     badge.classList.toggle('d-none', !unread);
-    list.innerHTML = sharedNotesItems.length ? sharedNotesItems.map(note => `<article class="shared-note">
-        <header><strong>${escapeHtml(note.senderName || 'Người dùng')}</strong><time datetime="${sharedNoteTime(note).toISOString()}">${escapeHtml(sharedNoteTime(note).toLocaleString('vi-VN'))}</time></header>
+    const followLatest = list.scrollHeight - list.scrollTop - list.clientHeight < 80;
+    const oldScrollTop = list.scrollTop;
+    const orderedNotes = [...sharedNotesItems].sort((a, b) => sharedNoteTime(a) - sharedNoteTime(b) || String(a.id).localeCompare(String(b.id)));
+    list.innerHTML = orderedNotes.length ? orderedNotes.map(note => `<article class="shared-note">
+        <header><strong>${escapeHtml(note.senderName || 'Người dùng')}</strong><span class="shared-note-times"><time datetime="${sharedNoteTime(note).toISOString()}">${escapeHtml(sharedNoteTime(note).toLocaleString('vi-VN'))}</time>${note.updatedAt ? `<span>· Đã chỉnh sửa <time datetime="${sharedNoteTime(note, 'updatedAt').toISOString()}">${escapeHtml(sharedNoteTime(note, 'updatedAt').toLocaleString('vi-VN'))}</time></span>` : ''}</span></header>
         <div class="shared-note-content">${sanitizeSharedNote(note.content)}</div>
-        ${note.updatedAt ? '<small class="text-muted">Đã chỉnh sửa</small>' : ''}
-        ${note.senderId === currentUser.uid ? `<div class="shared-note-actions"><button type="button" data-note-edit="${escapeHtml(note.id)}" ${sharedNotesDeleting.has(note.id) ? 'disabled' : ''}><i class="bi bi-pencil"></i> Sửa</button><button type="button" data-note-delete="${escapeHtml(note.id)}" ${sharedNotesDeleting.has(note.id) ? 'disabled' : ''}><i class="bi bi-trash"></i> ${sharedNotesDeleting.has(note.id) ? 'Đang xóa…' : 'Xóa'}</button></div>` : ''}</article>`).join('') : '<p class="quick-chat-empty">Chưa có ghi chú. Chia sẻ thông tin đầu tiên bên dưới.</p>';
+        ${note.senderId === currentUser.uid ? `<div class="shared-note-actions"><button type="button" data-note-edit="${escapeHtml(note.id)}" title="Sửa ghi chú" aria-label="Sửa ghi chú" ${sharedNotesDeleting.has(note.id) ? 'disabled' : ''}><i class="bi bi-pencil" aria-hidden="true"></i></button><button type="button" data-note-delete="${escapeHtml(note.id)}" title="Xóa ghi chú" aria-label="Xóa ghi chú" ${sharedNotesDeleting.has(note.id) ? 'disabled' : ''}><i class="bi ${sharedNotesDeleting.has(note.id) ? 'bi-hourglass-split' : 'bi-trash'}" aria-hidden="true"></i></button></div>` : ''}</article>`).join('') : '<p class="quick-chat-empty">Chưa có ghi chú. Chia sẻ thông tin đầu tiên bên dưới.</p>';
+    list.scrollTop = sharedNotesOpen && followLatest ? list.scrollHeight : oldScrollTop;
 }
 
 function listenSharedNotes() {
@@ -8207,6 +8215,12 @@ function initSharedNotesUi() {
     document.getElementById('sharedNotesPanel').addEventListener('keydown', event => { if (event.key === 'Escape') { setSharedNotesOpen(false); toggle.focus(); } });
     const editor = document.getElementById('sharedNotesEditor');
     const file = document.getElementById('sharedNotesFile');
+    editor.addEventListener('keydown', event => {
+        if (event.key === 'Enter' && !event.shiftKey && !event.isComposing && event.keyCode !== 229) {
+            event.preventDefault();
+            document.getElementById('sharedNotesForm').requestSubmit();
+        }
+    });
     document.getElementById('sharedNotesCancelEdit').addEventListener('click', cancelSharedNoteEdit);
     document.getElementById('sharedNotesList').addEventListener('click', event => {
         const edit = event.target.closest('[data-note-edit]');
@@ -8261,6 +8275,7 @@ function initSharedNotesUi() {
                     sharedNotesSending = false; cancelSharedNoteEdit(); renderSharedNotes();
                 } else editor.replaceChildren();
                 status.textContent = editingId ? 'Đã lưu thay đổi.' : 'Đã gửi ghi chú.';
+                if (!editingId) { const list = document.getElementById('sharedNotesList'); list.scrollTop = list.scrollHeight; }
             }
         } catch (error) {
             if (generation === sharedNotesGeneration) status.textContent = error.code === 'permission-denied' ? 'Tài khoản chưa được cấp quyền gửi ghi chú chung. Nội dung vẫn được giữ lại.' : 'Gửi chưa thành công. Nội dung vẫn được giữ lại để thử lại.';

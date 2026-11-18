@@ -1205,6 +1205,8 @@ try {
     check(noteUpdates.length===1&&noteUpdates[0].ref.collection==='sharedNotes'&&noteUpdates[0].ref.id==='mine','edit updates existing note');
     check(Object.keys(noteUpdates[0].data).sort().join(',')==='content,updatedAt','edit preserves sender and original send time');
     check(noteEditor.textContent==='Unsent draft'&&noteWrites.length===1,'edit neither creates a new note nor loses the draft');
+    const editedArticle=document.querySelector('[data-note-edit="mine"]').closest('article');
+    check(editedArticle.querySelector('.shared-note-times').textContent.includes('Đã chỉnh sửa')&&editedArticle.querySelectorAll('header time').length===2,'edit timestamp appears beside original send time');
     editSharedNote('mine');noteEditor.innerHTML='<p>Retry edit</p>';rejectNoteWrite=true;await submitNote();
     check(sharedNoteEditingId==='mine'&&noteEditor.textContent==='Retry edit','failed edit preserves current editing content');
     rejectNoteWrite=false;cancelSharedNoteEdit();
@@ -1216,6 +1218,15 @@ try {
     check(sharedNotesItems.some(note=>note.id==='mine'),'failed deletion keeps note visible');
     rejectNoteWrite=false;await deleteSharedNote('mine');window.confirm=originalConfirm;
     check(noteDeletes.length===1&&!sharedNotesItems.some(note=>note.id==='mine'),'confirmed deletion removes own note');
+    noteSnapshot({docs:[{id:'new',data:()=>({senderId:'other',senderName:'Newest',content:'New',clientCreatedAt:'2026-11-18T11:00:00Z'})},{id:'old',data:()=>({senderId:'other',senderName:'Oldest',content:'Old',clientCreatedAt:'2026-11-18T10:00:00Z'})}]});
+    check(document.querySelector('#sharedNotesList article:first-child strong').textContent==='Oldest'&&document.querySelector('#sharedNotesList article:last-child strong').textContent==='Newest','newest notes appear at the bottom');
+    noteEditor.textContent='Keyboard note';
+    const shiftEnter=new KeyboardEvent('keydown',{key:'Enter',shiftKey:true,bubbles:true,cancelable:true});noteEditor.dispatchEvent(shiftEnter);
+    check(!shiftEnter.defaultPrevented&&noteWrites.length===1,'Shift+Enter keeps native newline behavior');
+    const composingEnter=new KeyboardEvent('keydown',{key:'Enter',isComposing:true,bubbles:true,cancelable:true});noteEditor.dispatchEvent(composingEnter);
+    check(!composingEnter.defaultPrevented&&noteWrites.length===1,'IME confirmation does not send prematurely');
+    const enter=new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true});noteEditor.dispatchEvent(enter);await new Promise(resolve=>setTimeout(resolve,0));
+    check(enter.defaultPrevented&&noteWrites.length===2&&!noteEditor.innerHTML,'Enter sends exactly one note');
     rejectNoteWrite=true; noteEditor.innerHTML='<p>Keep draft</p>'; await submitNote();
     check(noteEditor.textContent==='Keep draft','failed note preserves draft');
     check(!document.getElementById('sharedNotesSend').disabled,'failed note re-enables send');
