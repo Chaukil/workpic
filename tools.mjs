@@ -1135,12 +1135,14 @@ ${extract('function getHolidayName(', 'function renderDayOffCalendars(')}
 ${extract('function renderChangeHistory(', 'function getDayOffJobPreview(')}
 ${extract('function renderJobChecklist(', "window.addEventListener('beforeunload'")}
 ${extract('let sharedNotesUnsubscribe =', 'function initQuickChatUi(')}
-let noteSnapshot, noteWrites = [], noteUnsubscribed = 0, rejectNoteWrite = false;
+let noteSnapshot, noteWrites = [], noteUpdates = [], noteDeletes = [], noteUnsubscribed = 0, rejectNoteWrite = false;
 const collection = (_, name) => name;
 const query = (...args) => args, orderBy = (...args) => args, limit = value => value;
 const serverTimestamp = () => 'server-timestamp';
 const onSnapshot = (_, callback) => { noteSnapshot = callback; return () => noteUnsubscribed++; };
 const addDoc = async (name, data) => { if (rejectNoteWrite) throw Object.assign(new Error('denied'), {code:'permission-denied'}); noteWrites.push({name,data}); };
+const updateDoc = async (ref,data) => { if (rejectNoteWrite) throw new Error('denied'); noteUpdates.push({ref,data}); };
+const deleteDoc = async ref => { if (rejectNoteWrite) throw new Error('denied'); noteDeletes.push(ref); };
 let quickChatPanelOpen = false, quickChatUnreadCount = 0;
 const updateQuickChatBadge = () => {};
 ${extract('function openQuickChatPanel(', 'let sharedNotesUnsubscribe =')}
@@ -1192,6 +1194,28 @@ try {
     check(noteWrites[0].data.senderId==='me'&&noteWrites[0].data.createdAt==='server-timestamp','notes include sender and server time');
     check(!noteEditor.innerHTML,'successful note clears draft');
     await submitNote();check(noteWrites.length===1,'empty notes are not sent');
+    noteSnapshot({docs:[{id:'mine',data:()=>({senderId:'me',senderName:'Me',content:'<p>Original note</p>',clientCreatedAt:'2026-11-18T09:00:00Z'})},{id:'other',data:()=>({senderId:'other',senderName:'Other',content:'Other note'})}]});
+    check(document.querySelectorAll('[data-note-edit]').length===1,'edit actions appear only on own notes');
+    noteEditor.innerHTML='<p>Unsent draft</p>';
+    document.querySelector('[data-note-edit="mine"]').click();
+    check(noteEditor.textContent==='Original note'&&sharedNoteEditingId==='mine','edit loads original content');
+    document.getElementById('sharedNotesCancelEdit').click();
+    check(noteEditor.textContent==='Unsent draft'&&!sharedNoteEditingId,'cancel edit restores unsent draft');
+    editSharedNote('mine');noteEditor.innerHTML='<p>Edited note</p>';await submitNote();
+    check(noteUpdates.length===1&&noteUpdates[0].ref.collection==='sharedNotes'&&noteUpdates[0].ref.id==='mine','edit updates existing note');
+    check(Object.keys(noteUpdates[0].data).sort().join(',')==='content,updatedAt','edit preserves sender and original send time');
+    check(noteEditor.textContent==='Unsent draft'&&noteWrites.length===1,'edit neither creates a new note nor loses the draft');
+    editSharedNote('mine');noteEditor.innerHTML='<p>Retry edit</p>';rejectNoteWrite=true;await submitNote();
+    check(sharedNoteEditingId==='mine'&&noteEditor.textContent==='Retry edit','failed edit preserves current editing content');
+    rejectNoteWrite=false;cancelSharedNoteEdit();
+    const originalConfirm=window.confirm;window.confirm=()=>false;
+    await deleteSharedNote('mine');check(noteDeletes.length===0,'canceled delete does not write');
+    window.confirm=()=>true;
+    await deleteSharedNote('other');check(noteDeletes.length===0,'cannot delete another sender note');
+    rejectNoteWrite=true;await deleteSharedNote('mine');
+    check(sharedNotesItems.some(note=>note.id==='mine'),'failed deletion keeps note visible');
+    rejectNoteWrite=false;await deleteSharedNote('mine');window.confirm=originalConfirm;
+    check(noteDeletes.length===1&&!sharedNotesItems.some(note=>note.id==='mine'),'confirmed deletion removes own note');
     rejectNoteWrite=true; noteEditor.innerHTML='<p>Keep draft</p>'; await submitNote();
     check(noteEditor.textContent==='Keep draft','failed note preserves draft');
     check(!document.getElementById('sharedNotesSend').disabled,'failed note re-enables send');

@@ -8013,6 +8013,53 @@ let sharedNotesOpen = false;
 let sharedNotesSending = false;
 let sharedNotesReadingImage = false;
 let sharedNotesGeneration = 0;
+let sharedNoteEditingId = null;
+let sharedNoteDraftBeforeEdit = '';
+const sharedNotesDeleting = new Set();
+
+function cancelSharedNoteEdit() {
+    if (sharedNotesSending || sharedNotesReadingImage) return;
+    if (sharedNoteEditingId) document.getElementById('sharedNotesEditor').innerHTML = sharedNoteDraftBeforeEdit;
+    sharedNoteEditingId = null; sharedNoteDraftBeforeEdit = '';
+    document.getElementById('sharedNotesSend').innerHTML = '<i class="bi bi-send-fill"></i> Gửi ghi chú';
+    document.getElementById('sharedNotesCancelEdit').hidden = true;
+    document.getElementById('sharedNotesStatus').textContent = '';
+}
+
+function editSharedNote(id) {
+    const note = sharedNotesItems.find(item => item.id === id && item.senderId === currentUser?.uid);
+    if (!note || sharedNotesSending || sharedNotesReadingImage || sharedNotesDeleting.has(id)) return;
+    if (sharedNoteEditingId === id) { document.getElementById('sharedNotesEditor').focus(); return; }
+    if (sharedNoteEditingId && !window.confirm('Bỏ thay đổi đang sửa để mở ghi chú khác?')) return;
+    const editor = document.getElementById('sharedNotesEditor');
+    if (!sharedNoteEditingId) sharedNoteDraftBeforeEdit = editor.innerHTML;
+    sharedNoteEditingId = id;
+    editor.innerHTML = sanitizeSharedNote(note.content);
+    document.getElementById('sharedNotesSend').textContent = 'Lưu thay đổi';
+    document.getElementById('sharedNotesCancelEdit').hidden = false;
+    document.getElementById('sharedNotesStatus').textContent = 'Đang sửa ghi chú của bạn.';
+    editor.focus();
+}
+
+async function deleteSharedNote(id) {
+    const note = sharedNotesItems.find(item => item.id === id && item.senderId === currentUser?.uid);
+    if (!note || sharedNotesSending || sharedNotesReadingImage || sharedNotesDeleting.has(id)) return;
+    if (!window.confirm('Xóa ghi chú này khỏi bảng chung?')) return;
+    const generation = sharedNotesGeneration;
+    sharedNotesDeleting.add(id); renderSharedNotes();
+    try {
+        await deleteDoc(doc(db, 'sharedNotes', id));
+        if (generation !== sharedNotesGeneration) return;
+        sharedNotesItems = sharedNotesItems.filter(item => item.id !== id);
+        if (sharedNoteEditingId === id) cancelSharedNoteEdit();
+        document.getElementById('sharedNotesStatus').textContent = 'Đã xóa ghi chú.';
+    } catch (error) {
+        if (generation === sharedNotesGeneration) document.getElementById('sharedNotesStatus').textContent = 'Không xóa được ghi chú. Vui lòng thử lại.';
+    } finally {
+        sharedNotesDeleting.delete(id);
+        if (generation === sharedNotesGeneration) renderSharedNotes();
+    }
+}
 
 function sanitizeSharedNote(html) {
     const parsed = new DOMParser().parseFromString(String(html || ''), 'text/html');
@@ -8077,7 +8124,9 @@ function renderSharedNotes() {
     badge.classList.toggle('d-none', !unread);
     list.innerHTML = sharedNotesItems.length ? sharedNotesItems.map(note => `<article class="shared-note">
         <header><strong>${escapeHtml(note.senderName || 'Người dùng')}</strong><time datetime="${sharedNoteTime(note).toISOString()}">${escapeHtml(sharedNoteTime(note).toLocaleString('vi-VN'))}</time></header>
-        <div class="shared-note-content">${sanitizeSharedNote(note.content)}</div></article>`).join('') : '<p class="quick-chat-empty">Chưa có ghi chú. Chia sẻ thông tin đầu tiên bên dưới.</p>';
+        <div class="shared-note-content">${sanitizeSharedNote(note.content)}</div>
+        ${note.updatedAt ? '<small class="text-muted">Đã chỉnh sửa</small>' : ''}
+        ${note.senderId === currentUser.uid ? `<div class="shared-note-actions"><button type="button" data-note-edit="${escapeHtml(note.id)}" ${sharedNotesDeleting.has(note.id) ? 'disabled' : ''}><i class="bi bi-pencil"></i> Sửa</button><button type="button" data-note-delete="${escapeHtml(note.id)}" ${sharedNotesDeleting.has(note.id) ? 'disabled' : ''}><i class="bi bi-trash"></i> ${sharedNotesDeleting.has(note.id) ? 'Đang xóa…' : 'Xóa'}</button></div>` : ''}</article>`).join('') : '<p class="quick-chat-empty">Chưa có ghi chú. Chia sẻ thông tin đầu tiên bên dưới.</p>';
 }
 
 function listenSharedNotes() {
@@ -8104,6 +8153,7 @@ function stopSharedNotes() {
     sharedNotesItems = []; sharedNotesOpen = false; sharedNotesGeneration++;
     sharedNotesSending = false;
     sharedNotesReadingImage = false;
+    sharedNoteEditingId = null; sharedNoteDraftBeforeEdit = ''; sharedNotesDeleting.clear();
     const panel = document.getElementById('sharedNotesPanel');
     if (!panel) return;
     panel.classList.remove('show'); panel.inert = true;
@@ -8114,6 +8164,8 @@ function stopSharedNotes() {
     document.getElementById('sharedNotesEditor').replaceChildren();
     document.getElementById('sharedNotesEditor').contentEditable = 'true';
     document.getElementById('sharedNotesSend').disabled = false;
+    document.getElementById('sharedNotesSend').innerHTML = '<i class="bi bi-send-fill"></i> Gửi ghi chú';
+    document.getElementById('sharedNotesCancelEdit').hidden = true;
     document.getElementById('sharedNotesStatus').textContent = '';
     document.getElementById('sharedNotesFile').value = '';
     document.getElementById('sharedNotesBadge').classList.add('d-none');
@@ -8155,6 +8207,13 @@ function initSharedNotesUi() {
     document.getElementById('sharedNotesPanel').addEventListener('keydown', event => { if (event.key === 'Escape') { setSharedNotesOpen(false); toggle.focus(); } });
     const editor = document.getElementById('sharedNotesEditor');
     const file = document.getElementById('sharedNotesFile');
+    document.getElementById('sharedNotesCancelEdit').addEventListener('click', cancelSharedNoteEdit);
+    document.getElementById('sharedNotesList').addEventListener('click', event => {
+        const edit = event.target.closest('[data-note-edit]');
+        const remove = event.target.closest('[data-note-delete]');
+        if (edit) editSharedNote(edit.dataset.noteEdit);
+        if (remove) deleteSharedNote(remove.dataset.noteDelete);
+    });
     editor.addEventListener('dragover', event => event.preventDefault());
     editor.addEventListener('drop', event => {
         event.preventDefault();
@@ -8186,11 +8245,23 @@ function initSharedNotesUi() {
         if (!check.textContent.trim() && !check.querySelector('img')) { status.textContent = 'Nhập nội dung hoặc thêm ảnh trước khi gửi.'; return; }
         if (check.textContent.length > 20000 || new Blob([content]).size > 750000) { status.textContent = 'Ghi chú quá dài. Hãy chia thành nhiều ghi chú nhỏ hơn.'; return; }
         const uid = currentUser.uid, generation = sharedNotesGeneration;
+        const editingId = sharedNoteEditingId;
+        if (editingId && !sharedNotesItems.some(note => note.id === editingId && note.senderId === uid)) {
+            status.textContent = 'Ghi chú này không còn tồn tại. Hãy hủy sửa hoặc sao chép nội dung trước khi đóng.'; return;
+        }
         const button = document.getElementById('sharedNotesSend');
         sharedNotesSending = true; button.disabled = true; editor.contentEditable = 'false'; status.textContent = 'Đang gửi…';
         try {
-            await addDoc(collection(db, 'sharedNotes'), { senderId: uid, senderName: currentUser.displayName || currentUser.email || 'Người dùng', content, createdAt: serverTimestamp(), clientCreatedAt: new Date().toISOString() });
-            if (generation === sharedNotesGeneration && currentUser?.uid === uid) { editor.replaceChildren(); status.textContent = 'Đã gửi ghi chú.'; }
+            if (editingId) await updateDoc(doc(db, 'sharedNotes', editingId), { content, updatedAt: serverTimestamp() });
+            else await addDoc(collection(db, 'sharedNotes'), { senderId: uid, senderName: currentUser.displayName || currentUser.email || 'Người dùng', content, createdAt: serverTimestamp(), clientCreatedAt: new Date().toISOString() });
+            if (generation === sharedNotesGeneration && currentUser?.uid === uid) {
+                if (editingId) {
+                    const note = sharedNotesItems.find(item => item.id === editingId);
+                    if (note) { note.content = content; note.updatedAt = new Date(); }
+                    sharedNotesSending = false; cancelSharedNoteEdit(); renderSharedNotes();
+                } else editor.replaceChildren();
+                status.textContent = editingId ? 'Đã lưu thay đổi.' : 'Đã gửi ghi chú.';
+            }
         } catch (error) {
             if (generation === sharedNotesGeneration) status.textContent = error.code === 'permission-denied' ? 'Tài khoản chưa được cấp quyền gửi ghi chú chung. Nội dung vẫn được giữ lại.' : 'Gửi chưa thành công. Nội dung vẫn được giữ lại để thử lại.';
         } finally { if (generation === sharedNotesGeneration) { sharedNotesSending = false; button.disabled = false; editor.contentEditable = 'true'; } }
