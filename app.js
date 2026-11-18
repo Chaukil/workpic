@@ -549,7 +549,7 @@ const TOPBAR_THEMES = [
     { id: 'default', name: 'Mặc định', emoji: '☀️', desc: 'Trời sáng/tối tự nhiên' },
     { id: 'tet', name: 'Tết', emoji: '🌸', desc: 'Hoa đào, rồng bay, lì xì và kim tuyến' },
     { id: 'trungthu', name: 'Trung Thu', emoji: '🌕', desc: 'Trăng rằm, đèn lồng trôi' },
-    { id: 'noel', name: 'Noel', emoji: '🎄', desc: 'Tuyết rơi, ông già Noel chạy ngang' },
+    { id: 'noel', name: 'Noel', emoji: '🎄', desc: 'Tuyết rơi, đèn vàng, cây thông và tuần lộc' },
     { id: 'rain', name: 'Mưa', emoji: '🌧️', desc: 'Mưa rơi, mây đen, chớp' },
     { id: 'space', name: 'Vũ trụ', emoji: '🪐', desc: 'Sao lấp lánh, hành tinh, tàu vũ trụ' },
     { id: 'halloween', name: 'Halloween', emoji: '🎃', desc: 'Bí ngô, dơi, ma, mèo đen, sương mù' }

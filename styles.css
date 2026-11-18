@@ -15354,25 +15354,24 @@ body.theme-dark #userJobsModal .user-job-status.paused { color: #fcd34d; backgro
 .shared-note-actions button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .shared-note-times { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 6px; font-size: .65rem; color: var(--muted); }
 .shared-note-times time { font-size: inherit; }
-/* Noel accents are code-native and only appear for the selected Noel theme. */
-.noel-light-string { position: absolute; inset: 3px 2% auto; display: flex; justify-content: space-around; border-top: 1px solid #60734b; pointer-events: none; }
-.noel-light-string i { width: 6px; height: 10px; border-radius: 35% 35% 50% 50%; background: #fbbf24; box-shadow: 0 0 7px #fbbf24; animation: noel-bulb-glow 2.8s ease-in-out infinite alternate; }
-.noel-light-string i:nth-child(3n) { background: #fb7185; box-shadow: 0 0 8px #fb7185; animation-delay: -.9s; }
-.noel-light-string i:nth-child(3n + 1) { background: #6ee7b7; box-shadow: 0 0 8px #6ee7b7; animation-delay: -1.8s; }
-.noel-room-decor { display: none; position: fixed; left: 12px; bottom: 9px; width: 150px; height: 110px; pointer-events: none; z-index: 1000; opacity: .8; }
-body[data-topbar-theme='noel'] .noel-room-decor { display: block; }
-.noel-corner-tree { position: absolute; bottom: 0; left: 0; width: 65px; height: 105px; filter: drop-shadow(0 0 5px #064e3b); }
-.noel-corner-tree > span { position: absolute; top: 0; left: 25px; color: #fde68a; font-size: 20px; text-shadow: 0 0 9px #fbbf24; z-index: 2; }
-.noel-corner-tree i { position: absolute; left: 7px; bottom: 17px; width: 56px; height: 46px; background: radial-gradient(circle at 35% 65%,#fbbf24 0 2px,transparent 3px),radial-gradient(circle at 65% 65%,#fb7185 0 2px,transparent 3px),#15803d; clip-path: polygon(50% 0,100% 100%,0 100%); }
-.noel-corner-tree i:nth-of-type(2) { width: 46px; left: 12px; bottom: 37px; background-color: #16a34a; }
-.noel-corner-tree i:nth-of-type(3) { width: 34px; height: 39px; left: 18px; bottom: 58px; background-color: #22c55e; }
-.noel-corner-tree b { position: absolute; bottom: 0; left: 29px; width: 12px; height: 18px; background: #92400e; }
-.noel-corner-deer { position: absolute; left: 75px; bottom: 1px; font-size: 40px; animation: noel-deer-idle 4s ease-in-out infinite; }
-@keyframes noel-bulb-glow { from { opacity: .5; } to { opacity: 1; } }
-@keyframes noel-deer-idle { 0%,100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-4px) rotate(2deg); } }
-@media (max-width: 760px) { .noel-room-decor { transform: scale(.65); transform-origin: bottom left; } }
-@media (prefers-reduced-motion: reduce) { .noel-light-string i, .noel-corner-deer { animation: none; } }
 
-.noel-global-lights { display: none; position: fixed; inset: 4px 12px auto; z-index: 1000; }
+/* Warm-white wire lights, glitter pendants and ribbon-wrapped pine artwork. */
+.noel-art-defs { position: absolute; overflow: hidden; pointer-events: none; }
+.noel-fairy-lights { position: absolute; inset: 0 -8px auto; height: 83px; display: flex; overflow: hidden; pointer-events: none; opacity: .9; }
+.noel-fairy-lights > svg { flex: 1 0 180px; width: 240px; height: 84px; overflow: visible; }
+.noel-pendant { filter: drop-shadow(0 0 3px #ffc65b) drop-shadow(0 0 8px #e9a53680); animation: noel-warm-glow 4s ease-in-out infinite alternate; }
+.noel-fairy-lights > svg:nth-child(2n) .noel-pendant { animation-delay: -2s; }
+.noel-room-decor { display: none; position: fixed; left: 9px; bottom: 4px; width: 180px; height: 156px; pointer-events: none; z-index: 1000; }
+body[data-topbar-theme='noel'] .noel-room-decor { display: block; }
+.noel-room-decor > .noel-ribbon-tree { position: absolute; bottom: 0; left: 0; width: 95px; height: 146px; filter: drop-shadow(0 0 5px #e5ae3540); }
+.noel-room-decor > .noel-golden-deer { position: absolute; bottom: 0; left: 82px; width: 95px; height: 110px; filter: drop-shadow(0 0 3px #d5a54950); }
+.noel-global-lights { display: none; position: fixed; inset: 0 0 auto; z-index: 1000; height: 83px; }
 body.fx-fullscreen-on[data-topbar-theme='noel'] .noel-global-lights { display: flex; }
-body.fx-paused :is(.noel-room-decor,.noel-global-lights) * { animation-play-state: paused; }
+@keyframes noel-warm-glow { from { opacity: .72; } to { opacity: 1; } }
+@media (max-width: 760px) {
+ .noel-room-decor { transform: scale(.7); transform-origin: bottom left; }
+ .noel-fairy-lights { height: 65px; }
+ .noel-fairy-lights > svg { flex-basis: 150px; height: 66px; }
+}
+@media (prefers-reduced-motion: reduce) { .noel-pendant { animation: none; } }
+body.fx-paused :is(.noel-fairy-lights,.noel-room-decor) * { animation-play-state: paused; }
