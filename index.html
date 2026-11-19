@@ -189,6 +189,7 @@
                     <button type="button" class="notif-bell-btn" id="settingsBtn" title="Cài đặt">
                         <i class="bi bi-gear-fill"></i>
                     </button>
+                    <button type="button" class="notif-bell-btn" id="attendancePetToggle" title="Điểm danh và thú cưng" aria-label="Điểm danh và thú cưng" hidden><i class="bi bi-calendar-heart"></i><span class="attendance-pet-dot" id="attendancePetDot"></span></button>
                     <button class="user-profile-btn" id="userProfileBtn" title="Thông tin tài khoản">
                         <img id="userAvatar" class="user-avatar" src="" alt="Avatar">
                         <span id="userDisplayName" class="user-name"></span>
@@ -2167,6 +2168,15 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
         </div>
     </div>
 
+    <button type="button" id="attendancePetSwimmer" class="attendance-pet-swimmer" aria-label="Thú cưng" hidden><span id="attendancePetArt"></span><span id="attendancePetEggTimer" class="attendance-pet-egg-timer" hidden></span><span id="attendancePetBubble" class="attendance-pet-bubble" role="status"></span></button>
+    <dialog id="attendancePetDialog" class="attendance-pet-dialog" aria-labelledby="attendancePetTitle">
+        <header><div><small>BẠN ĐỒNG HÀNH ĐẠI DƯƠNG</small><h5 id="attendancePetTitle">Điểm danh và thú cưng</h5></div><button type="button" id="attendancePetClose" aria-label="Đóng">✕</button></header>
+        <section class="attendance-pet-summary"><span id="attendancePetLevel" class="attendance-pet-level">Trứng</span><h4 id="attendancePetName">Đang tải…</h4><p id="attendancePetDescription"></p><p id="attendancePetCountdown"></p></section>
+        <div class="attendance-pet-progress"><div id="attendancePetProgress"></div></div><p id="attendancePetProgressText" class="text-muted"></p>
+        <div class="attendance-pet-actions"><button type="button" id="attendancePetCheckin" class="btn btn-primary">Điểm danh hôm nay</button><button type="button" id="attendancePetFeed" class="btn btn-outline-primary">Cho ăn</button><button type="button" id="attendancePetRetry" class="btn btn-outline-secondary" hidden>Thử kết nối lại</button></div>
+        <p id="attendancePetStatus" class="attendance-pet-status" role="status"></p>
+        <details><summary>Hành trình tiến hóa và cách chăm sóc</summary><p>Điểm danh 10 ngày còn sống để tiến hóa một bậc. Cho ăn tối đa một lần mỗi ngày. Bỏ điểm danh đủ 72 giờ: thú cưng chết. Bấm thú cưng để hồi sinh thành trứng, nở sau 1 giờ thực tế. Ngày mới tính theo giờ Việt Nam.</p><ol id="attendancePetRoad"></ol></details>
+    </dialog>
     <button type="button" class="quick-chat-toggle" id="quickChatToggleBtn" title="Job trong ngày">
         <i class="bi bi-chat-dots-fill"></i>
         <span class="quick-chat-badge d-none" id="quickChatBadge">0</span>

@@ -54,3 +54,26 @@ match /sharedNotes/{noteId} {
 
 Browser tests mock Firestore, including send failures and sign-out cleanup; they do
 not write sample notes into the live shared collection or deploy security rules.
+
+## Attendance companion
+
+Each account stores `attendancePet` on its existing user profile. The profile is
+chosen consistently by document ID when legacy duplicate profiles exist. Check-in,
+feeding and resurrection use transactions to read the latest state before writing;
+the app never reports a successful check-in when the write fails.
+
+Days reset at midnight in Asia/Bangkok (UTC+7). Ten actual check-in days during one
+life unlock the next form. The pet dies 72 hours after its latest check-in, or birth
+if it has never checked in. Clicking a dead pet resurrects it and resets evolution.
+Both the initial and resurrected egg hatch one hour after birth. These times are
+stored as timestamps, so hatching and absence are evaluated correctly after closing
+and reopening the app. Feeding is limited to once per calendar day.
+
+The companion uses the same pinned Three.js version as the existing visual effects,
+with a small transparent WebGL canvas and a lightweight vector fallback. Hover/focus
+pauses roaming. Sign-out stops the renderer, timers and profile listener.
+
+`node --use-system-ca tools.mjs test:ui --pet` additionally checks all 20 egg/creature
+forms with real WebGL and saves the preview to `.artifacts/attendance-pet-stages.png`.
+Regular UI tests use a fake Firebase backend; live profile permissions are not deployed
+or changed by these tests.

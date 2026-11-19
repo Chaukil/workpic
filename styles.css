@@ -15463,3 +15463,43 @@ body.storm-bucket-active, body.storm-bucket-active * { cursor: none !important; 
 @keyframes storm-impact-ring { from { transform: scale(.4); } to { transform: scale(3,.8); } }
 @keyframes storm-bucket-empty { 0%,20%,100% { opacity: 1; } 45%,80% { opacity: .1; } }
 @media (prefers-reduced-motion: reduce) { .storm-scoop-water { display: none; } .storm-bucket-contents { animation: none !important; } }
+
+/* Account attendance companion: small transparent 3D stage and centered care panel. */
+#attendancePetToggle { position: relative; }
+.attendance-pet-dot { position: absolute; top: 3px; right: 3px; width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; box-shadow: 0 0 0 2px var(--surface); }
+#attendancePetToggle[hidden],.attendance-pet-swimmer[hidden],#attendancePetRetry[hidden],#attendancePetDot[hidden] { display: none !important; }
+.attendance-pet-swimmer { position: fixed; top: 0; left: 0; width: 144px; height: 104px; padding: 0; border: 0; border-radius: 45%; background: transparent; color: var(--text); z-index: 1100; cursor: pointer; will-change: transform; filter: drop-shadow(0 7px 9px rgba(2,6,23,.25)); }
+.attendance-pet-swimmer:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+#attendancePetArt,#attendancePetArt canvas,#attendancePetArt svg { display: block; width: 144px; height: 104px; pointer-events: none; }
+.attendance-pet-swimmer:disabled { cursor: wait; }
+.attendance-pet-swimmer.pet-is-dead { filter: grayscale(.7) drop-shadow(0 5px 7px rgba(2,6,23,.25)); }
+.attendance-pet-bubble { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); min-width: 160px; max-width: 220px; border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; background: var(--surface); color: var(--text); font-size: .75rem; line-height: 1.5; opacity: 0; pointer-events: none; transition: opacity .2s; }
+.attendance-pet-bubble.show { opacity: 1; }
+body.modal-open .attendance-pet-swimmer,body:has(dialog[open]) .attendance-pet-swimmer { visibility: hidden; }
+.attendance-pet-dialog { width: min(94vw,540px); max-width: 94vw; max-height: 88dvh; padding: 22px; border: 1px solid var(--border); border-radius: 20px; background: var(--surface); color: var(--text); overflow-y: auto; box-shadow: 0 24px 90px #02061755; }
+.attendance-pet-dialog::backdrop { background: #020617aa; }
+.attendance-pet-dialog > header { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 20px; }
+.attendance-pet-dialog header small { color: var(--muted); font-size: .64rem; letter-spacing: .12em; }
+.attendance-pet-dialog h5 { margin: 5px 0 0; font-size: 1.1rem; }
+#attendancePetClose { flex-shrink: 0; width: 34px; height: 34px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-muted); color: var(--text); }
+.attendance-pet-summary { border: 1px solid var(--border); border-radius: 14px; padding: 18px; background: linear-gradient(140deg,color-mix(in srgb,#0ea5e9 10%,var(--surface)),var(--surface)); }
+.attendance-pet-level { display: inline-block; padding: 4px 9px; border: 1px solid #38bdf855; border-radius: 30px; color: var(--primary); font-size: .72rem; font-weight: 700; }
+.attendance-pet-summary h4 { font-size: 1.3rem; margin: 12px 0; }
+.attendance-pet-summary p { font-size: .83rem; line-height: 1.65; margin: 6px 0; }
+#attendancePetCountdown { color: var(--muted); font-size: .76rem; }
+.attendance-pet-progress { height: 7px; background: var(--surface-muted); border: 1px solid var(--border); border-radius: 20px; overflow: hidden; margin-top: 18px; }
+#attendancePetProgress { height: 100%; width: 0; background: linear-gradient(90deg,#0ea5e9,#34d399); transition: width .4s; }
+#attendancePetProgressText { font-size: .76rem; line-height: 1.5; margin-top: 8px; }
+.attendance-pet-actions { display: flex; flex-wrap: wrap; gap: 9px; margin: 16px 0 10px; }
+.attendance-pet-actions .btn { flex: 1 1 auto; white-space: normal; font-size: .82rem; padding: 10px 12px; }
+.attendance-pet-status { font-size: .78rem; line-height: 1.6; color: var(--muted); min-height: 24px; }
+.attendance-pet-dialog details { border-top: 1px solid var(--border); padding-top: 12px; font-size: .78rem; line-height: 1.65; }
+.attendance-pet-dialog details p { margin: 12px 0; }
+#attendancePetRoad { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 5px 18px; padding-left: 22px; color: var(--muted); }
+.pet-fallback-tail { transform-box: fill-box; transform-origin: right center; animation: pet-tail-idle 1.8s ease-in-out infinite alternate; }
+@keyframes pet-tail-idle { to { transform: scaleX(.65) rotate(8deg); } }
+@media (max-width: 560px) { .attendance-pet-dialog { padding: 16px; } #attendancePetRoad { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .pet-fallback-tail { animation: none; } }
+
+.attendance-pet-egg-timer { position: absolute; left: 50%; bottom: -9px; transform: translateX(-50%); display: block; width: max-content; max-width: 170px; padding: 5px 9px; border: 1px solid color-mix(in srgb,#38bdf8 40%,var(--border)); border-radius: 20px; background: var(--surface); color: var(--text); font-size: .67rem; line-height: 1.3; font-variant-numeric: tabular-nums; box-shadow: 0 3px 10px #02061725; pointer-events: none; }
+.attendance-pet-egg-timer[hidden] { display: none !important; }

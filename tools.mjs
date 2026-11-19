@@ -50,8 +50,8 @@ console.log(`Deploy dist/: index.html (${((await stat('dist/index.html')).size /
 
     "test": async () => {
 const helperSource = fs.readFileSync('app.js', 'utf8').split('// BEGIN SHARED HELPERS\n')[1].split('// END SHARED HELPERS')[0];
-const helperModule = helperSource + '\nexport { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater };';
-const { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater } = await import('data:text/javascript;base64,' + Buffer.from(helperModule).toString('base64'));
+const helperModule = helperSource + '\nexport { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater, attendancePetDay, newAttendancePet, attendancePetView, transitionAttendancePet };';
+const { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater, attendancePetDay, newAttendancePet, attendancePetView, transitionAttendancePet } = await import('data:text/javascript;base64,' + Buffer.from(helperModule).toString('base64'));
 
 
 
@@ -819,6 +819,32 @@ test('job catalog keeps paused jobs last and statistics sort types and weekdays'
     assert.deepEqual(titles,['daily','mon','fri','daily','mon','fri']);
 });
 
+test('attendance pet checks in and feeds once per Bangkok day, evolves and revives after offline absence', () => {
+ const born=Date.parse('2026-11-01T09:00:00+07:00');
+ let pet=newAttendancePet(born);
+ assert.equal(attendancePetView(pet,born).egg,true);
+ assert.equal(attendancePetView(pet,born+3600000).egg,false,'egg hatches after one real hour without page activity');
+ assert.equal(transitionAttendancePet(pet,'feed',born).result,'egg');
+ let change=transitionAttendancePet(pet,'checkin',born);pet=change.pet;
+ assert.equal(pet.checkins,1);assert.equal(transitionAttendancePet(pet,'checkin',born+1000).changed,false);
+ change=transitionAttendancePet(pet,'feed',born+3600000);pet=change.pet;
+ assert.equal(change.result,'fed');assert.equal(transitionAttendancePet(pet,'feed',born+7200000).changed,false);
+ for(let day=1;day<10;day++)pet=transitionAttendancePet(pet,'checkin',born+day*86400000).pet;
+ assert.equal(attendancePetView(pet,born+9*86400000).level,2,'ten daily check-ins unlock the next creature');
+ const death=pet.lastCheckinAt+72*3600000;
+ assert.equal(attendancePetView(pet,death-1).dead,false);assert.equal(attendancePetView(pet,death).dead,true);
+ assert.equal(transitionAttendancePet(pet,'checkin',death).result,'dead','check-in cannot revive a dead pet');
+ const revived=transitionAttendancePet(pet,'revive',death);pet=revived.pet;
+ assert.equal(pet.checkins,0);assert.equal(attendancePetView(pet,death).level,0);assert.equal(pet.hatchAt,death+3600000);
+ assert.equal(transitionAttendancePet(pet,'revive',death+1).changed,false,'another tab cannot restart the hatch timer');
+ assert.equal(attendancePetView(pet,death+3600000).level,1,'resurrected egg hatches to first fish while offline');
+ const fedBeforeDeath={...newAttendancePet(born-100*3600000),lastCheckinAt:born-73*3600000,fedOn:attendancePetDay(born)};
+ const revivedSameDay=transitionAttendancePet(fedBeforeDeath,'revive',born).pet;
+ assert.equal(transitionAttendancePet(revivedSameDay,'feed',born+3600000).result,'already-fed','resurrection does not bypass the daily feeding limit');
+ assert.equal(attendancePetDay(Date.parse('2026-11-01T16:59:59Z')),'2026-11-01');
+ assert.equal(attendancePetDay(Date.parse('2026-11-01T17:00:00Z')),'2026-11-02','daily actions reset at Bangkok midnight');
+});
+
 test('storm water survives refresh without adding time spent outside the app', () => {
     const values=new Map(),storage={getItem:key=>values.get(key),setItem:(key,value)=>values.set(key,value)};
     let water=loadStormWater(0,storage);advanceStormWater(water,900000);scoopStormWater(water,900000);
@@ -1248,7 +1274,11 @@ let jobDayOverridesList = [], stored = {overrideDate:'2026-11-04',note:'Keep thi
 let historyCalls = 0, denyWrite = false;
 const doc = (_, collection, id) => ({ collection, id });
 // Reproduce owner-based rules rejecting the read of a missing override.
-const runTransaction = async () => { throw Object.assign(new Error('Missing or insufficient permissions.'), {code:'permission-denied'}); };
+let petRecord={uid:'me',attendancePet:{...newAttendancePet(Date.now()-7200000)}},petWrites=0,petReject=false,petFeedAnimations=0;
+const runTransaction = async (_, callback) => callback({
+    get: async ref => { if(ref.collection!=='users'||petReject)throw Object.assign(new Error('Missing or insufficient permissions.'),{code:'permission-denied'});return {exists:()=>true,data:()=>petRecord}; },
+    update: (ref,patch) => {check(ref.collection==='users'&&Object.keys(patch).join(',')==='attendancePet','pet updates only own profile pet state');petRecord={...petRecord,...patch};petWrites++;}
+});
 const setDoc = async (ref, patch, options) => {
     if (denyWrite) throw Object.assign(new Error('Missing or insufficient permissions.'), {code:'permission-denied'});
     check(options.merge, 'checklist must merge');
@@ -1265,6 +1295,8 @@ ${extract('function getHolidayName(', 'function renderDayOffCalendars(')}
 ${extract('function renderChangeHistory(', 'function getDayOffJobPreview(')}
 ${extract('function renderJobChecklist(', "window.addEventListener('beforeunload'")}
 ${extract('let sharedNotesUnsubscribe =', 'function initQuickChatUi(')}
+const AttendancePet3D={start(){},stop(){},update(){},feed(){petFeedAnimations++;}};
+${extract('let attendancePetData =', 'let sharedNotesUnsubscribe =')}
 let noteSnapshot, noteWrites = [], noteUpdates = [], noteDeletes = [], noteUnsubscribed = 0, rejectNoteWrite = false;
 const collection = (_, name) => name;
 const query = (...args) => args, orderBy = (...args) => args, limit = value => value;
@@ -1277,7 +1309,7 @@ let quickChatPanelOpen = false, quickChatUnreadCount = 0;
 const updateQuickChatBadge = () => {};
 ${extract('function openQuickChatPanel(', 'let sharedNotesUnsubscribe =')}
 try {
-    const kept = ['dayOffModal','viewJobModal','changeHistoryModal','sharedNotesPanel','sharedNotesToggle','quickChatToggleBtn','quickChatPanel','sharedNoteImageDialog'].map(id=>document.getElementById(id));
+    const kept = ['dayOffModal','viewJobModal','changeHistoryModal','sharedNotesPanel','sharedNotesToggle','quickChatToggleBtn','quickChatPanel','sharedNoteImageDialog','attendancePetDialog','attendancePetToggle','attendancePetSwimmer'].map(id=>document.getElementById(id));
     check(document.getElementById('scheduleActions').closest('#mainContent'),'job actions are inside schedule area');
     check(!document.getElementById('sidebar').contains(document.getElementById('addJobBtn')),'job actions leave sidebar');
     check(document.getElementById('jobColor')&&document.getElementById('settingsHideOutOfSchedule'),'color and hide-outside controls exist');
@@ -1287,6 +1319,25 @@ try {
     }
     const historyButton = document.getElementById('changeHistoryBtn');
     document.body.replaceChildren(...kept,historyButton);
+    initAttendancePetUi();initAttendancePetUi();attendancePetData=petRecord.attendancePet;attendancePetRef={collection:'users',id:'me'};attendancePetReady=true;
+    document.getElementById('attendancePetToggle').hidden=false;renderAttendancePet();
+    document.getElementById('attendancePetToggle').click();
+    check(document.getElementById('attendancePetDialog').open,'pet care dialog opens');
+    document.getElementById('attendancePetCheckin').click();await new Promise(resolve=>setTimeout(resolve,0));
+    check(petRecord.attendancePet.checkins===1&&document.getElementById('attendancePetCheckin').disabled,'check-in is saved and same-day button disabled');
+    document.getElementById('attendancePetFeed').click();await new Promise(resolve=>setTimeout(resolve,0));
+    check(petWrites===2&&petFeedAnimations===1&&document.getElementById('attendancePetFeed').disabled,'feeding saves once and animates');
+    attendancePetData={...attendancePetData,fedOn:null};await actOnAttendancePet('feed');
+    check(petWrites===2&&petFeedAnimations===1,'stale tab rereads server state and cannot feed twice');
+    petRecord.attendancePet={...petRecord.attendancePet,bornAt:Date.now()-100*3600000,lastCheckinAt:Date.now()-73*3600000};attendancePetData=petRecord.attendancePet;renderAttendancePet();
+    check(document.getElementById('attendancePetCheckin').disabled&&document.getElementById('attendancePetFeed').textContent.includes('Hồi sinh'),'dead pet exposes resurrection instead of feeding');
+    document.getElementById('attendancePetFeed').click();await new Promise(resolve=>setTimeout(resolve,0));
+    check(petRecord.attendancePet.checkins===0&&attendancePetView(petRecord.attendancePet).egg,'resurrection resets progress and starts new egg timer');
+    check(!document.getElementById('attendancePetEggTimer').hidden&&document.getElementById('attendancePetEggTimer').textContent.includes('Nở sau'),'egg shows countdown directly beneath swimmer');
+    check(document.getElementById('attendancePetCountdown').textContent.includes('Dự kiến nở lúc'),'care dialog shows exact hatch date and time');
+    petReject=true;await actOnAttendancePet('checkin');petReject=false;
+    check(petRecord.attendancePet.checkins===0&&document.getElementById('attendancePetStatus').textContent.includes('Chưa lưu'),'failed write does not fake a check-in');
+    stopAttendancePet();check(!document.getElementById('attendancePetDialog').open&&document.getElementById('attendancePetSwimmer').hidden,'sign-out clears the companion UI');
     const cleaned = sanitizeSharedNote('<scr'+'ipt>alert(1)</scr'+'ipt><table><tr><td onclick="alert(1)">Cell</td></tr></table><img src="https://example.com/x"><img src="data:image/png;base64,aGVsbG8=" onerror="alert(1)">');
     check(cleaned.includes('<td>Cell</td>'),'notes preserve pasted table cells');
     check(!/script|onclick|onerror|https:/.test(cleaned),'notes remove scripts, handlers and remote images');
@@ -1461,7 +1512,7 @@ try {
     }
     check(document.querySelector('#dayOffReasonPresets [data-reason="SO"]'),'SO reason is available');
     check(document.getElementById('dayOffYear').closest('.dayoff-period-picker')===document.getElementById('dayOffMonth').closest('.dayoff-period-picker'),'year and month share a picker group');
-    document.body.innerHTML='<pre id="smoke-result">PASS: shared notes (table, image, sanitization, send failures, unread and sign-out), event editor, recurrence, history and checklist</pre>';
+    document.body.innerHTML='<pre id="smoke-result">PASS: attendance pet (check-in, feeding, stale tabs, resurrection, write errors), shared notes, event editor, recurrence, history and checklist</pre>';
 } catch(error) {document.body.innerHTML='<pre id="smoke-result">FAIL: '+escapeHtml(error.stack)+'</pre>';}
 `;
 try {
@@ -1476,6 +1527,47 @@ try {
     if (resolved.startsWith(path.resolve(os.tmpdir()) + path.sep) && path.basename(resolved).startsWith('workpic-ui-')) fs.rmSync(resolved, {recursive:true,force:true,maxRetries:5,retryDelay:200});
 }
 
+})();
+
+// ===== attendance-pet GPU checks =====
+if(process.argv.includes('--pet')) await (async()=>{
+ const chrome=['C:/Program Files/Google/Chrome/Application/chrome.exe','C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(fs.existsSync);assert.ok(chrome,'browser required');
+ const temp=fs.mkdtempSync(path.join(os.tmpdir(),'workpic-pet-'));
+ try{
+  const response=await fetch('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js',{signal:AbortSignal.timeout(15000)});assert.ok(response.ok);fs.writeFileSync(path.join(temp,'three.module.js'),await response.text());
+  const source=fs.readFileSync('app.js','utf8');
+  const shared=source.split('// BEGIN SHARED HELPERS\n')[1].split('// END SHARED HELPERS')[0];
+  let code=source.slice(source.indexOf('const AttendancePet3D ='),source.indexOf('let attendancePetData ='));
+  code=code.replace("import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js')",'Promise.resolve(THREE)').replace('return {start,stop,update,feed:','return {inspect:()=>state,start,stop,update,feed:');
+  const script=`import * as THREE from './three.module.js';
+${shared}
+const renderAttendancePet=()=>{};
+${code}
+try {
+ const check=(ok,message)=>{if(!ok)throw Error(message)};
+ AttendancePet3D.start();
+ let now=Date.now(),pet={...newAttendancePet(now-7200000),lastCheckinAt:now};
+ AttendancePet3D.update(attendancePetView(pet,now));
+ for(let i=0;i<50&&!AttendancePet3D.inspect()?.renderer;i++)await new Promise(resolve=>setTimeout(resolve,100));
+ const s=AttendancePet3D.inspect();check(s?.renderer,'real WebGL pet renderer starts');
+ const cards=[];
+ const capture=(view,label)=>{
+  AttendancePet3D.update(view);s.model.rotation.y=.25;s.model.rotation.z=0;s.renderer.render(s.scene,s.camera);
+  const gl=s.renderer.getContext(),pixels=new Uint8Array(s.renderer.domElement.width*s.renderer.domElement.height*4);gl.readPixels(0,0,s.renderer.domElement.width,s.renderer.domElement.height,gl.RGBA,gl.UNSIGNED_BYTE,pixels);
+  check(pixels.some((value,index)=>index%4===3&&value>0),'visible 3D creature: '+label);
+  cards.push('<article><img src="'+s.renderer.domElement.toDataURL()+'"><strong>'+label+'</strong></article>');
+ };
+ capture(attendancePetView(newAttendancePet(now),now),'Trứng');
+ for(let index=0;index<ATTENDANCE_PET_FORMS.length;index++){pet={...pet,checkins:index*10};capture(attendancePetView(pet,now),'Cấp '+(index+1)+' · '+ATTENDANCE_PET_FORMS[index].name);}
+ AttendancePet3D.feed();AttendancePet3D.stop();check(!document.querySelector('#attendancePetArt canvas'),'renderer disposes on stop');
+ document.body.innerHTML='<main class="pet-gallery">'+cards.join('')+'</main><pre id="pet-result">PASS: 20 real 3D pet forms render visible pixels; renderer cleanup works</pre>';
+}catch(error){document.body.innerHTML='<pre id="pet-result">FAIL: '+error.stack+'</pre>';}
+`;
+  fs.writeFileSync(path.join(temp,'pet.html'),'<!doctype html><meta charset="utf-8"><style>'+fs.readFileSync('styles.css','utf8')+'body{background:#0c1524!important;color:white;padding:20px;height:auto;overflow:auto}.pet-gallery{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}.pet-gallery article{display:grid;justify-items:center;gap:8px;padding:15px;background:#172337;border:1px solid #29405c;border-radius:14px}.pet-gallery img{width:190px;height:137px;object-fit:contain}.pet-gallery strong{font:13px sans-serif}#pet-result{color:#7dd3fc}</style><body><button id="attendancePetSwimmer" class="attendance-pet-swimmer"><span id="attendancePetArt"></span></button><script type="module">'+script+'</script>');
+  fs.mkdirSync('.artifacts',{recursive:true});
+  const result=spawnSync(chrome,['--headless','--no-first-run','--disable-extensions','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--allow-file-access-from-files','--user-data-dir='+path.join(temp,'profile'),'--window-size=1500,1050','--screenshot='+path.resolve('.artifacts/attendance-pet-stages.png'),'--dump-dom','--virtual-time-budget=12000',pathToFileURL(path.join(temp,'pet.html')).href],{encoding:'utf8',timeout:60000,windowsHide:true,maxBuffer:12*1024*1024});
+  const output=result.stdout?.match(/<pre id="pet-result">([\s\S]*?)<\/pre>/)?.[1];assert.ok(output?.startsWith('PASS:'),output||result.error?.message||result.stderr?.slice(-1500)||'No pet result');console.log(output);
+ }finally{const resolved=path.resolve(temp);if(resolved.startsWith(path.resolve(os.tmpdir())+path.sep)&&path.basename(resolved).startsWith('workpic-pet-'))fs.rmSync(resolved,{recursive:true,force:true,maxRetries:5,retryDelay:200});}
 })();
 
 // ===== theme-fx-ui checks =====

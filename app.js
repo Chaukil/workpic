@@ -284,6 +284,75 @@ function createScheduleCache() {
     };
 }
 
+const ATTENDANCE_PET_FORMS = [
+    {name:'Cá bột',kind:'fish',color:'#7dd3fc',shape:'small'},
+    {name:'Cá vàng',kind:'fish',color:'#f59e0b',shape:'gold'},
+    {name:'Cá hề',kind:'fish',color:'#f97316',shape:'clown'},
+    {name:'Cá thiên thần',kind:'fish',color:'#c4b5fd',shape:'angel'},
+    {name:'Cá đuôi gai',kind:'fish',color:'#2563eb',shape:'tang'},
+    {name:'Cá sư tử',kind:'fish',color:'#dc6846',shape:'lion'},
+    {name:'Cá nóc ngọc',kind:'fish',color:'#6ee7b7',shape:'puffer'},
+    {name:'Cá kiếm',kind:'fish',color:'#38bdf8',shape:'sword'},
+    {name:'Cá đuối',kind:'fish',color:'#a78bfa',shape:'ray'},
+    {name:'Cá mập đầu búa',kind:'shark',color:'#94a3b8',shape:'hammer'},
+    {name:'Cá mập trắng',kind:'shark',color:'#64748b',shape:'shark'},
+    {name:'Cá voi sát thủ',kind:'whale',color:'#172033',shape:'orca'},
+    {name:'Cá voi xanh',kind:'whale',color:'#3788ad',shape:'blue'},
+    {name:'Khủng long biển',kind:'dino',color:'#2dd4bf',shape:'sea'},
+    {name:'Khủng long con',kind:'dino',color:'#86efac',shape:'baby'},
+    {name:'Khủng long ba sừng',kind:'dino',color:'#fbbf24',shape:'triceratops'},
+    {name:'Khủng long giáp lưng',kind:'dino',color:'#fb7185',shape:'stego'},
+    {name:'Khủng long bạo chúa',kind:'dino',color:'#4ade80',shape:'trex'},
+    {name:'Rồng biển',kind:'dino',color:'#818cf8',shape:'dragon'}
+];
+
+function attendancePetDay(now) {
+    const parts = new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(now));
+    const part = type => parts.find(item=>item.type===type).value;
+    return `${part('year')}-${part('month')}-${part('day')}`;
+}
+
+function newAttendancePet(now) {
+    return {version:1,bornAt:now,hatchAt:now+3600000,checkins:0,lastCheckinAt:null,lastCheckinDay:null,fedOn:null,feeds:0,life:1,updatedAt:now};
+}
+
+function attendancePetView(raw, now = Date.now()) {
+    const pet = raw && raw.version === 1 && Number.isFinite(raw.bornAt) && Number.isFinite(raw.hatchAt) ? raw : newAttendancePet(now);
+    const checkinCount = Number(pet.checkins);
+    const checkins = Number.isFinite(checkinCount) ? Math.max(0,Math.floor(checkinCount)) : 0;
+    const diesAt = Math.max(pet.bornAt,Number(pet.lastCheckinAt)||pet.bornAt)+72*3600000;
+    const dead = now >= diesAt;
+    const egg = now < pet.hatchAt;
+    const level = egg ? 0 : 1+Math.floor(checkins/10);
+    const formIndex = Math.max(0,Math.min(ATTENDANCE_PET_FORMS.length-1,level-1));
+    const form = ATTENDANCE_PET_FORMS[formIndex];
+    return {pet,dead,egg,level,diesAt,checkins,today:attendancePetDay(now),name:egg?'Trứng đại dương':form.name+(level>ATTENDANCE_PET_FORMS.length?` · Biến thể ${level-ATTENDANCE_PET_FORMS.length+1}`:''),form,
+        checkedToday:pet.lastCheckinDay===attendancePetDay(now),fedToday:pet.fedOn===attendancePetDay(now),untilHatch:Math.max(0,pet.hatchAt-now),nextEvolutionIn:10-checkins%10};
+}
+
+function transitionAttendancePet(raw, action, now = Date.now()) {
+    const view = attendancePetView(raw,now);
+    const pet = {...view.pet};
+    if (action==='init') return {pet,changed:!raw||raw.version!==1||!Number.isFinite(raw.bornAt)||!Number.isFinite(raw.hatchAt),result:'ready'};
+    if (action==='revive') {
+        if (!view.dead) return {pet,changed:false,result:'alive'};
+        return {pet:{...newAttendancePet(now),fedOn:pet.fedOn===view.today?view.today:null,life:(Number(pet.life)||1)+1},changed:true,result:'revived'};
+    }
+    if (view.dead) return {pet,changed:false,result:'dead'};
+    if (action==='checkin') {
+        if (view.checkedToday) return {pet,changed:false,result:'already-checked'};
+        pet.checkins=view.checkins+1;pet.lastCheckinAt=now;pet.lastCheckinDay=view.today;pet.updatedAt=now;
+        return {pet,changed:true,result:'checked'};
+    }
+    if (action==='feed') {
+        if (view.egg) return {pet,changed:false,result:'egg'};
+        if (view.fedToday) return {pet,changed:false,result:'already-fed'};
+        pet.fedOn=view.today;pet.feeds=(Number(pet.feeds)||0)+1;pet.updatedAt=now;
+        return {pet,changed:true,result:'fed'};
+    }
+    return {pet,changed:false,result:'invalid'};
+}
+
 function advanceStormWater(water, now) {
     const elapsed = Math.max(0, now - water.lastAt);
     water.level = Math.min(.5, Math.max(0, water.level) + elapsed / 1800000 * .5);
@@ -3785,6 +3854,7 @@ async function changeAvatar(file) {
 }
 
 function handleSignedOut() {
+    stopAttendancePet();
     accessControl.stop();
     stopUiRefreshLoop();
     clearInterval(notificationCheckInterval);
@@ -3911,6 +3981,7 @@ function initializeAuthenticatedApp() {
         listenWorkHours();
         listenJobDayOverrides();
         listenUsersAvatars();
+        startAttendancePet();
     });
 }
 
@@ -4055,6 +4126,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     initQuickChatUi();
     initSharedNotesUi();
+    initAttendancePetUi();
     initLayoutDropdown();
 
     // Event Listeners
@@ -8265,6 +8337,297 @@ function toggleQuickChatPanel() {
     } else {
         openQuickChatPanel();
     }
+}
+
+const AttendancePet3D = (()=>{
+    let state=null,generation=0;
+    const fallback = view => {
+        const art=document.getElementById('attendancePetArt');
+        if (!art) return;
+        const color=view.dead?'#94a3b8':view.form.color;
+        art.innerHTML=view.egg?`<svg viewBox="0 0 140 100" aria-hidden="true"><defs><radialGradient id="pet-egg-light"><stop stop-color="#fffef5"/><stop offset="1" stop-color="#b9c6d8"/></radialGradient></defs><ellipse cx="70" cy="53" rx="29" ry="38" fill="url(#pet-egg-light)"/><path d="m58 35 9 6-6 9 14 6-8 10" fill="none" stroke="#d5ab66" stroke-width="2"/><circle cx="82" cy="31" r="5" fill="#e4c989"/></svg>`
+            :view.form.kind==='dino'?`<svg viewBox="0 0 140 100" aria-hidden="true"><path d="M20 66 4 51 35 59Q45 31 77 43L91 29 116 28 131 42 125 56 103 53 92 68 91 88 80 88 76 69 57 70 51 88 40 88 43 66Z" fill="${color}"/><path d="m47 45 5-13 8 9 9-16 8 19" fill="#fbbf24"/><circle cx="115" cy="38" r="3" fill="#0f172a"/></svg>`
+            :`<svg viewBox="0 0 140 100" aria-hidden="true"><defs><radialGradient id="pet-fish-light"><stop stop-color="#ecfeff"/><stop offset="1" stop-color="${color}"/></radialGradient></defs><path class="pet-fallback-tail" d="m42 50-28-24 4 24-4 24Z" fill="${color}"/><ellipse cx="76" cy="50" rx="42" ry="${view.form.kind==='whale'?25:29}" fill="url(#pet-fish-light)"/><path d="m61 26 19-16 12 21M61 73l22 13 7-15" fill="${color}"/><circle cx="101" cy="41" r="7" fill="white"/><circle cx="104" cy="42" r="4" fill="#0f172a"/><path d="M113 58q-8 4-12 0" fill="none" stroke="#0f172a" stroke-width="2"/></svg>`;
+    };
+    function disposeModel(s) {
+        if (!s.model) return;
+        const geometries=new Set(),materials=new Set();
+        s.model.traverse(object=>{if(object.geometry)geometries.add(object.geometry);const mats=object.material?Array.isArray(object.material)?object.material:[object.material]:[];mats.forEach(mat=>materials.add(mat));});
+        s.scene.remove(s.model);geometries.forEach(value=>value.dispose());materials.forEach(value=>value.dispose());
+    }
+    function build(s,view) {
+        disposeModel(s);
+        const T=s.THREE,group=new T.Group();s.model=group;s.rig=[];s.mouth=null;s.scene.add(group);
+        const variant=view.level>ATTENDANCE_PET_FORMS.length;
+        const mainColor=variant?new T.Color().setHSL((view.level*.117)%1,.65,.55):new T.Color(view.form.color);
+        if(view.dead)mainColor.lerp(new T.Color('#64748b'),.8);
+        const material=color=>new T.MeshPhysicalMaterial({color,roughness:.28,metalness:.08,clearcoat:.85,clearcoatRoughness:.2});
+        const bodyMat=material(mainColor),finMat=material(mainColor.clone().multiplyScalar(.7)),cream=material('#e5f3ed'),black=material('#10202d');
+        const sphere=(parent,x,y,z,sx,sy,sz,mat)=>{const mesh=new T.Mesh(new T.SphereGeometry(1,28,18),mat);mesh.position.set(x,y,z);mesh.scale.set(sx,sy,sz);parent.add(mesh);return mesh;};
+        const cone=(parent,x,y,z,radius,length,mat,angle=0)=>{const mesh=new T.Mesh(new T.ConeGeometry(radius,length,12),mat);mesh.position.set(x,y,z);mesh.rotation.z=angle;parent.add(mesh);return mesh;};
+        const fin=(parent,points,mat,z=0)=>{const shape=new T.Shape();points.forEach(([x,y],index)=>index?shape.lineTo(x,y):shape.moveTo(x,y));shape.closePath();const mesh=new T.Mesh(new T.ExtrudeGeometry(shape,{depth:.045,bevelEnabled:true,bevelSegments:1,steps:1,bevelSize:.025,bevelThickness:.015}),mat);mesh.position.z=z;parent.add(mesh);return mesh;};
+        const eyes=(parent,x,y,z)=>{[-1,1].forEach(side=>{sphere(parent,x,y,z*side,.105,.115,.045,cream);sphere(parent,x+.024,y,.045*side+z*side,.065,.075,.025,black);sphere(parent,x+.038,y+.025,.07*side+z*side,.02,.025,.012,cream);});};
+        if(view.egg){
+            sphere(group,0,0,0,.62,.84,.62,material('#ece9da'));
+            for(let i=0;i<10;i++){const angle=i*2.399;const y=-.5+i*.105;const r=.61*Math.sqrt(Math.max(.1,1-y*y));sphere(group,Math.sin(angle)*r,y,Math.cos(angle)*r,.05,.07,.025,material(i%2?'#bfaa77':'#adc4c7'));}
+            group.rotation.z=.07;return;
+        }
+        const shape=view.form.shape,kind=view.form.kind;
+        if(shape==='sea'){
+            sphere(group,-.15,0,0,1.05,.34,.34,bodyMat);sphere(group,.85,.06,0,.62,.22,.25,bodyMat);sphere(group,1.18,-.08,0,.48,.08,.24,cream);eyes(group,1.02,.13,.24);
+            const tail=cone(group,-1.55,.03,0,.25,1.3,finMat,Math.PI/2);s.rig.push({mesh:tail,axis:'y',amount:.25,phase:0});
+            for(const side of [-1,1])for(const x of [-.5,.5]){const flipper=fin(group,[[x,.03],[x-.4,-.7],[x+.2,-.1]],finMat,side*.25);flipper.rotation.x=side*.8;s.rig.push({mesh:flipper,axis:'x',base:side*.8,amount:.25,phase:side+x});}
+            for(let i=0;i<6;i++)cone(group,.75+i*.13,-.04,.24,.025,.1,cream,Math.PI);
+            return;
+        }
+        if(shape==='trex'){
+            sphere(group,-.12,0,0,.76,.54,.42,bodyMat);sphere(group,.45,.5,0,.4,.56,.33,bodyMat);sphere(group,.98,.82,0,.6,.39,.35,bodyMat);sphere(group,1.09,.59,0,.5,.15,.34,finMat);eyes(group,1.08,.94,.33);
+            const tail=cone(group,-1.15,-.03,0,.33,1.4,finMat,Math.PI/2);s.rig.push({mesh:tail,axis:'y',amount:.15,phase:0});
+            for(const side of [-1,1]){const leg=sphere(group,-.3,-.53,side*.37,.24,.5,.22,bodyMat);sphere(leg,.8,-.78,.1,1.45,.2,1.05,finMat);s.rig.push({mesh:leg,axis:'z',amount:.23,phase:side<0?0:Math.PI});const arm=sphere(group,.55,.13,side*.35,.1,.22,.1,bodyMat);arm.rotation.z=.6;s.rig.push({mesh:arm,axis:'z',base:.6,amount:.12,phase:side});}
+            for(let i=0;i<6;i++)for(const side of [-1,1])cone(group,.85+i*.12,.58,side*.3,.03,.12,cream,Math.PI);
+            return;
+        }
+        if(kind==='dino'){
+            sphere(group,-.1,0,0,.92+(variant?(view.level%4)*.06:0),.5,.43,bodyMat);sphere(group,.68,.3,0,.36,.57,.32,bodyMat);sphere(group,1.02,.72,0,.5,.36,.35,bodyMat);
+            sphere(group,1.25,.6,0,.4,.2,.3,cream);eyes(group,1.19,.82,.31);
+            const tail=cone(group,-1.28,.02,0,.31,1.45,finMat,Math.PI/2);s.rig.push({mesh:tail,axis:'y',amount:.17,phase:0});
+            const shortArms=shape==='trex';
+            for(const x of [-.55,.55])for(const z of [-.32,.32]){
+                const leg=sphere(group,x,-.51,z,shortArms&&x>.0?.12:.19,shortArms&&x>0?.24:.43,.18,bodyMat);
+                s.rig.push({mesh:leg,axis:'z',amount:.22,phase:x*z>0?0:Math.PI});
+                sphere(leg,.2,-.8,.05,1.1,.25,1.05,finMat);
+            }
+            if(shape==='triceratops'){
+                sphere(group,.84,.93,0,.13,.48,.56,finMat);cone(group,1.13,1.2,.22,.07,.5,cream,-.4);cone(group,1.13,1.2,-.22,.07,.5,cream,-.4);cone(group,1.54,.83,0,.07,.27,cream,-.7);
+            }
+            if(['stego','dragon','sea'].includes(shape)||variant){
+                const count=variant?7+view.level%7:shape==='dragon'?9:6;
+                for(let i=0;i<count;i++)cone(group,-1.15+i*.25,.5+Math.sin(i/count*Math.PI)*.2,0,.13,.35+(i%2)*.15,material(shape==='stego'?'#fbbf24':'#e9d5ff'));
+            }
+            if(shape==='dragon')[-1,1].forEach(side=>{const wing=fin(group,[[-.4,.2],[-.8,1.3],[.15,.95],[.45,.25]],material('#c4b5fd'),side*.35);wing.rotation.x=side*.8;s.rig.push({mesh:wing,axis:'x',base:side*.8,amount:.2,phase:side});});
+            return;
+        }
+        const round=shape==='puffer',disc=['angel','tang'].includes(shape),whale=kind==='whale',ray=shape==='ray';
+        const size=shape==='small'?.78:whale?1.2:1;
+        sphere(group,.05,0,0,size,ray?.2:round?.72:disc?.76:whale?.57:.48,ray?.86:round?.63:disc?.3:.4,bodyMat);
+        if(whale||kind==='shark')sphere(group,.2,-.23,.01,.8,.25,.34,cream);
+        const tail=new T.Group();tail.position.x=-size*.85;group.add(tail);
+        if(ray){cone(tail,-.7,0,0,.045,1.5,finMat,Math.PI/2);group.rotation.x=.7;}
+        else fin(tail,[[0,0],[-.75,.5],[-.58,0],[-.75,-.5]],shape==='gold'?material('#f97316'):shape==='tang'?material('#fde047'):finMat);
+        if(whale)tail.rotation.x=Math.PI/2;
+        s.rig.push({mesh:tail,axis:'y',amount:.32,phase:0});
+        if(!ray)fin(group,[[-.48,.2],[-.25,kind==='shark'?1:shape==='angel'?1.2:.76],[.35,.35]],finMat);
+        if(shape==='angel')fin(group,[[-.4,-.3],[.1,-1.1],[.4,-.32]],finMat);
+        for(const side of [-1,1]){const wing=fin(group,[[.3,.1],[-.3,-.62],[-.57,-.15]],finMat,side*.3);wing.rotation.x=side*.65;s.rig.push({mesh:wing,axis:'x',base:side*.65,amount:.15,phase:side});}
+        if(ray)[-1,1].forEach(side=>{const wing=sphere(group,-.05,0,side*.72,.75,.08,.8,bodyMat);s.rig.push({mesh:wing,axis:'x',amount:.16,phase:side});});
+        if(shape==='hammer'){sphere(group,.85,.03,0,.26,.19,.86,bodyMat);eyes(group,.95,.1,.81);}else eyes(group,size*.69,.13,round?.55:disc?.28:.35);
+        if(shape==='sword')cone(group,1.35,-.06,0,.06,.95,bodyMat,-Math.PI/2);
+        if(shape==='clown')for(const x of [-.55,.1,.65]){const ring=new T.Mesh(new T.TorusGeometry(.42,.055,8,30),cream);ring.rotation.y=Math.PI/2;ring.position.x=x;ring.scale.y=1.13;group.add(ring);}
+        if(shape==='lion'||round)for(let i=0;i<14;i++){const angle=i/14*Math.PI*2;cone(group,Math.sin(angle)*.75,Math.cos(angle)*.63,0,.035,shape==='lion'?.65:.22,finMat,-angle);}
+        if(round)for(let i=0;i<12;i++)sphere(group,Math.sin(i*2.4)*.68,Math.cos(i*1.7)*.5,.5,.035,.04,.025,finMat);
+        if(shape==='orca')for(const side of [-1,1])sphere(group,.65,.28,side*.39,.21,.13,.025,cream);
+        if(whale)sphere(group,.3,.52,0,.08,.025,.065,black);
+        if(kind==='shark')for(let i=0;i<5;i++)for(const side of [-1,1])cone(group,.53+i*.12,-.28,side*.24,.024,.09,cream,Math.PI);
+        const mouth=new T.Mesh(new T.TorusGeometry(.07,.018,8,18),finMat);mouth.position.set(size*.98,-.08,0);mouth.rotation.y=Math.PI/2;group.add(mouth);s.mouth=mouth;
+    }
+    function stop(){
+        generation++;const s=state;state=null;if(!s)return;
+        cancelAnimationFrame(s.raf);document.removeEventListener('visibilitychange',s.visibility);
+        s.button.removeEventListener('mouseenter',s.enter);s.button.removeEventListener('mouseleave',s.leave);s.button.removeEventListener('focus',s.enter);s.button.removeEventListener('blur',s.leave);
+        if(s.renderer){disposeModel(s);s.renderer.dispose();s.renderer.domElement.remove();}
+        document.getElementById('attendancePetArt')?.replaceChildren();
+    }
+    function start(){
+        stop();const token=generation,button=document.getElementById('attendancePetSwimmer');
+        if(!button)return;
+        const s={button,raf:0,renderer:null,view:null,signature:'',x:Math.max(15,window.innerWidth-180),y:Math.max(80,window.innerHeight-240),targetX:80,targetY:150,last:0,t:0,hover:false,fedAt:-100,nextTarget:0,facingAngle:0};state=s;
+        s.enter=()=>{s.hover=true;};s.leave=()=>{s.hover=false;};button.addEventListener('mouseenter',s.enter);button.addEventListener('mouseleave',s.leave);button.addEventListener('focus',s.enter);button.addEventListener('blur',s.leave);
+        const frame=now=>{
+            if(state!==s||document.hidden)return;s.raf=requestAnimationFrame(frame);
+            if(s.last&&now-s.last<32)return;const dt=s.last?Math.min(.06,(now-s.last)/1000):.033;s.last=now;s.t+=dt;
+            if(document.body.classList.contains('modal-open')||document.querySelector('dialog[open]'))return;
+            const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            const maxX=Math.max(12,window.innerWidth-150),maxY=Math.max(80,window.innerHeight-145);
+            if(s.view?.dead||reduced){s.x=maxX;s.y=maxY;}
+            else if(!s.hover){
+                if(s.t>s.nextTarget||Math.hypot(s.targetX-s.x,s.targetY-s.y)<15){s.targetX=12+Math.random()*Math.max(1,maxX-12);s.targetY=75+Math.random()*Math.max(1,maxY-75);s.nextTarget=s.t+15;}
+                s.x+=(s.targetX-s.x)*dt*.16;s.y+=(s.targetY-s.y)*dt*.16;
+            }
+            s.x=Math.max(8,Math.min(maxX,s.x));s.y=Math.max(70,Math.min(maxY,s.y));
+            button.style.transform=`translate3d(${s.x}px,${s.y+(reduced?0:Math.sin(s.t*1.7)*5)}px,0)`;
+            if(s.renderer&&s.model){
+                const alive=!s.view?.dead;
+                const targetAngle=s.targetX<s.x?Math.PI:0;
+                const turn=Math.atan2(Math.sin(targetAngle-s.facingAngle),Math.cos(targetAngle-s.facingAngle));
+                s.facingAngle+=turn*Math.min(1,dt*3);
+                s.model.rotation.y=s.facingAngle+(reduced?0:Math.sin(s.t*.9)*.22);
+                s.model.rotation.z=alive?(reduced?0:Math.sin(s.t*1.3)*.045):Math.PI*.75;
+                if(alive&&!reduced)s.rig.forEach(part=>{part.mesh.rotation[part.axis]=(part.base||0)+Math.sin(s.t*4+part.phase)*part.amount;});
+                const feeding=Math.max(0,1-(s.t-s.fedAt)/1.4);s.model.scale.setScalar(1+feeding*.07);if(s.mouth)s.mouth.scale.y=1+feeding*Math.abs(Math.sin(s.t*14));
+                s.renderer.render(s.scene,s.camera);
+            }
+        };
+        s.visibility=()=>{cancelAnimationFrame(s.raf);if(!document.hidden){s.last=0;s.raf=requestAnimationFrame(frame);renderAttendancePet();}};
+        document.addEventListener('visibilitychange',s.visibility);s.raf=requestAnimationFrame(frame);
+        import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js').then(T=>{
+            if(state!==s||token!==generation)return;
+            try{
+                const renderer=new T.WebGLRenderer({alpha:true,antialias:true,powerPreference:'low-power'});renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.5));renderer.setSize(144,104);renderer.setClearColor(0,0);renderer.outputColorSpace=T.SRGBColorSpace;
+                s.THREE=T;s.renderer=renderer;s.scene=new T.Scene();s.camera=new T.PerspectiveCamera(38,144/104,.1,30);s.camera.position.set(.2,.35,5.7);s.camera.lookAt(0,0,0);
+                s.scene.add(new T.HemisphereLight('#e5f8ff','#344b6a',2));const light=new T.DirectionalLight('#fff7d6',3);light.position.set(2,4,5);s.scene.add(light);const rim=new T.DirectionalLight('#67d8ff',2);rim.position.set(-3,1,-3);s.scene.add(rim);
+                document.getElementById('attendancePetArt').replaceChildren(renderer.domElement);
+                if(s.view)build(s,s.view);
+            }catch(error){if(s.view)fallback(s.view);}
+        }).catch(()=>{if(state===s&&s.view)fallback(s.view);});
+    }
+    function update(view){const s=state;if(!s)return;s.view=view;const key=`${view.egg?'egg':view.level}:${view.dead}`;if(s.signature===key)return;s.signature=key;if(s.renderer)build(s,view);else fallback(view);}
+    return {start,stop,update,feed:()=>{if(state)state.fedAt=state.t;}};
+})();
+
+let attendancePetData = null;
+let attendancePetRef = null;
+let attendancePetUnsubscribe = null;
+let attendancePetInterval = null;
+let attendancePetGeneration = 0;
+let attendancePetBusy = false;
+let attendancePetReady = false;
+let attendancePetBubbleTimer = null;
+
+function attendancePetMessage(message) {
+    document.getElementById('attendancePetStatus').textContent = message;
+    const bubble = document.getElementById('attendancePetBubble');
+    bubble.textContent = message; bubble.classList.add('show');
+    clearTimeout(attendancePetBubbleTimer);
+    attendancePetBubbleTimer = setTimeout(()=>bubble.classList.remove('show'),3500);
+}
+
+function renderAttendancePet() {
+    if (!currentUser) return;
+    const view = attendancePetView(attendancePetData);
+    const duration = value => {
+        const seconds = Math.max(0,Math.ceil(value/1000));
+        return `${Math.floor(seconds/3600)}h ${Math.floor(seconds%3600/60)}m ${seconds%60}s`;
+    };
+    document.getElementById('attendancePetName').textContent = view.dead ? `${view.name} · Đã chết` : view.name;
+    document.getElementById('attendancePetLevel').textContent = view.egg ? 'Trứng · Cấp 0' : `Cấp ${view.level}`;
+    document.getElementById('attendancePetDescription').textContent = view.dead ? 'Bạn đã vắng điểm danh đủ 72 giờ. Bấm thú cưng hoặc Hồi sinh để bắt đầu một cuộc đời mới.'
+        : view.egg ? 'Trứng đang ấp. Bạn vẫn có thể điểm danh hôm nay để tích ngày tiến hóa.'
+        : view.fedToday ? 'Bụng no rồi! Hẹn bạn cho ăn vào ngày mai.' : 'Bấm vào thú cưng đang bơi để cho ăn hôm nay.';
+    const hatchTime = new Date(view.pet.hatchAt).toLocaleString('vi-VN',{timeZone:'Asia/Bangkok'});
+    document.getElementById('attendancePetCountdown').textContent = view.dead ? 'Hồi sinh: trở về trứng, nở sau 1 giờ.' : view.egg ? `Nở sau ${duration(view.untilHatch)} · Dự kiến nở lúc ${hatchTime}. Thời gian vẫn tính khi đóng web.` : `Cần điểm danh trước ${new Date(view.diesAt).toLocaleString('vi-VN',{timeZone:'Asia/Bangkok'})}.`;
+    const eggTimer = document.getElementById('attendancePetEggTimer');
+    eggTimer.hidden = !view.egg || view.dead || !attendancePetReady;
+    eggTimer.textContent = `Nở sau ${duration(view.untilHatch)}`;
+    eggTimer.title = `Dự kiến nở lúc ${hatchTime}`;
+    document.getElementById('attendancePetProgress').style.width = `${view.checkins%10*10}%`;
+    document.getElementById('attendancePetProgressText').textContent = `${view.checkins} ngày điểm danh trong cuộc đời này · Còn ${view.nextEvolutionIn} ngày điểm danh để tiến hóa.`;
+    const checkin = document.getElementById('attendancePetCheckin');
+    checkin.textContent = view.checkedToday ? 'Đã điểm danh hôm nay' : 'Điểm danh hôm nay';
+    checkin.disabled = !attendancePetReady || attendancePetBusy || view.dead || view.checkedToday;
+    const feed = document.getElementById('attendancePetFeed');
+    feed.textContent = view.dead ? 'Hồi sinh thành trứng' : view.egg ? 'Đang ấp trứng' : view.fedToday ? 'Đã cho ăn hôm nay' : 'Cho ăn';
+    feed.disabled = !attendancePetReady || attendancePetBusy || (!view.dead && (view.egg || view.fedToday));
+    document.getElementById('attendancePetDot').hidden = view.checkedToday && !view.dead;
+    const swimmer = document.getElementById('attendancePetSwimmer');
+    const petTitle = `${view.name} · Cấp ${view.level} · ${view.dead?'Bấm để hồi sinh':view.egg?`Nở sau ${duration(view.untilHatch)} · ${hatchTime}`:view.fedToday?'Đã cho ăn hôm nay':'Bấm để cho ăn'}`;
+    if (swimmer.title!==petTitle) {swimmer.title=petTitle;swimmer.setAttribute('aria-label',petTitle);}
+    swimmer.disabled = !attendancePetReady || attendancePetBusy;
+    swimmer.classList.toggle('pet-is-dead',view.dead);
+    AttendancePet3D.update(view);
+}
+
+async function actOnAttendancePet(action) {
+    if (!currentUser || !attendancePetRef || attendancePetBusy || !attendancePetReady) return;
+    const generation = attendancePetGeneration, uid = currentUser.uid, ref = attendancePetRef;
+    const previousLevel = attendancePetView(attendancePetData).level;
+    attendancePetBusy = true; renderAttendancePet();
+    try {
+        const result = await runTransaction(db, async transaction => {
+            const snapshot = await transaction.get(ref);
+            if (!snapshot.exists() || snapshot.data().uid !== uid) throw new Error('Không đọc được hồ sơ thú cưng.');
+            const change = transitionAttendancePet(snapshot.data().attendancePet,action,Date.now());
+            if (change.changed) transaction.update(ref,{attendancePet:change.pet});
+            return change;
+        });
+        if (generation !== attendancePetGeneration || currentUser?.uid !== uid) return;
+        attendancePetData = result.pet;
+        const messages = {checked:'Điểm danh thành công! Thêm một ngày tiến hóa.',fed:'Măm măm! Cảm ơn bạn đã cho ăn.',revived:'Đã hồi sinh! Trứng sẽ nở sau 1 giờ.',dead:'Thú cưng đã chết. Bấm Hồi sinh để bắt đầu lại.',egg:'Trứng chưa nở, chưa thể cho ăn.',alive:'Thú cưng đã được hồi sinh rồi.', 'already-checked':'Bạn đã điểm danh hôm nay.', 'already-fed':'Hôm nay đã cho ăn rồi. Hẹn ngày mai!'};
+        const after = attendancePetView(result.pet);
+        attendancePetMessage(result.result==='checked' && after.level>previousLevel && !after.egg ? `Tiến hóa! Cấp ${after.level} · ${after.name}.` : messages[result.result] || 'Đã đồng bộ thú cưng.');
+        if (result.result==='fed') AttendancePet3D.feed();
+    } catch (error) {
+        if (generation===attendancePetGeneration) attendancePetMessage('Chưa lưu được. Kiểm tra kết nối và quyền cập nhật hồ sơ rồi thử lại.');
+    } finally {
+        if (generation===attendancePetGeneration) { attendancePetBusy=false; renderAttendancePet(); }
+    }
+}
+
+async function startAttendancePet() {
+    stopAttendancePet();
+    if (!currentUser) return;
+    const generation = attendancePetGeneration, uid = currentUser.uid;
+    document.getElementById('attendancePetToggle').hidden=false;
+    document.getElementById('attendancePetStatus').textContent='Đang đồng bộ thú cưng…';
+    try {
+        const profiles = await getDocs(query(collection(db,'users'),where('uid','==',uid)));
+        if (generation!==attendancePetGeneration || currentUser?.uid!==uid) return;
+        const profile = [...profiles.docs].sort((a,b)=>a.id.localeCompare(b.id))[0];
+        if (!profile) throw new Error('Missing profile');
+        attendancePetRef = profile.ref;
+        const pet = await runTransaction(db,async transaction=>{
+            const snapshot=await transaction.get(profile.ref);
+            if (!snapshot.exists() || snapshot.data().uid!==uid) throw new Error('Missing profile');
+            const change=transitionAttendancePet(snapshot.data().attendancePet,'init',Date.now());
+            if (change.changed) transaction.update(profile.ref,{attendancePet:change.pet});
+            return change.pet;
+        });
+        if (generation!==attendancePetGeneration || currentUser?.uid!==uid) return;
+        attendancePetData=pet;attendancePetReady=true;
+        document.getElementById('attendancePetRetry').hidden=true;
+        document.getElementById('attendancePetStatus').textContent='Thú cưng đã được lưu theo tài khoản.';
+        document.getElementById('attendancePetSwimmer').hidden=false;
+        AttendancePet3D.start();renderAttendancePet();
+        attendancePetInterval=setInterval(renderAttendancePet,1000);
+        attendancePetUnsubscribe=onSnapshot(profile.ref,snapshot=>{
+            if (generation!==attendancePetGeneration || currentUser?.uid!==uid) return;
+            if (snapshot.exists() && snapshot.data().attendancePet) {attendancePetData=snapshot.data().attendancePet;renderAttendancePet();}
+        },()=>{
+            if (generation!==attendancePetGeneration) return;
+            attendancePetReady=false;renderAttendancePet();
+            document.getElementById('attendancePetStatus').textContent='Mất đồng bộ thú cưng. Bấm Thử kết nối lại.';
+            document.getElementById('attendancePetRetry').hidden=false;
+        });
+    } catch (error) {
+        if (generation!==attendancePetGeneration) return;
+        document.getElementById('attendancePetStatus').textContent='Chưa tải được thú cưng. Cần quyền đọc/cập nhật hồ sơ tài khoản trên Firebase.';
+        document.getElementById('attendancePetRetry').hidden=false;renderAttendancePet();
+    }
+}
+
+function stopAttendancePet() {
+    attendancePetGeneration++;attendancePetUnsubscribe?.();attendancePetUnsubscribe=null;
+    clearInterval(attendancePetInterval);clearTimeout(attendancePetBubbleTimer);
+    attendancePetData=null;attendancePetRef=null;attendancePetReady=false;attendancePetBusy=false;
+    AttendancePet3D.stop();
+    const dialog=document.getElementById('attendancePetDialog');
+    if (dialog?.open) dialog.close();
+    const toggle=document.getElementById('attendancePetToggle');if(toggle)toggle.hidden=true;
+    const swimmer=document.getElementById('attendancePetSwimmer');if(swimmer)swimmer.hidden=true;
+}
+
+function initAttendancePetUi() {
+    const toggle=document.getElementById('attendancePetToggle');
+    if (!toggle || toggle.dataset.ready) return;toggle.dataset.ready='true';
+    const dialog=document.getElementById('attendancePetDialog');
+    toggle.addEventListener('click',()=>{renderAttendancePet();if(!dialog.open)dialog.showModal();});
+    document.getElementById('attendancePetClose').addEventListener('click',()=>dialog.close());
+    dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close();});
+    document.getElementById('attendancePetCheckin').addEventListener('click',()=>actOnAttendancePet('checkin'));
+    const interact=()=>{const view=attendancePetView(attendancePetData);actOnAttendancePet(view.dead?'revive':'feed');};
+    document.getElementById('attendancePetFeed').addEventListener('click',interact);
+    document.getElementById('attendancePetSwimmer').addEventListener('click',interact);
+    document.getElementById('attendancePetRetry').addEventListener('click',startAttendancePet);
+    document.getElementById('attendancePetRoad').innerHTML='<li>Trứng · nở sau 1 giờ</li>'+ATTENDANCE_PET_FORMS.map((form,index)=>`<li>Cấp ${index+1} · ${form.name}${index?` · ${index*10} ngày điểm danh`:''}</li>`).join('');
 }
 
 let sharedNotesUnsubscribe = null;
