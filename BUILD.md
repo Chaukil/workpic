@@ -92,6 +92,16 @@ check-ins and display the ray until a branch is chosen. Resurrection resets the
 branch along with evolution; admin revival that keeps progress retains it.
 Floating canvas size follows species scale and is bounded by viewport dimensions.
 The admin panel selects the branch before offering its higher level forms.
+Branch selection uses a separate native dialog. Its launcher is hidden below
+level 9, and opening is guarded by readiness, life state and branch eligibility.
+When an eligible pet without a branch is viewed in the care form, the picker is
+prompted once per life/session; dismissing it does not reopen it on timer ticks.
+Users may reopen it with the care form's branch button, and successful selection
+closes only the picker. Closing care/signing out closes the picker too.
+The care form's visibility switch hides only the floating pet, retaining its
+preview, attendance, feeding and aging. The preference is stored per account in
+local storage and makes no Firestore writes. Hidden floating models skip GPU
+drawing unless displayed in the care preview.
 
 `node --use-system-ca tools.mjs test:ui --pet` additionally checks all 90 egg/creature
 forms with real WebGL and saves the preview to `.artifacts/attendance-pet-stages.png`.

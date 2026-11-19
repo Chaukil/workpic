@@ -826,7 +826,7 @@ test('pet startup reuses login profile, creates only missing pets and never writ
  const context={currentUser:{uid:'me'},attendancePetStarting:false,attendancePetGeneration:0,attendancePetReady:false,
   authenticatedProfileSnapshot:{ref:{id:'me'},data:()=>state},db:{},Date,transitionAttendancePet,
   document:{getElementById:id=>{if(!elements.has(id))elements.set(id,{});return elements.get(id);}},
-  stopAttendancePet:()=>{context.attendancePetGeneration++;},assertPetQuotaAvailable:()=>{},
+  stopAttendancePet:()=>{context.attendancePetGeneration++;},assertPetQuotaAvailable:()=>{},loadAttendancePetVisibility:()=>true,
   getDocs:()=>assert.fail('Existing login profile must not be queried again'),
   runTransaction:async (_,callback,options)=>{transactions++;assert.equal(options.maxAttempts,2);return callback({get:async()=>({exists:()=>true,data:()=>state}),update:(_,patch)=>{state={...state,...patch};writes++;}});},
   onSnapshot:()=>()=>{},AttendancePet3D:{start:()=>{}},renderAttendancePet:()=>{},setInterval:fn=>{tick=fn;return 1;},petQuotaErrorText:()=>''
@@ -1414,7 +1414,7 @@ let quickChatPanelOpen = false, quickChatUnreadCount = 0;
 const updateQuickChatBadge = () => {};
 ${extract('function openQuickChatPanel(', 'let sharedNotesUnsubscribe =')}
 try {
-    const kept = ['dayOffModal','viewJobModal','changeHistoryModal','sharedNotesPanel','sharedNotesToggle','quickChatToggleBtn','quickChatPanel','sharedNoteImageDialog','attendancePetDialog','attendancePetToggle','attendancePetSwimmer'].map(id=>document.getElementById(id));
+    const kept = ['dayOffModal','viewJobModal','changeHistoryModal','sharedNotesPanel','sharedNotesToggle','quickChatToggleBtn','quickChatPanel','sharedNoteImageDialog','attendancePetDialog','attendancePetBranchDialog','attendancePetToggle','attendancePetSwimmer'].map(id=>document.getElementById(id));
     check(document.getElementById('scheduleActions').closest('#mainContent'),'job actions are inside schedule area');
     check(!document.getElementById('sidebar').contains(document.getElementById('addJobBtn')),'job actions leave sidebar');
     check(document.getElementById('jobColor')&&document.getElementById('settingsHideOutOfSchedule'),'color and hide-outside controls exist');
@@ -1431,6 +1431,15 @@ try {
     const petDialogRect=document.getElementById('attendancePetDialog').getBoundingClientRect();
     check(Math.abs(petDialogRect.left+petDialogRect.width/2-innerWidth/2)<2&&Math.abs(petDialogRect.top+petDialogRect.height/2-innerHeight/2)<2,'pet care form is centered horizontally and vertically');
     check(document.querySelector('#attendancePetPreview svg'),'pet care form displays current pet artwork');
+    check(!document.getElementById('attendancePetBranchDialog').open&&document.getElementById('attendancePetBranchOpen').hidden,'branch form and button stay hidden below level nine');
+    openAttendancePetBranch();check(!document.getElementById('attendancePetBranchDialog').open,'direct branch opening is blocked below level nine');
+    const visibleSwitch=document.getElementById('attendancePetVisible'),writesBeforeVisibility=petWrites;
+    visibleSwitch.checked=false;visibleSwitch.dispatchEvent(new Event('change',{bubbles:true}));
+    check(document.getElementById('attendancePetSwimmer').hidden&&document.querySelector('#attendancePetPreview svg'),'hide floating pet while keeping preview and care form');
+    check(localStorage.getItem('workpic-pet-visible-me')==='false'&&!loadAttendancePetVisibility()&&petWrites===writesBeforeVisibility,'visibility persists locally without Firebase writes');
+    visibleSwitch.checked=true;visibleSwitch.dispatchEvent(new Event('change',{bubbles:true}));
+    check(!document.getElementById('attendancePetSwimmer').hidden&&loadAttendancePetVisibility(),'show floating pet again');
+
     document.getElementById('attendancePetCheckin').click();await new Promise(resolve=>setTimeout(resolve,0));
     check(petRecord.attendancePet.checkins===1&&document.getElementById('attendancePetCheckin').disabled,'check-in is saved and same-day button disabled');
     document.getElementById('attendancePetFeed').click();await new Promise(resolve=>setTimeout(resolve,0));
@@ -1447,9 +1456,15 @@ try {
     check(petRecord.attendancePet.checkins===0&&document.getElementById('attendancePetStatus').textContent.includes('Chưa lưu'),'failed write does not fake a check-in');
     check(document.getElementById('attendancePetBranchPanel').hidden,'branch picker stays hidden before level nine');
     petRecord.attendancePet={...newAttendancePet(Date.now()-7200000),checkins:80,lastCheckinAt:Date.now()};attendancePetData=petRecord.attendancePet;renderAttendancePet();
-    check(!document.getElementById('attendancePetBranchPanel').hidden,'ray unlocks branch picker');
+    check(!document.getElementById('attendancePetBranchPanel').hidden&&document.getElementById('attendancePetBranchDialog').open,'ray unlocks and opens dedicated branch form');
+    document.getElementById('attendancePetBranchClose').click();renderAttendancePet();
+    check(!document.getElementById('attendancePetBranchDialog').open,'dismissed branch form does not reopen on every timer tick');
+    document.getElementById('attendancePetBranchOpen').click();check(document.getElementById('attendancePetBranchDialog').open,'eligible user can reopen branch form');
+
     document.querySelector('[data-pet-branch="beast"]').click();await new Promise(resolve=>setTimeout(resolve,0));
     check(petRecord.attendancePet.branch==='beast'&&petRecord.attendancePet.checkins===80,'branch choice saves without resetting days');
+    check(!document.getElementById('attendancePetBranchDialog').open&&document.getElementById('attendancePetDialog').open,'successful choice closes only branch form');
+
     petRecord.attendancePet={...petRecord.attendancePet,checkins:90};attendancePetData=petRecord.attendancePet;renderAttendancePet();
     check(document.querySelectorAll('#attendancePetRoad li').length===30,'journey lists shared path and twenty branch stages');
     document.querySelector('[data-pet-branch="bird"]').click();await new Promise(resolve=>setTimeout(resolve,0));

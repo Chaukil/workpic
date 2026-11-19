@@ -8761,6 +8761,7 @@ const AttendancePet3D = (()=>{
             if(s.last&&now-s.last<32)return;const dt=s.last?Math.min(.06,(now-s.last)/1000):.033;s.last=now;s.t+=dt;
             const petDialogOpen=document.getElementById('attendancePetDialog')?.open;
             if(document.body.classList.contains('modal-open')||(document.querySelector('dialog[open]')&&!petDialogOpen))return;
+            if(button.hidden&&!s.previewMode)return;
             const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
             resizePet(s);
             const bounds=attendancePetTravelBounds(s.view,window.innerWidth,window.innerHeight);
@@ -8897,6 +8898,19 @@ function initPetAdminPanel() {
 }
 
 let attendancePetData = null;
+let attendancePetVisible=true,attendancePetBranchPrompted='';
+function loadAttendancePetVisibility(){
+    try{return localStorage.getItem(`workpic-pet-visible-${currentUser.uid}`)!=='false';}catch{return true;}
+}
+function openAttendancePetBranch(automatic=false){
+    const view=attendancePetView(attendancePetData),dialog=document.getElementById('attendancePetBranchDialog');
+    if(!currentUser||!attendancePetReady||attendancePetBusy||!view.branchUnlocked||view.dead)return;
+    const key=`${currentUser.uid}:${view.pet.bornAt}:${view.pet.life}`;
+    if(automatic&&(!view.needsBranch||attendancePetBranchPrompted===key))return;
+    attendancePetBranchPrompted=key;
+    document.getElementById('attendancePetBranchStatus').textContent='';
+    if(!dialog.open)dialog.showModal();
+}
 let attendancePetStarting=false;
 let petQuotaRetryAt=0;
 function assertPetQuotaAvailable(){
@@ -8918,6 +8932,7 @@ let attendancePetBubbleTimer = null;
 
 function attendancePetMessage(message) {
     document.getElementById('attendancePetStatus').textContent = message;
+    document.getElementById('attendancePetBranchStatus').textContent=message;
     const bubble = document.getElementById('attendancePetBubble');
     bubble.textContent = message; bubble.classList.add('show');
     clearTimeout(attendancePetBubbleTimer);
@@ -8962,11 +8977,19 @@ function renderAttendancePet() {
     if (swimmer.title!==petTitle) {swimmer.title=petTitle;swimmer.setAttribute('aria-label',petTitle);}
     swimmer.disabled = !attendancePetReady || attendancePetBusy;
     swimmer.classList.toggle('pet-is-dead',view.dead);
+    swimmer.hidden=!attendancePetReady||!attendancePetVisible;
+    document.getElementById('attendancePetVisible').checked=attendancePetVisible;
     AttendancePet3D.update(view);
+    if(document.getElementById('attendancePetDialog').open)openAttendancePetBranch(true);
 }
 
 function renderAttendancePetBranches(view){
     const panel=document.getElementById('attendancePetBranchPanel');panel.hidden=!view.branchUnlocked;
+    const launch=document.getElementById('attendancePetBranchOpen');launch.hidden=!view.branchUnlocked;
+    launch.disabled=!attendancePetReady||attendancePetBusy||view.dead;
+    launch.textContent=view.branch?'Đổi nhánh tiến hóa':'Chọn nhánh tiến hóa';
+    const dialog=document.getElementById('attendancePetBranchDialog');
+    if((!view.branchUnlocked||view.dead)&&dialog.open)dialog.close();
     document.getElementById('attendancePetBranchHint').textContent=view.branch?`Nhánh ${ATTENDANCE_PET_BRANCHES[view.branch].name} · Bậc ${view.branchLevel}/${ATTENDANCE_PET_BRANCHES[view.branch].forms.length}. Đổi nhánh vẫn giữ số ngày điểm danh.`:'Từ cá đuối cấp 9, chọn 1 trong 4 nhánh. Mỗi nhánh có 20 dạng tiến hóa, từ cấp 10 đến 29.';
     panel.querySelectorAll('[data-pet-branch]').forEach(button=>{
         const selected=button.dataset.petBranch===view.branch;
@@ -8999,6 +9022,7 @@ async function actOnAttendancePet(action) {
         if(result.result==='renamed')delete document.getElementById('attendancePetNickname').dataset.dirty;
         const messages = {checked:'Điểm danh thành công! Thêm một ngày tiến hóa.',fed:'Măm măm! Cảm ơn bạn đã cho ăn.',revived:'Đã hồi sinh! Trứng sẽ nở sau 1 giờ.',dead:'Thú cưng đã chết. Bấm Hồi sinh để bắt đầu lại.',egg:'Trứng chưa nở, chưa thể cho ăn.',alive:'Thú cưng đã được hồi sinh rồi.', 'already-checked':'Bạn đã điểm danh hôm nay.', 'already-fed':'Hôm nay đã cho ăn rồi. Hẹn ngày mai!'};
         const after = attendancePetView(result.pet);
+        if(result.result==='branched')document.getElementById('attendancePetBranchDialog').close();
         messages.renamed='Đã lưu tên thú cưng.';
         Object.assign(messages,{branched:`Đã chọn nhánh ${after.branch?ATTENDANCE_PET_BRANCHES[after.branch].name:''}. Tiến độ điểm danh được giữ nguyên.`,'branch-locked':'Đạt cá đuối cấp 9 để mở nhánh.','already-branch':'Bạn đang ở nhánh này.'});
         attendancePetMessage(result.result==='checked' && after.level>previousLevel && !after.egg ? `Tiến hóa! Cấp ${after.level} · ${after.name}.` : messages[result.result] || 'Đã đồng bộ thú cưng.');
@@ -9014,6 +9038,7 @@ async function startAttendancePet() {
     if(attendancePetStarting)return;
     stopAttendancePet();
     if (!currentUser) return;
+    attendancePetVisible=loadAttendancePetVisibility();
     attendancePetStarting=true;
     const generation = attendancePetGeneration, uid = currentUser.uid;
     document.getElementById('attendancePetToggle').hidden=false;
@@ -9069,6 +9094,8 @@ function stopAttendancePet() {
     attendancePetStarting=false;
     clearInterval(attendancePetInterval);clearTimeout(attendancePetBubbleTimer);
     attendancePetData=null;attendancePetRef=null;attendancePetReady=false;attendancePetBusy=false;
+    attendancePetBranchPrompted='';
+    const branchDialog=document.getElementById('attendancePetBranchDialog');if(branchDialog?.open)branchDialog.close();
     AttendancePet3D.stop();
     const dialog=document.getElementById('attendancePetDialog');
     if (dialog?.open) dialog.close();
@@ -9081,11 +9108,20 @@ function initAttendancePetUi() {
     const toggle=document.getElementById('attendancePetToggle');
     if (!toggle || toggle.dataset.ready) return;toggle.dataset.ready='true';
     const dialog=document.getElementById('attendancePetDialog');
-    toggle.addEventListener('click',()=>{renderAttendancePet();if(!dialog.open)dialog.showModal();AttendancePet3D.preview(true);});
-    dialog.addEventListener('close',()=>AttendancePet3D.preview(false));
+    toggle.addEventListener('click',()=>{renderAttendancePet();if(!dialog.open)dialog.showModal();AttendancePet3D.preview(true);openAttendancePetBranch(true);});
+    dialog.addEventListener('close',()=>{document.getElementById('attendancePetBranchDialog').close();AttendancePet3D.preview(false);});
     document.getElementById('attendancePetClose').addEventListener('click',()=>dialog.close());
     dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close();});
     document.getElementById('attendancePetCheckin').addEventListener('click',()=>actOnAttendancePet('checkin'));
+    const branchDialog=document.getElementById('attendancePetBranchDialog');
+    document.getElementById('attendancePetBranchOpen').addEventListener('click',()=>openAttendancePetBranch());
+    document.getElementById('attendancePetBranchClose').addEventListener('click',()=>branchDialog.close());
+    branchDialog.addEventListener('click',event=>{if(event.target===branchDialog)branchDialog.close();});
+    document.getElementById('attendancePetVisible').addEventListener('change',event=>{
+        if(!currentUser)return;attendancePetVisible=event.target.checked;
+        try{localStorage.setItem(`workpic-pet-visible-${currentUser.uid}`,String(attendancePetVisible));}catch{}
+        renderAttendancePet();
+    });
     const nickname=document.getElementById('attendancePetNickname');
     nickname.addEventListener('input',()=>nickname.dataset.dirty='true');
     document.getElementById('attendancePetNicknameForm').addEventListener('submit',async event=>{
