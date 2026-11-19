@@ -1471,8 +1471,10 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
                         </div>
                         <div class="input-group mt-3 d-none" id="profileNewDeptRow"><input type="text" class="form-control" id="profileNewDeptName" maxlength="40" placeholder="Tên bộ phận mới" aria-label="Tên bộ phận mới"><button class="btn account-save-name" type="button" id="profileNewDeptSaveBtn"><i class="bi bi-plus-lg"></i> Thêm</button></div>
                         <p class="account-inline-note"><i class="bi bi-check-circle"></i> Bộ phận và ca làm việc được lưu khi bạn thay đổi.</p>
+                        <button type="button" class="btn btn-outline-primary pet-admin-launch" id="petAdminOpen" hidden><i class="bi bi-magic" aria-hidden="true"></i> Trung tâm điều khiển thú cưng</button>
                         <p id="profileSaveStatus" class="account-save-status" role="status" aria-live="polite"></p>
                     </section>
+
                     <details class="account-section account-security">
                         <summary class="account-section-heading"><span class="account-section-icon"><i class="bi bi-shield-lock"></i></span><span><strong>Bảo mật tài khoản</strong><small>Đổi mật khẩu bằng xác nhận an toàn.</small></span><i class="bi bi-chevron-down"></i></summary>
                         <div class="account-security-fields"><label class="form-label" for="profileNewPassword">Mật khẩu mới</label><div class="input-group account-password-field"><input type="password" class="form-control" id="profileNewPassword" placeholder="Ít nhất 6 ký tự" minlength="6" autocomplete="new-password"><button type="button" class="btn account-password-toggle" id="profileTogglePassword" aria-label="Hiện mật khẩu mới" aria-pressed="false"><i class="bi bi-eye"></i></button></div><div class="account-security-actions"><span><i class="bi bi-lock"></i> Cần mật khẩu hiện tại để xác nhận.</span><button class="btn account-secondary-button" id="changePasswordBtn" type="button"><i class="bi bi-key"></i> Đổi mật khẩu</button></div></div>
@@ -1483,6 +1485,15 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
         </div>
     </div>
 
+<dialog id="petAdminDialog" class="pet-admin-dialog" aria-labelledby="petAdminTitle"><header><h5 id="petAdminTitle">Trung tâm điều khiển thú cưng</h5><button type="button" id="petAdminClose" aria-label="Đóng">✕</button></header>                    <section class="account-section pet-admin-panel" id="petAdminPanel" hidden>
+                        <div class="account-section-heading"><span class="account-section-icon"><i class="bi bi-magic"></i></span><div><h6>Trung tâm điều khiển thú cưng</h6><p>Chọn thành viên để chăm sóc và điều chỉnh tiến hóa.</p></div></div>
+                        <div class="pet-admin-fields"><div><label class="form-label" for="petAdminUser">Thú cưng của thành viên</label><select class="form-select" id="petAdminUser"></select></div><button type="button" class="btn btn-outline-secondary" id="petAdminRefresh">Tải lại</button></div>
+                        <p id="petAdminSummary" class="pet-admin-summary"></p>
+                        <div class="pet-admin-actions"><button type="button" class="btn btn-outline-primary" data-pet-admin="checkin">Điểm danh hôm nay</button><button type="button" class="btn btn-outline-primary" data-pet-admin="feed">Cho ăn ngay</button><button type="button" class="btn btn-outline-primary" data-pet-admin="hatch">Nở trứng ngay</button><button type="button" class="btn btn-outline-primary" data-pet-admin="evolve">Tăng 1 cấp</button><button type="button" class="btn btn-outline-primary" data-pet-admin="revive">Hồi sinh giữ cấp</button><button type="button" class="btn btn-outline-secondary" data-pet-admin="egg">Trở về trứng</button></div>
+                        <div class="pet-admin-fields"><div><label class="form-label" for="petAdminBranch">Nhánh tiến hóa</label><select class="form-select" id="petAdminBranch"></select></div><button type="button" class="btn btn-outline-primary" id="petAdminApplyBranch">Áp dụng nhánh</button></div>
+<div class="pet-admin-fields"><div><label class="form-label" for="petAdminLevel">Chọn cấp tiến hóa</label><select class="form-select" id="petAdminLevel"></select></div><button type="button" class="btn btn-primary" data-pet-admin="level">Áp dụng cấp</button></div>
+                        <p id="petAdminStatus" class="account-save-status" role="status" aria-live="polite"></p>
+                    </section></dialog>
     <!-- Change Password Confirm Modal -->
     <div class="modal fade workpic-dialog" id="changePasswordConfirmModal" tabindex="-1">
         <div class="modal-dialog modal-md modal-dialog-centered">
@@ -2171,12 +2182,18 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
     <button type="button" id="attendancePetSwimmer" class="attendance-pet-swimmer" aria-label="Thú cưng" hidden><span id="attendancePetArt"></span><span id="attendancePetEggTimer" class="attendance-pet-egg-timer" hidden></span><span id="attendancePetBubble" class="attendance-pet-bubble" role="status"></span></button>
     <dialog id="attendancePetDialog" class="attendance-pet-dialog" aria-labelledby="attendancePetTitle">
         <header><div><small>BẠN ĐỒNG HÀNH ĐẠI DƯƠNG</small><h5 id="attendancePetTitle">Điểm danh và thú cưng</h5></div><button type="button" id="attendancePetClose" aria-label="Đóng">✕</button></header>
+        <div class="attendance-pet-layout"><div class="attendance-pet-care">
         <div id="attendancePetPreview" class="attendance-pet-preview" role="img" aria-label="Thú cưng hiện tại"></div>
         <section class="attendance-pet-summary"><span id="attendancePetLevel" class="attendance-pet-level">Trứng</span><h4 id="attendancePetName">Đang tải…</h4><p id="attendancePetDescription"></p><p id="attendancePetCountdown"></p></section>
         <div class="attendance-pet-progress"><div id="attendancePetProgress"></div></div><p id="attendancePetProgressText" class="text-muted"></p>
+        <form id="attendancePetNicknameForm" class="pet-nickname-form"><label for="attendancePetNickname">Tên riêng của thú cưng</label><div><input id="attendancePetNickname" type="text" maxlength="60" autocomplete="off" placeholder="Đặt tên cho người bạn của bạn…" aria-describedby="attendancePetNicknameHint"><button type="submit" class="btn btn-outline-primary" id="attendancePetNicknameSave">Lưu tên</button></div><small id="attendancePetNicknameHint">Tối đa 30 ký tự. Để trống để dùng tên loài. Chỉ lưu khi bấm Lưu tên.</small></form>
         <div class="attendance-pet-actions"><button type="button" id="attendancePetCheckin" class="btn btn-primary">Điểm danh hôm nay</button><button type="button" id="attendancePetFeed" class="btn btn-outline-primary">Cho ăn</button><button type="button" id="attendancePetRetry" class="btn btn-outline-secondary" hidden>Thử kết nối lại</button></div>
         <p id="attendancePetStatus" class="attendance-pet-status" role="status"></p>
-        <details><summary>Hành trình tiến hóa và cách chăm sóc</summary><p>Điểm danh 10 ngày còn sống để tiến hóa một bậc. Cho ăn tối đa một lần mỗi ngày. Bỏ điểm danh đủ 72 giờ: thú cưng chết. Bấm thú cưng để hồi sinh thành trứng, nở sau 1 giờ thực tế. Ngày mới tính theo giờ Việt Nam.</p><ol id="attendancePetRoad"></ol></details>
+        <section id="attendancePetBranchPanel" class="pet-branch-panel" hidden><h6>Chọn nhánh tiến hóa</h6><p id="attendancePetBranchHint"></p><div class="pet-branch-options" id="attendancePetBranchOptions"></div></section>
+        </div><aside class="attendance-pet-guide" aria-label="Hành trình tiến hóa và cách chăm sóc">
+            <section class="attendance-pet-guide-card"><h6><i class="bi bi-heart-pulse" aria-hidden="true"></i> Cách chăm sóc</h6><ul class="attendance-pet-tips"><li><strong>Điểm danh mỗi ngày</strong><span>Cứ 10 ngày điểm danh còn sống, thú cưng tiến hóa một bậc.</span></li><li><strong>Cho ăn 1 lần / ngày</strong><span>Nhấn vào thú cưng hoặc nút Cho ăn. Ngày mới tính theo giờ Việt Nam.</span></li><li><strong>Đừng vắng quá 72 giờ</strong><span>Không điểm danh đủ 3 ngày, thú cưng sẽ chết. Nhấn để hồi sinh thành trứng và chờ nở sau 1 giờ thực tế.</span></li></ul></section>
+            <section class="attendance-pet-guide-card attendance-pet-journey"><h6><i class="bi bi-stars" aria-hidden="true"></i> Hành trình tiến hóa</h6><p>Từ quả trứng nhỏ đến người bạn khổng lồ</p><ol id="attendancePetRoad"></ol></section>
+        </aside></div>
     </dialog>
     <button type="button" class="quick-chat-toggle" id="quickChatToggleBtn" title="Job trong ngày">
         <i class="bi bi-chat-dots-fill"></i>

@@ -50,8 +50,8 @@ console.log(`Deploy dist/: index.html (${((await stat('dist/index.html')).size /
 
     "test": async () => {
 const helperSource = fs.readFileSync('app.js', 'utf8').split('// BEGIN SHARED HELPERS\n')[1].split('// END SHARED HELPERS')[0];
-const helperModule = helperSource + '\nexport { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater, attendancePetDay, newAttendancePet, attendancePetView, transitionAttendancePet };';
-const { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater, attendancePetDay, newAttendancePet, attendancePetView, transitionAttendancePet } = await import('data:text/javascript;base64,' + Buffer.from(helperModule).toString('base64'));
+const helperModule = helperSource + '\nexport { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater, attendancePetDay, newAttendancePet, attendancePetView, transitionAttendancePet, adjustAdminPet, attendancePetMotion, attendancePetTravelBounds, attendancePetCatalog, attendancePetScale, ATTENDANCE_PET_BRANCHES, normalizePetNickname };';
+const { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater, attendancePetDay, newAttendancePet, attendancePetView, transitionAttendancePet, adjustAdminPet, attendancePetMotion, attendancePetTravelBounds, attendancePetCatalog, attendancePetScale, ATTENDANCE_PET_BRANCHES, normalizePetNickname } = await import('data:text/javascript;base64,' + Buffer.from(helperModule).toString('base64'));
 
 
 
@@ -819,6 +819,111 @@ test('job catalog keeps paused jobs last and statistics sort types and weekdays'
     assert.deepEqual(titles,['daily','mon','fri','daily','mon','fri']);
 });
 
+test('pet startup reuses login profile, creates only missing pets and never writes on timer ticks', async () => {
+ const source=fs.readFileSync('app.js','utf8');
+ const code=source.slice(source.indexOf('async function startAttendancePet()'),source.indexOf('function stopAttendancePet()'));
+ const now=Date.now(),elements=new Map();let state={uid:'me',attendancePet:newAttendancePet(now)},transactions=0,writes=0,tick;
+ const context={currentUser:{uid:'me'},attendancePetStarting:false,attendancePetGeneration:0,attendancePetReady:false,
+  authenticatedProfileSnapshot:{ref:{id:'me'},data:()=>state},db:{},Date,transitionAttendancePet,
+  document:{getElementById:id=>{if(!elements.has(id))elements.set(id,{});return elements.get(id);}},
+  stopAttendancePet:()=>{context.attendancePetGeneration++;},assertPetQuotaAvailable:()=>{},
+  getDocs:()=>assert.fail('Existing login profile must not be queried again'),
+  runTransaction:async (_,callback,options)=>{transactions++;assert.equal(options.maxAttempts,2);return callback({get:async()=>({exists:()=>true,data:()=>state}),update:(_,patch)=>{state={...state,...patch};writes++;}});},
+  onSnapshot:()=>()=>{},AttendancePet3D:{start:()=>{}},renderAttendancePet:()=>{},setInterval:fn=>{tick=fn;return 1;},petQuotaErrorText:()=>''
+ };
+ vm.createContext(context);vm.runInContext(code,context);await context.startAttendancePet();
+ assert.equal(transactions,0);assert.equal(writes,0);
+ for(let i=0;i<10;i++)tick();assert.equal(writes,0);
+ state={uid:'me'};await context.startAttendancePet();assert.equal(transactions,1);assert.equal(writes,1);
+ await context.startAttendancePet();assert.equal(transactions,1);assert.equal(writes,1);
+});
+
+test('pet nickname is bounded, normalized, idempotent and retained through evolution and revival', () => {
+ const now=Date.UTC(2026,10,19),pet={...newAttendancePet(now-7200000),checkins:90,branch:'bird',lastCheckinAt:now};
+ const renamed=transitionAttendancePet(pet,'rename:  Sky   Bird  ',now);
+ assert.equal(renamed.pet.nickname,'Sky Bird');assert.equal(attendancePetView(renamed.pet,now).displayName,'Sky Bird');
+ assert.equal(transitionAttendancePet(renamed.pet,'rename:Sky Bird',now).changed,false);
+ assert.equal(normalizePetNickname('a'.repeat(100)).length,30);
+ assert.equal(normalizePetNickname('\u202ebad\u0000name'),'badname');
+ assert.equal(adjustAdminPet(renamed.pet,'evolve',0,now).nickname,'Sky Bird');
+ const dead={...renamed.pet,bornAt:now-100*3600000,lastCheckinAt:now-73*3600000};
+ assert.equal(transitionAttendancePet(dead,'revive',now).pet.nickname,'Sky Bird');
+ assert.equal(adjustAdminPet(dead,'egg',0,now).nickname,'Sky Bird');
+ const cleared=transitionAttendancePet(renamed.pet,'rename:',now);
+ assert.equal(attendancePetView(cleared.pet,now).displayName,attendancePetView(cleared.pet,now).name);
+});
+
+test('four evolution branches unlock at ray level and preserve progress through switching and reload', () => {
+ const now=Date.UTC(2026,10,19),pet={...newAttendancePet(now-7200000),checkins:80,lastCheckinAt:now};
+ assert.equal(attendancePetView(pet,now).level,9);
+ assert.equal(attendancePetView(pet,now).needsBranch,true);
+ assert.equal(transitionAttendancePet({...pet,checkins:79},'branch:fish',now).result,'branch-locked');
+ for(const branch of Object.keys(ATTENDANCE_PET_BRANCHES)){
+  assert.equal(ATTENDANCE_PET_BRANCHES[branch].forms.length,20);
+  assert.equal(new Set(ATTENDANCE_PET_BRANCHES[branch].forms.map(f=>f.name)).size,20);
+  assert.equal(attendancePetCatalog(branch).length,29);
+  const stages=ATTENDANCE_PET_BRANCHES[branch].forms;
+  for(let i=1;i<stages.length;i++)assert.ok(stages[i].scale>stages[i-1].scale,'each evolution grows larger');
+  for(let i=0;i<stages.length;i+=2){assert.equal(stages[i].juvenile,true);assert.equal(stages[i+1].juvenile,false);}
+
+  const change=transitionAttendancePet(pet,'branch:'+branch,now);
+  assert.equal(change.pet.checkins,80);assert.equal(change.pet.branch,branch);
+  assert.equal(attendancePetView(JSON.parse(JSON.stringify(change.pet)),now).branch,branch);
+  const first=attendancePetView({...change.pet,checkins:90},now),last=attendancePetView({...change.pet,checkins:280},now);
+  assert.equal(first.branchLevel,1);assert.equal(last.branchLevel,20);assert.equal(last.maxed,true);
+  const previousCap=attendancePetView({...change.pet,checkins:180},now);
+  assert.equal(previousCap.level,19);assert.equal(previousCap.maxed,false,'old capped pets can continue growing without rewriting progress');
+  assert.equal(attendancePetView(adjustAdminPet(change.pet,'level',29,now),now).branchLevel,20);
+  assert.throws(()=>adjustAdminPet(change.pet,'level',30,now));
+
+  assert.equal(attendancePetView({...change.pet,checkins:999},now).level,29);
+  const switched=transitionAttendancePet({...change.pet,checkins:120},'branch:'+(branch==='bird'?'beast':'bird'),now);
+  assert.equal(switched.pet.checkins,120);assert.equal(attendancePetView(switched.pet,now).branchLevel,4);
+ }
+ const old={...pet,checkins:220};assert.equal(attendancePetView(old,now).level,9);assert.equal(old.checkins,220);
+ assert.equal(attendancePetView(transitionAttendancePet(old,'branch:dino',now).pet,now).level,23);
+ assert.equal(transitionAttendancePet(pet,'branch:__proto__',now).changed,false);
+ const dead={...pet,branch:'fish',lastCheckinAt:now-73*3600000,bornAt:now-100*3600000};
+ assert.equal(transitionAttendancePet(dead,'branch:bird',now).result,'dead');
+ assert.equal(transitionAttendancePet(dead,'revive',now).pet.branch,null);
+ assert.equal(adjustAdminPet(pet,'branch:beast',0,now).branch,'beast');
+ assert.throws(()=>adjustAdminPet(pet,'level',10,now));
+ const small=attendancePetView({...pet,branch:'bird',checkins:90},now),big=attendancePetView({...pet,branch:'fish',checkins:170},now);
+ assert.ok(attendancePetScale(big)>attendancePetScale(small));
+ const bounds=attendancePetTravelBounds(big,1366,768);assert.ok(bounds.maxY+104*attendancePetScale(big)<=768);
+});
+
+test('pet motion respects species, floor, sky and small viewport bounds', () => {
+ const view=(kind,shape)=>({egg:false,dead:false,form:{kind,shape}});
+ assert.equal(attendancePetMotion(view('fish','gold')),'swim');
+ assert.equal(attendancePetMotion(view('dino','sea')),'swim');
+ for(const shape of ['trex','dragon','baby']){
+  const b=attendancePetTravelBounds(view('dino',shape),1366,768);
+  assert.equal(b.mode,'walk');assert.equal(b.minY,b.maxY);assert.equal(b.maxY,660);
+ }
+ const bird=attendancePetTravelBounds(view('bird','eagle'),1366,768);
+ assert.equal(bird.mode,'fly');assert.ok(bird.maxY<768*.6);
+ assert.equal(attendancePetMotion({...view('bird','eagle'),dead:true}),'rest');
+ assert.equal(attendancePetMotion({...view('fish','gold'),egg:true}),'rest');
+ for(const kind of ['fish','bird','dino']){const b=attendancePetTravelBounds(view(kind,'trex'),180,160);assert.ok(b.minY<=b.maxY);assert.ok(b.maxX>=b.minX);}
+});
+
+test('admin pet adjustments preserve revival progress and apply requested evolution', () => {
+ const now=Date.UTC(2026,10,19), original={...newAttendancePet(now-100*3600000),checkins:35};
+ assert.equal(attendancePetView(original,now).dead,true);
+ const revived=adjustAdminPet(original,'revive',0,now);
+ assert.equal(revived.checkins,35);assert.equal(attendancePetView(revived,now).dead,false);
+ assert.equal(attendancePetView(adjustAdminPet(original,'level',8,now),now).level,8);
+ assert.equal(attendancePetView(adjustAdminPet(original,'evolve',0,now),now).level,5);
+ const checked=adjustAdminPet(original,'checkin',0,now);
+ assert.equal(adjustAdminPet(checked,'checkin',0,now).checkins,36);
+ const egg=adjustAdminPet(original,'egg',0,now);
+ assert.equal(egg.checkins,0);assert.equal(egg.hatchAt,now+3600000);
+ assert.equal(attendancePetView(adjustAdminPet(egg,'hatch',0,now),now).egg,false);
+ assert.equal(adjustAdminPet(original,'feed',0,now).fedOn,attendancePetDay(now));
+ assert.throws(()=>adjustAdminPet(original,'level',-1,now));
+});
+
 test('attendance pet checks in and feeds once per Bangkok day, evolves and revives after offline absence', () => {
  const born=Date.parse('2026-11-01T09:00:00+07:00');
  let pet=newAttendancePet(born);
@@ -1340,6 +1445,27 @@ try {
     check(document.getElementById('attendancePetCountdown').textContent.includes('Dự kiến nở lúc'),'care dialog shows exact hatch date and time');
     petReject=true;await actOnAttendancePet('checkin');petReject=false;
     check(petRecord.attendancePet.checkins===0&&document.getElementById('attendancePetStatus').textContent.includes('Chưa lưu'),'failed write does not fake a check-in');
+    check(document.getElementById('attendancePetBranchPanel').hidden,'branch picker stays hidden before level nine');
+    petRecord.attendancePet={...newAttendancePet(Date.now()-7200000),checkins:80,lastCheckinAt:Date.now()};attendancePetData=petRecord.attendancePet;renderAttendancePet();
+    check(!document.getElementById('attendancePetBranchPanel').hidden,'ray unlocks branch picker');
+    document.querySelector('[data-pet-branch="beast"]').click();await new Promise(resolve=>setTimeout(resolve,0));
+    check(petRecord.attendancePet.branch==='beast'&&petRecord.attendancePet.checkins===80,'branch choice saves without resetting days');
+    petRecord.attendancePet={...petRecord.attendancePet,checkins:90};attendancePetData=petRecord.attendancePet;renderAttendancePet();
+    check(document.querySelectorAll('#attendancePetRoad li').length===30,'journey lists shared path and twenty branch stages');
+    document.querySelector('[data-pet-branch="bird"]').click();await new Promise(resolve=>setTimeout(resolve,0));
+    check(petRecord.attendancePet.branch==='bird'&&attendancePetView(petRecord.attendancePet).level===10,'switching branch keeps earned level');
+    const nickname=document.getElementById('attendancePetNickname'),nameForm=document.getElementById('attendancePetNicknameForm'),beforeNameWrites=petWrites;
+    nickname.value='<b>My pet</b>';nickname.dispatchEvent(new Event('input'));renderAttendancePet();
+    check(petWrites===beforeNameWrites&&nickname.value==='<b>My pet</b>','typing a nickname does not write or get overwritten by timer');
+    nameForm.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));await new Promise(resolve=>setTimeout(resolve,0));
+    check(petRecord.attendancePet.nickname==='<b>My pet</b>'&&document.getElementById('attendancePetName').textContent==='<b>My pet</b>'&&!document.querySelector('#attendancePetName b'),'nickname saves and renders as plain text');
+    nameForm.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));await new Promise(resolve=>setTimeout(resolve,0));
+    check(petWrites===beforeNameWrites+1,'saving same nickname does not write again');
+    const quotaText=petQuotaErrorText({code:'resource-exhausted'});
+    check(quotaText.includes('429'),'quota error is identified instead of reported as permission failure');
+    let quotaBlocked=false;try{assertPetQuotaAvailable();}catch(error){quotaBlocked=error.code==='resource-exhausted';}
+    check(quotaBlocked,'quota cooldown prevents repeated pet requests');
+    petQuotaRetryAt=0;sessionStorage.removeItem('workpicPetQuotaRetryAt');
     stopAttendancePet();check(!document.getElementById('attendancePetDialog').open&&document.getElementById('attendancePetSwimmer').hidden,'sign-out clears the companion UI');
     const cleaned = sanitizeSharedNote('<scr'+'ipt>alert(1)</scr'+'ipt><table><tr><td onclick="alert(1)">Cell</td></tr></table><img src="https://example.com/x"><img src="data:image/png;base64,aGVsbG8=" onerror="alert(1)">');
     check(cleaned.includes('<td>Cell</td>'),'notes preserve pasted table cells');
@@ -1562,6 +1688,9 @@ try {
  };
  capture(attendancePetView(newAttendancePet(now),now),'Trứng');
  for(let index=0;index<ATTENDANCE_PET_FORMS.length;index++){pet={...pet,checkins:index*10};capture(attendancePetView(pet,now),'Cấp '+(index+1)+' · '+ATTENDANCE_PET_FORMS[index].name);}
+ for(const [key,branch] of Object.entries(ATTENDANCE_PET_BRANCHES))for(let index=0;index<branch.forms.length;index++){
+  pet={...pet,branch:key,checkins:(index+9)*10};capture(attendancePetView(pet,now),branch.name+' '+(index+1)+' - '+branch.forms[index].name);
+ }
  const petDialog=document.createElement('dialog');petDialog.id='attendancePetDialog';petDialog.innerHTML='<div id="attendancePetPreview"></div>';document.body.appendChild(petDialog);petDialog.showModal();
  AttendancePet3D.preview(true);
  check(s.renderer.domElement.parentElement.id==='attendancePetPreview','real 3D canvas moves into care form');
@@ -1570,12 +1699,12 @@ try {
  petDialog.close();AttendancePet3D.preview(false);
  check(s.renderer.domElement.parentElement.id==='attendancePetArt','closing care form restores swimming model');
  AttendancePet3D.feed();AttendancePet3D.stop();check(!document.querySelector('#attendancePetArt canvas'),'renderer disposes on stop');
- document.body.innerHTML='<main class="pet-gallery">'+cards.join('')+'</main><pre id="pet-result">PASS: 20 real 3D pet forms render visible pixels; renderer cleanup works</pre>';
+ document.body.innerHTML='<main class="pet-gallery">'+cards.join('')+'</main><pre id="pet-result">PASS: all real 3D pet forms render visible pixels; renderer cleanup works</pre>';
 }catch(error){document.body.innerHTML='<pre id="pet-result">FAIL: '+error.stack+'</pre>';}
 `;
   fs.writeFileSync(path.join(temp,'pet.html'),'<!doctype html><meta charset="utf-8"><style>'+fs.readFileSync('styles.css','utf8')+'body{background:#0c1524!important;color:white;padding:20px;height:auto;overflow:auto}.pet-gallery{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}.pet-gallery article{display:grid;justify-items:center;gap:8px;padding:15px;background:#172337;border:1px solid #29405c;border-radius:14px}.pet-gallery img{width:190px;height:137px;object-fit:contain}.pet-gallery strong{font:13px sans-serif}#pet-result{color:#7dd3fc}</style><body><button id="attendancePetSwimmer" class="attendance-pet-swimmer"><span id="attendancePetArt"></span></button><script type="module">'+script+'</script>');
   fs.mkdirSync('.artifacts',{recursive:true});
-  const result=spawnSync(chrome,['--headless','--no-first-run','--disable-extensions','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--allow-file-access-from-files','--user-data-dir='+path.join(temp,'profile'),'--window-size=1500,1050','--screenshot='+path.resolve('.artifacts/attendance-pet-stages.png'),'--dump-dom','--virtual-time-budget=12000',pathToFileURL(path.join(temp,'pet.html')).href],{encoding:'utf8',timeout:60000,windowsHide:true,maxBuffer:12*1024*1024});
+  const result=spawnSync(chrome,['--headless','--no-first-run','--disable-extensions','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--allow-file-access-from-files','--user-data-dir='+path.join(temp,'profile'),'--window-size=1500,3900','--screenshot='+path.resolve('.artifacts/attendance-pet-stages.png'),'--dump-dom','--virtual-time-budget=12000',pathToFileURL(path.join(temp,'pet.html')).href],{encoding:'utf8',timeout:180000,windowsHide:true,maxBuffer:12*1024*1024});
   const output=result.stdout?.match(/<pre id="pet-result">([\s\S]*?)<\/pre>/)?.[1];assert.ok(output?.startsWith('PASS:'),output||result.error?.message||result.stderr?.slice(-1500)||'No pet result');console.log(output);
  }finally{const resolved=path.resolve(temp);if(resolved.startsWith(path.resolve(os.tmpdir())+path.sep)&&path.basename(resolved).startsWith('workpic-pet-'))fs.rmSync(resolved,{recursive:true,force:true,maxRetries:5,retryDelay:200});}
 })();

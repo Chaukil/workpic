@@ -72,8 +72,64 @@ and reopening the app. Feeding is limited to once per calendar day.
 The companion uses the same pinned Three.js version as the existing visual effects,
 with a small transparent WebGL canvas and a lightweight vector fallback. Hover/focus
 pauses roaming. Sign-out stops the renderer, timers and profile listener.
+Models are procedural Three.js geometry, not scanned or sculpted GLB assets.
+Smooth implicit surfaces join dinosaur torso, neck and skull; curved tube meshes
+form tails, limbs and claws. Fish use tapered profiles, fin rays and gill folds.
+Generated color/relief textures add scales, while sharks and whales use smoother
+skin. Textures and geometries are disposed on each model change and sign-out.
+Fish and marine dinosaurs swim, land dinosaurs/dragons walk along the viewport
+floor, and bird forms fly in the upper viewport. Cats, tigers and lions also walk.
+Eggs and dead pets rest; reduced-motion mode stops roaming and articulation.
 
-`node --use-system-ca tools.mjs test:ui --pet` additionally checks all 20 egg/creature
+Levels 1–9 are shared, ending with the ray. At 80 check-in days (level 9), users
+unlock four branches: fish, dinosaurs, birds, and cats/tigers/lions. Each branch
+has twenty forms, covering overall levels 10–29 (90–280 check-in days). Each
+species has a juvenile and mature stage with increasing display size. Users may
+switch branches without losing check-ins; transactions persist the selected
+`branch` in the same profile. The last form is capped at level 29, but daily
+check-ins continue to keep it alive. Legacy profiles without a branch retain all
+check-ins and display the ray until a branch is chosen. Resurrection resets the
+branch along with evolution; admin revival that keeps progress retains it.
+Floating canvas size follows species scale and is bounded by viewport dimensions.
+The admin panel selects the branch before offering its higher level forms.
+
+`node --use-system-ca tools.mjs test:ui --pet` additionally checks all 90 egg/creature
 forms with real WebGL and saves the preview to `.artifacts/attendance-pet-stages.png`.
 Regular UI tests use a fake Firebase backend; live profile permissions are not deployed
 or changed by these tests.
+
+Pet nicknames are plain text, normalized to at most 30 Unicode code points, and
+saved only on explicit form submission. Empty names fall back to the species.
+Evolution, normal resurrection and admin egg resets retain the nickname.
+
+### Firestore traffic audit (2026-11-19)
+
+The supplied 429 log identifies `documents:batchGet`, `resource-exhausted`, and
+the pet startup transaction. It shows a failed read, not evidence that admin
+writes exhausted the write quota. Exact exhausted quota and project totals
+require Firebase/Google Cloud Usage; no live usage console was accessed.
+
+| Data path | When writes occur |
+| --- | --- |
+| users / attendancePet | One-time missing-pet initialization; explicit check-in, feeding, resurrection, branch, nickname or admin actions |
+| users / account settings and calendar | Registration, profile/settings changes and personal calendar edits |
+| jobs, quickJobs, overrides | Explicit creation, edit, transfer, completion, snooze and checklist actions |
+| transfer requests and notifications | Explicit assignment/transfer workflow actions |
+| work hours, days off, departments | Explicit edit/import/delete actions; imports can write multiple records |
+| Pet animation, egg countdown, evolution status, rain water | No Firestore writes from timers; water uses local storage |
+
+Pet startup reuses the canonical profile read during authentication and does not
+run an initialization transaction for an already valid pet. The connection probe
+now limits its jobs read to one document. The admin picker reuses the existing
+users directory snapshot instead of rereading the full collection when available.
+Pet transactions use two attempts instead of the SDK default five. After a
+resource-exhausted response, new pet/admin requests are locally blocked for five
+minutes (also across reloads of that tab). This is retry throttling, not a quota
+reset; exhausted daily quota can outlast that interval. Draft names and unchanged
+name submissions do not write. Tests use fake backends, not live quota.
+
+The existing realtime users-directory listener remains a read amplification point:
+each user document change (including a pet update) is read by clients listening to
+that collection. No pet fields were migrated to a new collection, and rules were
+not changed. Separating pets from public directory metadata would require a
+data/rules migration; the current patch reduces redundant startup/admin reads.

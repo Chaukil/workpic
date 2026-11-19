@@ -15424,10 +15424,17 @@ body :is(.schedule-item,.timeline-job)[style*='--job-custom-color'] :is(h6,small
 
 /* Bucket interaction never captures clicks on jobs, controls or modal content. */
 body.storm-bucket-active, body.storm-bucket-active * { cursor: none !important; }
-.storm-water-overlay { position: fixed; left: 0; right: 0; bottom: 0; height: 0; pointer-events: none; z-index: 1000; background: linear-gradient(rgba(68,157,198,.2),rgba(12,62,108,.5)); border-top: 2px solid rgba(169,222,246,.4); transition: height .25s ease-out; }
-.storm-water-overlay::before { content: ''; position: absolute; left: -5%; top: -5px; width: 110%; height: 10px; background: rgba(122,199,229,.2); border-radius: 45%; animation: storm-water-sway 4s ease-in-out infinite alternate; }
-@keyframes storm-water-sway { to { transform: translateX(3%) translateY(3px); } }
-@media (prefers-reduced-motion: reduce) { .storm-water-overlay, .storm-water-overlay::before { animation: none; transition: none; } }
+.storm-water-overlay { position: fixed; left: 0; right: 0; bottom: 0; height: 0; pointer-events: none; z-index: 1000; transition: height .25s ease-out; visibility:hidden; }
+.storm-water-overlay::after { content:''; position:absolute; inset:22px 0 0; background:linear-gradient(rgba(45,131,177,.24),rgba(12,62,108,.5)); }
+.storm-water-waves { position:absolute; left:0; right:0; top:-28px; height:56px; overflow:hidden; }
+.storm-water-waves svg { display:block; width:200%; height:100%; overflow:visible; }
+.storm-wave { transform-box:fill-box; animation:storm-wave-travel 9s linear infinite; will-change:transform; }
+.storm-wave-back { fill:rgba(79,165,201,.18); stroke:rgba(215,245,255,.3); stroke-width:1.5; animation-duration:13s; animation-delay:-5s; }
+.storm-wave-middle { fill:rgba(45,140,186,.2); stroke:rgba(183,235,252,.4); stroke-width:2; animation-duration:10s; animation-delay:-4s; animation-direction:reverse; }
+.storm-wave-front { fill:rgba(55,145,184,.28); stroke:rgba(223,249,255,.55); stroke-width:2.5; animation-duration:7s; animation-delay:-2s; }
+@keyframes storm-wave-travel { from { transform:translateX(0); } to { transform:translateX(-50%); } }
+.storm-water-overlay.is-paused .storm-wave,body.modal-open .storm-wave { animation-play-state:paused; }
+@media (prefers-reduced-motion: reduce) { .storm-water-overlay,.storm-wave { animation:none; transition:none; } }
 
 /* Enamel pail follows the pointer; a dip-and-throw animation flings water outward. */
 .storm-bucket-cursor { position: fixed; top: 0; left: 0; width: 50px; height: 54px; pointer-events: none; z-index: 1040; display: none; filter: drop-shadow(0 3px 4px rgba(2,6,23,.5)); }
@@ -15470,13 +15477,34 @@ body.storm-bucket-active, body.storm-bucket-active * { cursor: none !important; 
 #attendancePetToggle[hidden],.attendance-pet-swimmer[hidden],#attendancePetRetry[hidden],#attendancePetDot[hidden] { display: none !important; }
 .attendance-pet-swimmer { position: fixed; top: 0; left: 0; width: 144px; height: 104px; padding: 0; border: 0; border-radius: 45%; background: transparent; color: var(--text); z-index: 1100; cursor: pointer; will-change: transform; filter: drop-shadow(0 7px 9px rgba(2,6,23,.25)); }
 .attendance-pet-swimmer:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-#attendancePetArt,#attendancePetArt canvas,#attendancePetArt svg { display: block; width: 144px; height: 104px; pointer-events: none; }
+#attendancePetArt,#attendancePetArt canvas,#attendancePetArt svg { display: block; width: 100%; height: 100%; pointer-events: none; }
 .attendance-pet-swimmer:disabled { cursor: wait; }
 .attendance-pet-swimmer.pet-is-dead { filter: grayscale(.7) drop-shadow(0 5px 7px rgba(2,6,23,.25)); }
 .attendance-pet-bubble { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); min-width: 160px; max-width: 220px; border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; background: var(--surface); color: var(--text); font-size: .75rem; line-height: 1.5; opacity: 0; pointer-events: none; transition: opacity .2s; }
 .attendance-pet-bubble.show { opacity: 1; }
+.attendance-pet-swimmer .attendance-pet-bubble { bottom:calc(100% + 6px); }
 body.modal-open .attendance-pet-swimmer,body:has(dialog[open]) .attendance-pet-swimmer { visibility: hidden; }
-.attendance-pet-dialog { width: min(94vw,540px); max-width: 94vw; max-height: 88dvh; padding: 22px; border: 1px solid var(--border); border-radius: 20px; background: var(--surface); color: var(--text); overflow-y: auto; box-shadow: 0 24px 90px #02061755; }
+.attendance-pet-dialog { width: min(94vw,960px); max-width: 94vw; max-height: 88dvh; padding: 22px; border: 1px solid var(--border); border-radius: 20px; background: var(--surface); color: var(--text); overflow-y: auto; box-shadow: 0 24px 90px #02061755; }
+.pet-admin-panel[hidden] { display: none !important; }
+.pet-admin-launch[hidden] { display:none !important; }
+.pet-admin-launch { margin:12px 0; width:100%; white-space:normal; }
+.pet-admin-dialog { position:fixed; inset:0; margin:auto; width:min(94vw,680px); max-width:94vw; max-height:88dvh; padding:22px; border:1px solid var(--border); border-radius:20px; background:var(--surface); color:var(--text); box-shadow:0 24px 90px #02061755; overflow-y:auto; }
+.pet-admin-dialog::backdrop { background:#020617aa; }
+.pet-admin-dialog > header { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:18px; }
+.pet-admin-dialog > header h5 { margin:0; font-size:1.05rem; }
+#petAdminClose { flex-shrink:0; width:34px; height:34px; border:1px solid var(--border); border-radius:10px; background:var(--surface-muted); color:var(--text); }
+.pet-admin-dialog .pet-admin-panel { margin:0; padding:16px; }
+.pet-admin-dialog .form-select { background-color:var(--surface); color:var(--text); border-color:var(--border); font-size:.82rem; }
+.pet-admin-dialog .form-label { font-size:.78rem; }
+@media(max-width:560px) { .pet-admin-dialog { padding:16px; } }
+.pet-admin-panel { border-color: color-mix(in srgb,var(--primary) 35%,var(--border)); }
+.pet-admin-fields { display:flex; align-items:end; gap:10px; margin:14px 0; }
+.pet-admin-fields > div { flex:1; min-width:0; }
+.pet-admin-fields .btn { white-space:normal; flex-shrink:0; }
+.pet-admin-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+.pet-admin-actions .btn { white-space:normal; font-size:.78rem; padding:10px; }
+.pet-admin-summary { padding:12px; border:1px solid var(--border); border-radius:12px; background:var(--surface-muted); font-size:.8rem; line-height:1.6; }
+@media(max-width:560px) { .pet-admin-actions { grid-template-columns:repeat(2,minmax(0,1fr)); } .pet-admin-fields { flex-wrap:wrap; } }
 .attendance-pet-dialog::backdrop { background: #020617aa; }
 .attendance-pet-dialog > header { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 20px; }
 .attendance-pet-dialog header small { color: var(--muted); font-size: .64rem; letter-spacing: .12em; }
@@ -15493,9 +15521,41 @@ body.modal-open .attendance-pet-swimmer,body:has(dialog[open]) .attendance-pet-s
 .attendance-pet-actions { display: flex; flex-wrap: wrap; gap: 9px; margin: 16px 0 10px; }
 .attendance-pet-actions .btn { flex: 1 1 auto; white-space: normal; font-size: .82rem; padding: 10px 12px; }
 .attendance-pet-status { font-size: .78rem; line-height: 1.6; color: var(--muted); min-height: 24px; }
-.attendance-pet-dialog details { border-top: 1px solid var(--border); padding-top: 12px; font-size: .78rem; line-height: 1.65; }
-.attendance-pet-dialog details p { margin: 12px 0; }
-#attendancePetRoad { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 5px 18px; padding-left: 22px; color: var(--muted); }
+.attendance-pet-layout { display: grid; grid-template-columns: minmax(0,1.05fr) minmax(0,1fr); gap: 22px; align-items: start; }
+.attendance-pet-care,.attendance-pet-guide { min-width: 0; }
+.attendance-pet-guide { display: grid; gap: 14px; }
+.pet-branch-panel[hidden] { display:none !important; }
+.pet-nickname-form { margin:14px 0; }
+.pet-nickname-form label { display:block; font-size:.78rem; font-weight:600; margin-bottom:7px; }
+.pet-nickname-form > div { display:flex; gap:8px; }
+.pet-nickname-form input { min-width:0; flex:1; padding:9px 11px; border:1px solid var(--border); border-radius:10px; background:var(--surface-muted); color:var(--text); font-size:.8rem; }
+.pet-nickname-form .btn { flex-shrink:0; font-size:.78rem; }
+.pet-nickname-form small { display:block; color:var(--muted); font-size:.68rem; line-height:1.5; margin-top:6px; }
+.pet-branch-panel { padding:16px; border:1px solid color-mix(in srgb,var(--primary) 45%,var(--border)); border-radius:16px; background:var(--surface-muted); margin-top:14px; }
+.pet-branch-panel h6 { font-size:.9rem; font-weight:700; margin:0 0 8px; }
+.pet-branch-panel p { color:var(--muted); font-size:.75rem; line-height:1.6; }
+.pet-branch-options { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+.pet-branch-options button { display:grid; grid-template-columns:32px 1fr; align-items:center; gap:3px 8px; text-align:left; padding:12px 10px; border:1px solid var(--border); border-radius:12px; background:var(--surface); color:var(--text); transition:background .2s,border-color .2s; }
+.pet-branch-options button:hover:not(:disabled),.pet-branch-options button.is-selected { border-color:var(--primary); background:color-mix(in srgb,var(--primary) 12%,var(--surface)); }
+.pet-branch-options button:disabled:not(.is-selected) { opacity:.5; }
+.pet-branch-symbol { grid-row:span 2; font-size:1.5rem; }
+.pet-branch-options strong { font-size:.78rem; }
+.pet-branch-options small { color:var(--muted); font-size:.65rem; }
+#attendancePetRoad .is-current { border-color:var(--primary); color:var(--text); background:color-mix(in srgb,var(--primary) 12%,var(--surface)); }
+#attendancePetRoad .is-complete { border-color:color-mix(in srgb,#34d399 35%,var(--border)); }
+#attendancePetRoad .pet-road-unlock { grid-column:1/-1; color:var(--primary); }
+.attendance-pet-guide-card { padding: 18px; border: 1px solid var(--border); border-radius: 16px; background: color-mix(in srgb,var(--surface-muted) 65%,var(--surface)); }
+.attendance-pet-guide-card h6 { display: flex; align-items: center; gap: 9px; margin: 0 0 14px; font-size: .9rem; font-weight: 700; }
+.attendance-pet-guide-card h6 i { color: var(--primary); font-size: 1rem; }
+.attendance-pet-tips { display: grid; gap: 12px; list-style: none; padding: 0; margin: 0; }
+.attendance-pet-tips li { padding-left: 13px; border-left: 2px solid color-mix(in srgb,#38bdf8 50%,var(--border)); }
+.attendance-pet-tips strong { display: block; font-size: .78rem; margin-bottom: 3px; }
+.attendance-pet-tips span,.attendance-pet-journey > p { color: var(--muted); font-size: .74rem; line-height: 1.6; }
+.attendance-pet-journey > p { margin: -6px 0 12px; }
+#attendancePetRoad { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; padding: 0; margin: 0; list-style: none; counter-reset: pet-stage; max-height: 225px; overflow-y: auto; scrollbar-width: thin; }
+#attendancePetRoad li { counter-increment: pet-stage; padding: 9px 10px; border: 1px solid var(--border); border-radius: 10px; color: var(--muted); font-size: .71rem; line-height: 1.5; background: var(--surface); overflow-wrap: anywhere; }
+#attendancePetRoad li::before { content: counter(pet-stage,decimal-leading-zero); display: block; color: var(--primary); font-size: .65rem; font-weight: 700; margin-bottom: 3px; }
+@media (max-width: 700px) { .attendance-pet-layout { grid-template-columns: 1fr; gap: 16px; } .attendance-pet-dialog { width: min(94vw,540px); } }
 .pet-fallback-tail { transform-box: fill-box; transform-origin: right center; animation: pet-tail-idle 1.8s ease-in-out infinite alternate; }
 @keyframes pet-tail-idle { to { transform: scaleX(.65) rotate(8deg); } }
 @media (max-width: 560px) { .attendance-pet-dialog { padding: 16px; } #attendancePetRoad { grid-template-columns: 1fr; } }

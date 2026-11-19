@@ -294,17 +294,82 @@ const ATTENDANCE_PET_FORMS = [
     {name:'Cá nóc ngọc',kind:'fish',color:'#6ee7b7',shape:'puffer'},
     {name:'Cá kiếm',kind:'fish',color:'#38bdf8',shape:'sword'},
     {name:'Cá đuối',kind:'fish',color:'#a78bfa',shape:'ray'},
-    {name:'Cá mập đầu búa',kind:'shark',color:'#94a3b8',shape:'hammer'},
-    {name:'Cá mập trắng',kind:'shark',color:'#64748b',shape:'shark'},
-    {name:'Cá voi sát thủ',kind:'whale',color:'#172033',shape:'orca'},
-    {name:'Cá voi xanh',kind:'whale',color:'#3788ad',shape:'blue'},
-    {name:'Khủng long biển',kind:'dino',color:'#2dd4bf',shape:'sea'},
-    {name:'Khủng long con',kind:'dino',color:'#86efac',shape:'baby'},
-    {name:'Khủng long ba sừng',kind:'dino',color:'#fbbf24',shape:'triceratops'},
-    {name:'Khủng long giáp lưng',kind:'dino',color:'#fb7185',shape:'stego'},
-    {name:'Khủng long bạo chúa',kind:'dino',color:'#4ade80',shape:'trex'},
-    {name:'Rồng biển',kind:'dino',color:'#818cf8',shape:'dragon'}
 ];
+
+const petForm=(name,kind,shape,color,scale,extra={})=>({name,kind,shape,color,scale,...extra});
+const ATTENDANCE_PET_BRANCHES={
+    fish:{name:'Cá',icon:'bi-water',forms:[
+        petForm('Cá mập đầu búa','shark','hammer','#94a3b8',1.1),
+        petForm('Cá mập trắng','shark','shark','#64748b',1.2),
+        petForm('Cá voi sát thủ','whale','orca','#172033',1.25),
+        petForm('Cá voi lưng gù','whale','humpback','#476a7c',1.35),
+        petForm('Cá nhà táng','whale','sperm','#536878',1.4),
+        petForm('Cá mập voi','shark','whaleshark','#456f83',1.45,{spots:true}),
+        petForm('Cá voi xanh','whale','blue','#3788ad',1.5),
+        petForm('Cá mập Megalodon','shark','megalodon','#495d66',1.6),
+        petForm('Cá voi xanh khổng lồ','whale','blue','#285c7a',1.7,{crest:true}),
+        petForm('Thủy quái Leviathan','dino','sea','#326b68',1.8,{crest:true})]},
+    dino:{name:'Khủng long',icon:'bi-globe-americas',forms:[
+        petForm('Khủng long con','dino','baby','#71966b',.8),
+        petForm('Khủng long ba sừng','dino','triceratops','#8f825f',1),
+        petForm('Khủng long giáp lưng','dino','stego','#687c59',1.1),
+        petForm('Khủng long bọc giáp','dino','ankylosaur','#7e7659',1.15),
+        petForm('Khủng long săn mồi','dino','raptor','#978056',1.1),
+        petForm('Khủng long bạo chúa','dino','trex','#6b7854',1.3),
+        petForm('Khủng long gai lưng','dino','spino','#96724f',1.4),
+        petForm('Khủng long cổ dài','dino','brachio','#708976',1.5),
+        petForm('Rồng trưởng thành','dino','dragon','#647d69',1.6),
+        petForm('Cổ long','dino','dragon','#526070',1.75,{crest:true})]},
+    bird:{name:'Chim',icon:'bi-feather',forms:[
+        petForm('Chim bói cá','bird','kingfisher','#268ca3',.65),
+        petForm('Vẹt ngũ sắc','bird','parrot','#48a76b',.75),
+        petForm('Cú tuyết','bird','owl','#c9d0ce',.85),
+        petForm('Đại bàng','bird','eagle','#735643',1),
+        petForm('Hạc trắng','bird','crane','#d9e1de',1.1),
+        petForm('Công xanh','bird','peacock','#338388',1.15),
+        petForm('Kền kền Andes','bird','condor','#514946',1.25),
+        petForm('Hải âu hoàng gia','bird','albatross','#b6c4cb',1.35),
+        petForm('Phượng hoàng','bird','phoenix','#cf642c',1.45),
+        petForm('Phượng hoàng thiên giới','bird','phoenix','#c6a455',1.6,{crest:true})]},
+    beast:{name:'Hổ / Sư tử',icon:'bi-heart',forms:[
+        petForm('Mèo rừng con','beast','cub','#b09b76',.65),
+        petForm('Linh miêu','beast','lynx','#a68d68',.8),
+        petForm('Báo hoa mai','beast','leopard','#c39c58',.95,{spots:true}),
+        petForm('Báo đen','beast','panther','#303a41',1),
+        petForm('Báo sư tử','beast','cougar','#ad8d65',1.1),
+        petForm('Hổ Bengal','beast','tiger','#c58b42',1.2,{stripes:true}),
+        petForm('Hổ trắng','beast','tiger','#d1cec2',1.25,{stripes:true}),
+        petForm('Sư tử','beast','lion','#be9b61',1.3),
+        petForm('Sư tử trắng','beast','lion','#d8d0b7',1.4),
+        petForm('Hổ răng kiếm','beast','sabertooth','#b58c54',1.5,{stripes:true})]}
+};
+// Every species has a juvenile and mature form, ordered by branch growth.
+for(const [key,branch] of Object.entries(ATTENDANCE_PET_BRANCHES)){
+    const [small,large]={fish:[.65,1.8],dino:[.6,1.75],bird:[.5,1.6],beast:[.5,1.5]}[key];
+    const stages=branch.forms.flatMap(form=>[
+        {...form,name:form.name.endsWith(' con')?form.name.slice(0,-4)+' sơ sinh':form.name+(form.kind==='bird'?' non':' con'),juvenile:true},
+        {...form,juvenile:false}
+    ]);
+    branch.forms=stages.map((form,index)=>({...form,scale:Number((small+(large-small)*index/(stages.length-1)).toFixed(3))}));
+}
+const ATTENDANCE_PET_MAX_LEVEL=ATTENDANCE_PET_FORMS.length+Math.max(...Object.values(ATTENDANCE_PET_BRANCHES).map(branch=>branch.forms.length));
+function attendancePetCatalog(branch){return ATTENDANCE_PET_FORMS.concat(ATTENDANCE_PET_BRANCHES[branch]?.forms||[]);}
+function attendancePetScale(view){return view.egg ? .8 : (view.form.scale||[.55,.65,.7,.75,.8,.85,.9,.95,1][view.level-1]||1);}
+
+function attendancePetMotion(view) {
+    if(view?.egg || view?.dead)return 'rest';
+    if(view?.form.kind==='bird')return 'fly';
+    return view?.form.kind==='beast'||view?.form.kind==='dino' && view?.form.shape!=='sea' ? 'walk' : 'swim';
+}
+
+function attendancePetTravelBounds(view,width,height) {
+    const scale=view?Math.min(attendancePetScale(view),Math.max(.35,(width-16)/144),Math.max(.35,(height-16)/104)):1;
+    const mode=attendancePetMotion(view),maxX=Math.max(8,width-144*scale-6);
+    const bottom=Math.max(8,height-104*scale-4);
+    const minY=mode==='walk'||mode==='rest'?bottom:Math.min(70,bottom);
+    const maxY=mode==='walk'||mode==='rest'?bottom:mode==='fly'?Math.max(minY,Math.min(bottom,height*.6-104)):Math.max(minY,Math.min(bottom,height-145));
+    return {mode,minX:8,maxX,minY,maxY};
+}
 
 function attendancePetDay(now) {
     const parts = new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Bangkok',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(now));
@@ -313,7 +378,11 @@ function attendancePetDay(now) {
 }
 
 function newAttendancePet(now) {
-    return {version:1,bornAt:now,hatchAt:now+3600000,checkins:0,lastCheckinAt:null,lastCheckinDay:null,fedOn:null,feeds:0,life:1,updatedAt:now};
+    return {version:1,bornAt:now,hatchAt:now+3600000,checkins:0,lastCheckinAt:null,lastCheckinDay:null,fedOn:null,feeds:0,life:1,branch:null,updatedAt:now};
+}
+
+function normalizePetNickname(value){
+    return Array.from(String(value||'').normalize('NFC').replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g,'').replace(/\s+/g,' ').trim()).slice(0,30).join('');
 }
 
 function attendancePetView(raw, now = Date.now()) {
@@ -323,11 +392,14 @@ function attendancePetView(raw, now = Date.now()) {
     const diesAt = Math.max(pet.bornAt,Number(pet.lastCheckinAt)||pet.bornAt)+72*3600000;
     const dead = now >= diesAt;
     const egg = now < pet.hatchAt;
-    const level = egg ? 0 : 1+Math.floor(checkins/10);
-    const formIndex = Math.max(0,Math.min(ATTENDANCE_PET_FORMS.length-1,level-1));
-    const form = ATTENDANCE_PET_FORMS[formIndex];
-    return {pet,dead,egg,level,diesAt,checkins,today:attendancePetDay(now),name:egg?'Trứng đại dương':form.name+(level>ATTENDANCE_PET_FORMS.length?` · Biến thể ${level-ATTENDANCE_PET_FORMS.length+1}`:''),form,
-        checkedToday:pet.lastCheckinDay===attendancePetDay(now),fedToday:pet.fedOn===attendancePetDay(now),untilHatch:Math.max(0,pet.hatchAt-now),nextEvolutionIn:10-checkins%10};
+    const branch=Object.hasOwn(ATTENDANCE_PET_BRANCHES,pet.branch)?pet.branch:null;
+    const earnedLevel=Math.min(ATTENDANCE_PET_MAX_LEVEL,1+Math.floor(checkins/10));
+    const level = egg ? 0 : Math.min(earnedLevel,branch?ATTENDANCE_PET_MAX_LEVEL:9);
+    const form = attendancePetCatalog(branch)[Math.max(0,level-1)];
+    const branchUnlocked=!egg&&earnedLevel>=9,maxed=!egg&&!!branch&&level===ATTENDANCE_PET_MAX_LEVEL;
+    const name=egg?'Trứng đại dương':form.name,nickname=normalizePetNickname(pet.nickname);
+    return {pet,dead,egg,level,diesAt,checkins,branch,branchUnlocked,maxed,branchLevel:Math.max(0,level-9),needsBranch:branchUnlocked&&!branch,today:attendancePetDay(now),name,nickname,displayName:nickname||name,form,
+        checkedToday:pet.lastCheckinDay===attendancePetDay(now),fedToday:pet.fedOn===attendancePetDay(now),untilHatch:Math.max(0,pet.hatchAt-now),nextEvolutionIn:maxed?0:10-checkins%10};
 }
 
 function transitionAttendancePet(raw, action, now = Date.now()) {
@@ -336,9 +408,20 @@ function transitionAttendancePet(raw, action, now = Date.now()) {
     if (action==='init') return {pet,changed:!raw||raw.version!==1||!Number.isFinite(raw.bornAt)||!Number.isFinite(raw.hatchAt),result:'ready'};
     if (action==='revive') {
         if (!view.dead) return {pet,changed:false,result:'alive'};
-        return {pet:{...newAttendancePet(now),fedOn:pet.fedOn===view.today?view.today:null,life:(Number(pet.life)||1)+1},changed:true,result:'revived'};
+        return {pet:{...newAttendancePet(now),nickname:view.nickname,fedOn:pet.fedOn===view.today?view.today:null,life:(Number(pet.life)||1)+1},changed:true,result:'revived'};
+    }
+    if(action.startsWith('rename:')){
+        const nickname=normalizePetNickname(action.slice(7));
+        return {pet:{...pet,nickname,updatedAt:now},changed:nickname!==view.nickname,result:'renamed'};
     }
     if (view.dead) return {pet,changed:false,result:'dead'};
+    if (action.startsWith('branch:')) {
+        const branch=action.slice(7);
+        if(!Object.hasOwn(ATTENDANCE_PET_BRANCHES,branch))return {pet,changed:false,result:'invalid'};
+        if(!view.branchUnlocked)return {pet,changed:false,result:'branch-locked'};
+        if(branch===view.branch)return {pet,changed:false,result:'already-branch'};
+        return {pet:{...pet,branch,updatedAt:now},changed:true,result:'branched'};
+    }
     if (action==='checkin') {
         if (view.checkedToday) return {pet,changed:false,result:'already-checked'};
         pet.checkins=view.checkins+1;pet.lastCheckinAt=now;pet.lastCheckinDay=view.today;pet.updatedAt=now;
@@ -351,6 +434,29 @@ function transitionAttendancePet(raw, action, now = Date.now()) {
         return {pet,changed:true,result:'fed'};
     }
     return {pet,changed:false,result:'invalid'};
+}
+
+function adjustAdminPet(raw, action, level, now = Date.now()) {
+    const view = attendancePetView(raw, now), pet = {...view.pet};
+    const keepAlive = () => { pet.lastCheckinAt = now; };
+    if (action === 'egg') return {...newAttendancePet(now),nickname:view.nickname,life:(Number(pet.life)||1)+1};
+    if (action === 'checkin') {
+        if (!view.checkedToday) pet.checkins = view.checkins + 1;
+        pet.lastCheckinDay = view.today; keepAlive();
+    } else if (action === 'feed') {
+        pet.fedOn = view.today; pet.feeds = (Number(pet.feeds)||0)+1; keepAlive();
+    } else if (action === 'revive') { keepAlive(); }
+    else if (action === 'hatch') { pet.hatchAt = Math.min(pet.hatchAt,now); keepAlive(); }
+    else if(action.startsWith('branch:')){
+        const branch=action.slice(7);if(!Object.hasOwn(ATTENDANCE_PET_BRANCHES,branch))throw new Error('Invalid branch');
+        pet.branch=branch;pet.checkins=Math.max(80,view.checkins);pet.hatchAt=Math.min(pet.hatchAt,now);keepAlive();
+    } else if (action === 'evolve' || action === 'level') {
+        const next = action === 'evolve' ? Math.max(1,view.level+1) : Number(level);
+        if (!Number.isInteger(next) || next<1 || next>ATTENDANCE_PET_MAX_LEVEL) throw new Error('Invalid pet level');
+        if(next>9&&!view.branch)throw new Error('Choose pet branch first');
+        pet.checkins = (next-1)*10; pet.hatchAt = Math.min(pet.hatchAt,now); keepAlive();
+    } else throw new Error('Invalid pet action');
+    return {...pet,updatedAt:now};
 }
 
 function advanceStormWater(water, now) {
@@ -787,6 +893,8 @@ const RainFx = (() => {
             s.waterOverlay = document.createElement('div');
             s.waterOverlay.className = 'storm-water-overlay';
             s.waterOverlay.setAttribute('aria-hidden', 'true');
+            const wavePath='M0 48C120 16 240 16 360 48S600 80 720 48S960 16 1080 48S1320 80 1440 48S1680 16 1800 48S2040 80 2160 48S2400 16 2520 48S2760 80 2880 48V120H0Z';
+            s.waterOverlay.innerHTML=`<div class="storm-water-waves"><svg viewBox="0 0 2880 120" preserveAspectRatio="none" focusable="false"><path class="storm-wave storm-wave-back" d="${wavePath}"/><path class="storm-wave storm-wave-middle" d="${wavePath}"/><path class="storm-wave storm-wave-front" d="${wavePath}"/></svg></div>`;
             s.waterOverlay.title = 'Bấm vùng nước trống để tát nước';
             document.body.appendChild(s.waterOverlay);
             s.bucket = document.createElement('div');
@@ -848,6 +956,7 @@ const RainFx = (() => {
                 if (Date.now() - s.lastWaterSave >= 5000) s.persistWater();
                 const waterHeight = `${Math.round(s.water.level * 10000) / 100}dvh`;
                 if (s.waterOverlay.style.height !== waterHeight) s.waterOverlay.style.height = waterHeight;
+                s.waterOverlay.style.visibility=s.water.level>.0005?'visible':'hidden';
             }
             g.clearRect(0, 0, s.width, s.height);
             if (level === 2) {
@@ -892,8 +1001,14 @@ const RainFx = (() => {
                 water.addColorStop(0, light ? 'rgba(72,144,182,.18)' : 'rgba(68,157,198,.2)');
                 water.addColorStop(1, light ? 'rgba(35,93,137,.34)' : 'rgba(12,62,108,.5)');
                 g.fillStyle = water; g.beginPath(); g.moveTo(0,s.height);
-                for (let x = 0; x <= s.width + 20; x += 20) g.lineTo(x,surface + Math.sin(x * .013 + s.time * 1.5) * 3 + Math.sin(x * .027 - s.time) * 1.8);
+                const waveY=x=>surface+Math.sin(x*.009+s.time*1.2)*5+Math.sin(x*.021-s.time*1.7)*2.5;
+                for (let x = 0; x <= s.width + 12; x += 12) g.lineTo(x,waveY(x));
                 g.lineTo(s.width,s.height); g.closePath(); g.fill();
+                for(let layer=0;layer<3;layer++){
+                    g.beginPath();
+                    for(let x=0;x<=s.width+12;x+=12){const y=waveY(x)+layer*7+Math.sin(x*.017-s.time+layer)*2; if(x===0)g.moveTo(x,y);else g.lineTo(x,y);}
+                    g.strokeStyle=`rgba(194,237,250,${.24-layer*.06})`;g.lineWidth=layer===0?1.5:.8;g.stroke();
+                }
                 g.strokeStyle = light ? 'rgba(225,248,255,.55)' : 'rgba(169,222,246,.4)'; g.lineWidth = 1;
                 for (let i = 0; i < 10; i++) {
                     const age = (s.time * .6 + i * .17) % 1;
@@ -917,6 +1032,7 @@ const RainFx = (() => {
             }
         };
         s.resume = () => {
+            s.waterOverlay?.classList.toggle('is-paused',document.hidden||document.body.classList.contains('modal-open'));
             if (document.hidden) s.persistWater();
             if (document.hidden || document.body.classList.contains('modal-open')) { cancelAnimationFrame(s.raf); s.raf = 0; document.body.classList.remove('storm-bucket-active'); if (s.bucket) { s.bucket.style.display = 'none'; s.bucket.classList.remove('scooping'); } s.splashes.forEach(splash => splash.remove()); s.splashes.clear(); s.soundNodes.forEach(node => { try { node.stop(); } catch {} }); }
             else if (!s.raf) { s.last = 0; s.raf = requestAnimationFrame(frame); }
@@ -3569,6 +3685,7 @@ async function handleAuthenticatedUser(user) {
  * Fetch user data from Firestore based on UID
  * Returns { displayName, email, uid, ... } or null if not found
  */
+let authenticatedProfileSnapshot=null;
 async function getUserData(uid) {
     try {
         const usersRef = collection(db, 'users');
@@ -3576,7 +3693,8 @@ async function getUserData(uid) {
         const snapshot = await getDocs(q);
 
         if (!snapshot.empty) {
-            const userDoc = snapshot.docs[0];
+            const userDoc = [...snapshot.docs].sort((a,b)=>a.id.localeCompare(b.id))[0];
+            if(auth.currentUser?.uid===uid)authenticatedProfileSnapshot=userDoc;
             return userDoc.data();
         } else {
             console.warn('No user document found for UID:', uid);
@@ -3602,6 +3720,7 @@ function updateUserProfileUI() {
 
 function openUserProfileModal() {
     if (!currentUser) return;
+    initPetAdminPanel();
     accessControl.apply();
     document.getElementById('profileEmail').textContent = currentUser.email || '---';
 
@@ -3935,6 +4054,7 @@ function handleSignedOut() {
         unsubscribeUsersAvatar = null;
     }
     usersAvatarCache = null;
+    authenticatedProfileSnapshot=null;usersDirectorySnapshot=null;
 
     jobs = [];
     filteredJobs = [];
@@ -4677,7 +4797,7 @@ async function testFirestoreConnection() {
     if (!accessControl.can('jobs')) { firestoreConnected = true; return true; }
     try {
         if (!currentUser) return false;
-        const testCollection = query(collection(db, 'jobs'), where('ownerId', '==', currentUser.uid));
+        const testCollection = query(collection(db, 'jobs'), where('ownerId', '==', currentUser.uid),limit(1));
         const snapshot = await getDocs(testCollection);
 
         firestoreConnected = true;
@@ -8018,10 +8138,12 @@ async function quickChatConfirmAssign(jobId) {
 // USERS AVATAR — realtime để mọi người thấy avatar mới của nhau
 // ============================================================
 let departmentCalendarUsers = {};
+let usersDirectorySnapshot=null;
 
 function listenUsersAvatars() {
     if (unsubscribeUsersAvatar) unsubscribeUsersAvatar();
     unsubscribeUsersAvatar = onSnapshot(collection(db, 'users'), (snapshot) => {
+        usersDirectorySnapshot=snapshot;
         usersAvatarCache = {};
         usersInfoCache = {};
         usersDeptLatest = {};
@@ -8346,34 +8468,132 @@ const AttendancePet3D = (()=>{
         if (!art) return;
         const color=view.dead?'#94a3b8':view.form.color;
         art.innerHTML=view.egg?`<svg viewBox="0 0 140 100" aria-hidden="true"><defs><radialGradient id="pet-egg-light"><stop stop-color="#fffef5"/><stop offset="1" stop-color="#b9c6d8"/></radialGradient></defs><ellipse cx="70" cy="53" rx="29" ry="38" fill="url(#pet-egg-light)"/><path d="m58 35 9 6-6 9 14 6-8 10" fill="none" stroke="#d5ab66" stroke-width="2"/><circle cx="82" cy="31" r="5" fill="#e4c989"/></svg>`
-            :view.form.kind==='dino'?`<svg viewBox="0 0 140 100" aria-hidden="true"><path d="M20 66 4 51 35 59Q45 31 77 43L91 29 116 28 131 42 125 56 103 53 92 68 91 88 80 88 76 69 57 70 51 88 40 88 43 66Z" fill="${color}"/><path d="m47 45 5-13 8 9 9-16 8 19" fill="#fbbf24"/><circle cx="115" cy="38" r="3" fill="#0f172a"/></svg>`
+            :view.form.kind==='beast'?`<svg viewBox="0 0 140 100" aria-hidden="true"><path d="M28 51Q4 30 10 60M35 58 31 88 42 88 48 62 80 62 85 88 96 88 92 57" fill="none" stroke="${color}" stroke-width="9" stroke-linecap="round"/><ellipse cx="63" cy="51" rx="37" ry="19" fill="${color}"/><circle cx="101" cy="41" r="21" fill="${color}"/><path d="m87 27-3-15 16 11 13-12 4 18" fill="${color}"/><ellipse cx="111" cy="47" rx="12" ry="8" fill="#e4d7b8"/><circle cx="107" cy="35" r="3" fill="#18212a"/></svg>`
+            :view.form.kind==='bird'?`<svg viewBox="0 0 140 100" aria-hidden="true"><path d="M70 54Q27 8 8 25L46 65 19 77 72 68Q100 72 110 52L133 48 116 40Q102 23 90 46Z" fill="${color}"/><path d="M62 53Q68 5 95 13L83 57" fill="${color}" stroke="#ffffff55" stroke-width="2"/><circle cx="108" cy="43" r="3" fill="#18212a"/></svg>`
+            :view.form.kind==='dino'&&view.form.shape!=='sea'?`<svg viewBox="0 0 140 100" aria-hidden="true"><path d="M20 66 4 51 35 59Q45 31 77 43L91 29 116 28 131 42 125 56 103 53 92 68 91 88 80 88 76 69 57 70 51 88 40 88 43 66Z" fill="${color}"/><path d="m47 45 5-13 8 9 9-16 8 19" fill="#fbbf24"/><circle cx="115" cy="38" r="3" fill="#0f172a"/></svg>`
             :`<svg viewBox="0 0 140 100" aria-hidden="true"><defs><radialGradient id="pet-fish-light"><stop stop-color="#ecfeff"/><stop offset="1" stop-color="${color}"/></radialGradient></defs><path class="pet-fallback-tail" d="m42 50-28-24 4 24-4 24Z" fill="${color}"/><ellipse cx="76" cy="50" rx="42" ry="${view.form.kind==='whale'?25:29}" fill="url(#pet-fish-light)"/><path d="m61 26 19-16 12 21M61 73l22 13 7-15" fill="${color}"/><circle cx="101" cy="41" r="7" fill="white"/><circle cx="104" cy="42" r="4" fill="#0f172a"/><path d="M113 58q-8 4-12 0" fill="none" stroke="#0f172a" stroke-width="2"/></svg>`;
         if(state?.previewMode)document.getElementById('attendancePetPreview').innerHTML=art.innerHTML.replaceAll('pet-egg-light','pet-panel-egg-light').replaceAll('pet-fish-light','pet-panel-fish-light');
     };
     function disposeModel(s) {
         if (!s.model) return;
-        const geometries=new Set(),materials=new Set();
+        const geometries=new Set(),materials=new Set(),textures=new Set();
         s.model.traverse(object=>{if(object.geometry)geometries.add(object.geometry);const mats=object.material?Array.isArray(object.material)?object.material:[object.material]:[];mats.forEach(mat=>materials.add(mat));});
-        s.scene.remove(s.model);geometries.forEach(value=>value.dispose());materials.forEach(value=>value.dispose());
+        s.scene.remove(s.model);geometries.forEach(value=>value.dispose());materials.forEach(value=>{for(const key of ['map','bumpMap','roughnessMap'])if(value[key])textures.add(value[key]);value.dispose();});textures.forEach(value=>value.dispose());
     }
     function build(s,view) {
         disposeModel(s);
         const T=s.THREE,group=new T.Group();s.model=group;s.rig=[];s.mouth=null;s.scene.add(group);
-        const variant=view.level>ATTENDANCE_PET_FORMS.length;
-        const mainColor=variant?new T.Color().setHSL((view.level*.117)%1,.65,.55):new T.Color(view.form.color);
+        const variant=!!view.form.crest;
+        const mainColor=new T.Color(view.form.color);
+        if(view.form.juvenile)mainColor.lerp(new T.Color('#e5e3d3'),.1);
         if(view.dead)mainColor.lerp(new T.Color('#64748b'),.8);
-        const material=color=>new T.MeshPhysicalMaterial({color,roughness:.28,metalness:.08,clearcoat:.85,clearcoatRoughness:.2});
+        const reptile=view.form.kind==='dino'&&view.form.shape!=='sea';
+        const material=color=>new T.MeshPhysicalMaterial({color,roughness:reptile?.78:.39,metalness:0,clearcoat:reptile?.08:.38,clearcoatRoughness:.32});
         const bodyMat=material(mainColor),finMat=material(mainColor.clone().multiplyScalar(.7)),cream=material('#e5f3ed'),black=material('#10202d');
-        const sphere=(parent,x,y,z,sx,sy,sz,mat)=>{const mesh=new T.Mesh(new T.SphereGeometry(1,28,18),mat);mesh.position.set(x,y,z);mesh.scale.set(sx,sy,sz);parent.add(mesh);return mesh;};
-        const cone=(parent,x,y,z,radius,length,mat,angle=0)=>{const mesh=new T.Mesh(new T.ConeGeometry(radius,length,12),mat);mesh.position.set(x,y,z);mesh.rotation.z=angle;parent.add(mesh);return mesh;};
-        const fin=(parent,points,mat,z=0)=>{const shape=new T.Shape();points.forEach(([x,y],index)=>index?shape.lineTo(x,y):shape.moveTo(x,y));shape.closePath();const mesh=new T.Mesh(new T.ExtrudeGeometry(shape,{depth:.045,bevelEnabled:true,bevelSegments:1,steps:1,bevelSize:.025,bevelThickness:.015}),mat);mesh.position.z=z;parent.add(mesh);return mesh;};
-        const eyes=(parent,x,y,z)=>{[-1,1].forEach(side=>{sphere(parent,x,y,z*side,.105,.115,.045,cream);sphere(parent,x+.024,y,.045*side+z*side,.065,.075,.025,black);sphere(parent,x+.038,y+.025,.07*side+z*side,.02,.025,.012,cream);});};
+        if(view.form.kind==='beast'){bodyMat.roughness=.9;bodyMat.clearcoat=0;finMat.roughness=.85;}
+        // Painted color and relief share a UV layout: mottled reptile scales / overlapping fish scales.
+        const skinCanvas=document.createElement('canvas');skinCanvas.width=512;skinCanvas.height=256;
+        const ctx=skinCanvas.getContext('2d');
+        let seed=37;const random=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
+        const base=mainColor.clone();
+        ctx.fillStyle='#'+base.getHexString();ctx.fillRect(0,0,512,256);
+        for(let row=0;row<32;row++)for(let col=0;col<64;col++){
+            const x=col*8+(row%2)*4,y=row*8;
+            const shade=base.clone().multiplyScalar(.64+random()*.58);
+            ctx.fillStyle='#'+shade.getHexString();ctx.strokeStyle='rgba(10,20,10,.22)';ctx.lineWidth=.7;
+            if(view.form.kind==='beast'){
+                ctx.strokeStyle='#'+shade.getHexString();ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+3,y+7);ctx.stroke();continue;
+            }
+            if(['whale','shark'].includes(view.form.kind)){
+                ctx.globalAlpha=.14;ctx.fillRect(x,y,8,8);ctx.globalAlpha=1;continue;
+            }
+            ctx.beginPath();ctx.ellipse(x,y,3.8,3.2,0,0,Math.PI*2);ctx.fill();ctx.stroke();
+            ctx.fillStyle='rgba(255,245,210,.12)';ctx.fillRect(x-2,y-2,2,1);
+        }
+        if(view.form.stripes){ctx.strokeStyle='#302c27';ctx.lineWidth=5;for(let i=0;i<18;i++){const x=i*30;ctx.beginPath();ctx.moveTo(x,0);ctx.bezierCurveTo(x+35,60,x-25,110,x+15,175);ctx.stroke();}}
+        if(view.form.spots){ctx.fillStyle='#302c2780';for(let i=0;i<130;i++){ctx.beginPath();ctx.ellipse(random()*512,random()*256,3+random()*5,2+random()*4,random()*3,0,Math.PI*2);ctx.fill();}}
+        const skin=new T.CanvasTexture(skinCanvas);skin.colorSpace=T.SRGBColorSpace;skin.anisotropy=4;
+        const relief=skin.clone();relief.colorSpace=T.NoColorSpace;relief.needsUpdate=true;
+        if(!view.egg&&view.form.kind!=='bird'){
+            bodyMat.color.set('#ffffff');bodyMat.map=skin;bodyMat.bumpMap=relief;bodyMat.bumpScale=reptile?.045:.018;
+            finMat.bumpMap=relief;finMat.bumpScale=.018;
+        }else{skin.dispose();relief.dispose();}
+        const sphere=(parent,x,y,z,sx,sy,sz,mat)=>{const geometry=new T.SphereGeometry(1,48,32);const mesh=new T.Mesh(geometry,mat);mesh.position.set(x,y,z);mesh.scale.set(sx,sy,sz);parent.add(mesh);return mesh;};
+        const cone=(parent,x,y,z,radius,length,mat,angle=0)=>{const mesh=new T.Mesh(new T.ConeGeometry(radius*(view.form.juvenile?.8:1),length*(view.form.juvenile?.7:1),32,4),mat);mesh.position.set(x,y,z);mesh.rotation.z=angle;parent.add(mesh);return mesh;};
+        const tube=(parent,points,radii,mat)=>{
+            const curve=new T.CatmullRomCurve3(points.map(point=>new T.Vector3(...point)));
+            const segments=48,sides=12,frames=curve.computeFrenetFrames(segments,false),positions=[],indices=[],uv=[];
+            for(let i=0;i<=segments;i++){
+                const t=i/segments,p=curve.getPointAt(t),r=t*(radii.length-1),j=Math.min(radii.length-2,Math.floor(r)),radius=T.MathUtils.lerp(radii[j],radii[j+1],r-j);
+                for(let k=0;k<=sides;k++){const a=k/sides*Math.PI*2;const v=p.clone().addScaledVector(frames.normals[i],Math.cos(a)*radius).addScaledVector(frames.binormals[i],Math.sin(a)*radius);positions.push(v.x,v.y,v.z);uv.push(k/sides,t);if(i<segments&&k<sides){const n=i*(sides+1)+k;indices.push(n,n+sides+1,n+1,n+1,n+sides+1,n+sides+2);}}
+            }
+            const geometry=new T.BufferGeometry();geometry.setAttribute('position',new T.Float32BufferAttribute(positions,3));geometry.setAttribute('uv',new T.Float32BufferAttribute(uv,2));geometry.setIndex(indices);geometry.computeVertexNormals();const mesh=new T.Mesh(geometry,mat);parent.add(mesh);return mesh;
+        };
+        const fin=(parent,points,mat,z=0)=>{const shape=new T.Shape();shape.moveTo(...points[0]);for(let i=1;i<points.length;i++){const prev=points[i-1],p=points[i];shape.quadraticCurveTo(prev[0]*.35+p[0]*.65,prev[1],p[0],p[1]);}shape.closePath();const mesh=new T.Mesh(new T.ExtrudeGeometry(shape,{depth:.035,curveSegments:16,bevelEnabled:true,bevelSegments:3,steps:1,bevelSize:.018,bevelThickness:.012}),mat);mesh.position.z=z;parent.add(mesh);return mesh;};
+        const eyes=(parent,x,y,z)=>{[-1,1].forEach(side=>{sphere(parent,x,y,z*side,.064,.068,.034,material('#bfa55f'));sphere(parent,x+.012,y,.025*side+z*side,.036,.045,.019,black);sphere(parent,x+.024,y+.017,.04*side+z*side,.012,.014,.009,cream);});};
+        const organicBody=(parts,mat)=>{
+            // Smooth implicit union removes the visible sphere seams between torso, neck and skull.
+            const field=(x,y,z)=>{
+                let distance=10;
+                for(const [cx,cy,cz,rx,ry,rz] of parts){
+                    const px=(x-cx)/rx,py=(y-cy)/ry,pz=(z-cz)/rz;
+                    const k0=Math.hypot(px,py,pz),k1=Math.hypot(px/rx,py/ry,pz/rz);
+                    const d=k0<.00001?-Math.min(rx,ry,rz):k0*(k0-1)/k1,h=Math.max(.14-Math.abs(distance-d),0)/.14;
+                    distance=Math.min(distance,d)-h*h*.035;
+                }return distance;
+            };
+            const low=[-1.3,-.6,-.65],high=[1.75,1.35,.65],count=[44,30,22],values=[],points=[];
+            const stride=count[0]+1,plane=stride*(count[1]+1);
+            for(let z=0;z<=count[2];z++)for(let y=0;y<=count[1];y++)for(let x=0;x<=count[0];x++){
+                const p=[low[0]+x/count[0]*(high[0]-low[0]),low[1]+y/count[1]*(high[1]-low[1]),low[2]+z/count[2]*(high[2]-low[2])];points.push(p);values.push(field(...p));
+            }
+            const positions=[],normals=[],uv=[];
+            const edge=(a,b)=>{const ratio=values[a]/(values[a]-values[b]);return points[a].map((v,i)=>v+(points[b][i]-v)*ratio);};
+            const normal=p=>{const e=.001;return new T.Vector3(field(p[0]+e,p[1],p[2])-field(p[0]-e,p[1],p[2]),field(p[0],p[1]+e,p[2])-field(p[0],p[1]-e,p[2]),field(p[0],p[1],p[2]+e)-field(p[0],p[1],p[2]-e)).normalize();};
+            const triangle=(a,b,c)=>{
+                const n=normal(a),cross=new T.Vector3(...b).sub(new T.Vector3(...a)).cross(new T.Vector3(...c).sub(new T.Vector3(...a)));
+                if(cross.dot(n)<0)[b,c]=[c,b];
+                for(const p of [a,b,c]){positions.push(...p);const n=normal(p);normals.push(n.x,n.y,n.z);uv.push((p[0]-low[0])/(high[0]-low[0]),(p[1]-low[1])/(high[1]-low[1]));}
+            };
+            const tets=[[0,5,1,6],[0,1,2,6],[0,2,3,6],[0,3,7,6],[0,7,4,6],[0,4,5,6]];
+            for(let z=0;z<count[2];z++)for(let y=0;y<count[1];y++)for(let x=0;x<count[0];x++){
+                const n=z*plane+y*stride+x,corners=[n,n+1,n+1+stride,n+stride,n+plane,n+plane+1,n+plane+1+stride,n+plane+stride];
+                for(const tet of tets){const ids=tet.map(i=>corners[i]),inside=ids.filter(i=>values[i]<0),outside=ids.filter(i=>values[i]>=0);
+                    if(inside.length===1)triangle(...outside.map(i=>edge(inside[0],i)));
+                    else if(inside.length===3)triangle(...inside.map(i=>edge(outside[0],i)));
+                    else if(inside.length===2){const a=edge(inside[0],outside[0]),b=edge(inside[0],outside[1]),c=edge(inside[1],outside[0]),d=edge(inside[1],outside[1]);triangle(a,b,c);triangle(b,d,c);}
+                }
+            }
+            const geometry=new T.BufferGeometry();geometry.setAttribute('position',new T.Float32BufferAttribute(positions,3));geometry.setAttribute('normal',new T.Float32BufferAttribute(normals,3));geometry.setAttribute('uv',new T.Float32BufferAttribute(uv,2));group.add(new T.Mesh(geometry,mat));
+        };
         if(view.egg){
             sphere(group,0,0,0,.62,.84,.62,material('#ece9da'));
             for(let i=0;i<10;i++){const angle=i*2.399;const y=-.5+i*.105;const r=.61*Math.sqrt(Math.max(.1,1-y*y));sphere(group,Math.sin(angle)*r,y,Math.cos(angle)*r,.05,.07,.025,material(i%2?'#bfaa77':'#adc4c7'));}
             group.rotation.z=.07;return;
         }
         const shape=view.form.shape,kind=view.form.kind;
+        if(kind==='beast'){
+            organicBody([[-.2,.02,0,.8,.34,.27],[.42,.12,0,.36,.38,.29],[.64,.29,0,.26,.34,.25],[.93,.38,0,.32,.28,.26]],bodyMat);
+            sphere(group,1.12,.25,0,.25,.14,.23,cream);sphere(group,1.3,.29,0,.07,.045,.11,black);eyes(group,1.05,.48,.235);
+            for(const side of [-1,1]){
+                const ear=sphere(group,.84,.65,side*.18,.11,.16,.075,bodyMat);ear.rotation.x=side*.25;sphere(ear,0,.1,side*.35,.55,.65,.5,finMat);
+                for(const x of [-.67,.53]){
+                    const leg=new T.Group();leg.position.set(x,-.13,side*.22);group.add(leg);
+                    tube(leg,[[0,0,0],[-.06,-.3,side*.02],[.04,-.62,side*.02]],[.12,.075,.055],bodyMat);sphere(leg,.11,-.66,side*.02,.16,.065,.1,bodyMat);
+                    for(let toe=0;toe<3;toe++)sphere(leg,.21,-.66,side*.02+(toe-1)*.05,.025,.018,.014,cream);
+                    s.rig.push({mesh:leg,axis:'z',amount:.27,phase:x*side>0?0:Math.PI});
+                }
+                for(let i=0;i<4;i++)tube(group,[[1.14,.23,side*.2],[1.25,.22-i*.02,side*.32],[1.35,.23-i*.03,side*.42]],[.004,.003,.001],cream);
+            }
+            const tail=new T.Group();tail.position.set(-.85,.08,0);group.add(tail);tube(tail,[[0,0,0],[-.44,-.03,0],[-.62,.29,.06],[-.5,.49,.1]],[.06,.045,.035,.01],bodyMat);s.rig.push({mesh:tail,axis:'y',amount:.18,phase:0});
+            if(shape==='lion'){
+                const mane=material(mainColor.clone().multiplyScalar(.48));
+                for(let i=0;i<24;i++){const angle=i/24*Math.PI*2;sphere(group,.64,.36+Math.sin(angle)*.3,Math.cos(angle)*.29,.18,.13,.13,mane);}
+            }
+            if(shape==='lynx')for(const side of [-1,1])cone(group,.84,.85,side*.18,.025,.18,black);
+            if(shape==='sabertooth')for(const side of [-1,1])tube(group,[[1.16,.2,side*.16],[1.21,.03,side*.16],[1.15,-.12,side*.16]],[.035,.025,.001],cream);
+            return;
+        }
         if(shape==='sea'){
             sphere(group,-.15,0,0,1.05,.34,.34,bodyMat);sphere(group,.85,.06,0,.62,.22,.25,bodyMat);sphere(group,1.18,-.08,0,.48,.08,.24,cream);eyes(group,1.02,.13,.24);
             const tail=cone(group,-1.55,.03,0,.25,1.3,finMat,Math.PI/2);s.rig.push({mesh:tail,axis:'y',amount:.25,phase:0});
@@ -8381,25 +8601,97 @@ const AttendancePet3D = (()=>{
             for(let i=0;i<6;i++)cone(group,.75+i*.13,-.04,.24,.025,.1,cream,Math.PI);
             return;
         }
-        if(shape==='trex'){
-            sphere(group,-.12,0,0,.76,.54,.42,bodyMat);sphere(group,.45,.5,0,.4,.56,.33,bodyMat);sphere(group,.98,.82,0,.6,.39,.35,bodyMat);sphere(group,1.09,.59,0,.5,.15,.34,finMat);eyes(group,1.08,.94,.33);
-            const tail=cone(group,-1.15,-.03,0,.33,1.4,finMat,Math.PI/2);s.rig.push({mesh:tail,axis:'y',amount:.15,phase:0});
-            for(const side of [-1,1]){const leg=sphere(group,-.3,-.53,side*.37,.24,.5,.22,bodyMat);sphere(leg,.8,-.78,.1,1.45,.2,1.05,finMat);s.rig.push({mesh:leg,axis:'z',amount:.23,phase:side<0?0:Math.PI});const arm=sphere(group,.55,.13,side*.35,.1,.22,.1,bodyMat);arm.rotation.z=.6;s.rig.push({mesh:arm,axis:'z',base:.6,amount:.12,phase:side});}
-            for(let i=0;i<6;i++)for(const side of [-1,1])cone(group,.85+i*.12,.58,side*.3,.03,.12,cream,Math.PI);
+        if(['trex','raptor','spino'].includes(shape)){
+            // Horizontal torso, muscular hips, S-shaped neck and long counterbalancing tail.
+            organicBody([[-.22,.03,0,.87,.48,.37],[.18,-.14,0,.57,.36,.33],[.37,.33,0,.32,.4,.27],[.51,.64,0,.25,.37,.23],[.92,.82,0,.52,.28,.26],[1.18,.8,0,.38,.23,.25]],bodyMat);
+            sphere(group,1.12,.59,0,.47,.10,.245,finMat);
+            const gum=material('#61433a'),ivory=material('#dfd2ab');
+            for(const side of [-1,1]){
+                tube(group,[[.76,.63,side*.22],[1.02,.62,side*.25],[1.45,.68,side*.19]],[.025,.022,.009],gum);
+                for(let i=0;i<11;i++){
+                    const x=.81+i*.055;
+                    cone(group,x,.62,side*(.215+Math.sin(i/10*Math.PI)*.025),.017,.065+(i%3)*.013,ivory,Math.PI);
+                    cone(group,x+.02,.61,side*.213,.013,.045,ivory);
+                }
+                sphere(group,1.38,.85,side*.205,.045,.027,.016,black);
+                sphere(group,.85,1.01,side*.22,.18,.075,.10,finMat);
+                sphere(group,.92,.94,side*.245,.068,.055,.024,material('#cc9b32'));
+                sphere(group,.935,.944,side*.267,.018,.037,.009,black);
+                sphere(group,.948,.961,side*.276,.009,.009,.006,cream);
+                const leg=new T.Group();leg.position.set(-.4,-.15,side*.29);group.add(leg);
+                tube(leg,[[0,0,0],[.10,-.32,side*.05],[-.11,-.62,side*.08],[.02,-.85,side*.09]],[.23,.18,.085,.07],bodyMat);
+                sphere(leg,.11,-.87,side*.09,.24,.065,.13,finMat);
+                for(let toe=0;toe<3;toe++){
+                    const z=side*.09+(toe-1)*.085;
+                    tube(leg,[[.05,-.86,z],[.25,-.89,z],[.37,-.88,z]],[.043,.032,.007],finMat);
+                    tube(leg,[[.32,-.88,z],[.4,-.88,z],[.41,-.92,z]],[.026,.018,.001],ivory);
+                }
+                s.rig.push({mesh:leg,axis:'z',amount:.27,phase:side<0?0:Math.PI});
+                const arm=new T.Group();arm.position.set(.46,.22,side*.25);group.add(arm);
+                tube(arm,[[0,0,0],[.08,-.13,side*.07],[.22,-.16,side*.09]],[.065,.045,.025],bodyMat);
+                for(let i=0;i<2;i++)tube(arm,[[.2,-.16,side*.09+i*.04],[.28,-.14,side*.09+i*.04],[.3,-.19,side*.09+i*.04]],[.019,.015,.001],ivory);
+                s.rig.push({mesh:arm,axis:'z',amount:.08,phase:side});
+            }
+            const tailPivot=new T.Group();tailPivot.position.set(-.75,.04,0);group.add(tailPivot);
+            tube(tailPivot,[[0,0,0],[-.48,-.05,0],[-1.05,.02,.04],[-1.65,.18,.08]],[.3,.22,.12,.005],bodyMat);
+            s.rig.push({mesh:tailPivot,axis:'y',amount:.12,phase:0});
+            for(let i=0;i<17;i++)sphere(group,-.84+i*.092,.39+Math.sin(i/17*Math.PI)*.1,0,.038,.042,.052,finMat);
+            if(shape==='spino')fin(group,[[-.85,.37],[-.6,1.18],[-.05,1.35],[.35,.55]],finMat);
+            if(shape==='raptor'){for(let i=0;i<7;i++)cone(group,-.4+i*.13,.48,0,.04,.15,finMat);}
+            group.scale.setScalar(.87);
+            if(shape==='raptor')group.scale.y*=.88;
+            return;
+        }
+        if(kind==='bird'){
+            sphere(group,-.05,0,0,.63,.32,.29,bodyMat);
+            sphere(group,.45,.18,0,.3,.29,.25,shape==='eagle'?cream:bodyMat);
+            eyes(group,.58,.25,.215);
+            cone(group,.88,.12,0,.095,.4,material(shape==='phoenix'?'#c9a032':'#414447'),-Math.PI/2);
+            const featherMat=material(mainColor.clone().multiplyScalar(.67));
+            for(const side of [-1,1]){
+                const wing=new T.Group();wing.position.set(-.06,.12,side*.18);group.add(wing);
+                sphere(wing,-.14,.02,side*.3,.42,.065,.4,bodyMat);
+                for(let i=0;i<10;i++){
+                    const feather=sphere(wing,-.25-i*.045,-.005,side*(.42+i*.065),.13,.022,.44-i*.018, i%3?featherMat:bodyMat);
+                    feather.rotation.y=side*(-.15+i*.09);
+                }
+                s.rig.push({mesh:wing,axis:'x',base:side*.1,amount:.6,phase:side<0?0:Math.PI});
+                tube(group,[[-.1,-.2,side*.12],[-.26,-.37,side*.13],[-.1,-.4,side*.13]],[.026,.018,.006],material('#9e8051'));
+            }
+            for(let i=0;i<7;i++){
+                const feather=sphere(group,-.83,-.04,(i-3)*.06,shape==='phoenix'?.8:.43,.024,.063, i%2?featherMat:bodyMat);feather.rotation.y=(i-3)*.07;
+            }
+            if(shape==='phoenix')for(let i=0;i<4;i++)tube(group,[[.3,.36,i*.035-.05],[.2,.55,i*.04-.05],[.03,.63,i*.04-.05]],[.025,.017,.001],material('#d8af48'));
+            if(shape==='owl'){sphere(group,.46,.23,0,.32,.33,.26,bodyMat);eyes(group,.64,.31,.22);}
+            if(['crane','albatross','condor'].includes(shape))group.scale.z=1.4;
+            if(shape==='parrot')cone(group,.79,.09,0,.11,.21,material('#d9ad57'),-.5);
+            if(shape==='peacock')for(let i=0;i<11;i++){const feather=sphere(group,-.95,.08,(i-5)*.09,.6,.025,.09,material(i%2?'#3b8971':'#466da5'));feather.rotation.y=(i-5)*.09;}
             return;
         }
         if(kind==='dino'){
-            sphere(group,-.1,0,0,.92+(variant?(view.level%4)*.06:0),.5,.43,bodyMat);sphere(group,.68,.3,0,.36,.57,.32,bodyMat);sphere(group,1.02,.72,0,.5,.36,.35,bodyMat);
-            sphere(group,1.25,.6,0,.4,.2,.3,cream);eyes(group,1.19,.82,.31);
-            const tail=cone(group,-1.28,.02,0,.31,1.45,finMat,Math.PI/2);s.rig.push({mesh:tail,axis:'y',amount:.17,phase:0});
+            const bodyParts=[[-.1,0,0,.92+(variant?(view.level%4)*.06:0),.5,.43],[.52,.25,0,.32,.42,.3]];
+            if(shape!=='brachio')bodyParts.push([.68,.46,0,.28,.43,.28],[1.02,.72,0,.5,.36,.35]);
+            organicBody(bodyParts,bodyMat);
+            if(shape!=='brachio'){sphere(group,1.25,.6,0,.4,.2,.3,cream);eyes(group,1.19,.82,.31);}
+            const tail=new T.Group();tail.position.set(-.76,.02,0);group.add(tail);tube(tail,[[0,0,0],[-.5,.02,0],[-1,.13,.03],[-1.45,.24,.07]],[.3,.2,.09,.005],bodyMat);s.rig.push({mesh:tail,axis:'y',amount:.17,phase:0});
             const shortArms=shape==='trex';
             for(const x of [-.55,.55])for(const z of [-.32,.32]){
-                const leg=sphere(group,x,-.51,z,shortArms&&x>.0?.12:.19,shortArms&&x>0?.24:.43,.18,bodyMat);
+                const leg=new T.Group();leg.position.set(x,-.24,z);group.add(leg);
+                tube(leg,[[0,0,0],[-.06,-.27,0],[.04,-.56,0]],[.17,.12,.07],bodyMat);
                 s.rig.push({mesh:leg,axis:'z',amount:.22,phase:x*z>0?0:Math.PI});
-                sphere(leg,.2,-.8,.05,1.1,.25,1.05,finMat);
+                sphere(leg,.12,-.61,.02,.21,.07,.13,finMat);
+                for(let toe=0;toe<3;toe++)tube(leg,[[.2,-.61,(toe-1)*.07],[.31,-.63,(toe-1)*.08],[.34,-.66,(toe-1)*.08]],[.027,.019,.001],cream);
             }
             if(shape==='triceratops'){
                 sphere(group,.84,.93,0,.13,.48,.56,finMat);cone(group,1.13,1.2,.22,.07,.5,cream,-.4);cone(group,1.13,1.2,-.22,.07,.5,cream,-.4);cone(group,1.54,.83,0,.07,.27,cream,-.7);
+            }
+            if(shape==='ankylosaur'){
+                for(let row=0;row<3;row++)for(let i=0;i<7;i++)sphere(group,-.72+i*.2,.43+Math.sin(i/7*Math.PI)*.11,(row-1)*.23,.12,.09,.12,finMat);
+                sphere(tail,-1.35,.23,.07,.24,.17,.2,finMat);
+            }
+            if(shape==='brachio'){
+                tube(group,[[.65,.4,0],[.83,.85,0],[.92,1.27,0],[1.03,1.4,0]],[.22,.18,.13,.1],bodyMat);
+                sphere(group,1.1,1.4,0,.26,.15,.16,bodyMat);eyes(group,1.24,1.45,.14);group.scale.setScalar(.82);
             }
             if(['stego','dragon','sea'].includes(shape)||variant){
                 const count=variant?7+view.level%7:shape==='dragon'?9:6;
@@ -8410,16 +8702,27 @@ const AttendancePet3D = (()=>{
         }
         const round=shape==='puffer',disc=['angel','tang'].includes(shape),whale=kind==='whale',ray=shape==='ray';
         const size=shape==='small'?.78:whale?1.2:1;
-        sphere(group,.05,0,0,size,ray?.2:round?.72:disc?.76:whale?.57:.48,ray?.86:round?.63:disc?.3:.4,bodyMat);
+        if(round||disc||ray)sphere(group,.05,0,0,size,ray?.2:round?.72:.76,ray?.86:round?.63:.3,bodyMat);
+        else{
+            const profile=new T.SplineCurve([[-size,.05],[-size*.8,.18],[-size*.45,.38],[0,whale?.56:.46],[size*.43,whale?.48:.39],[size*.79,.24],[size,.035]].map(([x,r])=>new T.Vector2(r,x)));
+            const geometry=new T.LatheGeometry(profile.getPoints(72),48);geometry.rotateZ(-Math.PI/2);geometry.scale(1,1,.82);geometry.computeVertexNormals();group.add(new T.Mesh(geometry,bodyMat));
+        }
         if(whale||kind==='shark')sphere(group,.2,-.23,.01,.8,.25,.34,cream);
+        if(shape==='sperm')sphere(group,.61,.07,0,.6,.43,.37,bodyMat);
+        if(shape==='humpback')for(let i=0;i<7;i++)sphere(group,.58+i*.06,.19-i*.02,.31,.035,.025,.025,finMat);
         const tail=new T.Group();tail.position.x=-size*.85;group.add(tail);
         if(ray){cone(tail,-.7,0,0,.045,1.5,finMat,Math.PI/2);group.rotation.x=.7;}
         else fin(tail,[[0,0],[-.75,.5],[-.58,0],[-.75,-.5]],shape==='gold'?material('#f97316'):shape==='tang'?material('#fde047'):finMat);
         if(whale)tail.rotation.x=Math.PI/2;
-        s.rig.push({mesh:tail,axis:'y',amount:.32,phase:0});
+        s.rig.push({mesh:tail,axis:whale?'z':'y',amount:.32,phase:0});
         if(!ray)fin(group,[[-.48,.2],[-.25,kind==='shark'?1:shape==='angel'?1.2:.76],[.35,.35]],finMat);
         if(shape==='angel')fin(group,[[-.4,-.3],[.1,-1.1],[.4,-.32]],finMat);
         for(const side of [-1,1]){const wing=fin(group,[[.3,.1],[-.3,-.62],[-.57,-.15]],finMat,side*.3);wing.rotation.x=side*.65;s.rig.push({mesh:wing,axis:'x',base:side*.65,amount:.15,phase:side});}
+        // Fine fin rays and gill folds catch the light without polygonal slabs.
+        if(!whale)for(const side of [-1,1]){
+            for(let i=0;i<5;i++)tube(group,[[size*.43,.05,side*.32],[size*.4-i*.035,-.08,side*.36],[size*.38-i*.038,-.22,side*.3]],[.008,.009,.003],finMat);
+        }
+        if(!whale&&!ray)for(let i=0;i<9;i++)tube(group,[[-.3+i*.06,.4,0],[-.3+i*.05,.55+Math.sin(i/9*Math.PI)*.15,0]],[.008,.002],bodyMat);
         if(ray)[-1,1].forEach(side=>{const wing=sphere(group,-.05,0,side*.72,.75,.08,.8,bodyMat);s.rig.push({mesh:wing,axis:'x',amount:.16,phase:side});});
         if(shape==='hammer'){sphere(group,.85,.03,0,.26,.19,.86,bodyMat);eyes(group,.95,.1,.81);}else eyes(group,size*.69,.13,round?.55:disc?.28:.35);
         if(shape==='sword')cone(group,1.35,-.06,0,.06,.95,bodyMat,-Math.PI/2);
@@ -8439,6 +8742,15 @@ const AttendancePet3D = (()=>{
         document.getElementById('attendancePetArt')?.replaceChildren();
         document.getElementById('attendancePetPreview')?.replaceChildren();
     }
+    function resizePet(s){
+        const scale=Math.min(s.view?attendancePetScale(s.view):1,Math.max(.35,(window.innerWidth-16)/144),Math.max(.35,(window.innerHeight-16)/104));
+        s.width=Math.round(144*scale);s.height=Math.round(104*scale);
+        s.button.style.width=s.width+'px';s.button.style.height=s.height+'px';
+        if(!s.renderer)return;
+        const width=s.previewMode?320:s.width,height=s.previewMode?220:s.height,key=width+':'+height;
+        if(s.sizeKey===key)return;s.sizeKey=key;
+        s.renderer.setSize(width,height);s.camera.aspect=width/height;s.camera.updateProjectionMatrix();
+    }
     function start(){
         stop();const token=generation,button=document.getElementById('attendancePetSwimmer');
         if(!button)return;
@@ -8450,22 +8762,29 @@ const AttendancePet3D = (()=>{
             const petDialogOpen=document.getElementById('attendancePetDialog')?.open;
             if(document.body.classList.contains('modal-open')||(document.querySelector('dialog[open]')&&!petDialogOpen))return;
             const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-            const maxX=Math.max(12,window.innerWidth-150),maxY=Math.max(80,window.innerHeight-145);
-            if(s.view?.dead||reduced){s.x=maxX;s.y=maxY;}
+            resizePet(s);
+            const bounds=attendancePetTravelBounds(s.view,window.innerWidth,window.innerHeight);
+            const {maxX,maxY,minY,mode}=bounds;
+            if(s.motion!==mode){s.motion=mode;s.nextTarget=0;s.targetY=minY;}
+            const previousX=s.x;
+            if(mode==='rest'||reduced){s.x=maxX;s.y=maxY;}
             else if(!s.hover&&!petDialogOpen){
-                if(s.t>s.nextTarget||Math.hypot(s.targetX-s.x,s.targetY-s.y)<15){s.targetX=12+Math.random()*Math.max(1,maxX-12);s.targetY=75+Math.random()*Math.max(1,maxY-75);s.nextTarget=s.t+15;}
-                s.x+=(s.targetX-s.x)*dt*.16;s.y+=(s.targetY-s.y)*dt*.16;
+                if(s.t>s.nextTarget||Math.hypot(s.targetX-s.x,s.targetY-s.y)<15){s.targetX=8+Math.random()*Math.max(0,maxX-8);s.targetY=minY+Math.random()*(maxY-minY);s.nextTarget=s.t+15;}
+                const speed=mode==='fly'?.25:mode==='walk'?.13:.16;
+                s.x+=(s.targetX-s.x)*dt*speed;s.y+=(s.targetY-s.y)*dt*speed;
             }
-            s.x=Math.max(8,Math.min(maxX,s.x));s.y=Math.max(70,Math.min(maxY,s.y));
-            button.style.transform=`translate3d(${s.x}px,${s.y+(reduced?0:Math.sin(s.t*1.7)*5)}px,0)`;
+            s.x=Math.max(8,Math.min(maxX,s.x));s.y=Math.max(minY,Math.min(maxY,s.y));
+            const walking=mode==='walk'&&Math.abs(s.x-previousX)>.01;
+            const bob=reduced||mode==='rest'?0:mode==='walk'?(walking?Math.abs(Math.sin(s.t*5))*1.5:0):Math.sin(s.t*(mode==='fly'?3:1.7))*(mode==='fly'?7:4);
+            button.style.transform=`translate3d(${s.x}px,${Math.max(minY,Math.min(maxY,s.y+bob))}px,0)`;
             if(s.renderer&&s.model){
                 const alive=!s.view?.dead;
                 const targetAngle=s.targetX<s.x?Math.PI:0;
                 const turn=Math.atan2(Math.sin(targetAngle-s.facingAngle),Math.cos(targetAngle-s.facingAngle));
                 s.facingAngle+=turn*Math.min(1,dt*3);
-                s.model.rotation.y=s.facingAngle+(reduced?0:Math.sin(s.t*.9)*.22);
-                s.model.rotation.z=alive?(reduced?0:Math.sin(s.t*1.3)*.045):Math.PI*.75;
-                if(alive&&!reduced)s.rig.forEach(part=>{part.mesh.rotation[part.axis]=(part.base||0)+Math.sin(s.t*4+part.phase)*part.amount;});
+                s.model.rotation.y=s.facingAngle+(reduced?0:Math.sin(s.t*.9)*(mode==='walk'?.06:.16));
+                s.model.rotation.z=alive?(reduced?0:Math.sin(s.t*1.3)*(mode==='walk'?.012:.035)):Math.PI*.75;
+                if(alive&&!reduced)s.rig.forEach(part=>{const pace=mode==='fly'?7:mode==='walk'?5:3.5;const intensity=mode==='walk'&&!walking&&!petDialogOpen?.08:1;part.mesh.rotation[part.axis]=(part.base||0)+Math.sin(s.t*pace+part.phase)*part.amount*intensity;});
                 const feeding=Math.max(0,1-(s.t-s.fedAt)/1.4);s.model.scale.setScalar(1+feeding*.07);if(s.mouth)s.mouth.scale.y=1+feeding*Math.abs(Math.sin(s.t*14));
                 s.renderer.render(s.scene,s.camera);
             }
@@ -8475,7 +8794,7 @@ const AttendancePet3D = (()=>{
         import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js').then(T=>{
             if(state!==s||token!==generation)return;
             try{
-                const renderer=new T.WebGLRenderer({alpha:true,antialias:true,powerPreference:'low-power'});renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.5));renderer.setSize(144,104);renderer.setClearColor(0,0);renderer.outputColorSpace=T.SRGBColorSpace;
+                const renderer=new T.WebGLRenderer({alpha:true,antialias:true,powerPreference:'low-power'});renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.75));renderer.setSize(144,104);renderer.setClearColor(0,0);renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;
                 s.THREE=T;s.renderer=renderer;s.scene=new T.Scene();s.camera=new T.PerspectiveCamera(38,144/104,.1,30);s.camera.position.set(.2,.35,5.7);s.camera.lookAt(0,0,0);
                 s.scene.add(new T.HemisphereLight('#e5f8ff','#344b6a',2));const light=new T.DirectionalLight('#fff7d6',3);light.position.set(2,4,5);s.scene.add(light);const rim=new T.DirectionalLight('#67d8ff',2);rim.position.set(-3,1,-3);s.scene.add(rim);
                 document.getElementById('attendancePetArt').replaceChildren(renderer.domElement);
@@ -8484,19 +8803,111 @@ const AttendancePet3D = (()=>{
             }catch(error){if(s.view)fallback(s.view);}
         }).catch(()=>{if(state===s&&s.view)fallback(s.view);});
     }
-    function update(view){const s=state;if(!s)return;s.view=view;const key=`${view.egg?'egg':view.level}:${view.dead}`;if(s.signature===key)return;s.signature=key;if(s.renderer)build(s,view);else fallback(view);}
+    function update(view){const s=state;if(!s)return;s.view=view;resizePet(s);const key=`${view.egg?'egg':view.level}:${view.branch}:${view.form.name}:${view.dead}`;if(s.signature===key)return;s.signature=key;if(s.renderer)build(s,view);else fallback(view);}
     function preview(open){
         const s=state;if(!s)return;s.previewMode=open;
         const container=document.getElementById(open?'attendancePetPreview':'attendancePetArt');
         if(!container)return;
-        if(s.renderer){container.replaceChildren(s.renderer.domElement);s.renderer.setSize(open?320:144,open?220:104);s.camera.aspect=open?320/220:144/104;s.camera.updateProjectionMatrix();}
+        if(s.renderer){container.replaceChildren(s.renderer.domElement);resizePet(s);}
         else if(s.view)fallback(s.view);
         if(!open)document.getElementById('attendancePetPreview')?.replaceChildren();
     }
     return {start,stop,update,preview,feed:()=>{if(state)state.fedAt=state.t;}};
 })();
 
+const canControlPets = () => auth.currentUser?.email?.toLowerCase() === 'chauchikil01@gmail.com';
+let petAdminProfiles = [], petAdminBusy = false, petAdminLoad = 0;
+function renderPetAdminSummary() {
+    const item=petAdminProfiles.find(item=>item.id===document.getElementById('petAdminUser').value);
+    const el=document.getElementById('petAdminSummary');
+    if(!item){el.textContent='Chưa có hồ sơ thú cưng.';return;}
+    const view=attendancePetView(item.pet);
+    document.getElementById('petAdminBranch').value=view.branch||'fish';
+    document.getElementById('petAdminLevel').replaceChildren(...attendancePetCatalog(view.branch).map((form,index)=>new Option(`Cấp ${index+1} · ${form.name}`,index+1)));
+    document.getElementById('petAdminLevel').value=Math.max(1,view.level);
+    el.textContent=`${view.name} · Cấp ${view.level} · ${view.checkins} ngày điểm danh · ${view.dead?'Đã chết':view.egg?'Đang ấp trứng':'Đang sống'}`;
+}
+async function loadPetAdminProfiles() {
+    if(!canControlPets() || petAdminBusy)return;
+    const token=++petAdminLoad,uid=auth.currentUser.uid;
+    const status=document.getElementById('petAdminStatus');status.textContent='Đang tải danh sách…';
+    try {
+        if(!usersDirectorySnapshot)assertPetQuotaAvailable();
+        const result=usersDirectorySnapshot||await getDocs(collection(db,'users'));
+        if(token!==petAdminLoad || !canControlPets() || auth.currentUser.uid!==uid)return;
+        const previous=document.getElementById('petAdminUser').value, seen=new Set();
+        petAdminProfiles=[...result.docs].sort((a,b)=>a.id.localeCompare(b.id)).filter(snapshot=>{
+            const data=snapshot.data();if(!data.uid||seen.has(data.uid))return false;seen.add(data.uid);return true;
+        }).map(snapshot=>({id:snapshot.id,ref:snapshot.ref,uid:snapshot.data().uid,name:snapshot.data().displayName||snapshot.data().email||snapshot.id,pet:snapshot.data().attendancePet}));
+        petAdminProfiles.sort((a,b)=>a.name.localeCompare(b.name,'vi'));
+        const select=document.getElementById('petAdminUser');select.replaceChildren(...petAdminProfiles.map(item=>new Option(item.name,item.id)));
+        select.value=petAdminProfiles.some(item=>item.id===previous)?previous:(petAdminProfiles.find(item=>item.uid===uid)?.id||petAdminProfiles[0]?.id||'');
+        renderPetAdminSummary();status.textContent='Đã tải danh sách. Thay đổi sẽ được lưu vào hồ sơ thành viên.';
+    }catch(error){if(token===petAdminLoad)status.textContent=petQuotaErrorText(error)||'Không tải được danh sách. Kiểm tra kết nối và quyền đọc hồ sơ hiện tại.';}
+}
+async function applyPetAdminAction(action) {
+    if(!canControlPets()||petAdminBusy)return;
+    const item=petAdminProfiles.find(item=>item.id===document.getElementById('petAdminUser').value);
+    if(!item)return;
+    const before=attendancePetView(item.pet);
+    if((action==='evolve'||action==='level')&&!before.branch&&(action==='evolve'?before.level>=9:Number(document.getElementById('petAdminLevel').value)>9)){
+        document.getElementById('petAdminStatus').textContent='Chọn và áp dụng nhánh tiến hóa trước khi tăng quá cấp 9.';return;
+    }
+    if(action==='evolve'&&before.maxed){document.getElementById('petAdminStatus').textContent='Thú cưng đã đạt cấp cuối của nhánh.';return;}
+    const uid=auth.currentUser.uid,level=Number(document.getElementById('petAdminLevel').value);
+    const panel=document.getElementById('petAdminPanel'),status=document.getElementById('petAdminStatus');
+    petAdminBusy=true;panel.querySelectorAll('button,select').forEach(el=>el.disabled=true);status.textContent='Đang lưu…';
+    try{
+        assertPetQuotaAvailable();
+        const pet=await runTransaction(db,async transaction=>{
+            if(!canControlPets()||auth.currentUser.uid!==uid)throw new Error('Session changed');
+            const snapshot=await transaction.get(item.ref);
+            if(!snapshot.exists()||snapshot.data().uid!==item.uid)throw new Error('Profile changed');
+            const next=adjustAdminPet(snapshot.data().attendancePet,action,level);
+            transaction.update(item.ref,{attendancePet:next});return next;
+        },{maxAttempts:2});
+        if(!canControlPets()||auth.currentUser.uid!==uid)return;
+        item.pet=pet;renderPetAdminSummary();
+        if(item.uid===currentUser?.uid){attendancePetData=pet;renderAttendancePet();}
+        status.textContent=`Đã cập nhật thú cưng của ${item.name}.`;
+    }catch(error){if(canControlPets()&&auth.currentUser.uid===uid)status.textContent=petQuotaErrorText(error)||(error.code==='permission-denied'?'Firebase hiện tại không cho phép sửa hồ sơ thành viên này. Thay đổi chưa được lưu.':'Chưa lưu được thay đổi. Kiểm tra kết nối rồi thử lại.');}
+    finally{petAdminBusy=false;panel.querySelectorAll('button,select').forEach(el=>el.disabled=false);}
+}
+function initPetAdminPanel() {
+    const panel=document.getElementById('petAdminPanel');if(!panel)return;
+    const launch=document.getElementById('petAdminOpen'),dialog=document.getElementById('petAdminDialog');
+    launch.hidden=!canControlPets();
+    panel.hidden=!canControlPets();
+    if(panel.hidden){petAdminLoad++;petAdminProfiles=[];document.getElementById('petAdminUser').replaceChildren();return;}
+    if(!panel.dataset.ready){
+        panel.dataset.ready='true';
+        launch.addEventListener('click',()=>{
+            if(!canControlPets())return;
+            if(!dialog.open)dialog.showModal();
+            loadPetAdminProfiles();
+        });
+        document.getElementById('petAdminClose').addEventListener('click',()=>dialog.close());
+        dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close();});
+        document.getElementById('petAdminBranch').replaceChildren(...Object.entries(ATTENDANCE_PET_BRANCHES).map(([key,branch])=>new Option(branch.name,key)));
+        document.getElementById('petAdminApplyBranch').addEventListener('click',()=>applyPetAdminAction('branch:'+document.getElementById('petAdminBranch').value));
+        document.getElementById('petAdminUser').addEventListener('change',renderPetAdminSummary);
+        document.getElementById('petAdminRefresh').addEventListener('click',loadPetAdminProfiles);
+        panel.querySelectorAll('[data-pet-admin]').forEach(button=>button.addEventListener('click',()=>applyPetAdminAction(button.dataset.petAdmin)));
+    }
+}
+
 let attendancePetData = null;
+let attendancePetStarting=false;
+let petQuotaRetryAt=0;
+function assertPetQuotaAvailable(){
+    try{petQuotaRetryAt=Math.max(petQuotaRetryAt,Number(sessionStorage.getItem('workpicPetQuotaRetryAt'))||0);}catch{}
+    if(Date.now()<petQuotaRetryAt){const error=new Error('Firestore quota cooldown');error.code='resource-exhausted';error.cooldown=true;throw error;}
+}
+function petQuotaErrorText(error){
+    if(String(error?.code||'').split('/').pop()!=='resource-exhausted')return '';
+    if(!error.cooldown){petQuotaRetryAt=Date.now()+300000;try{sessionStorage.setItem('workpicPetQuotaRetryAt',String(petQuotaRetryAt));}catch{}}
+    return 'Firestore đang giới hạn yêu cầu (429). Thay đổi chưa được lưu. Tạm ngưng gửi yêu cầu thú cưng 5 phút; nếu hết quota ngày, cần chờ quota được cấp lại hoặc kiểm tra Usage trên Firebase.';
+}
 let attendancePetRef = null;
 let attendancePetUnsubscribe = null;
 let attendancePetInterval = null;
@@ -8520,20 +8931,25 @@ function renderAttendancePet() {
         const seconds = Math.max(0,Math.ceil(value/1000));
         return `${Math.floor(seconds/3600)}h ${Math.floor(seconds%3600/60)}m ${seconds%60}s`;
     };
-    document.getElementById('attendancePetName').textContent = view.dead ? `${view.name} · Đã chết` : view.name;
-    document.getElementById('attendancePetPreview').setAttribute('aria-label',`${view.name} · Cấp ${view.level}${view.dead?' · Đã chết':''}`);
-    document.getElementById('attendancePetLevel').textContent = view.egg ? 'Trứng · Cấp 0' : `Cấp ${view.level}`;
+    document.getElementById('attendancePetName').textContent = view.dead ? `${view.displayName} · Đã chết` : view.displayName;
+    document.getElementById('attendancePetPreview').setAttribute('aria-label',`${view.displayName} · ${view.name} · Cấp ${view.level}${view.dead?' · Đã chết':''}`);
+    document.getElementById('attendancePetLevel').textContent = `${view.egg?'Trứng · Cấp 0':`Cấp ${view.level}`}${view.nickname?` · ${view.name}`:''}`;
+    const nicknameInput=document.getElementById('attendancePetNickname');
+    nicknameInput.disabled=!attendancePetReady||attendancePetBusy;
+    if(!nicknameInput.dataset.dirty&&document.activeElement!==nicknameInput)nicknameInput.value=view.nickname;
+    document.getElementById('attendancePetNicknameSave').disabled=!attendancePetReady||attendancePetBusy;
     document.getElementById('attendancePetDescription').textContent = view.dead ? 'Bạn đã vắng điểm danh đủ 72 giờ. Bấm thú cưng hoặc Hồi sinh để bắt đầu một cuộc đời mới.'
         : view.egg ? 'Trứng đang ấp. Bạn vẫn có thể điểm danh hôm nay để tích ngày tiến hóa.'
-        : view.fedToday ? 'Bụng no rồi! Hẹn bạn cho ăn vào ngày mai.' : 'Bấm vào thú cưng đang bơi để cho ăn hôm nay.';
+        : view.fedToday ? 'Bụng no rồi! Hẹn bạn cho ăn vào ngày mai.' : 'Bấm vào thú cưng để cho ăn hôm nay.';
     const hatchTime = new Date(view.pet.hatchAt).toLocaleString('vi-VN',{timeZone:'Asia/Bangkok'});
     document.getElementById('attendancePetCountdown').textContent = view.dead ? 'Hồi sinh: trở về trứng, nở sau 1 giờ.' : view.egg ? `Nở sau ${duration(view.untilHatch)} · Dự kiến nở lúc ${hatchTime}. Thời gian vẫn tính khi đóng web.` : `Cần điểm danh trước ${new Date(view.diesAt).toLocaleString('vi-VN',{timeZone:'Asia/Bangkok'})}.`;
     const eggTimer = document.getElementById('attendancePetEggTimer');
     eggTimer.hidden = !view.egg || view.dead || !attendancePetReady;
     eggTimer.textContent = `Nở sau ${duration(view.untilHatch)}`;
     eggTimer.title = `Dự kiến nở lúc ${hatchTime}`;
-    document.getElementById('attendancePetProgress').style.width = `${view.checkins%10*10}%`;
-    document.getElementById('attendancePetProgressText').textContent = `${view.checkins} ngày điểm danh trong cuộc đời này · Còn ${view.nextEvolutionIn} ngày điểm danh để tiến hóa.`;
+    document.getElementById('attendancePetProgress').style.width = `${view.maxed?100:view.checkins%10*10}%`;
+    document.getElementById('attendancePetProgressText').textContent = `${view.checkins} ngày điểm danh trong cuộc đời này · ${view.maxed?'Đã đạt cấp cuối của nhánh.':view.needsBranch?'Đã mở 4 nhánh tiến hóa! Chọn nhánh bên dưới để tiếp tục.':`Còn ${view.nextEvolutionIn} ngày điểm danh để tiến hóa.`}`;
+    renderAttendancePetBranches(view);
     const checkin = document.getElementById('attendancePetCheckin');
     checkin.textContent = view.checkedToday ? 'Đã điểm danh hôm nay' : 'Điểm danh hôm nay';
     checkin.disabled = !attendancePetReady || attendancePetBusy || view.dead || view.checkedToday;
@@ -8542,11 +8958,26 @@ function renderAttendancePet() {
     feed.disabled = !attendancePetReady || attendancePetBusy || (!view.dead && (view.egg || view.fedToday));
     document.getElementById('attendancePetDot').hidden = view.checkedToday && !view.dead;
     const swimmer = document.getElementById('attendancePetSwimmer');
-    const petTitle = `${view.name} · Cấp ${view.level} · ${view.dead?'Bấm để hồi sinh':view.egg?`Nở sau ${duration(view.untilHatch)} · ${hatchTime}`:view.fedToday?'Đã cho ăn hôm nay':'Bấm để cho ăn'}`;
+    const petTitle = `${view.displayName}${view.nickname?` · ${view.name}`:''} · Cấp ${view.level} · ${view.dead?'Bấm để hồi sinh':view.egg?`Nở sau ${duration(view.untilHatch)} · ${hatchTime}`:view.fedToday?'Đã cho ăn hôm nay':'Bấm để cho ăn'}`;
     if (swimmer.title!==petTitle) {swimmer.title=petTitle;swimmer.setAttribute('aria-label',petTitle);}
     swimmer.disabled = !attendancePetReady || attendancePetBusy;
     swimmer.classList.toggle('pet-is-dead',view.dead);
     AttendancePet3D.update(view);
+}
+
+function renderAttendancePetBranches(view){
+    const panel=document.getElementById('attendancePetBranchPanel');panel.hidden=!view.branchUnlocked;
+    document.getElementById('attendancePetBranchHint').textContent=view.branch?`Nhánh ${ATTENDANCE_PET_BRANCHES[view.branch].name} · Bậc ${view.branchLevel}/${ATTENDANCE_PET_BRANCHES[view.branch].forms.length}. Đổi nhánh vẫn giữ số ngày điểm danh.`:'Từ cá đuối cấp 9, chọn 1 trong 4 nhánh. Mỗi nhánh có 20 dạng tiến hóa, từ cấp 10 đến 29.';
+    panel.querySelectorAll('[data-pet-branch]').forEach(button=>{
+        const selected=button.dataset.petBranch===view.branch;
+        button.classList.toggle('is-selected',selected);button.setAttribute('aria-pressed',String(selected));
+        button.disabled=!attendancePetReady||attendancePetBusy||view.dead||selected;
+    });
+    const road=document.getElementById('attendancePetRoad'),key=`${view.branch}:${view.level}`;
+    if(road.dataset.path!==key){
+        road.dataset.path=key;
+        road.innerHTML='<li>Trứng · nở sau 1 giờ</li>'+attendancePetCatalog(view.branch).map((form,index)=>`<li class="${index+1===view.level?'is-current':index+1<view.level?'is-complete':''}" ${index+1===view.level?'aria-current="step"':''}>Cấp ${index+1} · ${form.name}${index?` · ${index*10} ngày điểm danh`:''}</li>`).join('')+(!view.branch?'<li class="pet-road-unlock">Cấp 9: mở 4 nhánh, mỗi nhánh 20 cấp</li>':'');
+    }
 }
 
 async function actOnAttendancePet(action) {
@@ -8555,45 +8986,54 @@ async function actOnAttendancePet(action) {
     const previousLevel = attendancePetView(attendancePetData).level;
     attendancePetBusy = true; renderAttendancePet();
     try {
+        assertPetQuotaAvailable();
         const result = await runTransaction(db, async transaction => {
             const snapshot = await transaction.get(ref);
             if (!snapshot.exists() || snapshot.data().uid !== uid) throw new Error('Không đọc được hồ sơ thú cưng.');
             const change = transitionAttendancePet(snapshot.data().attendancePet,action,Date.now());
             if (change.changed) transaction.update(ref,{attendancePet:change.pet});
             return change;
-        });
+        },{maxAttempts:2});
         if (generation !== attendancePetGeneration || currentUser?.uid !== uid) return;
         attendancePetData = result.pet;
+        if(result.result==='renamed')delete document.getElementById('attendancePetNickname').dataset.dirty;
         const messages = {checked:'Điểm danh thành công! Thêm một ngày tiến hóa.',fed:'Măm măm! Cảm ơn bạn đã cho ăn.',revived:'Đã hồi sinh! Trứng sẽ nở sau 1 giờ.',dead:'Thú cưng đã chết. Bấm Hồi sinh để bắt đầu lại.',egg:'Trứng chưa nở, chưa thể cho ăn.',alive:'Thú cưng đã được hồi sinh rồi.', 'already-checked':'Bạn đã điểm danh hôm nay.', 'already-fed':'Hôm nay đã cho ăn rồi. Hẹn ngày mai!'};
         const after = attendancePetView(result.pet);
+        messages.renamed='Đã lưu tên thú cưng.';
+        Object.assign(messages,{branched:`Đã chọn nhánh ${after.branch?ATTENDANCE_PET_BRANCHES[after.branch].name:''}. Tiến độ điểm danh được giữ nguyên.`,'branch-locked':'Đạt cá đuối cấp 9 để mở nhánh.','already-branch':'Bạn đang ở nhánh này.'});
         attendancePetMessage(result.result==='checked' && after.level>previousLevel && !after.egg ? `Tiến hóa! Cấp ${after.level} · ${after.name}.` : messages[result.result] || 'Đã đồng bộ thú cưng.');
         if (result.result==='fed') AttendancePet3D.feed();
     } catch (error) {
-        if (generation===attendancePetGeneration) attendancePetMessage('Chưa lưu được. Kiểm tra kết nối và quyền cập nhật hồ sơ rồi thử lại.');
+        if (generation===attendancePetGeneration) attendancePetMessage(petQuotaErrorText(error)||'Chưa lưu được. Kiểm tra kết nối và quyền cập nhật hồ sơ rồi thử lại.');
     } finally {
         if (generation===attendancePetGeneration) { attendancePetBusy=false; renderAttendancePet(); }
     }
 }
 
 async function startAttendancePet() {
+    if(attendancePetStarting)return;
     stopAttendancePet();
     if (!currentUser) return;
+    attendancePetStarting=true;
     const generation = attendancePetGeneration, uid = currentUser.uid;
     document.getElementById('attendancePetToggle').hidden=false;
     document.getElementById('attendancePetStatus').textContent='Đang đồng bộ thú cưng…';
     try {
-        const profiles = await getDocs(query(collection(db,'users'),where('uid','==',uid)));
+        assertPetQuotaAvailable();
+        const cached=authenticatedProfileSnapshot?.data()?.uid===uid?authenticatedProfileSnapshot:null;
+        const profiles = cached ? {docs:[cached]} : await getDocs(query(collection(db,'users'),where('uid','==',uid)));
         if (generation!==attendancePetGeneration || currentUser?.uid!==uid) return;
         const profile = [...profiles.docs].sort((a,b)=>a.id.localeCompare(b.id))[0];
         if (!profile) throw new Error('Missing profile');
         attendancePetRef = profile.ref;
-        const pet = await runTransaction(db,async transaction=>{
+        const initial=transitionAttendancePet(profile.data().attendancePet,'init',Date.now());
+        const pet = !initial.changed ? initial.pet : await runTransaction(db,async transaction=>{
             const snapshot=await transaction.get(profile.ref);
             if (!snapshot.exists() || snapshot.data().uid!==uid) throw new Error('Missing profile');
             const change=transitionAttendancePet(snapshot.data().attendancePet,'init',Date.now());
             if (change.changed) transaction.update(profile.ref,{attendancePet:change.pet});
             return change.pet;
-        });
+        },{maxAttempts:2});
         if (generation!==attendancePetGeneration || currentUser?.uid!==uid) return;
         attendancePetData=pet;attendancePetReady=true;
         document.getElementById('attendancePetRetry').hidden=true;
@@ -8603,22 +9043,30 @@ async function startAttendancePet() {
         attendancePetInterval=setInterval(renderAttendancePet,1000);
         attendancePetUnsubscribe=onSnapshot(profile.ref,snapshot=>{
             if (generation!==attendancePetGeneration || currentUser?.uid!==uid) return;
+            authenticatedProfileSnapshot=snapshot;
             if (snapshot.exists() && snapshot.data().attendancePet) {attendancePetData=snapshot.data().attendancePet;renderAttendancePet();}
-        },()=>{
+        },error=>{
             if (generation!==attendancePetGeneration) return;
             attendancePetReady=false;renderAttendancePet();
-            document.getElementById('attendancePetStatus').textContent='Mất đồng bộ thú cưng. Bấm Thử kết nối lại.';
+            document.getElementById('attendancePetStatus').textContent=petQuotaErrorText(error)||'Mất đồng bộ thú cưng. Bấm Thử kết nối lại.';
             document.getElementById('attendancePetRetry').hidden=false;
         });
     } catch (error) {
         if (generation!==attendancePetGeneration) return;
-        document.getElementById('attendancePetStatus').textContent='Chưa tải được thú cưng. Cần quyền đọc/cập nhật hồ sơ tài khoản trên Firebase.';
+        document.getElementById('attendancePetStatus').textContent=petQuotaErrorText(error)||(error.code==='permission-denied'?'Firebase chưa cho phép đọc/cập nhật hồ sơ thú cưng.':'Chưa tải được thú cưng. Kiểm tra kết nối rồi thử lại.');
         document.getElementById('attendancePetRetry').hidden=false;renderAttendancePet();
+    } finally {
+        if(generation===attendancePetGeneration)attendancePetStarting=false;
     }
 }
 
 function stopAttendancePet() {
+    petAdminLoad++;petAdminProfiles=[];
+    const adminPanel=document.getElementById('petAdminPanel');if(adminPanel)adminPanel.hidden=true;
+    const adminLaunch=document.getElementById('petAdminOpen');if(adminLaunch)adminLaunch.hidden=true;
+    const adminDialog=document.getElementById('petAdminDialog');if(adminDialog?.open)adminDialog.close();
     attendancePetGeneration++;attendancePetUnsubscribe?.();attendancePetUnsubscribe=null;
+    attendancePetStarting=false;
     clearInterval(attendancePetInterval);clearTimeout(attendancePetBubbleTimer);
     attendancePetData=null;attendancePetRef=null;attendancePetReady=false;attendancePetBusy=false;
     AttendancePet3D.stop();
@@ -8626,6 +9074,7 @@ function stopAttendancePet() {
     if (dialog?.open) dialog.close();
     const toggle=document.getElementById('attendancePetToggle');if(toggle)toggle.hidden=true;
     const swimmer=document.getElementById('attendancePetSwimmer');if(swimmer)swimmer.hidden=true;
+    const nickname=document.getElementById('attendancePetNickname');if(nickname){nickname.value='';delete nickname.dataset.dirty;}
 }
 
 function initAttendancePetUi() {
@@ -8637,11 +9086,21 @@ function initAttendancePetUi() {
     document.getElementById('attendancePetClose').addEventListener('click',()=>dialog.close());
     dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close();});
     document.getElementById('attendancePetCheckin').addEventListener('click',()=>actOnAttendancePet('checkin'));
+    const nickname=document.getElementById('attendancePetNickname');
+    nickname.addEventListener('input',()=>nickname.dataset.dirty='true');
+    document.getElementById('attendancePetNicknameForm').addEventListener('submit',async event=>{
+        event.preventDefault();if(!attendancePetReady||attendancePetBusy)return;
+        const value=normalizePetNickname(nickname.value);
+        if(value===attendancePetView(attendancePetData).nickname){delete nickname.dataset.dirty;nickname.value=value;attendancePetMessage('Tên thú cưng không thay đổi.');return;}
+        await actOnAttendancePet('rename:'+value);
+        if(attendancePetView(attendancePetData).nickname===value)nickname.value=value;
+    });
     const interact=()=>{const view=attendancePetView(attendancePetData);actOnAttendancePet(view.dead?'revive':'feed');};
     document.getElementById('attendancePetFeed').addEventListener('click',interact);
     document.getElementById('attendancePetSwimmer').addEventListener('click',interact);
     document.getElementById('attendancePetRetry').addEventListener('click',startAttendancePet);
-    document.getElementById('attendancePetRoad').innerHTML='<li>Trứng · nở sau 1 giờ</li>'+ATTENDANCE_PET_FORMS.map((form,index)=>`<li>Cấp ${index+1} · ${form.name}${index?` · ${index*10} ngày điểm danh`:''}</li>`).join('');
+    document.getElementById('attendancePetBranchOptions').innerHTML=Object.entries(ATTENDANCE_PET_BRANCHES).map(([key,branch])=>`<button type="button" data-pet-branch="${key}" aria-pressed="false"><span class="pet-branch-symbol" aria-hidden="true">${{fish:'🐋',dino:'🦖',bird:'🦅',beast:'🦁'}[key]}</span><strong>${branch.name}</strong><small>${branch.forms.length} cấp tiến hóa</small></button>`).join('');
+    document.getElementById('attendancePetBranchOptions').addEventListener('click',event=>{const button=event.target.closest('[data-pet-branch]');if(button&&!button.disabled)actOnAttendancePet('branch:'+button.dataset.petBranch);});
 }
 
 let sharedNotesUnsubscribe = null;
