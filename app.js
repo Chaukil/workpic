@@ -293,8 +293,26 @@ function advanceStormWater(water, now) {
 
 function scoopStormWater(water, now) {
     advanceStormWater(water, now);
-    water.level = Math.max(0, water.level - .05);
+    water.level = Math.max(0, water.level - .02);
     return water.level;
+}
+
+function loadStormWater(now, storage) {
+    let level = 0;
+    try {
+        const saved = JSON.parse(storage?.getItem('workpic-storm-water-v1') || 'null');
+        if (typeof saved?.level === 'number' && Number.isFinite(saved.level)) level = Math.max(0, Math.min(.5, saved.level));
+    } catch {}
+    // Resume from the saved level; do not flood the screen while the app was closed.
+    return { level, lastAt: now };
+}
+
+function saveStormWater(water, storage) {
+    try {
+        if (!storage || !Number.isFinite(water.level)) return false;
+        storage.setItem('workpic-storm-water-v1', JSON.stringify({ level: Math.max(0, Math.min(.5, water.level)) }));
+        return true;
+    } catch { return false; }
 }
 
 function jobColorStyle(job) {
@@ -601,9 +619,11 @@ const RainFx = (() => {
     function stop() {
         if (!state) return;
         const s = state; state = null;
+        s.persistWater?.();
         cancelAnimationFrame(s.raf);
         s.observer?.disconnect();
         window.removeEventListener('resize', s.fit);
+        window.removeEventListener('pagehide', s.persistWater);
         document.removeEventListener('visibilitychange', s.resume);
         document.removeEventListener('shown.bs.modal', s.resume);
         document.removeEventListener('hidden.bs.modal', s.resume);
@@ -613,6 +633,8 @@ const RainFx = (() => {
         document.removeEventListener('pointerdown', s.scoop);
         document.body.classList.remove('storm-bucket-active');
         s.waterOverlay?.remove();
+        s.bucket?.remove();
+        s.splashes?.forEach(splash => splash.remove());
         s.audio?.close().catch(() => {});
         s.canvas.remove();
     }
@@ -624,18 +646,69 @@ const RainFx = (() => {
         if (!g) return false;
         canvas.className = 'rain-fx-canvas'; canvas.setAttribute('aria-hidden', 'true');
         host.prepend(canvas);
-        const s = { canvas, raf: 0, last: 0, time: 0, width: 0, height: 0, drops: [], profile: profiles[level] || profiles[1], nextStrike: 3, bolt: null, audio: null, soundNodes: new Set(), water: { level: 0, lastAt: Date.now() }, scoopRipples: [] };
+        const waterStorage = typeof localStorage === 'undefined' ? null : localStorage;
+        const s = { canvas, raf: 0, last: 0, time: 0, width: 0, height: 0, drops: [], profile: profiles[level] || profiles[1], nextStrike: 3, bolt: null, audio: null, soundNodes: new Set(), water: level === 2 ? loadStormWater(Date.now(), waterStorage) : { level: 0, lastAt: Date.now() }, lastWaterSave: Date.now(), scoopRipples: [], splashes: new Set() };
         state = s;
+        s.throwWater = event => {
+            const width = window.innerWidth, height = window.innerHeight;
+            const direction = event.clientX < width / 2 ? -1 : 1;
+            const x = event.clientX + direction * 17, y = event.clientY - 12;
+            const landingX = direction < 0 ? 32 : width - 32;
+            const landingY = height * (1 - s.water.level);
+            const rise = Math.max(100, y - landingY + 85);
+            const travel = landingX - x;
+            const curve = (dx = 0, dy = 0) => `M${x},${y} C${x + travel * .3},${y - rise} ${x + travel * .75},${landingY - 80} ${landingX + dx},${landingY + dy}`;
+            const id = `storm-pour-${Date.now()}`;
+            const splash = document.createElement('div');
+            splash.className = 'storm-scoop-water'; splash.setAttribute('aria-hidden', 'true');
+            splash.innerHTML = `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none"><defs><linearGradient id="${id}"><stop stop-color="#f0f9ff" stop-opacity=".85"/><stop offset=".5" stop-color="#7dd3fc" stop-opacity=".65"/><stop offset="1" stop-color="#38bdf8" stop-opacity=".2"/></linearGradient></defs>
+                ${[24,14,6].map((size,index) => `<path class="storm-pour-stream" d="${curve(index * direction * 10,index * 3)}" fill="none" stroke="url(#${id})" stroke-width="${size}" stroke-linecap="round" pathLength="1" style="animation-delay:${.16 + index * .06}s"/>`).join('')}
+                ${Array.from({length:32},(_,index) => {
+                    const dx = (Math.random() - .5) * 110, dy = Math.random() * 18;
+                    const duration = .65 + Math.random() * .35, delay = .15 + Math.random() * .22;
+                    return `<ellipse rx="${3 + Math.random() * 5}" ry="${4 + Math.random() * 7}" fill="${index % 3 ? '#7dd3fc' : '#e0f2fe'}" opacity="0"><animateMotion path="${curve(dx,dy)}" dur="${duration}s" begin="${delay}s" fill="freeze"/><animate attributeName="opacity" values="0;.9;.85;0" keyTimes="0;.1;.85;1" dur="${duration}s" begin="${delay}s" fill="freeze"/></ellipse>`;
+                }).join('')}
+                <g class="storm-water-impact"><path d="M${landingX-38},${landingY+5}q10-32 20 0q5-48 13-5q8-40 14 4q12-33 27 1" fill="none" stroke="#bae6fd" stroke-width="3" stroke-linecap="round"/><ellipse class="storm-impact-ring" cx="${landingX}" cy="${landingY+8}" rx="25" ry="6" fill="none" stroke="#e0f2fe" stroke-width="2"/></g>
+                </svg>`;
+            splash.addEventListener('animationend', event => {
+                if (event.animationName !== 'storm-pour-lifetime') return;
+                splash.remove(); s.splashes.delete(splash);
+            });
+            // Bound effects even if a browser suppresses animation-end events.
+            if (s.splashes.size >= 3) { const oldest = s.splashes.values().next().value; oldest.remove(); s.splashes.delete(oldest); }
+            s.splashes.add(splash); document.body.appendChild(splash);
+        };
+        s.persistWater = () => {
+            if (level !== 2) return;
+            advanceStormWater(s.water, Date.now());
+            saveStormWater(s.water, waterStorage);
+            s.lastWaterSave = Date.now();
+        };
         const blockedBucketTarget = target => target?.closest?.('button,a,input,select,textarea,[contenteditable],[role="button"],dialog,.modal,.quick-chat-panel,.job-item,.schedule-item,.timeline-job,.out-of-schedule-card');
         const inWater = event => {
             advanceStormWater(s.water, Date.now());
             return s.water.level > 0 && !document.hidden && !document.body.classList.contains('modal-open')
                 && !blockedBucketTarget(event.target) && event.clientY >= window.innerHeight * (1 - s.water.level);
         };
-        s.moveBucket = event => document.body.classList.toggle('storm-bucket-active', inWater(event));
+        s.moveBucket = event => {
+            const active = inWater(event);
+            document.body.classList.toggle('storm-bucket-active', active);
+            if (!s.bucket) return;
+            s.bucket.style.display = active || s.bucket.classList.contains('scooping') ? 'block' : 'none';
+            if (active) s.bucket.style.transform = `translate3d(${event.clientX - 22}px,${event.clientY - 22}px,0)`;
+        };
         s.scoop = event => {
-            if (event.button !== 0 || !inWater(event)) return;
+            if (event.button !== 0 || !inWater(event) || Date.now() < (s.nextScoopAt || 0)) return;
+            s.nextScoopAt = Date.now() + 850;
             scoopStormWater(s.water, Date.now());
+            s.persistWater();
+            s.throwWater(event);
+            if (s.bucket) {
+                const throwLeft = event.clientX < window.innerWidth / 2;
+                s.bucket.style.setProperty('--throw-x', `${throwLeft ? -event.clientX - 80 : window.innerWidth - event.clientX + 80}px`);
+                s.bucket.classList.toggle('throw-left', throwLeft);
+                s.bucket.classList.add('scooping');
+            }
             const rect = host.getBoundingClientRect();
             s.scoopRipples.push({ x: event.clientX - rect.left, at: s.time });
             s.scoopRipples = s.scoopRipples.slice(-8);
@@ -647,6 +720,16 @@ const RainFx = (() => {
             s.waterOverlay.setAttribute('aria-hidden', 'true');
             s.waterOverlay.title = 'Bấm vùng nước trống để tát nước';
             document.body.appendChild(s.waterOverlay);
+            s.bucket = document.createElement('div');
+            s.bucket.className = 'storm-bucket-cursor';
+            s.bucket.setAttribute('aria-hidden', 'true');
+            s.bucket.innerHTML = `<svg viewBox="0 0 56 58" class="storm-bucket-icon"><defs><linearGradient id="storm-bucket-enamel" x2="1" y2=".2"><stop stop-color="#0f766e"/><stop offset=".45" stop-color="#5eead4"/><stop offset="1" stop-color="#0d9488"/></linearGradient><linearGradient id="storm-bucket-rim"><stop stop-color="#f8fafc"/><stop offset=".5" stop-color="#94a3b8"/><stop offset="1" stop-color="#e2e8f0"/></linearGradient></defs><g class="storm-bucket-vessel"><path d="M13 24C11 2 45 2 43 24" fill="none" stroke="#172c3b" stroke-width="5"/><path d="M13 24C11 2 45 2 43 24" fill="none" stroke="url(#storm-bucket-rim)" stroke-width="2.5"/><path d="M10 24h36l-5 27q-13 6-26 0Z" fill="url(#storm-bucket-enamel)" stroke="#0a4e4a" stroke-width="1.5"/><ellipse cx="28" cy="24" rx="18" ry="5" fill="#134e4a" stroke="url(#storm-bucket-rim)" stroke-width="2.5"/><ellipse class="storm-bucket-contents" cx="28" cy="24.5" rx="15" ry="3.5" fill="#7dd3fc"/><path class="storm-bucket-contents" d="M16 24q8-4 19-1" fill="none" stroke="#e0f2fe" stroke-width="1.5"/><path d="m17 32 3 15" stroke="#ccfbf1" stroke-width="2.5" stroke-linecap="round" opacity=".75"/><path d="M20 50q9 2 17-1" fill="none" stroke="#115e59" stroke-width="1.5"/><rect x="22" y="6" width="12" height="5" rx="2.5" fill="#c8a77a"/></g></svg><span class="storm-bucket-splash"><i></i><i></i><i></i><i></i><i></i><i></i></span>`;
+            s.bucket.addEventListener('animationend', event => {
+                if (event.animationName !== 'storm-bucket-scoop') return;
+                s.bucket.classList.remove('scooping');
+                if (!document.body.classList.contains('storm-bucket-active')) s.bucket.style.display = 'none';
+            });
+            document.body.appendChild(s.bucket);
             document.addEventListener('pointermove', s.moveBucket);
             document.addEventListener('pointerdown', s.scoop);
         }
@@ -693,6 +776,7 @@ const RainFx = (() => {
             const p = s.profile;
             if (level === 2) {
                 advanceStormWater(s.water, Date.now());
+                if (Date.now() - s.lastWaterSave >= 5000) s.persistWater();
                 const waterHeight = `${Math.round(s.water.level * 10000) / 100}dvh`;
                 if (s.waterOverlay.style.height !== waterHeight) s.waterOverlay.style.height = waterHeight;
             }
@@ -764,7 +848,8 @@ const RainFx = (() => {
             }
         };
         s.resume = () => {
-            if (document.hidden || document.body.classList.contains('modal-open')) { cancelAnimationFrame(s.raf); s.raf = 0; document.body.classList.remove('storm-bucket-active'); s.soundNodes.forEach(node => { try { node.stop(); } catch {} }); }
+            if (document.hidden) s.persistWater();
+            if (document.hidden || document.body.classList.contains('modal-open')) { cancelAnimationFrame(s.raf); s.raf = 0; document.body.classList.remove('storm-bucket-active'); if (s.bucket) { s.bucket.style.display = 'none'; s.bucket.classList.remove('scooping'); } s.splashes.forEach(splash => splash.remove()); s.splashes.clear(); s.soundNodes.forEach(node => { try { node.stop(); } catch {} }); }
             else if (!s.raf) { s.last = 0; s.raf = requestAnimationFrame(frame); }
         };
         s.fit();
@@ -774,6 +859,7 @@ const RainFx = (() => {
         document.addEventListener('shown.bs.modal', s.resume);
         document.addEventListener('hidden.bs.modal', s.resume);
         if (level === 2) {
+            window.addEventListener('pagehide', s.persistWater);
             document.addEventListener('pointerdown', s.armAudio);
             document.addEventListener('keydown', s.armAudio);
             if (navigator.userActivation?.hasBeenActive) s.armAudio();

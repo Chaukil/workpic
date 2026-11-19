@@ -15423,8 +15423,43 @@ body :is(.schedule-item,.timeline-job)[style*='--job-custom-color'] :is(h6,small
 .shared-note-image-dialog.zoomed #sharedNoteImageFull { max-width: none; max-height: none; }
 
 /* Bucket interaction never captures clicks on jobs, controls or modal content. */
-body.storm-bucket-active, body.storm-bucket-active * { cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2236%22%20height%3D%2238%22%20viewBox%3D%220%200%2036%2038%22%3E%3Cpath%20d%3D%22M8%2014C8%201%2028%201%2028%2014%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%223%22%2F%3E%3Cpath%20d%3D%22M5%2014h26l-4%2021H9Z%22%20fill%3D%22%2338bdf8%22%20stroke%3D%22%23f8fafc%22%20stroke-width%3D%222%22%2F%3E%3Cellipse%20cx%3D%2218%22%20cy%3D%2214%22%20rx%3D%2213%22%20ry%3D%224%22%20fill%3D%22%23075985%22%20stroke%3D%22%23e0f2fe%22%20stroke-width%3D%222%22%2F%3E%3Cpath%20d%3D%22m13%2021%201%208m5-8v8%22%20stroke%3D%22%23e0f2fe%22%20stroke-width%3D%222%22%2F%3E%3C%2Fsvg%3E") 18 18, crosshair !important; }
+body.storm-bucket-active, body.storm-bucket-active * { cursor: none !important; }
 .storm-water-overlay { position: fixed; left: 0; right: 0; bottom: 0; height: 0; pointer-events: none; z-index: 1000; background: linear-gradient(rgba(68,157,198,.2),rgba(12,62,108,.5)); border-top: 2px solid rgba(169,222,246,.4); transition: height .25s ease-out; }
 .storm-water-overlay::before { content: ''; position: absolute; left: -5%; top: -5px; width: 110%; height: 10px; background: rgba(122,199,229,.2); border-radius: 45%; animation: storm-water-sway 4s ease-in-out infinite alternate; }
 @keyframes storm-water-sway { to { transform: translateX(3%) translateY(3px); } }
 @media (prefers-reduced-motion: reduce) { .storm-water-overlay, .storm-water-overlay::before { animation: none; transition: none; } }
+
+/* Enamel pail follows the pointer; a dip-and-throw animation flings water outward. */
+.storm-bucket-cursor { position: fixed; top: 0; left: 0; width: 50px; height: 54px; pointer-events: none; z-index: 1040; display: none; filter: drop-shadow(0 3px 4px rgba(2,6,23,.5)); }
+.storm-bucket-icon { width: 50px; height: 54px; overflow: visible; }
+.storm-bucket-vessel { transform-origin: 28px 32px; }
+.storm-bucket-cursor.throw-left .storm-bucket-icon { transform: scaleX(-1); }
+.storm-bucket-cursor.scooping .storm-bucket-vessel { animation: storm-bucket-scoop .85s cubic-bezier(.4,0,.2,1); }
+.storm-bucket-splash { position: absolute; top: 14px; left: 36px; }
+.storm-bucket-splash i { position: absolute; opacity: 0; width: 5px; height: 9px; border-radius: 50% 50% 55% 55%; background: linear-gradient(#e0f2fe,#38bdf8); box-shadow: 0 0 4px #7dd3fc60; }
+.storm-bucket-splash i:nth-child(2n) { width: 4px; height: 6px; margin-top: 6px; }
+.storm-bucket-splash i:nth-child(3n) { width: 7px; height: 11px; margin-top: -5px; }
+.storm-bucket-cursor.scooping .storm-bucket-splash i { animation: storm-bucket-throw .55s ease-in .24s both; }
+.storm-bucket-cursor.scooping .storm-bucket-splash i:nth-child(2) { animation-delay: .27s; }
+.storm-bucket-cursor.scooping .storm-bucket-splash i:nth-child(3) { animation-delay: .3s; }
+.storm-bucket-cursor.scooping .storm-bucket-splash i:nth-child(4) { animation-delay: .25s; }
+.storm-bucket-cursor.scooping .storm-bucket-splash i:nth-child(5) { animation-delay: .29s; }
+.storm-bucket-cursor.scooping .storm-bucket-splash i:nth-child(6) { animation-delay: .26s; }
+@keyframes storm-bucket-scoop { 0%,100% { transform: translateY(0) rotate(0); } 18% { transform: translateY(7px) rotate(-14deg); } 48% { transform: translate(3px,-8px) rotate(68deg); } 70% { transform: translate(3px,-8px) rotate(68deg); } }
+@keyframes storm-bucket-throw { 0% { opacity: 0; transform: translate(0,0) rotate(10deg); } 12% { opacity: .95; } 45% { opacity: .85; transform: translate(calc(var(--throw-x) * .35),-65px) rotate(60deg); } 100% { opacity: 0; transform: translate(var(--throw-x),35px) rotate(110deg); } }
+@media (prefers-reduced-motion: reduce) { .storm-bucket-vessel, .storm-bucket-splash i { animation: none !important; } }
+.storm-bucket-cursor.throw-left .storm-bucket-splash { left: 8px; }
+/* A full pail produces a thick stream, falling droplets and a surface splash. */
+.storm-bucket-splash { display: none; }
+.storm-bucket-cursor.scooping .storm-bucket-contents { animation: storm-bucket-empty .85s ease both; }
+.storm-scoop-water { position: fixed; inset: 0; z-index: 1039; pointer-events: none; animation: storm-pour-lifetime 1.65s linear both; }
+.storm-scoop-water > svg { width: 100%; height: 100%; overflow: visible; }
+.storm-pour-stream { stroke-dasharray: .001 1; animation: storm-pour-stream .8s ease-out both; }
+.storm-water-impact { opacity: 0; transform-box: fill-box; transform-origin: center bottom; animation: storm-water-impact .7s ease-out .8s both; }
+.storm-impact-ring { transform-box: fill-box; transform-origin: center; animation: storm-impact-ring .7s ease-out .8s both; }
+@keyframes storm-pour-lifetime { 0%,90% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes storm-pour-stream { 0% { stroke-dasharray: .001 1; stroke-dashoffset: 0; opacity: 0; } 15% { opacity: .85; } 45% { stroke-dasharray: .45 1; stroke-dashoffset: -.2; opacity: .7; } 100% { stroke-dasharray: .08 1; stroke-dashoffset: -1; opacity: 0; } }
+@keyframes storm-water-impact { 0% { opacity: 0; transform: scale(.3,.2); } 25% { opacity: .9; transform: scale(1,1); } 100% { opacity: 0; transform: scale(1.5,.35) translateY(10px); } }
+@keyframes storm-impact-ring { from { transform: scale(.4); } to { transform: scale(3,.8); } }
+@keyframes storm-bucket-empty { 0%,20%,100% { opacity: 1; } 45%,80% { opacity: .1; } }
+@media (prefers-reduced-motion: reduce) { .storm-scoop-water { display: none; } .storm-bucket-contents { animation: none !important; } }
