@@ -8348,6 +8348,7 @@ const AttendancePet3D = (()=>{
         art.innerHTML=view.egg?`<svg viewBox="0 0 140 100" aria-hidden="true"><defs><radialGradient id="pet-egg-light"><stop stop-color="#fffef5"/><stop offset="1" stop-color="#b9c6d8"/></radialGradient></defs><ellipse cx="70" cy="53" rx="29" ry="38" fill="url(#pet-egg-light)"/><path d="m58 35 9 6-6 9 14 6-8 10" fill="none" stroke="#d5ab66" stroke-width="2"/><circle cx="82" cy="31" r="5" fill="#e4c989"/></svg>`
             :view.form.kind==='dino'?`<svg viewBox="0 0 140 100" aria-hidden="true"><path d="M20 66 4 51 35 59Q45 31 77 43L91 29 116 28 131 42 125 56 103 53 92 68 91 88 80 88 76 69 57 70 51 88 40 88 43 66Z" fill="${color}"/><path d="m47 45 5-13 8 9 9-16 8 19" fill="#fbbf24"/><circle cx="115" cy="38" r="3" fill="#0f172a"/></svg>`
             :`<svg viewBox="0 0 140 100" aria-hidden="true"><defs><radialGradient id="pet-fish-light"><stop stop-color="#ecfeff"/><stop offset="1" stop-color="${color}"/></radialGradient></defs><path class="pet-fallback-tail" d="m42 50-28-24 4 24-4 24Z" fill="${color}"/><ellipse cx="76" cy="50" rx="42" ry="${view.form.kind==='whale'?25:29}" fill="url(#pet-fish-light)"/><path d="m61 26 19-16 12 21M61 73l22 13 7-15" fill="${color}"/><circle cx="101" cy="41" r="7" fill="white"/><circle cx="104" cy="42" r="4" fill="#0f172a"/><path d="M113 58q-8 4-12 0" fill="none" stroke="#0f172a" stroke-width="2"/></svg>`;
+        if(state?.previewMode)document.getElementById('attendancePetPreview').innerHTML=art.innerHTML.replaceAll('pet-egg-light','pet-panel-egg-light').replaceAll('pet-fish-light','pet-panel-fish-light');
     };
     function disposeModel(s) {
         if (!s.model) return;
@@ -8436,6 +8437,7 @@ const AttendancePet3D = (()=>{
         s.button.removeEventListener('mouseenter',s.enter);s.button.removeEventListener('mouseleave',s.leave);s.button.removeEventListener('focus',s.enter);s.button.removeEventListener('blur',s.leave);
         if(s.renderer){disposeModel(s);s.renderer.dispose();s.renderer.domElement.remove();}
         document.getElementById('attendancePetArt')?.replaceChildren();
+        document.getElementById('attendancePetPreview')?.replaceChildren();
     }
     function start(){
         stop();const token=generation,button=document.getElementById('attendancePetSwimmer');
@@ -8445,11 +8447,12 @@ const AttendancePet3D = (()=>{
         const frame=now=>{
             if(state!==s||document.hidden)return;s.raf=requestAnimationFrame(frame);
             if(s.last&&now-s.last<32)return;const dt=s.last?Math.min(.06,(now-s.last)/1000):.033;s.last=now;s.t+=dt;
-            if(document.body.classList.contains('modal-open')||document.querySelector('dialog[open]'))return;
+            const petDialogOpen=document.getElementById('attendancePetDialog')?.open;
+            if(document.body.classList.contains('modal-open')||(document.querySelector('dialog[open]')&&!petDialogOpen))return;
             const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
             const maxX=Math.max(12,window.innerWidth-150),maxY=Math.max(80,window.innerHeight-145);
             if(s.view?.dead||reduced){s.x=maxX;s.y=maxY;}
-            else if(!s.hover){
+            else if(!s.hover&&!petDialogOpen){
                 if(s.t>s.nextTarget||Math.hypot(s.targetX-s.x,s.targetY-s.y)<15){s.targetX=12+Math.random()*Math.max(1,maxX-12);s.targetY=75+Math.random()*Math.max(1,maxY-75);s.nextTarget=s.t+15;}
                 s.x+=(s.targetX-s.x)*dt*.16;s.y+=(s.targetY-s.y)*dt*.16;
             }
@@ -8477,11 +8480,20 @@ const AttendancePet3D = (()=>{
                 s.scene.add(new T.HemisphereLight('#e5f8ff','#344b6a',2));const light=new T.DirectionalLight('#fff7d6',3);light.position.set(2,4,5);s.scene.add(light);const rim=new T.DirectionalLight('#67d8ff',2);rim.position.set(-3,1,-3);s.scene.add(rim);
                 document.getElementById('attendancePetArt').replaceChildren(renderer.domElement);
                 if(s.view)build(s,s.view);
+                if(s.previewMode)preview(true);
             }catch(error){if(s.view)fallback(s.view);}
         }).catch(()=>{if(state===s&&s.view)fallback(s.view);});
     }
     function update(view){const s=state;if(!s)return;s.view=view;const key=`${view.egg?'egg':view.level}:${view.dead}`;if(s.signature===key)return;s.signature=key;if(s.renderer)build(s,view);else fallback(view);}
-    return {start,stop,update,feed:()=>{if(state)state.fedAt=state.t;}};
+    function preview(open){
+        const s=state;if(!s)return;s.previewMode=open;
+        const container=document.getElementById(open?'attendancePetPreview':'attendancePetArt');
+        if(!container)return;
+        if(s.renderer){container.replaceChildren(s.renderer.domElement);s.renderer.setSize(open?320:144,open?220:104);s.camera.aspect=open?320/220:144/104;s.camera.updateProjectionMatrix();}
+        else if(s.view)fallback(s.view);
+        if(!open)document.getElementById('attendancePetPreview')?.replaceChildren();
+    }
+    return {start,stop,update,preview,feed:()=>{if(state)state.fedAt=state.t;}};
 })();
 
 let attendancePetData = null;
@@ -8509,6 +8521,7 @@ function renderAttendancePet() {
         return `${Math.floor(seconds/3600)}h ${Math.floor(seconds%3600/60)}m ${seconds%60}s`;
     };
     document.getElementById('attendancePetName').textContent = view.dead ? `${view.name} · Đã chết` : view.name;
+    document.getElementById('attendancePetPreview').setAttribute('aria-label',`${view.name} · Cấp ${view.level}${view.dead?' · Đã chết':''}`);
     document.getElementById('attendancePetLevel').textContent = view.egg ? 'Trứng · Cấp 0' : `Cấp ${view.level}`;
     document.getElementById('attendancePetDescription').textContent = view.dead ? 'Bạn đã vắng điểm danh đủ 72 giờ. Bấm thú cưng hoặc Hồi sinh để bắt đầu một cuộc đời mới.'
         : view.egg ? 'Trứng đang ấp. Bạn vẫn có thể điểm danh hôm nay để tích ngày tiến hóa.'
@@ -8619,7 +8632,8 @@ function initAttendancePetUi() {
     const toggle=document.getElementById('attendancePetToggle');
     if (!toggle || toggle.dataset.ready) return;toggle.dataset.ready='true';
     const dialog=document.getElementById('attendancePetDialog');
-    toggle.addEventListener('click',()=>{renderAttendancePet();if(!dialog.open)dialog.showModal();});
+    toggle.addEventListener('click',()=>{renderAttendancePet();if(!dialog.open)dialog.showModal();AttendancePet3D.preview(true);});
+    dialog.addEventListener('close',()=>AttendancePet3D.preview(false));
     document.getElementById('attendancePetClose').addEventListener('click',()=>dialog.close());
     dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close();});
     document.getElementById('attendancePetCheckin').addEventListener('click',()=>actOnAttendancePet('checkin'));

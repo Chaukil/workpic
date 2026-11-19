@@ -1295,7 +1295,7 @@ ${extract('function getHolidayName(', 'function renderDayOffCalendars(')}
 ${extract('function renderChangeHistory(', 'function getDayOffJobPreview(')}
 ${extract('function renderJobChecklist(', "window.addEventListener('beforeunload'")}
 ${extract('let sharedNotesUnsubscribe =', 'function initQuickChatUi(')}
-const AttendancePet3D={start(){},stop(){},update(){},feed(){petFeedAnimations++;}};
+const AttendancePet3D={start(){},stop(){},update(){},preview(open){document.getElementById("attendancePetPreview").innerHTML=open?'<svg viewBox="0 0 140 100"><ellipse cx="70" cy="50" rx="30" ry="40"/></svg>':'';},feed(){petFeedAnimations++;}};
 ${extract('let attendancePetData =', 'let sharedNotesUnsubscribe =')}
 let noteSnapshot, noteWrites = [], noteUpdates = [], noteDeletes = [], noteUnsubscribed = 0, rejectNoteWrite = false;
 const collection = (_, name) => name;
@@ -1323,6 +1323,9 @@ try {
     document.getElementById('attendancePetToggle').hidden=false;renderAttendancePet();
     document.getElementById('attendancePetToggle').click();
     check(document.getElementById('attendancePetDialog').open,'pet care dialog opens');
+    const petDialogRect=document.getElementById('attendancePetDialog').getBoundingClientRect();
+    check(Math.abs(petDialogRect.left+petDialogRect.width/2-innerWidth/2)<2&&Math.abs(petDialogRect.top+petDialogRect.height/2-innerHeight/2)<2,'pet care form is centered horizontally and vertically');
+    check(document.querySelector('#attendancePetPreview svg'),'pet care form displays current pet artwork');
     document.getElementById('attendancePetCheckin').click();await new Promise(resolve=>setTimeout(resolve,0));
     check(petRecord.attendancePet.checkins===1&&document.getElementById('attendancePetCheckin').disabled,'check-in is saved and same-day button disabled');
     document.getElementById('attendancePetFeed').click();await new Promise(resolve=>setTimeout(resolve,0));
@@ -1538,7 +1541,7 @@ if(process.argv.includes('--pet')) await (async()=>{
   const source=fs.readFileSync('app.js','utf8');
   const shared=source.split('// BEGIN SHARED HELPERS\n')[1].split('// END SHARED HELPERS')[0];
   let code=source.slice(source.indexOf('const AttendancePet3D ='),source.indexOf('let attendancePetData ='));
-  code=code.replace("import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js')",'Promise.resolve(THREE)').replace('return {start,stop,update,feed:','return {inspect:()=>state,start,stop,update,feed:');
+  code=code.replace("import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js')",'Promise.resolve(THREE)').replace('return {start,stop,update,preview,feed:','return {inspect:()=>state,start,stop,update,preview,feed:');
   const script=`import * as THREE from './three.module.js';
 ${shared}
 const renderAttendancePet=()=>{};
@@ -1559,6 +1562,13 @@ try {
  };
  capture(attendancePetView(newAttendancePet(now),now),'Trứng');
  for(let index=0;index<ATTENDANCE_PET_FORMS.length;index++){pet={...pet,checkins:index*10};capture(attendancePetView(pet,now),'Cấp '+(index+1)+' · '+ATTENDANCE_PET_FORMS[index].name);}
+ const petDialog=document.createElement('dialog');petDialog.id='attendancePetDialog';petDialog.innerHTML='<div id="attendancePetPreview"></div>';document.body.appendChild(petDialog);petDialog.showModal();
+ AttendancePet3D.preview(true);
+ check(s.renderer.domElement.parentElement.id==='attendancePetPreview','real 3D canvas moves into care form');
+ check(Math.abs(s.camera.aspect-320/220)<.001,'preview camera resizes without distortion');
+ s.renderer.render(s.scene,s.camera);
+ petDialog.close();AttendancePet3D.preview(false);
+ check(s.renderer.domElement.parentElement.id==='attendancePetArt','closing care form restores swimming model');
  AttendancePet3D.feed();AttendancePet3D.stop();check(!document.querySelector('#attendancePetArt canvas'),'renderer disposes on stop');
  document.body.innerHTML='<main class="pet-gallery">'+cards.join('')+'</main><pre id="pet-result">PASS: 20 real 3D pet forms render visible pixels; renderer cleanup works</pre>';
 }catch(error){document.body.innerHTML='<pre id="pet-result">FAIL: '+error.stack+'</pre>';}
