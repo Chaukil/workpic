@@ -34,7 +34,7 @@ try {
     const inlineCss = styles.replace(/<\/style/gi, '<\\/style');
     const replacements = [
         ['<link rel="stylesheet" href="styles.css">', `<style>\n${inlineCss}\n</style>`],
-        ['<script type="module" src="app.js"></script>', `<script type="module">\n${inlineJs}\n</script>`]
+        [template.match(/<script type="module" src="app\.js(?:\?[^"\s]*)?"><\/script>/)?.[0] || '<script type="module" src="app.js"></script>', `<script type="module">\n${inlineJs}\n</script>`]
     ];
     let html = template;
     for (const [marker, value] of replacements) {
@@ -1766,6 +1766,13 @@ try {
     document.getElementById('petBattleViewInvite').click();check(document.getElementById('petBattleDialog').open,'banner reopens invitation after dismissal');
     inviteSnapshot({id:incoming.id,exists:()=>true,data:()=>({...incoming,status:'rps',players:[fightOther,fightMe]})});
     check(document.getElementById('petBattleInvite').hidden&&!document.getElementById('petBattleRps').hidden,'acceptance clears invite and shows RPS without a combat turn');
+    document.getElementById('petBattleClose').click();PetBattleGame.open();
+    const battleSelect=document.getElementById('petBattleMatches');battleSelect.value=incoming.id;battleSelect.dispatchEvent(new Event('change'));
+    check(document.getElementById('petBattleDialog').open&&!document.getElementById('petBattleRps').hidden&&document.getElementById('petBattleDamage0').textContent===''&&document.getElementById('petBattleDamage1').textContent==='','reopening accepted room from match selector is safe before either RPS move');
+    for(const commits of [{opponent:'pending-hash'},{opponent:'pending-hash',me:'pending-hash'}]){
+        inviteSnapshot({id:incoming.id,exists:()=>true,data:()=>({...incoming,status:'rps',players:[fightOther,fightMe],commits})});
+        check(document.getElementById('petBattleDamage0').textContent===''&&document.getElementById('petBattleDamage1').textContent==='','RPS commits never render nonexistent damage');
+    }
     usersDirectorySnapshot=savedDirectory;
     battleState.matches.set('ui-countdown',{...battleFixture,id:'ui-countdown',startedAt:Date.now()});PetBattleGame.open('ui-countdown');
     check(document.getElementById('petBattleDamage0').textContent===''&&document.getElementById('petBattleDamage1').textContent==='','fight countdown has no damage before the first turn');
