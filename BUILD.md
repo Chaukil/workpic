@@ -210,3 +210,21 @@ each user document change (including a pet update) is read by clients listening 
 that collection. No pet fields were migrated to a new collection, and rules were
 not changed. Separating pets from public directory metadata would require a
 data/rules migration; the current patch reduces redundant startup/admin reads.
+
+Pet challenges use `petBattles/{id}` and `users/{uid}.petBattleLocks`. Each player
+reserves their own virtual grams in a transaction; acceptance reserves the other
+stake. Commit/reveal hashes hide rock-paper-scissors choices until both commit.
+The server timestamp anchors a deterministic alternating fight locally, without
+Firestore writes per animation frame or combat turn. Claims update only the
+claimant's profile and are idempotent; an offline player claims on returning.
+Unaccepted invitations expire after ten minutes; RPS expires after two minutes
+and refunds both stakes. Closing the dialog does not cancel an accepted match.
+Incoming invitations reuse directory lock metadata and individual battle document
+listeners, with no additional collection query or composite index.
+
+Battle tests use two simulated clients and real browser/WebGL rendering. Live
+Firebase access has not been tested. Existing rules must permit participant access
+to `petBattles` and owned profile updates; no deployed rules were overwritten.
+This client implementation prevents accidental duplicate settlements, but is not
+server-authoritative anti-cheat. Adversarial play requires server-side validation
+and restrictive rules; virtual pet weight has no monetary value.

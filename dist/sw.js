@@ -19,7 +19,8 @@ self.addEventListener('notificationclick', (event) => {
             action,
             jobId: data.jobId,
             originDate: data.originDate,
-            kind: data.kind
+            kind: data.kind,
+            ownerUid: data.ownerUid
         };
 
         const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
@@ -39,6 +40,7 @@ self.addEventListener('notificationclick', (event) => {
         if (data.jobId) url.searchParams.set('jobId', data.jobId);
         if (data.originDate) url.searchParams.set('originDate', data.originDate);
         if (data.kind) url.searchParams.set('kind', data.kind);
+        if (data.ownerUid) url.searchParams.set('ownerUid', data.ownerUid);
         await self.clients.openWindow(url.href);
     })());
 });
