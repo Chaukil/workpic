@@ -258,7 +258,7 @@
                                 </div>
                             </div>
                         </div>
-<div id="desktopNotificationWarning" class="desktop-notification-warning" role="alert" hidden><span data-desktop-warning></span><button type="button" class="btn btn-sm btn-outline-primary" id="desktopNotificationSetup">Bật / kiểm tra thông báo</button></div>
+<div id="desktopNotificationWarning" class="desktop-notification-warning" role="alert" hidden><span data-desktop-warning></span><button type="button" class="btn btn-sm btn-outline-primary" id="desktopNotificationSetup">Bật thông báo</button></div>
 <div class="schedule-actions" id="scheduleActions" aria-label="Thao tác job">
                                 <div class="col-6">
                                     <button class="btn btn-add-job w-100" id="addJobBtn">
@@ -1488,6 +1488,7 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
 <dialog id="petAdminDialog" class="pet-admin-dialog" aria-labelledby="petAdminTitle"><header><h5 id="petAdminTitle">Trung tâm điều khiển thú cưng</h5><button type="button" id="petAdminClose" aria-label="Đóng">✕</button></header>                    <section class="account-section pet-admin-panel" id="petAdminPanel" hidden>
                         <div class="account-section-heading"><span class="account-section-icon"><i class="bi bi-magic"></i></span><div><h6>Trung tâm điều khiển thú cưng</h6><p>Chọn thành viên để chăm sóc và điều chỉnh tiến hóa.</p></div></div>
                         <div class="pet-admin-fields"><div><label class="form-label" for="petAdminUser">Thú cưng của thành viên</label><select class="form-select" id="petAdminUser"></select></div><button type="button" class="btn btn-outline-secondary" id="petAdminRefresh">Tải lại</button></div>
+                        <label class="form-label" for="petAdminPet">Thú cưng trong đàn</label><select class="form-select" id="petAdminPet"></select>
                         <p id="petAdminSummary" class="pet-admin-summary"></p>
                         <div class="pet-admin-actions"><button type="button" class="btn btn-outline-primary" data-pet-admin="checkin">Điểm danh hôm nay</button><button type="button" class="btn btn-outline-primary" data-pet-admin="feed">Cho ăn ngay</button><button type="button" class="btn btn-outline-primary" data-pet-admin="hatch">Nở trứng ngay</button><button type="button" class="btn btn-outline-primary" data-pet-admin="evolve">Tăng 1 cấp</button><button type="button" class="btn btn-outline-primary" data-pet-admin="revive">Hồi sinh giữ cấp</button><button type="button" class="btn btn-outline-secondary" data-pet-admin="egg">Trở về trứng</button></div>
                         <div class="pet-admin-fields"><div><label class="form-label" for="petAdminBranch">Nhánh tiến hóa</label><select class="form-select" id="petAdminBranch"></select></div><button type="button" class="btn btn-outline-primary" id="petAdminApplyBranch">Áp dụng nhánh</button></div>
@@ -1558,16 +1559,8 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
                             <option value="60">1 giờ</option>
                             <option value="120">2 giờ</option>
                         </select>
-                        <button type="button" class="btn btn-outline-primary mt-2" id="testDesktopNotificationBtn"><i class="bi bi-bell"></i> Bật / thử thông báo desktop</button>
-                        <button type="button" class="btn btn-outline-primary mt-2" id="scheduledDesktopTestBtn"><i class="bi bi-alarm"></i> Thử nhắc sau 10 giây</button>
                         <small class="form-text d-block" id="desktopNotificationStatus" role="status"></small>
-                        <div id="desktopNotificationFeedback" class="desktop-notification-feedback" hidden>
-                            <button type="button" class="btn btn-sm btn-outline-success" id="desktopNotificationSeen">Tôi đã thấy thông báo Windows</button>
-                            <button type="button" class="btn btn-sm btn-outline-danger" id="desktopNotificationNotSeen">Chưa thấy thông báo</button>
-                        </div>
-                        <p class="form-text">Để thấy banner khi làm việc ở ứng dụng khác: Windows → Cài đặt → Hệ thống → Thông báo → Chrome/Edge → bật Biểu ngữ thông báo; tắt Không làm phiền.</p>
-                        <a class="btn btn-sm btn-outline-secondary" href="ms-settings:notifications">Mở cài đặt thông báo Windows</a>
-                        <div id="desktopReminderDiagnostics" class="desktop-reminder-diagnostics" aria-live="polite"></div>
+                        <details class="settings-notification-details"><summary>Trạng thái gửi thông báo</summary><div id="desktopReminderDiagnostics" class="desktop-reminder-diagnostics" aria-live="polite"></div></details>
                     </section>
 
                     <section class="settings-section">
@@ -2181,9 +2174,13 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
 
     <button type="button" id="attendancePetSwimmer" class="attendance-pet-swimmer" aria-label="Thú cưng" hidden><span id="attendancePetArt"></span><span id="attendancePetEggTimer" class="attendance-pet-egg-timer" hidden></span><span id="attendancePetBubble" class="attendance-pet-bubble" role="status"></span></button>
     <dialog id="attendancePetDialog" class="attendance-pet-dialog" aria-labelledby="attendancePetTitle">
-        <header><div><small>BẠN ĐỒNG HÀNH ĐẠI DƯƠNG</small><h5 id="attendancePetTitle">Điểm danh và thú cưng</h5></div><button type="button" id="attendancePetClose" aria-label="Đóng">✕</button></header>
+        <header><div><small>VƯƠNG QUỐC THÚ CƯNG</small><h5 id="attendancePetTitle">Điểm danh và thú cưng</h5></div><button type="button" id="attendancePetClose" aria-label="Đóng">✕</button></header>
+        <section class="pet-stable"><div class="pet-stable-heading"><div><small>BỘ SƯU TẬP CỦA BẠN</small><h6>Đàn thú cưng <span id="attendancePetRosterCount">1</span></h6></div><span>Chọn một bạn để chăm sóc</span></div><div id="attendancePetRoster" class="pet-roster" aria-label="Đàn thú cưng"></div></section>
+        <div class="pet-compare-launch-row"><button type="button" id="petCompareOpen" class="btn btn-outline-primary"><i class="bi bi-trophy" aria-hidden="true"></i> So sánh thú cưng</button><small>So cân nặng với các thành viên hoạt động trong 7 ngày.</small></div>
         <div class="attendance-pet-layout"><div class="attendance-pet-care">
         <div id="attendancePetPreview" class="attendance-pet-preview" role="img" aria-label="Thú cưng hiện tại"></div>
+        <div class="pet-game-hud"><div><small>ĐIỂM TIẾN HÓA</small><strong id="petGameXp">0 XP</strong></div><div><small>ĐỘ NO</small><strong id="petGameHunger">Đang tải…</strong><progress id="petGameFullness" max="100" value="0"></progress></div><div><small>ĐIỂM DANH TRƯỚC</small><strong id="petGameSurvival">Đang tải…</strong></div></div>
+        <div class="pet-weight-card"><div><small>CÂN NẶNG HIỆN TẠI</small><strong id="petGameWeight">0 kg</strong></div><p id="petGameWeightHint">Mỗi lần ăn +0,2 kg · Điểm danh không tăng cân.</p></div>
         <section class="attendance-pet-summary"><span id="attendancePetLevel" class="attendance-pet-level">Trứng</span><h4 id="attendancePetName">Đang tải…</h4><p id="attendancePetDescription"></p><p id="attendancePetCountdown"></p></section>
         <div class="attendance-pet-progress"><div id="attendancePetProgress"></div></div><p id="attendancePetProgressText" class="text-muted"></p>
         <form id="attendancePetNicknameForm" class="pet-nickname-form"><label for="attendancePetNickname">Tên riêng của thú cưng</label><div><input id="attendancePetNickname" type="text" maxlength="60" autocomplete="off" placeholder="Đặt tên cho người bạn của bạn…" aria-describedby="attendancePetNicknameHint"><button type="submit" class="btn btn-outline-primary" id="attendancePetNicknameSave">Lưu tên</button></div><small id="attendancePetNicknameHint">Tối đa 30 ký tự. Để trống để dùng tên loài. Chỉ lưu khi bấm Lưu tên.</small></form>
@@ -2192,9 +2189,16 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
         <button type="button" id="attendancePetBranchOpen" class="btn btn-outline-primary pet-branch-launch" hidden>Chọn nhánh tiến hóa</button>
         <label class="pet-visibility-setting" for="attendancePetVisible"><span><strong>Hiện thú cưng trên màn hình</strong><small>Khi ẩn, bạn vẫn điểm danh và chăm sóc tại đây.</small></span><input type="checkbox" role="switch" id="attendancePetVisible" checked></label>
         </div><aside class="attendance-pet-guide" aria-label="Hành trình tiến hóa và cách chăm sóc">
-            <section class="attendance-pet-guide-card"><h6><i class="bi bi-heart-pulse" aria-hidden="true"></i> Cách chăm sóc</h6><ul class="attendance-pet-tips"><li><strong>Điểm danh mỗi ngày</strong><span>Cứ 10 ngày điểm danh còn sống, thú cưng tiến hóa một bậc.</span></li><li><strong>Cho ăn 1 lần / ngày</strong><span>Nhấn vào thú cưng hoặc nút Cho ăn. Ngày mới tính theo giờ Việt Nam.</span></li><li><strong>Đừng vắng quá 72 giờ</strong><span>Không điểm danh đủ 3 ngày, thú cưng sẽ chết. Nhấn để hồi sinh thành trứng và chờ nở sau 1 giờ thực tế.</span></li></ul></section>
+            <section class="attendance-pet-guide-card"><h6><i class="bi bi-heart-pulse" aria-hidden="true"></i> Nhiệm vụ chăm sóc</h6><ul class="attendance-pet-tips"><li><strong>Điểm danh cả đàn · 1 lần/ngày</strong><span>+1 XP cho mỗi thú cưng còn sống, không cộng cân nặng. Ngày mới tính theo giờ Việt Nam.</span></li><li><strong>Cho ăn khi đói · mỗi 2 giờ</strong><span>Mỗi lần ăn +0,2 kg và +1 XP. Đủ 10 XP lên một cấp.</span></li><li><strong>Vắng 1 ngày −0,5 kg · 2 ngày −2 kg</strong><span>Mức giảm ngày 2 là 2 kg tổng cộng, cân nặng không âm. Đủ 72 giờ không điểm danh sẽ chết, dù vẫn cho ăn. Hồi sinh trở về trứng, nở sau 1 giờ.</span></li><li><strong>Đạt cấp tối đa · nhận trứng mới</strong><span>Mỗi thú cưng tặng một trứng khi đạt cấp 29. Giữ thú trưởng thành và nuôi trứng mới song song.</span></li></ul></section>
             <section class="attendance-pet-guide-card attendance-pet-journey"><h6><i class="bi bi-stars" aria-hidden="true"></i> Hành trình tiến hóa</h6><p>Từ quả trứng nhỏ đến người bạn khổng lồ</p><ol id="attendancePetRoad"></ol></section>
         </aside></div>
+    </dialog>
+    <dialog id="petCompareDialog" class="pet-compare-dialog" aria-labelledby="petCompareTitle">
+        <header><div><small>ĐẤU TRƯỜNG THÚ CƯNG</small><h5 id="petCompareTitle">So sánh cân nặng</h5></div><button type="button" id="petCompareClose" aria-label="Đóng">✕</button></header>
+        <p class="pet-compare-description">Chỉ hiện user có điểm danh hoặc cho ăn trong 7 ngày gần nhất. Đủ 7 ngày không hoạt động sẽ tự ẩn. Thú đã chết hiện cuối, không xếp hạng.</p>
+        <div class="pet-compare-toolbar"><p id="petCompareSummary" role="status"></p><label for="petCompareBranch">Nhánh <select id="petCompareBranch"><option value="all">Tất cả</option><option value="base">Chưa chọn nhánh</option></select></label></div>
+        <div class="pet-compare-scroll"><table class="pet-compare-table"><thead><tr><th>Hạng</th><th>Thành viên</th><th>Thú cưng</th><th>Cấp / Nhánh</th><th>Cân nặng</th><th>Hoạt động gần nhất</th><th>Trạng thái</th></tr></thead><tbody id="petCompareRows"></tbody></table></div>
+        <p id="petCompareEmpty" class="pet-compare-empty" hidden>Chưa có thú cưng hoạt động trong khoảng thời gian này.</p>
     </dialog>
     <dialog id="attendancePetBranchDialog" class="pet-branch-dialog" aria-labelledby="attendancePetBranchTitle"><header><div><small>MỞ KHÓA TỪ CẤP 9</small><h5 id="attendancePetBranchTitle">Chọn nhánh tiến hóa</h5></div><button type="button" id="attendancePetBranchClose" aria-label="Đóng">✕</button></header><section id="attendancePetBranchPanel" class="pet-branch-panel" hidden><p id="attendancePetBranchHint"></p><div class="pet-branch-options" id="attendancePetBranchOptions"></div><p id="attendancePetBranchStatus" class="attendance-pet-status" role="status"></p></section></dialog>
     <button type="button" class="quick-chat-toggle" id="quickChatToggleBtn" title="Job trong ngày">

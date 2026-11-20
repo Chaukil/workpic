@@ -378,7 +378,21 @@ function attendancePetDay(now) {
 }
 
 function newAttendancePet(now) {
-    return {version:1,bornAt:now,hatchAt:now+3600000,checkins:0,lastCheckinAt:null,lastCheckinDay:null,fedOn:null,feeds:0,life:1,branch:null,updatedAt:now};
+    return {version:1,bornAt:now,hatchAt:now+3600000,checkins:0,feedingXp:0,weightGrams:0,weightPenaltyGrams:0,lastFedAt:null,lastCheckinAt:null,lastCheckinDay:null,fedOn:null,feeds:0,life:1,branch:null,updatedAt:now};
+}
+
+function attendancePetWeight(raw,now=Date.now()){
+    const reference=Math.max(Number(raw.bornAt)||0,Number(raw.lastCheckinAt)||Number(raw.bornAt)||0);
+    const absence=Math.max(0,now-reference);
+    const penaltyGrams=absence>=172800000?2000:absence>=86400000?500:0;
+    const feeds=Number(raw.feeds);
+    const base=Number.isFinite(raw.weightGrams)?Math.max(0,Math.round(raw.weightGrams)):Math.max(0,Math.floor(Number.isFinite(feeds)?feeds:0))*200;
+    const applied=Math.max(0,Math.round(Number(raw.weightPenaltyGrams)||0));
+    return {weightGrams:Math.max(0,base-Math.max(0,penaltyGrams-applied)),penaltyGrams,missedDays:Math.min(3,Math.floor(absence/86400000))};
+}
+function settleAttendancePetWeight(raw,now=Date.now()){
+    const weight=attendancePetWeight(raw,now);
+    return {...raw,weightGrams:weight.weightGrams,weightPenaltyGrams:weight.penaltyGrams};
 }
 
 function normalizePetNickname(value){
@@ -393,22 +407,26 @@ function attendancePetView(raw, now = Date.now()) {
     const dead = now >= diesAt;
     const egg = now < pet.hatchAt;
     const branch=Object.hasOwn(ATTENDANCE_PET_BRANCHES,pet.branch)?pet.branch:null;
-    const earnedLevel=Math.min(ATTENDANCE_PET_MAX_LEVEL,1+Math.floor(checkins/10));
+    const feedingXp=Math.max(0,Math.floor(Number(pet.feedingXp)||0)),xp=checkins+feedingXp;
+    const earnedLevel=Math.min(ATTENDANCE_PET_MAX_LEVEL,1+Math.floor(xp/10));
     const level = egg ? 0 : Math.min(earnedLevel,branch?ATTENDANCE_PET_MAX_LEVEL:9);
     const form = attendancePetCatalog(branch)[Math.max(0,level-1)];
     const branchUnlocked=!egg&&earnedLevel>=9,maxed=!egg&&!!branch&&level===ATTENDANCE_PET_MAX_LEVEL;
     const name=egg?'Trứng đại dương':form.name,nickname=normalizePetNickname(pet.nickname);
-    return {pet,dead,egg,level,diesAt,checkins,branch,branchUnlocked,maxed,branchLevel:Math.max(0,level-9),needsBranch:branchUnlocked&&!branch,today:attendancePetDay(now),name,nickname,displayName:nickname||name,form,
-        checkedToday:pet.lastCheckinDay===attendancePetDay(now),fedToday:pet.fedOn===attendancePetDay(now),untilHatch:Math.max(0,pet.hatchAt-now),nextEvolutionIn:maxed?0:10-checkins%10};
+    const lastFedAt=Number(pet.lastFedAt)||(/^[\d]{4}-[\d]{2}-[\d]{2}$/.test(pet.fedOn||'')?Date.parse(pet.fedOn+'T00:00:00+07:00'):0);
+    const nextFeedAt=lastFedAt?lastFedAt+7200000:pet.hatchAt;
+    const weight=attendancePetWeight(pet,now);
+    return {pet,dead,egg,level,diesAt,checkins,xp,feedingXp,nextFeedAt,hungry:!dead&&!egg&&now>=nextFeedAt,untilHungry:Math.max(0,nextFeedAt-now),branch,branchUnlocked,maxed,branchLevel:Math.max(0,level-9),needsBranch:branchUnlocked&&!branch,today:attendancePetDay(now),name,nickname,displayName:nickname||name,form,
+        weightGrams:weight.weightGrams,missedDays:weight.missedDays,absencePenaltyGrams:weight.penaltyGrams,checkedToday:pet.lastCheckinDay===attendancePetDay(now),fedToday:pet.fedOn===attendancePetDay(now),untilHatch:Math.max(0,pet.hatchAt-now),nextEvolutionIn:maxed?0:10-xp%10};
 }
 
 function transitionAttendancePet(raw, action, now = Date.now()) {
     const view = attendancePetView(raw,now);
-    const pet = {...view.pet};
-    if (action==='init') return {pet,changed:!raw||raw.version!==1||!Number.isFinite(raw.bornAt)||!Number.isFinite(raw.hatchAt),result:'ready'};
+    const pet = settleAttendancePetWeight(view.pet,now);
+    if (action==='init') return {pet:view.pet,changed:!raw||raw.version!==1||!Number.isFinite(raw.bornAt)||!Number.isFinite(raw.hatchAt),result:'ready'};
     if (action==='revive') {
         if (!view.dead) return {pet,changed:false,result:'alive'};
-        return {pet:{...newAttendancePet(now),nickname:view.nickname,fedOn:pet.fedOn===view.today?view.today:null,life:(Number(pet.life)||1)+1},changed:true,result:'revived'};
+        return {pet:{...newAttendancePet(now),nickname:view.nickname,lastFedAt:pet.lastFedAt||null,fedOn:pet.fedOn===view.today?view.today:null,life:(Number(pet.life)||1)+1},changed:true,result:'revived'};
     }
     if(action.startsWith('rename:')){
         const nickname=normalizePetNickname(action.slice(7));
@@ -424,39 +442,123 @@ function transitionAttendancePet(raw, action, now = Date.now()) {
     }
     if (action==='checkin') {
         if (view.checkedToday) return {pet,changed:false,result:'already-checked'};
-        pet.checkins=view.checkins+1;pet.lastCheckinAt=now;pet.lastCheckinDay=view.today;pet.updatedAt=now;
+        pet.checkins=view.checkins+1;pet.lastCheckinAt=now;pet.lastCheckinDay=view.today;pet.weightPenaltyGrams=0;pet.updatedAt=now;
         return {pet,changed:true,result:'checked'};
     }
     if (action==='feed') {
         if (view.egg) return {pet,changed:false,result:'egg'};
-        if (view.fedToday) return {pet,changed:false,result:'already-fed'};
-        pet.fedOn=view.today;pet.feeds=(Number(pet.feeds)||0)+1;pet.updatedAt=now;
+        if (!view.hungry) return {pet,changed:false,result:'already-fed'};
+        pet.fedOn=view.today;pet.lastFedAt=now;pet.feeds=(Number(pet.feeds)||0)+1;pet.feedingXp=view.feedingXp+1;pet.weightGrams+=200;pet.updatedAt=now;
         return {pet,changed:true,result:'fed'};
     }
     return {pet,changed:false,result:'invalid'};
 }
 
+function unchangedPetAdminAction(view,action,level){
+    return action==='level'&&Number.isInteger(Number(level))&&Number(level)>=1&&Number(level)===view.level
+        ||action.startsWith('branch:')&&action.slice(7)===view.branch
+        ||action==='hatch'&&!view.egg
+        ||action==='revive'&&!view.dead
+        ||action==='egg'&&view.egg&&!view.dead;
+}
 function adjustAdminPet(raw, action, level, now = Date.now()) {
-    const view = attendancePetView(raw, now), pet = {...view.pet};
-    const keepAlive = () => { pet.lastCheckinAt = now; };
+    const view = attendancePetView(raw, now), pet = settleAttendancePetWeight(view.pet,now);
+    if(unchangedPetAdminAction(view,action,level))return view.pet;
+    const keepAlive = () => { pet.lastCheckinAt = now;pet.weightPenaltyGrams=0; };
     if (action === 'egg') return {...newAttendancePet(now),nickname:view.nickname,life:(Number(pet.life)||1)+1};
     if (action === 'checkin') {
         if (!view.checkedToday) pet.checkins = view.checkins + 1;
         pet.lastCheckinDay = view.today; keepAlive();
     } else if (action === 'feed') {
-        pet.fedOn = view.today; pet.feeds = (Number(pet.feeds)||0)+1; keepAlive();
+        return transitionAttendancePet(pet,'feed',now).pet;
     } else if (action === 'revive') { keepAlive(); }
-    else if (action === 'hatch') { pet.hatchAt = Math.min(pet.hatchAt,now); keepAlive(); }
+    else if (action === 'hatch') { pet.hatchAt = Math.min(pet.hatchAt,now); }
     else if(action.startsWith('branch:')){
         const branch=action.slice(7);if(!Object.hasOwn(ATTENDANCE_PET_BRANCHES,branch))throw new Error('Invalid branch');
-        pet.branch=branch;pet.checkins=Math.max(80,view.checkins);pet.hatchAt=Math.min(pet.hatchAt,now);keepAlive();
+        pet.branch=branch;
     } else if (action === 'evolve' || action === 'level') {
         const next = action === 'evolve' ? Math.max(1,view.level+1) : Number(level);
         if (!Number.isInteger(next) || next<1 || next>ATTENDANCE_PET_MAX_LEVEL) throw new Error('Invalid pet level');
         if(next>9&&!view.branch)throw new Error('Choose pet branch first');
-        pet.checkins = (next-1)*10; pet.hatchAt = Math.min(pet.hatchAt,now); keepAlive();
+        pet.checkins = (next-1)*10; pet.feedingXp=0; pet.hatchAt = Math.min(pet.hatchAt,now);
     } else throw new Error('Invalid pet action');
     return {...pet,updatedAt:now};
+}
+
+function attendancePetRecords(raw,now=Date.now()){
+    const root=attendancePetView(raw,now).pet,seen=new Set();
+    return [root,...(Array.isArray(root.companions)?root.companions:[])].filter(p=>p&&p.version===1&&Number.isFinite(p.bornAt)&&Number.isFinite(p.hatchAt)).map(p=>{
+        const {companions,attendanceDay,attendanceAt,...record}=p;
+        return {...record,id:String(record.id||`pet-${record.bornAt}-${Number(record.life)||1}`)};
+    }).filter(p=>{if(seen.has(p.id))return false;seen.add(p.id);return true;});
+}
+function attendancePetSelected(raw,id,now=Date.now()){
+    const records=attendancePetRecords(raw,now);return records.find(p=>p.id===id)||records[0];
+}
+function attendancePetHouseholdDay(raw,now=Date.now()){
+    return [raw?.attendanceDay,...attendancePetRecords(raw,now).map(p=>p.lastCheckinDay)].filter(value=>/^\d{4}-\d{2}-\d{2}$/.test(value||'')).sort().at(-1)||null;
+}
+function transitionPetHousehold(raw,action,now=Date.now(),targetId=null,adminLevel=null){
+    const initial=transitionAttendancePet(raw,'init',now),records=attendancePetRecords(initial.pet,now);
+    const index=Math.max(0,records.findIndex(p=>p.id===targetId));
+    if(targetId&&!records.some(p=>p.id===targetId))return {pet:raw,changed:false,result:'missing-pet',spawned:0};
+    let day=attendancePetHouseholdDay(raw,now),at=Number(raw?.attendanceAt)||Number(raw?.lastCheckinAt)||null;
+    let changed=initial.changed,result='ready';
+    if(adminLevel!==null){
+        if(action==='checkin')return transitionPetHousehold(raw,'checkin',now,targetId);
+        const next=adjustAdminPet(records[index],action,adminLevel,now);
+        changed=changed||JSON.stringify(next)!==JSON.stringify(records[index]);records[index]={...next,id:records[index].id};result='admin';
+    }else if(action==='checkin'){
+        if(day===attendancePetDay(now))return {pet:raw,changed:false,result:'already-checked',spawned:0};
+        if(!records.some(p=>!attendancePetView(p,now).dead))return {pet:raw,changed:false,result:'dead',spawned:0};
+        for(let i=0;i<records.length;i++){
+            const change=transitionAttendancePet(records[i],'checkin',now);
+            if(change.changed)records[i]=change.pet;
+        }
+        day=attendancePetDay(now);at=now;changed=true;result='checked';
+    }else if(action!=='init'){
+        const change=transitionAttendancePet(records[index],action,now);
+        records[index]={...change.pet,id:records[index].id};changed=changed||change.changed;result=change.result;
+        if(change.result==='revived'){records[index].lastCheckinDay=day;}
+    }
+    let spawned=0;
+    for(const record of [...records]){
+        const view=attendancePetView(record,now);
+        if(view.maxed&&!view.dead&&!record.eggGrantedAt){
+            record.eggGrantedAt=now;const id=`pet-${now}-${records.length+spawned}`;
+            records.unshift({...newAttendancePet(now),id,lastCheckinDay:day});spawned++;changed=true;
+        }
+    }
+    return {pet:changed?{...records[0],companions:records.slice(1),attendanceDay:day,attendanceAt:at}:raw,changed,result,spawned};
+}
+
+function attendancePetActivityTime(raw,now=Date.now()){
+    if(!raw||raw.version!==1||!Number.isFinite(raw.bornAt)||!Number.isFinite(raw.hatchAt))return 0;
+    const records=attendancePetRecords(raw,now);
+    const attendance=Object.hasOwn(raw,'attendanceAt')?[Number(raw.attendanceAt)||0]:records.map(p=>Number(p.lastCheckinAt)||0);
+    const times=attendance.concat(records.flatMap(p=>[Number(p.lastFedAt)||0,/^\d{4}-\d{2}-\d{2}$/.test(p.fedOn||'')?Date.parse(p.fedOn+'T00:00:00+07:00'):0]));
+    return Math.max(0,...times.filter(time=>Number.isFinite(time)&&time>0&&time<=now));
+}
+function buildPetComparison(profiles,now=Date.now(),branch='all'){
+    const canonical=new Map(),rows=[];
+    for(const profile of [...profiles].sort((a,b)=>String(a.id||'').localeCompare(String(b.id||'')))){
+        if(profile.uid&&!canonical.has(profile.uid))canonical.set(profile.uid,profile);
+    }
+    for(const profile of canonical.values()){
+        if(!profile.attendancePet)continue;
+        const activity=attendancePetActivityTime(profile.attendancePet,now);
+        if(!activity||activity>now||now-activity>=604800000)continue;
+        for(const pet of attendancePetRecords(profile.attendancePet,now)){
+            const view=attendancePetView(pet,now),key=view.branch||'base';
+            if(branch!=='all'&&key!==branch)continue;
+            rows.push({uid:profile.uid,ownerName:profile.displayName||String(profile.email||'').split('@')[0]||profile.uid,
+                petId:pet.id,petName:view.displayName,species:view.name,level:view.level,branchKey:key,branchName:view.branch?ATTENDANCE_PET_BRANCHES[view.branch].name:'Chưa chọn nhánh',
+                weightGrams:view.weightGrams,lastActiveAt:activity,dead:view.dead,egg:view.egg,
+                appearance:{form:view.form,level:view.level,branch:view.branch,egg:view.egg,dead:view.dead}});
+        }
+    }
+    rows.sort((a,b)=>Number(a.dead)-Number(b.dead)||b.weightGrams-a.weightGrams||b.level-a.level||a.ownerName.localeCompare(b.ownerName,'vi')||a.petId.localeCompare(b.petId));
+    let rank=0;return rows.map(row=>({...row,rank:row.dead?null:++rank}));
 }
 
 function advanceStormWater(water, now) {
@@ -3978,9 +4080,6 @@ function handleSignedOut() {
     stopUiRefreshLoop();
     clearInterval(notificationCheckInterval);
     notificationCheckInterval = null;
-    clearTimeout(desktopReminderProbeTimer);
-    desktopReminderProbeTimer = null;
-    desktopReminderProbe = null;
     desktopReminderEvents.length = 0;
     if (unsubscribeTransferRequests) {
         unsubscribeTransferRequests();
@@ -4351,19 +4450,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('settingsBtn').addEventListener('click', openSettingsModal);
     document.getElementById('settingsHideOutOfSchedule').addEventListener('change', event => saveOutOfScheduleVisibility(event.target.checked));
     document.getElementById('useJobColor').addEventListener('change', event => { document.getElementById('jobColor').disabled = !event.target.checked; });
-    document.getElementById('testDesktopNotificationBtn').addEventListener('click', testDesktopNotification);
-    document.getElementById('scheduledDesktopTestBtn').addEventListener('click', startScheduledDesktopTest);
-    document.getElementById('desktopNotificationSetup').addEventListener('click', () => { openSettingsModal(); testDesktopNotification(); });
-    document.getElementById('desktopNotificationSeen').addEventListener('click', () => {
-        document.getElementById('desktopNotificationStatus').textContent = 'Đã xác nhận thông báo Windows hoạt động. Ứng dụng không tự đóng thông báo nhắc job sau 15 giây nữa.';
-        document.getElementById('desktopNotificationWarning').hidden = true;
-        document.getElementById('desktopNotificationFeedback').hidden = true;
-    });
-    document.getElementById('desktopNotificationNotSeen').addEventListener('click', () => {
-        const message = 'Quyền của trang có thể đã bật nhưng Windows chưa hiện banner. Mở cài đặt thông báo Windows, bật thông báo và biểu ngữ cho Chrome/Edge; tắt Không làm phiền hoặc Focus Assist.';
-        document.getElementById('desktopNotificationStatus').textContent = message;
-        reportDesktopNotificationIssue(message);
-    });
+    document.getElementById('desktopNotificationSetup').addEventListener('click', () => { openSettingsModal(); enableDesktopNotifications(); });
 
     const _snl = document.getElementById('settingsNotifyLead');
     if (_snl) _snl.addEventListener('change', (e) => saveNotifyLead(e.target.value));
@@ -4502,9 +4589,9 @@ function requestNotificationPermission() {
 
 function desktopNotificationPermissionText() {
     if (!('Notification' in window)) return 'Trình duyệt không hỗ trợ thông báo desktop.';
-    if (Notification.permission === 'granted') return 'Đã cho phép thông báo. Bấm để gửi thông báo thử.';
+    if (Notification.permission === 'granted') return 'Thông báo desktop đã bật.';
     if (Notification.permission === 'denied') return 'Thông báo đang bị chặn. Bấm biểu tượng cạnh thanh địa chỉ → Cài đặt trang → Thông báo → Cho phép.';
-    return 'Chưa bật thông báo. Bấm nút bên trên để hiện yêu cầu cấp quyền.';
+    return 'Chưa bật thông báo. Cho phép thông báo tại biểu tượng cạnh địa chỉ trình duyệt.';
 }
 
 async function saveOutOfScheduleVisibility(hidden) {
@@ -4522,25 +4609,12 @@ async function saveOutOfScheduleVisibility(hidden) {
     } catch (error) { showNotification('Cài đặt', 'Đã lưu trên máy này, chưa đồng bộ được cài đặt lên tài khoản.', false, 'warning'); }
 }
 
-async function testDesktopNotification() {
-    const status = document.getElementById('desktopNotificationStatus');
-    const button = document.getElementById('testDesktopNotificationBtn');
-    if (!('Notification' in window)) { status.textContent = 'Trình duyệt này không hỗ trợ thông báo desktop.'; return; }
-    button.disabled = true;
+async function enableDesktopNotifications() {
+    const status=document.getElementById('desktopNotificationStatus');
     try {
-        // Request directly from this click: browsers can reject permission prompts from timers.
-        const permission = Notification.permission === 'default' ? await Notification.requestPermission() : Notification.permission;
-        if (permission !== 'granted') {
-            status.textContent = 'Thông báo chưa được cho phép. Mở quyền của trang tại biểu tượng cạnh thanh địa chỉ và cho phép Thông báo.';
-            return;
-        }
-        const sent = await showDesktopNotification({ id: `desktop-test-${Date.now()}`, title: 'Workpic · Thông báo thử', type: 'once', time: new Date().toTimeString().slice(0,5) }, { kind: 'test', originDate: todayKey() });
-        if (!sent) { status.textContent = 'Luồng gửi nhắc job báo lỗi. Xem trạng thái thông báo bên dưới rồi thử lại.'; return; }
-        document.getElementById('desktopNotificationFeedback')?.removeAttribute('hidden');
-        status.textContent = 'Đã chuyển yêu cầu cho trình duyệt, chưa xác nhận Windows đã hiện banner. Hãy kiểm tra thông báo ở góc màn hình rồi chọn kết quả bên dưới.';
-        checkNotifications();
-    } catch (error) { status.textContent = 'Không gửi được thông báo desktop. Kiểm tra quyền thông báo của trang và thử lại.'; console.warn(error); }
-    finally { button.disabled = false; }
+        if('Notification' in window && Notification.permission==='default')await Notification.requestPermission();
+        status.textContent=desktopNotificationPermissionText();
+    } catch(error){status.textContent=desktopNotificationPermissionText();}
 }
 
 function toggleDailyExcludeWrap() {
@@ -8144,6 +8218,7 @@ function listenUsersAvatars() {
     if (unsubscribeUsersAvatar) unsubscribeUsersAvatar();
     unsubscribeUsersAvatar = onSnapshot(collection(db, 'users'), (snapshot) => {
         usersDirectorySnapshot=snapshot;
+        if(document.getElementById('petCompareDialog')?.open)renderPetComparison(true);
         usersAvatarCache = {};
         usersInfoCache = {};
         usersDeptLatest = {};
@@ -8461,10 +8536,10 @@ function toggleQuickChatPanel() {
     }
 }
 
-const AttendancePet3D = (()=>{
+function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendancePetArt',previewId='attendancePetPreview'){
     let state=null,generation=0;
     const fallback = view => {
-        const art=document.getElementById('attendancePetArt');
+        const art=document.getElementById(artId);
         if (!art) return;
         const color=view.dead?'#94a3b8':view.form.color;
         art.innerHTML=view.egg?`<svg viewBox="0 0 140 100" aria-hidden="true"><defs><radialGradient id="pet-egg-light"><stop stop-color="#fffef5"/><stop offset="1" stop-color="#b9c6d8"/></radialGradient></defs><ellipse cx="70" cy="53" rx="29" ry="38" fill="url(#pet-egg-light)"/><path d="m58 35 9 6-6 9 14 6-8 10" fill="none" stroke="#d5ab66" stroke-width="2"/><circle cx="82" cy="31" r="5" fill="#e4c989"/></svg>`
@@ -8472,7 +8547,8 @@ const AttendancePet3D = (()=>{
             :view.form.kind==='bird'?`<svg viewBox="0 0 140 100" aria-hidden="true"><path d="M70 54Q27 8 8 25L46 65 19 77 72 68Q100 72 110 52L133 48 116 40Q102 23 90 46Z" fill="${color}"/><path d="M62 53Q68 5 95 13L83 57" fill="${color}" stroke="#ffffff55" stroke-width="2"/><circle cx="108" cy="43" r="3" fill="#18212a"/></svg>`
             :view.form.kind==='dino'&&view.form.shape!=='sea'?`<svg viewBox="0 0 140 100" aria-hidden="true"><path d="M20 66 4 51 35 59Q45 31 77 43L91 29 116 28 131 42 125 56 103 53 92 68 91 88 80 88 76 69 57 70 51 88 40 88 43 66Z" fill="${color}"/><path d="m47 45 5-13 8 9 9-16 8 19" fill="#fbbf24"/><circle cx="115" cy="38" r="3" fill="#0f172a"/></svg>`
             :`<svg viewBox="0 0 140 100" aria-hidden="true"><defs><radialGradient id="pet-fish-light"><stop stop-color="#ecfeff"/><stop offset="1" stop-color="${color}"/></radialGradient></defs><path class="pet-fallback-tail" d="m42 50-28-24 4 24-4 24Z" fill="${color}"/><ellipse cx="76" cy="50" rx="42" ry="${view.form.kind==='whale'?25:29}" fill="url(#pet-fish-light)"/><path d="m61 26 19-16 12 21M61 73l22 13 7-15" fill="${color}"/><circle cx="101" cy="41" r="7" fill="white"/><circle cx="104" cy="42" r="4" fill="#0f172a"/><path d="M113 58q-8 4-12 0" fill="none" stroke="#0f172a" stroke-width="2"/></svg>`;
-        if(state?.previewMode)document.getElementById('attendancePetPreview').innerHTML=art.innerHTML.replaceAll('pet-egg-light','pet-panel-egg-light').replaceAll('pet-fish-light','pet-panel-fish-light');
+        art.innerHTML=art.innerHTML.replaceAll('pet-egg-light',artId+'-egg-light').replaceAll('pet-fish-light',artId+'-fish-light');
+        if(state?.previewMode)document.getElementById(previewId).innerHTML=art.innerHTML.replaceAll(artId+'-egg-light',previewId+'-egg-light').replaceAll(artId+'-fish-light',previewId+'-fish-light');
     };
     function disposeModel(s) {
         if (!s.model) return;
@@ -8739,8 +8815,8 @@ const AttendancePet3D = (()=>{
         cancelAnimationFrame(s.raf);document.removeEventListener('visibilitychange',s.visibility);
         s.button.removeEventListener('mouseenter',s.enter);s.button.removeEventListener('mouseleave',s.leave);s.button.removeEventListener('focus',s.enter);s.button.removeEventListener('blur',s.leave);
         if(s.renderer){disposeModel(s);s.renderer.dispose();s.renderer.domElement.remove();}
-        document.getElementById('attendancePetArt')?.replaceChildren();
-        document.getElementById('attendancePetPreview')?.replaceChildren();
+        document.getElementById(artId)?.replaceChildren();
+        document.getElementById(previewId)?.replaceChildren();
     }
     function resizePet(s){
         const scale=Math.min(s.view?attendancePetScale(s.view):1,Math.max(.35,(window.innerWidth-16)/144),Math.max(.35,(window.innerHeight-16)/104));
@@ -8752,15 +8828,15 @@ const AttendancePet3D = (()=>{
         s.renderer.setSize(width,height);s.camera.aspect=width/height;s.camera.updateProjectionMatrix();
     }
     function start(){
-        stop();const token=generation,button=document.getElementById('attendancePetSwimmer');
+        stop();const token=generation,button=document.getElementById(buttonId);
         if(!button)return;
-        const s={button,raf:0,renderer:null,view:null,signature:'',x:Math.max(15,window.innerWidth-180),y:Math.max(80,window.innerHeight-240),targetX:80,targetY:150,last:0,t:0,hover:false,fedAt:-100,nextTarget:0,facingAngle:0};state=s;
+        const s={button,raf:0,renderer:null,view:null,signature:'',x:12+Math.random()*Math.max(1,window.innerWidth-180),y:80+Math.random()*Math.max(1,window.innerHeight-240),targetX:80,targetY:150,last:0,t:0,hover:false,fedAt:-100,nextTarget:0,facingAngle:0};state=s;
         s.enter=()=>{s.hover=true;};s.leave=()=>{s.hover=false;};button.addEventListener('mouseenter',s.enter);button.addEventListener('mouseleave',s.leave);button.addEventListener('focus',s.enter);button.addEventListener('blur',s.leave);
         const frame=now=>{
             if(state!==s||document.hidden)return;s.raf=requestAnimationFrame(frame);
             if(s.last&&now-s.last<32)return;const dt=s.last?Math.min(.06,(now-s.last)/1000):.033;s.last=now;s.t+=dt;
             const petDialogOpen=document.getElementById('attendancePetDialog')?.open;
-            if(document.body.classList.contains('modal-open')||(document.querySelector('dialog[open]')&&!petDialogOpen))return;
+            if(document.body.classList.contains('modal-open')||(document.querySelector('dialog[open]')&&!s.previewMode))return;
             if(button.hidden&&!s.previewMode)return;
             const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
             resizePet(s);
@@ -8768,7 +8844,7 @@ const AttendancePet3D = (()=>{
             const {maxX,maxY,minY,mode}=bounds;
             if(s.motion!==mode){s.motion=mode;s.nextTarget=0;s.targetY=minY;}
             const previousX=s.x;
-            if(mode==='rest'||reduced){s.x=maxX;s.y=maxY;}
+            if(mode==='rest'||reduced){s.x=Math.max(8,maxX-(Number(button.dataset.petSlot)||0)*(s.width+12));s.y=maxY;}
             else if(!s.hover&&!petDialogOpen){
                 if(s.t>s.nextTarget||Math.hypot(s.targetX-s.x,s.targetY-s.y)<15){s.targetX=8+Math.random()*Math.max(0,maxX-8);s.targetY=minY+Math.random()*(maxY-minY);s.nextTarget=s.t+15;}
                 const speed=mode==='fly'?.25:mode==='walk'?.13:.16;
@@ -8778,6 +8854,8 @@ const AttendancePet3D = (()=>{
             const walking=mode==='walk'&&Math.abs(s.x-previousX)>.01;
             const bob=reduced||mode==='rest'?0:mode==='walk'?(walking?Math.abs(Math.sin(s.t*5))*1.5:0):Math.sin(s.t*(mode==='fly'?3:1.7))*(mode==='fly'?7:4);
             button.style.transform=`translate3d(${s.x}px,${Math.max(minY,Math.min(maxY,s.y+bob))}px,0)`;
+            const bubbleHalf=Math.min(190,window.innerWidth-16)/2;
+            button.style.setProperty('--pet-hunger-center',`${Math.max(bubbleHalf+8,Math.min(window.innerWidth-bubbleHalf-8,s.x+s.width/2))-s.x}px`);
             if(s.renderer&&s.model){
                 const alive=!s.view?.dead;
                 const targetAngle=s.targetX<s.x?Math.PI:0;
@@ -8792,13 +8870,13 @@ const AttendancePet3D = (()=>{
         };
         s.visibility=()=>{cancelAnimationFrame(s.raf);if(!document.hidden){s.last=0;s.raf=requestAnimationFrame(frame);renderAttendancePet();}};
         document.addEventListener('visibilitychange',s.visibility);s.raf=requestAnimationFrame(frame);
-        import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js').then(T=>{
+        s.ready=import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js').then(T=>{
             if(state!==s||token!==generation)return;
             try{
                 const renderer=new T.WebGLRenderer({alpha:true,antialias:true,powerPreference:'low-power'});renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.75));renderer.setSize(144,104);renderer.setClearColor(0,0);renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;
                 s.THREE=T;s.renderer=renderer;s.scene=new T.Scene();s.camera=new T.PerspectiveCamera(38,144/104,.1,30);s.camera.position.set(.2,.35,5.7);s.camera.lookAt(0,0,0);
                 s.scene.add(new T.HemisphereLight('#e5f8ff','#344b6a',2));const light=new T.DirectionalLight('#fff7d6',3);light.position.set(2,4,5);s.scene.add(light);const rim=new T.DirectionalLight('#67d8ff',2);rim.position.set(-3,1,-3);s.scene.add(rim);
-                document.getElementById('attendancePetArt').replaceChildren(renderer.domElement);
+                document.getElementById(artId).replaceChildren(renderer.domElement);
                 if(s.view)build(s,s.view);
                 if(s.previewMode)preview(true);
             }catch(error){if(s.view)fallback(s.view);}
@@ -8807,25 +8885,45 @@ const AttendancePet3D = (()=>{
     function update(view){const s=state;if(!s)return;s.view=view;resizePet(s);const key=`${view.egg?'egg':view.level}:${view.branch}:${view.form.name}:${view.dead}`;if(s.signature===key)return;s.signature=key;if(s.renderer)build(s,view);else fallback(view);}
     function preview(open){
         const s=state;if(!s)return;s.previewMode=open;
-        const container=document.getElementById(open?'attendancePetPreview':'attendancePetArt');
+        const container=document.getElementById(open?previewId:artId);
         if(!container)return;
         if(s.renderer){container.replaceChildren(s.renderer.domElement);resizePet(s);}
         else if(s.view)fallback(s.view);
-        if(!open)document.getElementById('attendancePetPreview')?.replaceChildren();
+        if(!open)document.getElementById(previewId)?.replaceChildren();
     }
-    return {start,stop,update,preview,feed:()=>{if(state)state.fedAt=state.t;}};
-})();
+    async function thumbnail(view){
+        const s=state;if(!s)return null;update(view);await s.ready;
+        if(state!==s)return null;
+        if(s.renderer&&s.model){
+            try{
+                s.model.rotation.y=.25;s.model.rotation.z=view.dead?Math.PI*.75:0;
+                s.renderer.render(s.scene,s.camera);
+                const source=s.renderer.domElement.toDataURL('image/png');if(source.startsWith('data:image/png'))return source;
+            }catch{}
+        }
+        fallback(view);const art=document.getElementById(artId);
+        return art?.querySelector('svg')?'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(art.innerHTML):null;
+    }
+    return {start,stop,update,preview,thumbnail,feed:()=>{if(state)state.fedAt=state.t;}};
+}
+const AttendancePet3D=createAttendancePet3D();
 
 const canControlPets = () => auth.currentUser?.email?.toLowerCase() === 'chauchikil01@gmail.com';
 let petAdminProfiles = [], petAdminBusy = false, petAdminLoad = 0;
-function renderPetAdminSummary() {
+function renderPetAdminSummary(changedAction=null) {
+    const preserveDrafts=typeof changedAction==='string';
     const item=petAdminProfiles.find(item=>item.id===document.getElementById('petAdminUser').value);
     const el=document.getElementById('petAdminSummary');
     if(!item){el.textContent='Chưa có hồ sơ thú cưng.';return;}
-    const view=attendancePetView(item.pet);
-    document.getElementById('petAdminBranch').value=view.branch||'fish';
-    document.getElementById('petAdminLevel').replaceChildren(...attendancePetCatalog(view.branch).map((form,index)=>new Option(`Cấp ${index+1} · ${form.name}`,index+1)));
-    document.getElementById('petAdminLevel').value=Math.max(1,view.level);
+    const petSelect=document.getElementById('petAdminPet'),previous=petSelect.value,records=attendancePetRecords(item.pet);
+    const petsKey=JSON.stringify(records.map(p=>{const v=attendancePetView(p);return [p.id,v.displayName,v.level,v.dead];}));
+    if(petSelect.dataset.optionsKey!==petsKey){petSelect.dataset.optionsKey=petsKey;petSelect.replaceChildren(...records.map(p=>{const v=attendancePetView(p);return new Option(`${v.displayName} · Cấp ${v.level}${v.dead?' · Đã chết':''}`,p.id);}));}
+    petSelect.value=records.some(p=>p.id===previous)?previous:records[0].id;
+    const view=attendancePetView(attendancePetSelected(item.pet,petSelect.value));
+    if(!preserveDrafts||changedAction.startsWith('branch:'))document.getElementById('petAdminBranch').value=view.branch||'fish';
+    const levelSelect=document.getElementById('petAdminLevel'),levelKey=view.branch||'base',catalogChanged=levelSelect.dataset.optionsKey!==levelKey;
+    if(catalogChanged){levelSelect.dataset.optionsKey=levelKey;levelSelect.replaceChildren(...attendancePetCatalog(view.branch).map((form,index)=>new Option(`Cấp ${index+1} · ${form.name}`,index+1)));}
+    if(!preserveDrafts||catalogChanged||['level','evolve','egg','revive','hatch'].includes(changedAction))levelSelect.value=Math.max(1,view.level);
     el.textContent=`${view.name} · Cấp ${view.level} · ${view.checkins} ngày điểm danh · ${view.dead?'Đã chết':view.egg?'Đang ấp trứng':'Đang sống'}`;
 }
 async function loadPetAdminProfiles() {
@@ -8846,33 +8944,46 @@ async function loadPetAdminProfiles() {
         renderPetAdminSummary();status.textContent='Đã tải danh sách. Thay đổi sẽ được lưu vào hồ sơ thành viên.';
     }catch(error){if(token===petAdminLoad)status.textContent=petQuotaErrorText(error)||'Không tải được danh sách. Kiểm tra kết nối và quyền đọc hồ sơ hiện tại.';}
 }
-async function applyPetAdminAction(action) {
+async function applyPetAdminAction(action,trigger=null) {
     if(!canControlPets()||petAdminBusy)return;
+    if(!['checkin','feed','hatch','evolve','revive','egg','level'].includes(action)&&!(action.startsWith('branch:')&&Object.hasOwn(ATTENDANCE_PET_BRANCHES,action.slice(7))))return;
     const item=petAdminProfiles.find(item=>item.id===document.getElementById('petAdminUser').value);
     if(!item)return;
-    const before=attendancePetView(item.pet);
+    const targetId=document.getElementById('petAdminPet').value;
+    const before=attendancePetView(attendancePetSelected(item.pet,targetId));
+    if(unchangedPetAdminAction(before,action,Number(document.getElementById('petAdminLevel').value))){document.getElementById('petAdminStatus').textContent='Thú cưng đã ở trạng thái này, không có thay đổi cần lưu.';return;}
+    if(action==='checkin'&&attendancePetHouseholdDay(item.pet)===attendancePetDay(Date.now())){document.getElementById('petAdminStatus').textContent='Đàn thú cưng đã được điểm danh hôm nay.';return;}
+    if(action==='feed'&&!before.hungry){document.getElementById('petAdminStatus').textContent=before.dead?'Thú cưng đã chết. Cần hồi sinh trước khi cho ăn.':before.egg?'Trứng chưa nở, chưa thể cho ăn.':'Thú cưng chưa đói. Có thể cho ăn lại sau 2 giờ kể từ lần ăn trước.';return;}
     if((action==='evolve'||action==='level')&&!before.branch&&(action==='evolve'?before.level>=9:Number(document.getElementById('petAdminLevel').value)>9)){
         document.getElementById('petAdminStatus').textContent='Chọn và áp dụng nhánh tiến hóa trước khi tăng quá cấp 9.';return;
     }
     if(action==='evolve'&&before.maxed){document.getElementById('petAdminStatus').textContent='Thú cưng đã đạt cấp cuối của nhánh.';return;}
     const uid=auth.currentUser.uid,level=Number(document.getElementById('petAdminLevel').value);
     const panel=document.getElementById('petAdminPanel'),status=document.getElementById('petAdminStatus');
-    petAdminBusy=true;panel.querySelectorAll('button,select').forEach(el=>el.disabled=true);status.textContent='Đang lưu…';
+    const selects=[...panel.querySelectorAll('select')].map(el=>({el,disabled:el.disabled}));
+    const buttons=[...panel.querySelectorAll('button')].filter(el=>el!==trigger).map(el=>({el,ariaDisabled:el.getAttribute('aria-disabled')}));
+    petAdminBusy=true;panel.setAttribute('aria-busy','true');selects.forEach(({el})=>el.disabled=true);buttons.forEach(({el})=>el.setAttribute('aria-disabled','true'));
+    if(trigger){trigger.disabled=true;trigger.classList.add('pet-admin-pending');trigger.setAttribute('aria-busy','true');}
+    status.textContent=`Đang thực hiện: ${trigger?.textContent.trim()||action}…`;
     try{
         assertPetQuotaAvailable();
-        const pet=await runTransaction(db,async transaction=>{
+        const result=await runTransaction(db,async transaction=>{
             if(!canControlPets()||auth.currentUser.uid!==uid)throw new Error('Session changed');
             const snapshot=await transaction.get(item.ref);
             if(!snapshot.exists()||snapshot.data().uid!==item.uid)throw new Error('Profile changed');
-            const next=adjustAdminPet(snapshot.data().attendancePet,action,level);
-            transaction.update(item.ref,{attendancePet:next});return next;
-        },{maxAttempts:2});
+            const change=transitionPetHousehold(snapshot.data().attendancePet,action,Date.now(),targetId,level);
+            if(change.changed)transaction.update(item.ref,{attendancePet:change.pet});return change;
+        },{maxAttempts:1});
         if(!canControlPets()||auth.currentUser.uid!==uid)return;
-        item.pet=pet;renderPetAdminSummary();
-        if(item.uid===currentUser?.uid){attendancePetData=pet;renderAttendancePet();}
-        status.textContent=`Đã cập nhật thú cưng của ${item.name}.`;
-    }catch(error){if(canControlPets()&&auth.currentUser.uid===uid)status.textContent=petQuotaErrorText(error)||(error.code==='permission-denied'?'Firebase hiện tại không cho phép sửa hồ sơ thành viên này. Thay đổi chưa được lưu.':'Chưa lưu được thay đổi. Kiểm tra kết nối rồi thử lại.');}
-    finally{petAdminBusy=false;panel.querySelectorAll('button,select').forEach(el=>el.disabled=false);}
+        item.pet=result.pet;renderPetAdminSummary(action);
+        if(item.uid===currentUser?.uid){attendancePetData=result.pet;renderAttendancePet();}
+        status.textContent=result.changed?`Đã thực hiện ${trigger?.textContent.trim()||action} cho thú cưng của ${item.name}.${result.spawned?' Đạt cấp tối đa: nhận thêm trứng theo cơ chế tiến hóa.':''}`:'Trạng thái đã được cập nhật trước đó, không ghi thêm thay đổi.';
+    }catch(error){if(canControlPets()&&auth.currentUser.uid===uid)status.textContent=petQuotaErrorText(error)||(error.code==='aborted'?'Dữ liệu vừa thay đổi ở nơi khác. Tải lại danh sách rồi thử lại.':error.code==='permission-denied'?'Firebase hiện tại không cho phép sửa hồ sơ thành viên này. Thay đổi chưa được lưu.':'Chưa lưu được thay đổi. Kiểm tra kết nối rồi thử lại.');}
+    finally{
+        petAdminBusy=false;panel.removeAttribute('aria-busy');selects.forEach(({el,disabled})=>el.disabled=disabled);
+        buttons.forEach(({el,ariaDisabled})=>{if(ariaDisabled===null)el.removeAttribute('aria-disabled');else el.setAttribute('aria-disabled',ariaDisabled);});
+        if(trigger){trigger.disabled=false;trigger.classList.remove('pet-admin-pending');trigger.removeAttribute('aria-busy');}
+    }
 }
 function initPetAdminPanel() {
     const panel=document.getElementById('petAdminPanel');if(!panel)return;
@@ -8890,22 +9001,122 @@ function initPetAdminPanel() {
         document.getElementById('petAdminClose').addEventListener('click',()=>dialog.close());
         dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close();});
         document.getElementById('petAdminBranch').replaceChildren(...Object.entries(ATTENDANCE_PET_BRANCHES).map(([key,branch])=>new Option(branch.name,key)));
-        document.getElementById('petAdminApplyBranch').addEventListener('click',()=>applyPetAdminAction('branch:'+document.getElementById('petAdminBranch').value));
+        document.getElementById('petAdminApplyBranch').addEventListener('click',event=>applyPetAdminAction('branch:'+document.getElementById('petAdminBranch').value,event.currentTarget));
         document.getElementById('petAdminUser').addEventListener('change',renderPetAdminSummary);
+        document.getElementById('petAdminPet').addEventListener('change',renderPetAdminSummary);
         document.getElementById('petAdminRefresh').addEventListener('click',loadPetAdminProfiles);
-        panel.querySelectorAll('[data-pet-admin]').forEach(button=>button.addEventListener('click',()=>applyPetAdminAction(button.dataset.petAdmin)));
+        panel.querySelectorAll('[data-pet-admin]').forEach(button=>button.addEventListener('click',event=>applyPetAdminAction(button.dataset.petAdmin,event.currentTarget)));
     }
 }
 
 let attendancePetData = null;
+let selectedAttendancePetId=null;
+function selectedAttendancePetView(){return attendancePetView(attendancePetSelected(attendancePetData,selectedAttendancePetId));}
+const petWeightLabel=grams=>new Intl.NumberFormat('vi-VN',{minimumFractionDigits:1,maximumFractionDigits:1}).format(grams/1000)+' kg';
+let petComparisonCache=null;
+const petComparisonImageCache=new Map(),petComparisonImagePending=new Map();
+let petComparisonImageWorker=null,petComparisonImageQueue=Promise.resolve(),petComparisonImageGeneration=0;
+function stopPetComparisonThumbnails(){
+    petComparisonImageGeneration++;petComparisonImageWorker?.renderer.stop();petComparisonImageWorker?.button.remove();
+    petComparisonImageWorker=null;petComparisonImageQueue=Promise.resolve();petComparisonImagePending.clear();
+}
+function petComparisonThumbnail(view){
+    const key=JSON.stringify([view.egg?'egg':view.branch,view.level,view.form.name,view.dead]);
+    if(petComparisonImageCache.has(key)){const source=petComparisonImageCache.get(key);petComparisonImageCache.delete(key);petComparisonImageCache.set(key,source);return Promise.resolve(source);}
+    if(petComparisonImagePending.has(key))return petComparisonImagePending.get(key);
+    const generation=petComparisonImageGeneration;
+    const task=petComparisonImageQueue.then(async()=>{
+        if(generation!==petComparisonImageGeneration||!document.getElementById('petCompareDialog')?.open)return null;
+        if(!petComparisonImageWorker){
+            const button=document.createElement('button'),art=document.createElement('span');button.id='petComparisonRenderWorker';button.type='button';button.hidden=true;button.setAttribute('aria-hidden','true');art.id='petComparisonRenderArt';button.appendChild(art);document.body.appendChild(button);
+            const renderer=createAttendancePet3D(button.id,art.id,null);petComparisonImageWorker={button,renderer};renderer.start();
+        }
+        const source=await petComparisonImageWorker.renderer.thumbnail(view);
+        if(generation!==petComparisonImageGeneration)return null;
+        if(source){petComparisonImageCache.set(key,source);while(petComparisonImageCache.size>96)petComparisonImageCache.delete(petComparisonImageCache.keys().next().value);}
+        return source;
+    }).catch(()=>null).finally(()=>{if(petComparisonImagePending.get(key)===task)petComparisonImagePending.delete(key);});
+    petComparisonImageQueue=task.then(()=>new Promise(resolve=>setTimeout(resolve,0)));
+    petComparisonImagePending.set(key,task);return task;
+}
+function renderPetComparison(force=false){
+    const dialog=document.getElementById('petCompareDialog');if(!dialog?.open||!currentUser)return;
+    const filter=document.getElementById('petCompareBranch').value,minute=Math.floor(Date.now()/60000);
+    const cached=petComparisonCache;
+    if(!force&&cached&&cached.directory===usersDirectorySnapshot&&cached.pet===attendancePetData&&cached.filter===filter&&cached.minute===minute)return;
+    petComparisonCache={directory:usersDirectorySnapshot,pet:attendancePetData,filter,minute};
+    const profiles=(usersDirectorySnapshot?.docs||[]).map(snapshot=>({id:snapshot.id,...snapshot.data()})).filter(profile=>profile.uid!==currentUser.uid);
+    if(attendancePetData)profiles.push({id:'local-current',uid:currentUser.uid,displayName:currentUser.displayName||currentUser.email?.split('@')[0]||'Bạn',attendancePet:attendancePetData});
+    const rows=buildPetComparison(profiles,Date.now(),filter),body=document.getElementById('petCompareRows');
+    body.replaceChildren(...rows.map(row=>{
+        const tr=document.createElement('tr');if(row.uid===currentUser.uid)tr.classList.add('is-me');if(row.dead)tr.classList.add('is-dead');
+        const cell=text=>{const td=document.createElement('td');td.textContent=text;tr.appendChild(td);return td;};
+        cell(row.rank?(['🥇','🥈','🥉'][row.rank-1]||String(row.rank)):'—').className='pet-compare-rank';
+        const owner=cell(row.ownerName);if(row.uid===currentUser.uid){const badge=document.createElement('small');badge.className='pet-compare-me';badge.textContent='Bạn';owner.appendChild(badge);}
+        const pet=cell(''),identity=document.createElement('div'),picture=document.createElement('span'),image=document.createElement('img'),name=document.createElement('span');
+        identity.className='pet-compare-identity';picture.className='pet-compare-picture is-loading';image.alt=`${row.petName} · ${row.species} · Cấp ${row.level}`;image.width=76;image.height=56;image.decoding='async';image.hidden=true;name.className='pet-compare-name';name.textContent=row.petName;
+        if(row.petName!==row.species){const species=document.createElement('small');species.className='pet-compare-species';species.textContent=row.species;name.appendChild(species);}
+        picture.appendChild(image);identity.append(picture,name);pet.appendChild(identity);
+        const generation=petComparisonImageGeneration;
+        petComparisonThumbnail(row.appearance).then(source=>{if(source&&generation===petComparisonImageGeneration&&image.isConnected){image.src=source;image.hidden=false;picture.classList.remove('is-loading');}});
+        cell(`Cấp ${row.level} · ${row.branchName}`);
+        cell(petWeightLabel(row.weightGrams)).className='pet-compare-weight';
+        cell(new Date(row.lastActiveAt).toLocaleString('vi-VN',{timeZone:'Asia/Bangkok',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}));
+        const status=cell(''),badge=document.createElement('span');badge.className='pet-compare-state '+(row.dead?'dead':row.egg?'egg':'alive');badge.textContent=row.dead?'Đã chết':row.egg?'Đang ấp':'Đang sống';status.appendChild(badge);
+        return tr;
+    }));
+    document.getElementById('petCompareEmpty').hidden=rows.length>0;
+    const summary=`${new Set(rows.map(row=>row.uid)).size} thành viên · ${rows.length} thú cưng`;
+    document.getElementById('petCompareSummary').textContent=usersDirectorySnapshot?summary:'Đang chờ dữ liệu thành viên khác · '+summary;
+}
+const attendancePetFleet=new Map();
+function renderPetHungerBubble(button,view){
+    let bubble=button.querySelector('.pet-hunger-bubble');
+    if(!bubble){bubble=document.createElement('span');bubble.className='attendance-pet-bubble pet-hunger-bubble';bubble.textContent='Tôi đang đói, cho ăn lẹ đi!';bubble.setAttribute('aria-hidden','true');button.appendChild(bubble);}
+    bubble.hidden=!view.hungry||!attendancePetReady||!attendancePetVisible;
+}
+function stopAttendancePetFleet(){for(const entry of attendancePetFleet.values()){entry.renderer.stop();entry.button.remove();}attendancePetFleet.clear();}
+function renderAttendancePetFleet(){
+    if(!attendancePetReady||!attendancePetVisible){stopAttendancePetFleet();return;}
+    const selected=attendancePetSelected(attendancePetData,selectedAttendancePetId).id;
+    const peers=attendancePetRecords(attendancePetData).filter(p=>p.id!==selected).slice(0,3),ids=new Set(peers.map(p=>p.id));
+    for(const [id,entry] of attendancePetFleet)if(!ids.has(id)){entry.renderer.stop();entry.button.remove();attendancePetFleet.delete(id);}
+    for(const [peerIndex,pet] of peers.entries()){
+        let entry=attendancePetFleet.get(pet.id);
+        if(!entry){
+            const button=document.createElement('button'),art=document.createElement('span');
+            const suffix=pet.id.replace(/[^a-z0-9-]/gi,'');button.id='pet-peer-'+suffix;art.id=button.id+'-art';button.type='button';button.className='attendance-pet-swimmer';button.appendChild(art);document.body.appendChild(button);
+            button.addEventListener('click',()=>{if(attendancePetBusy)return;selectAttendancePet(pet.id);document.getElementById('attendancePetToggle').click();});
+            entry={button,renderer:createAttendancePet3D(button.id,art.id,null)};attendancePetFleet.set(pet.id,entry);entry.renderer.start();
+        }
+        const view=attendancePetView(pet);entry.button.dataset.petSlot=peerIndex+1;entry.button.title=`${view.displayName} · Cấp ${view.level} · Bấm để chăm sóc`;entry.button.setAttribute('aria-label',entry.button.title);entry.button.disabled=attendancePetBusy;entry.renderer.update(view);
+        renderPetHungerBubble(entry.button,view);
+    }
+}
+function selectAttendancePet(id){
+    if(attendancePetBusy)return;
+    selectedAttendancePetId=id;const nickname=document.getElementById('attendancePetNickname');nickname.value='';delete nickname.dataset.dirty;renderAttendancePet();
+}
+function renderAttendancePetRoster(){
+    const records=attendancePetRecords(attendancePetData),selected=attendancePetSelected(attendancePetData,selectedAttendancePetId).id;
+    const host=document.getElementById('attendancePetRoster'),key=JSON.stringify(records.map(p=>{const v=attendancePetView(p);return [p.id,v.displayName,v.level,v.dead,v.egg,v.hungry,v.weightGrams];}))+':'+selected;
+    document.getElementById('attendancePetRosterCount').textContent=records.length;
+    if(host.dataset.signature!==key){
+        host.dataset.signature=key;host.replaceChildren(...records.map(p=>{
+            const v=attendancePetView(p),button=document.createElement('button');button.type='button';button.dataset.petId=p.id;button.className='pet-roster-card'+(p.id===selected?' is-selected':'');button.setAttribute('aria-pressed',String(p.id===selected));
+            const icon=document.createElement('span'),name=document.createElement('strong'),meta=document.createElement('small');icon.className='pet-roster-icon';icon.textContent=v.dead?'💤':v.egg?'🥚':{fish:'🐠',shark:'🦈',whale:'🐋',dino:'🦖',bird:'🦅',beast:'🦁'}[v.form.kind];name.textContent=v.displayName;meta.textContent=`Cấp ${v.level} · ${petWeightLabel(v.weightGrams)} · ${v.dead?'Đã chết':v.egg?'Đang ấp':v.maxed?'Hoàn thành':v.hungry?'Đang đói':'No bụng'}`;button.append(icon,name,meta);return button;
+        }));
+    }
+    host.querySelectorAll('button').forEach(button=>button.disabled=attendancePetBusy);
+}
 let attendancePetVisible=true,attendancePetBranchPrompted='';
 function loadAttendancePetVisibility(){
     try{return localStorage.getItem(`workpic-pet-visible-${currentUser.uid}`)!=='false';}catch{return true;}
 }
 function openAttendancePetBranch(automatic=false){
-    const view=attendancePetView(attendancePetData),dialog=document.getElementById('attendancePetBranchDialog');
+    const view=selectedAttendancePetView(),dialog=document.getElementById('attendancePetBranchDialog');
     if(!currentUser||!attendancePetReady||attendancePetBusy||!view.branchUnlocked||view.dead)return;
-    const key=`${currentUser.uid}:${view.pet.bornAt}:${view.pet.life}`;
+    const key=`${currentUser.uid}:${view.pet.id}:${view.pet.bornAt}:${view.pet.life}`;
     if(automatic&&(!view.needsBranch||attendancePetBranchPrompted===key))return;
     attendancePetBranchPrompted=key;
     document.getElementById('attendancePetBranchStatus').textContent='';
@@ -8941,7 +9152,8 @@ function attendancePetMessage(message) {
 
 function renderAttendancePet() {
     if (!currentUser) return;
-    const view = attendancePetView(attendancePetData);
+    const view = selectedAttendancePetView();
+    renderAttendancePetRoster();
     const duration = value => {
         const seconds = Math.max(0,Math.ceil(value/1000));
         return `${Math.floor(seconds/3600)}h ${Math.floor(seconds%3600/60)}m ${seconds%60}s`;
@@ -8955,32 +9167,45 @@ function renderAttendancePet() {
     document.getElementById('attendancePetNicknameSave').disabled=!attendancePetReady||attendancePetBusy;
     document.getElementById('attendancePetDescription').textContent = view.dead ? 'Bạn đã vắng điểm danh đủ 72 giờ. Bấm thú cưng hoặc Hồi sinh để bắt đầu một cuộc đời mới.'
         : view.egg ? 'Trứng đang ấp. Bạn vẫn có thể điểm danh hôm nay để tích ngày tiến hóa.'
-        : view.fedToday ? 'Bụng no rồi! Hẹn bạn cho ăn vào ngày mai.' : 'Bấm vào thú cưng để cho ăn hôm nay.';
+        : view.hungry ? 'Đang đói! Cho ăn để nhận +1 XP tiến hóa.' : `Đang no bụng. Có thể cho ăn lại sau ${duration(view.untilHungry)}.`;
+    document.getElementById('attendancePetPreview').dataset.mode=attendancePetMotion(view);
+    document.getElementById('petGameXp').textContent=`${view.xp} XP`;
+    document.getElementById('petGameWeight').textContent=petWeightLabel(view.weightGrams);
+    document.getElementById('petGameWeightHint').textContent=view.dead?'Đã chết vì vắng điểm danh đủ 72 giờ.':view.missedDays?`Vắng điểm danh ${view.missedDays} ngày: mức giảm tổng ${petWeightLabel(view.absencePenaltyGrams)}. Cân nặng không âm.`:'Mỗi lần ăn +0,2 kg · Điểm danh không tăng cân.';
+    document.getElementById('petGameHunger').textContent=view.dead?'Đã chết':view.egg?'Đang ấp':view.hungry?'Đang đói':duration(view.untilHungry);
+    document.getElementById('petGameHunger').dataset.state=view.dead?'danger':view.hungry?'hungry':'full';
+    document.getElementById('petGameFullness').value=view.dead?0:view.egg?100:Math.min(100,view.untilHungry/7200000*100);
+    document.getElementById('petGameSurvival').textContent=view.dead?'Cần hồi sinh':duration(view.diesAt-Date.now());
+    document.getElementById('petGameSurvival').dataset.state=view.diesAt-Date.now()<86400000?'danger':'full';
     const hatchTime = new Date(view.pet.hatchAt).toLocaleString('vi-VN',{timeZone:'Asia/Bangkok'});
     document.getElementById('attendancePetCountdown').textContent = view.dead ? 'Hồi sinh: trở về trứng, nở sau 1 giờ.' : view.egg ? `Nở sau ${duration(view.untilHatch)} · Dự kiến nở lúc ${hatchTime}. Thời gian vẫn tính khi đóng web.` : `Cần điểm danh trước ${new Date(view.diesAt).toLocaleString('vi-VN',{timeZone:'Asia/Bangkok'})}.`;
     const eggTimer = document.getElementById('attendancePetEggTimer');
     eggTimer.hidden = !view.egg || view.dead || !attendancePetReady;
     eggTimer.textContent = `Nở sau ${duration(view.untilHatch)}`;
     eggTimer.title = `Dự kiến nở lúc ${hatchTime}`;
-    document.getElementById('attendancePetProgress').style.width = `${view.maxed?100:view.checkins%10*10}%`;
-    document.getElementById('attendancePetProgressText').textContent = `${view.checkins} ngày điểm danh trong cuộc đời này · ${view.maxed?'Đã đạt cấp cuối của nhánh.':view.needsBranch?'Đã mở 4 nhánh tiến hóa! Chọn nhánh bên dưới để tiếp tục.':`Còn ${view.nextEvolutionIn} ngày điểm danh để tiến hóa.`}`;
+    document.getElementById('attendancePetProgress').style.width = `${view.maxed?100:view.xp%10*10}%`;
+    document.getElementById('attendancePetProgressText').textContent = `${view.checkins} lần điểm danh + ${view.feedingXp} XP cho ăn · ${view.maxed?'Đã đạt cấp cuối của nhánh.':view.needsBranch?'Đã mở 4 nhánh tiến hóa! Chọn nhánh bên dưới để tiếp tục.':`Còn ${view.nextEvolutionIn} XP để tiến hóa.`}`;
     renderAttendancePetBranches(view);
     const checkin = document.getElementById('attendancePetCheckin');
-    checkin.textContent = view.checkedToday ? 'Đã điểm danh hôm nay' : 'Điểm danh hôm nay';
-    checkin.disabled = !attendancePetReady || attendancePetBusy || view.dead || view.checkedToday;
+    const checkedToday=attendancePetHouseholdDay(attendancePetData)===attendancePetDay(Date.now());
+    checkin.textContent = checkedToday ? 'Đã điểm danh cả đàn hôm nay' : 'Điểm danh cả đàn · +1 XP';
+    checkin.disabled = !attendancePetReady || attendancePetBusy || !attendancePetRecords(attendancePetData).some(p=>!attendancePetView(p).dead) || checkedToday;
     const feed = document.getElementById('attendancePetFeed');
-    feed.textContent = view.dead ? 'Hồi sinh thành trứng' : view.egg ? 'Đang ấp trứng' : view.fedToday ? 'Đã cho ăn hôm nay' : 'Cho ăn';
-    feed.disabled = !attendancePetReady || attendancePetBusy || (!view.dead && (view.egg || view.fedToday));
-    document.getElementById('attendancePetDot').hidden = view.checkedToday && !view.dead;
+    feed.textContent = view.dead ? 'Hồi sinh thành trứng' : view.egg ? 'Đang ấp trứng' : view.hungry ? 'Cho ăn · +1 XP' : 'Chưa đói · '+duration(view.untilHungry);
+    feed.disabled = !attendancePetReady || attendancePetBusy || (!view.dead && !view.hungry);
+    document.getElementById('attendancePetDot').hidden = checkedToday && !view.dead;
     const swimmer = document.getElementById('attendancePetSwimmer');
-    const petTitle = `${view.displayName}${view.nickname?` · ${view.name}`:''} · Cấp ${view.level} · ${view.dead?'Bấm để hồi sinh':view.egg?`Nở sau ${duration(view.untilHatch)} · ${hatchTime}`:view.fedToday?'Đã cho ăn hôm nay':'Bấm để cho ăn'}`;
+    const petTitle = `${view.displayName}${view.nickname?` · ${view.name}`:''} · Cấp ${view.level} · ${view.dead?'Bấm để hồi sinh':view.egg?`Nở sau ${duration(view.untilHatch)} · ${hatchTime}`:view.hungry?'Bấm để cho ăn':`Đói lại sau ${duration(view.untilHungry)}`}`;
     if (swimmer.title!==petTitle) {swimmer.title=petTitle;swimmer.setAttribute('aria-label',petTitle);}
     swimmer.disabled = !attendancePetReady || attendancePetBusy;
     swimmer.classList.toggle('pet-is-dead',view.dead);
+    renderPetHungerBubble(swimmer,view);
     swimmer.hidden=!attendancePetReady||!attendancePetVisible;
     document.getElementById('attendancePetVisible').checked=attendancePetVisible;
     AttendancePet3D.update(view);
+    renderAttendancePetFleet();
     if(document.getElementById('attendancePetDialog').open)openAttendancePetBranch(true);
+    renderPetComparison();
 }
 
 function renderAttendancePetBranches(view){
@@ -8999,33 +9224,38 @@ function renderAttendancePetBranches(view){
     const road=document.getElementById('attendancePetRoad'),key=`${view.branch}:${view.level}`;
     if(road.dataset.path!==key){
         road.dataset.path=key;
-        road.innerHTML='<li>Trứng · nở sau 1 giờ</li>'+attendancePetCatalog(view.branch).map((form,index)=>`<li class="${index+1===view.level?'is-current':index+1<view.level?'is-complete':''}" ${index+1===view.level?'aria-current="step"':''}>Cấp ${index+1} · ${form.name}${index?` · ${index*10} ngày điểm danh`:''}</li>`).join('')+(!view.branch?'<li class="pet-road-unlock">Cấp 9: mở 4 nhánh, mỗi nhánh 20 cấp</li>':'');
+        road.innerHTML='<li>Trứng · nở sau 1 giờ</li>'+attendancePetCatalog(view.branch).map((form,index)=>`<li class="${index+1===view.level?'is-current':index+1<view.level?'is-complete':''}" ${index+1===view.level?'aria-current="step"':''}>Cấp ${index+1} · ${form.name}${index?` · ${index*10} XP`:''}</li>`).join('')+(!view.branch?'<li class="pet-road-unlock">Cấp 9: mở 4 nhánh, mỗi nhánh 20 cấp</li>':'');
     }
 }
 
 async function actOnAttendancePet(action) {
     if (!currentUser || !attendancePetRef || attendancePetBusy || !attendancePetReady) return;
-    const generation = attendancePetGeneration, uid = currentUser.uid, ref = attendancePetRef;
-    const previousLevel = attendancePetView(attendancePetData).level;
+    const generation = attendancePetGeneration, uid = currentUser.uid, ref = attendancePetRef, targetId=attendancePetSelected(attendancePetData,selectedAttendancePetId).id;
+    const previousLevel = selectedAttendancePetView().level;
     attendancePetBusy = true; renderAttendancePet();
     try {
         assertPetQuotaAvailable();
         const result = await runTransaction(db, async transaction => {
             const snapshot = await transaction.get(ref);
             if (!snapshot.exists() || snapshot.data().uid !== uid) throw new Error('Không đọc được hồ sơ thú cưng.');
-            const change = transitionAttendancePet(snapshot.data().attendancePet,action,Date.now());
+            const change = transitionPetHousehold(snapshot.data().attendancePet,action,Date.now(),targetId);
             if (change.changed) transaction.update(ref,{attendancePet:change.pet});
             return change;
         },{maxAttempts:2});
         if (generation !== attendancePetGeneration || currentUser?.uid !== uid) return;
         attendancePetData = result.pet;
+        if(result.spawned)selectedAttendancePetId=attendancePetRecords(result.pet)[0].id;
         if(result.result==='renamed')delete document.getElementById('attendancePetNickname').dataset.dirty;
         const messages = {checked:'Điểm danh thành công! Thêm một ngày tiến hóa.',fed:'Măm măm! Cảm ơn bạn đã cho ăn.',revived:'Đã hồi sinh! Trứng sẽ nở sau 1 giờ.',dead:'Thú cưng đã chết. Bấm Hồi sinh để bắt đầu lại.',egg:'Trứng chưa nở, chưa thể cho ăn.',alive:'Thú cưng đã được hồi sinh rồi.', 'already-checked':'Bạn đã điểm danh hôm nay.', 'already-fed':'Hôm nay đã cho ăn rồi. Hẹn ngày mai!'};
-        const after = attendancePetView(result.pet);
+        const after = selectedAttendancePetView();
         if(result.result==='branched')document.getElementById('attendancePetBranchDialog').close();
         messages.renamed='Đã lưu tên thú cưng.';
+        messages.fed='Đã cho ăn! +0,2 kg và +1 XP tiến hóa. Sẽ đói lại sau 2 giờ.';
+        messages['already-fed']='Thú cưng chưa đói. Mỗi 2 giờ có thể cho ăn một lần.';
+        messages['missing-pet']='Thú cưng đã thay đổi. Hãy chọn lại trong đàn.';
         Object.assign(messages,{branched:`Đã chọn nhánh ${after.branch?ATTENDANCE_PET_BRANCHES[after.branch].name:''}. Tiến độ điểm danh được giữ nguyên.`,'branch-locked':'Đạt cá đuối cấp 9 để mở nhánh.','already-branch':'Bạn đang ở nhánh này.'});
         attendancePetMessage(result.result==='checked' && after.level>previousLevel && !after.egg ? `Tiến hóa! Cấp ${after.level} · ${after.name}.` : messages[result.result] || 'Đã đồng bộ thú cưng.');
+        if(result.spawned)attendancePetMessage(`Chúc mừng đạt cấp tối đa! Đã nhận ${result.spawned} trứng mới. Thú cưng trưởng thành vẫn ở trong đàn.`);
         if (result.result==='fed') AttendancePet3D.feed();
     } catch (error) {
         if (generation===attendancePetGeneration) attendancePetMessage(petQuotaErrorText(error)||'Chưa lưu được. Kiểm tra kết nối và quyền cập nhật hồ sơ rồi thử lại.');
@@ -9051,11 +9281,11 @@ async function startAttendancePet() {
         const profile = [...profiles.docs].sort((a,b)=>a.id.localeCompare(b.id))[0];
         if (!profile) throw new Error('Missing profile');
         attendancePetRef = profile.ref;
-        const initial=transitionAttendancePet(profile.data().attendancePet,'init',Date.now());
+        const initial=transitionPetHousehold(profile.data().attendancePet,'init',Date.now());
         const pet = !initial.changed ? initial.pet : await runTransaction(db,async transaction=>{
             const snapshot=await transaction.get(profile.ref);
             if (!snapshot.exists() || snapshot.data().uid!==uid) throw new Error('Missing profile');
-            const change=transitionAttendancePet(snapshot.data().attendancePet,'init',Date.now());
+            const change=transitionPetHousehold(snapshot.data().attendancePet,'init',Date.now());
             if (change.changed) transaction.update(profile.ref,{attendancePet:change.pet});
             return change.pet;
         },{maxAttempts:2});
@@ -9094,9 +9324,15 @@ function stopAttendancePet() {
     attendancePetStarting=false;
     clearInterval(attendancePetInterval);clearTimeout(attendancePetBubbleTimer);
     attendancePetData=null;attendancePetRef=null;attendancePetReady=false;attendancePetBusy=false;
+    selectedAttendancePetId=null;
+    petComparisonCache=null;
+    stopPetComparisonThumbnails();
+    const comparison=document.getElementById('petCompareDialog');if(comparison?.open)comparison.close();
+    document.getElementById('petCompareRows')?.replaceChildren();
     attendancePetBranchPrompted='';
     const branchDialog=document.getElementById('attendancePetBranchDialog');if(branchDialog?.open)branchDialog.close();
     AttendancePet3D.stop();
+    stopAttendancePetFleet();
     const dialog=document.getElementById('attendancePetDialog');
     if (dialog?.open) dialog.close();
     const toggle=document.getElementById('attendancePetToggle');if(toggle)toggle.hidden=true;
@@ -9109,10 +9345,18 @@ function initAttendancePetUi() {
     if (!toggle || toggle.dataset.ready) return;toggle.dataset.ready='true';
     const dialog=document.getElementById('attendancePetDialog');
     toggle.addEventListener('click',()=>{renderAttendancePet();if(!dialog.open)dialog.showModal();AttendancePet3D.preview(true);openAttendancePetBranch(true);});
-    dialog.addEventListener('close',()=>{document.getElementById('attendancePetBranchDialog').close();AttendancePet3D.preview(false);});
+    dialog.addEventListener('close',()=>{if(dialog.open)return;document.getElementById('attendancePetBranchDialog').close();document.getElementById('petCompareDialog').close();AttendancePet3D.preview(false);});
     document.getElementById('attendancePetClose').addEventListener('click',()=>dialog.close());
     dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close();});
     document.getElementById('attendancePetCheckin').addEventListener('click',()=>actOnAttendancePet('checkin'));
+    document.getElementById('attendancePetRoster').addEventListener('click',event=>{const button=event.target.closest('[data-pet-id]');if(button&&!button.disabled)selectAttendancePet(button.dataset.petId);});
+    const comparison=document.getElementById('petCompareDialog');
+    document.getElementById('petCompareBranch').append(...Object.entries(ATTENDANCE_PET_BRANCHES).map(([key,branch])=>new Option(branch.name,key)));
+    document.getElementById('petCompareOpen').addEventListener('click',()=>{if(!currentUser)return;if(!comparison.open)comparison.showModal();renderPetComparison(true);});
+    document.getElementById('petCompareClose').addEventListener('click',()=>comparison.close());
+    comparison.addEventListener('close',()=>{if(!comparison.open)stopPetComparisonThumbnails();});
+    comparison.addEventListener('click',event=>{if(event.target===comparison)comparison.close();});
+    document.getElementById('petCompareBranch').addEventListener('change',()=>renderPetComparison(true));
     const branchDialog=document.getElementById('attendancePetBranchDialog');
     document.getElementById('attendancePetBranchOpen').addEventListener('click',()=>openAttendancePetBranch());
     document.getElementById('attendancePetBranchClose').addEventListener('click',()=>branchDialog.close());
@@ -9127,11 +9371,11 @@ function initAttendancePetUi() {
     document.getElementById('attendancePetNicknameForm').addEventListener('submit',async event=>{
         event.preventDefault();if(!attendancePetReady||attendancePetBusy)return;
         const value=normalizePetNickname(nickname.value);
-        if(value===attendancePetView(attendancePetData).nickname){delete nickname.dataset.dirty;nickname.value=value;attendancePetMessage('Tên thú cưng không thay đổi.');return;}
+        if(value===selectedAttendancePetView().nickname){delete nickname.dataset.dirty;nickname.value=value;attendancePetMessage('Tên thú cưng không thay đổi.');return;}
         await actOnAttendancePet('rename:'+value);
-        if(attendancePetView(attendancePetData).nickname===value)nickname.value=value;
+        if(selectedAttendancePetView().nickname===value)nickname.value=value;
     });
-    const interact=()=>{const view=attendancePetView(attendancePetData);actOnAttendancePet(view.dead?'revive':'feed');};
+    const interact=()=>{const view=selectedAttendancePetView();actOnAttendancePet(view.dead?'revive':'feed');};
     document.getElementById('attendancePetFeed').addEventListener('click',interact);
     document.getElementById('attendancePetSwimmer').addEventListener('click',interact);
     document.getElementById('attendancePetRetry').addEventListener('click',startAttendancePet);
@@ -10139,8 +10383,6 @@ async function handleJobNotificationAction(d) {
 // ---------------- Kiểm tra & hiển thị nhắc nhở ----------------
 const notificationClaims = new Set();
 const notificationToastClaims = new Set();
-let desktopReminderProbe = null;
-let desktopReminderProbeTimer = null;
 const desktopReminderEvents = [];
 let lastDesktopReminderCheckAt = null;
 
@@ -10172,19 +10414,6 @@ function dispatchJobReminder(job, ctx, message) {
     });
 }
 
-async function startScheduledDesktopTest() {
-    const status = document.getElementById('desktopNotificationStatus');
-    if (!('Notification' in window)) { status.textContent = desktopNotificationPermissionText(); return; }
-    try {
-        const permission = Notification.permission === 'default' ? await Notification.requestPermission() : Notification.permission;
-        if (permission !== 'granted') { status.textContent = desktopNotificationPermissionText(); return; }
-        clearTimeout(desktopReminderProbeTimer);
-        const id = `desktop-test-${Date.now()}`;
-        desktopReminderProbe = { uid: currentUser?.uid, dueAt: Date.now() + 10000, job: { id, title: 'Workpic · Kiểm tra nhắc giờ khi ở ứng dụng khác', type: 'once', time: new Date(Date.now()+10000).toTimeString().slice(0,5) } };
-        status.textContent = 'Đã hẹn nhắc thử sau 10 giây. Bạn chuyển sang Excel ngay; kết quả gửi sẽ được ghi bên dưới.';
-        desktopReminderProbeTimer = setTimeout(checkNotifications, 10000);
-    } catch (error) { status.textContent = 'Không hẹn được nhắc thử: ' + error.message; }
-}
 function notifyOnce(key, send) {
     const claim = () => {
         let alreadySent = false;
@@ -10228,10 +10457,7 @@ function checkNotifications() {
     const now = new Date();
     lastDesktopReminderCheckAt = now;
     renderDesktopReminderDiagnostics();
-    if (desktopReminderProbe && now.getTime() >= desktopReminderProbe.dueAt) {
-        const probe = desktopReminderProbe; desktopReminderProbe = null;
-        if (probe.uid === currentUser.uid) dispatchJobReminder(probe.job, { kind: 'test', originDate: localDateKey(now), notificationKey: probe.job.id }, 'Nhắc thử khi làm việc ở ứng dụng khác.');
-    }
+
     const lead = notifyLeadMinutes;
 
     jobs.forEach(job => {

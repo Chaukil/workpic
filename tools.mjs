@@ -50,8 +50,8 @@ console.log(`Deploy dist/: index.html (${((await stat('dist/index.html')).size /
 
     "test": async () => {
 const helperSource = fs.readFileSync('app.js', 'utf8').split('// BEGIN SHARED HELPERS\n')[1].split('// END SHARED HELPERS')[0];
-const helperModule = helperSource + '\nexport { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater, attendancePetDay, newAttendancePet, attendancePetView, transitionAttendancePet, adjustAdminPet, attendancePetMotion, attendancePetTravelBounds, attendancePetCatalog, attendancePetScale, ATTENDANCE_PET_BRANCHES, normalizePetNickname };';
-const { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater, attendancePetDay, newAttendancePet, attendancePetView, transitionAttendancePet, adjustAdminPet, attendancePetMotion, attendancePetTravelBounds, attendancePetCatalog, attendancePetScale, ATTENDANCE_PET_BRANCHES, normalizePetNickname } = await import('data:text/javascript;base64,' + Buffer.from(helperModule).toString('base64'));
+const helperModule = helperSource + '\nexport { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater, attendancePetDay, newAttendancePet, attendancePetView, transitionAttendancePet, adjustAdminPet, attendancePetMotion, attendancePetTravelBounds, attendancePetCatalog, attendancePetScale, ATTENDANCE_PET_BRANCHES, normalizePetNickname, attendancePetRecords, attendancePetSelected, attendancePetHouseholdDay, transitionPetHousehold, attendancePetWeight, settleAttendancePetWeight, attendancePetActivityTime, buildPetComparison, unchangedPetAdminAction };';
+const { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater, attendancePetDay, newAttendancePet, attendancePetView, transitionAttendancePet, adjustAdminPet, attendancePetMotion, attendancePetTravelBounds, attendancePetCatalog, attendancePetScale, ATTENDANCE_PET_BRANCHES, normalizePetNickname, attendancePetRecords, attendancePetSelected, attendancePetHouseholdDay, transitionPetHousehold, attendancePetWeight, settleAttendancePetWeight, attendancePetActivityTime, buildPetComparison, unchangedPetAdminAction } = await import('data:text/javascript;base64,' + Buffer.from(helperModule).toString('base64'));
 
 
 
@@ -262,7 +262,7 @@ assert.equal(adjusted['2026-09-03'], 'Nghỉ liền kề Quốc khánh');
 assert.equal(holidays['2026-09-01'], 'Nghỉ liền kề Quốc khánh', 'policy cache is isolated');
 
 const source = fs.readFileSync('app.js', 'utf8');
-const extract = (start, end) => source.slice(source.indexOf(start), source.indexOf(end));
+const extract = (start, end) => {const a=source.indexOf(start),b=source.indexOf(end);assert.ok(a>=0&&b>a,'Missing UI source boundary: '+start+' / '+end);return source.slice(a,b);};
 const host = { innerHTML: '' };
 const user = { uid: 'me', personalCalendarEvents: [{ id: 'birthday', date: '2026-08-12', title: 'Birthday', time: '10:00' }] };
 const ctx = vm.createContext({
@@ -700,21 +700,21 @@ test('custom job colors preserve defaults and choose readable text', () => {
     assert.match(jobColorStyle({displayColor:'#000000'}), /--job-custom-text:#ffffff/);
 });
 
-test('desktop test requests undecided permission directly from click and reports blocked permission', async () => {
+test('desktop permission setup requests permission without sending diagnostic notifications', async () => {
     const source=fs.readFileSync('app.js','utf8');
-    const start=source.indexOf('async function testDesktopNotification(');
+    const start=source.indexOf('async function enableDesktopNotifications(');
     let requests=0, delivered=0;
     const status={textContent:''}, button={disabled:false};
     function FakeNotification(){delivered++;this.close=()=>{};}
     FakeNotification.permission='default';
     FakeNotification.requestPermission=()=>{requests++;FakeNotification.permission='granted';return Promise.resolve('granted');};
-    const ctx=vm.createContext({window:{Notification:FakeNotification},Notification:FakeNotification,console,document:{getElementById:id=>id==='desktopNotificationStatus'?status:button},showDesktopNotification:async()=>{delivered++;return true;},todayKey:()=> '2026-11-18',getSwRegistration:async()=>null,checkNotifications(){},setTimeout(){}});
+    const ctx=vm.createContext({window:{Notification:FakeNotification},Notification:FakeNotification,console,document:{getElementById:id=>id==='desktopNotificationStatus'?status:button},showDesktopNotification:async()=>{delivered++;return true;},desktopNotificationPermissionText:()=> 'Permission status',todayKey:()=> '2026-11-18',getSwRegistration:async()=>null,checkNotifications(){},setTimeout(){}});
     vm.runInContext(source.slice(start,source.indexOf('function toggleDailyExcludeWrap(',start)),ctx);
-    const prompt=ctx.testDesktopNotification();
+    const prompt=ctx.enableDesktopNotifications();
     assert.equal(requests,1,'permission prompt occurs synchronously in the button gesture');await prompt;
-    assert.equal(delivered,1);assert.equal(button.disabled,false);
-    FakeNotification.permission='denied';await ctx.testDesktopNotification();
-    assert.equal(delivered,1);assert.equal(requests,1,'blocked permission is not repeatedly prompted');
+    assert.equal(delivered,0,'enabling permission does not send a test notification');
+    FakeNotification.permission='denied';await ctx.enableDesktopNotifications();
+    assert.equal(delivered,0);assert.equal(requests,1,'blocked permission is not repeatedly prompted');
     assert.ok(status.textContent.length>0,'blocked state provides recovery instructions');
 });
 
@@ -731,11 +731,7 @@ test('real due-job pipeline reaches desktop service worker while page is hidden 
  assert.match(delivered[0].options.tag,/-due-1000$/);
  assert.equal(delivered[0].options.requireInteraction,true);
  ctx.checkNotifications();for(let i=0;i<5;i++)await Promise.resolve();assert.equal(delivered.length,1,'same due event is not repeated');
- await ctx.startScheduledDesktopTest();
- assert.ok(timers.some(timer=>timer.delay===10000),'background test schedules a real timer');
- instant=new Date(2026,10,18,10,0,11);ctx.checkNotifications();for(let i=0;i<10;i++)await Promise.resolve();
- assert.equal(delivered.length,2,'delayed test follows the same scheduler while tab stays hidden');
- assert.equal(delivered[1].options.data.kind,'test');
+
 });
 
 test('job desktop reminders persist, report actual API failures and retry instead of silently consuming them', async () => {
@@ -824,7 +820,7 @@ test('pet startup reuses login profile, creates only missing pets and never writ
  const code=source.slice(source.indexOf('async function startAttendancePet()'),source.indexOf('function stopAttendancePet()'));
  const now=Date.now(),elements=new Map();let state={uid:'me',attendancePet:newAttendancePet(now)},transactions=0,writes=0,tick;
  const context={currentUser:{uid:'me'},attendancePetStarting:false,attendancePetGeneration:0,attendancePetReady:false,
-  authenticatedProfileSnapshot:{ref:{id:'me'},data:()=>state},db:{},Date,transitionAttendancePet,
+  authenticatedProfileSnapshot:{ref:{id:'me'},data:()=>state},db:{},Date,transitionAttendancePet,transitionPetHousehold,
   document:{getElementById:id=>{if(!elements.has(id))elements.set(id,{});return elements.get(id);}},
   stopAttendancePet:()=>{context.attendancePetGeneration++;},assertPetQuotaAvailable:()=>{},loadAttendancePetVisibility:()=>true,
   getDocs:()=>assert.fail('Existing login profile must not be queried again'),
@@ -908,6 +904,23 @@ test('pet motion respects species, floor, sky and small viewport bounds', () => 
  for(const kind of ['fish','bird','dino']){const b=attendancePetTravelBounds(view(kind,'trex'),180,160);assert.ok(b.minY<=b.maxY);assert.ok(b.maxX>=b.minX);}
 });
 
+test('admin actions affect only their own fields and unchanged choices do not produce a write', () => {
+ const now=Date.UTC(2026,10,20),pet={...newAttendancePet(now-100*3600000),branch:'fish',checkins:100,lastCheckinAt:now-73*3600000,lastCheckinDay:'2026-11-16',feeds:5,weightGrams:1000};
+ const leveled=adjustAdminPet(pet,'level',14,now);
+ assert.equal(attendancePetView(leveled,now).level,14);assert.equal(attendancePetView(leveled,now).dead,true,'level selection cannot revive');
+ for(const field of ['branch','lastCheckinAt','lastCheckinDay','feeds','lastFedAt'])assert.equal(leveled[field],pet[field],field+' stays unchanged');
+ const branched=adjustAdminPet(pet,'branch:bird',0,now);
+ assert.equal(branched.branch,'bird');assert.equal(branched.checkins,pet.checkins);assert.equal(branched.lastCheckinAt,pet.lastCheckinAt);assert.equal(branched.hatchAt,pet.hatchAt);
+ const egg=newAttendancePet(now),eggBranch=adjustAdminPet(egg,'branch:dino',0,now);
+ assert.equal(eggBranch.hatchAt,egg.hatchAt);assert.equal(eggBranch.checkins,0);assert.equal(eggBranch.lastCheckinAt,null);
+ assert.equal(adjustAdminPet(pet,'level',11,now),pet,'same level is a no-op');
+ assert.equal(adjustAdminPet(pet,'branch:fish',0,now),pet,'same branch is a no-op');
+ assert.equal(adjustAdminPet(egg,'egg',0,now),egg,'egg reset does not restart an existing incubation');
+ const alive={...pet,lastCheckinAt:now};assert.equal(adjustAdminPet(alive,'revive',0,now),alive);
+ const root={...alive,companions:[],attendanceDay:attendancePetDay(now),attendanceAt:now};
+ assert.equal(transitionPetHousehold(root,'level',now,null,11).changed,false,'unchanged transaction does not request a write');
+});
+
 test('admin pet adjustments preserve revival progress and apply requested evolution', () => {
  const now=Date.UTC(2026,10,19), original={...newAttendancePet(now-100*3600000),checkins:35};
  assert.equal(attendancePetView(original,now).dead,true);
@@ -920,11 +933,112 @@ test('admin pet adjustments preserve revival progress and apply requested evolut
  const egg=adjustAdminPet(original,'egg',0,now);
  assert.equal(egg.checkins,0);assert.equal(egg.hatchAt,now+3600000);
  assert.equal(attendancePetView(adjustAdminPet(egg,'hatch',0,now),now).egg,false);
- assert.equal(adjustAdminPet(original,'feed',0,now).fedOn,attendancePetDay(now));
+ assert.equal(adjustAdminPet(original,'feed',0,now).fedOn,null,'feeding cannot revive an absent pet');
  assert.throws(()=>adjustAdminPet(original,'level',-1,now));
 });
 
-test('attendance pet checks in and feeds once per Bangkok day, evolves and revives after offline absence', () => {
+test('pet weight uses grams, feed-only gains and cumulative offline attendance penalties without restoration', () => {
+ const born=Date.UTC(2026,10,20),day=86400000;
+ const base={...newAttendancePet(born),weightGrams:5000,lastCheckinAt:born,lastCheckinDay:attendancePetDay(born)};
+ assert.equal(attendancePetView(base,born+day-1).weightGrams,5000);
+ assert.equal(attendancePetView(base,born+day).weightGrams,4500);
+ assert.equal(attendancePetView(base,born+2*day).weightGrams,3000,'day two is 2 kg total, not another 2 kg');
+ const original=JSON.stringify(base);for(let i=0;i<10;i++)attendancePetView(base,born+2*day);assert.equal(JSON.stringify(base),original,'reading weight never mutates or writes');
+ let pet=transitionAttendancePet(base,'feed',born+day).pet;
+ assert.equal(pet.weightGrams,4700);assert.equal(pet.weightPenaltyGrams,500);assert.equal(pet.lastCheckinAt,born);
+ assert.equal(transitionAttendancePet(pet,'feed',born+day+1).changed,false);
+ pet=transitionAttendancePet(pet,'rename:Heavy fish',born+day+1).pet;
+ assert.equal(attendancePetView(pet,born+day+2).weightGrams,4700,'rename cannot apply a penalty twice');
+ assert.equal(attendancePetView(pet,born+2*day).weightGrams,3200);
+ pet=transitionAttendancePet(pet,'feed',born+2*day).pet;assert.equal(pet.weightGrams,3400);
+ const checked=transitionAttendancePet(pet,'checkin',born+2*day+1).pet;
+ assert.equal(checked.weightGrams,3400,'attendance never adds or restores weight');assert.equal(checked.weightPenaltyGrams,0);
+ assert.equal(attendancePetView(checked,born+2*day+2).weightGrams,3400);
+ assert.equal(attendancePetView(pet,born+3*day).dead,true,'food does not prevent death');
+ const low={...base,weightGrams:100};assert.equal(attendancePetView(low,born+day).weightGrams,0);
+ assert.equal(transitionAttendancePet(low,'feed',born+day).pet.weightGrams,200,'loss at zero does not erase a later food gain');
+ const legacy={...base,feeds:7};delete legacy.weightGrams;delete legacy.weightPenaltyGrams;
+ assert.equal(attendancePetView(legacy,born+day).weightGrams,900,'legacy food is worth 200 grams per feed');
+ assert.equal(transitionAttendancePet(legacy,'checkin',born+day).pet.weightGrams,900);
+ assert.equal(attendancePetView({...base,weightGrams:Infinity,feeds:Infinity},born+day).weightGrams,0);
+ const root={...base,companions:[{...base,id:'other',weightGrams:7000}]};
+ const household=transitionPetHousehold(root,'checkin',born+day).pet;
+ assert.deepEqual(attendancePetRecords(household).map(p=>p.weightGrams),[4500,6500]);
+});
+
+test('pet comparison includes only actual feeding/attendance in seven days and ranks living pets by projected weight', () => {
+ const now=Date.UTC(2026,10,20),day=86400000;
+ const pet=(weight,activity,extra={})=>({...newAttendancePet(now-10*day),weightGrams:weight,lastCheckinAt:activity,lastCheckinDay:attendancePetDay(activity),...extra});
+ const profiles=[
+  {id:'a',uid:'a',displayName:'A',attendancePet:pet(3000,now-3600000)},
+  {id:'b',uid:'b',displayName:'B',attendancePet:pet(5000,now-day,{branch:'bird',checkins:90})},
+  {id:'z',uid:'a',displayName:'Duplicate',attendancePet:pet(99000,now-1)},
+  {id:'c',uid:'c',displayName:'Expired',attendancePet:pet(9000,now-7*day)},
+  {id:'d',uid:'d',displayName:'Dead but recently attended',attendancePet:pet(90000,now-6*day)},
+  {id:'e',uid:'e',displayName:'Fed recently',attendancePet:pet(2000,now-8*day,{bornAt:now-day,lastCheckinAt:null,lastCheckinDay:null,lastFedAt:now-3600000})},
+  {id:'f',uid:'f',displayName:'Rename is not activity',attendancePet:pet(2000,now-8*day,{updatedAt:now})}
+ ];
+ const rows=buildPetComparison(profiles,now);
+ assert.equal(rows.length,4);assert.deepEqual(rows.map(row=>row.uid),['b','a','e','d']);
+ assert.equal(rows[0].weightGrams,4500);assert.equal(rows[0].rank,1);assert.equal(rows.at(-1).rank,null);
+ assert.equal(buildPetComparison(profiles,now,'bird').length,1);
+ assert.equal(buildPetComparison(profiles,now,'dino').length,0);
+ const adminOnly=transitionPetHousehold(pet(1000,now-8*day),'level',now,null,8).pet;
+ assert.equal(buildPetComparison([{id:'admin-only',uid:'admin-only',attendancePet:adminOnly}],now).length,0,'admin level edits do not count as real attendance');
+
+ assert.equal(attendancePetActivityTime(profiles[5].attendancePet,now),now-3600000);
+ assert.equal(buildPetComparison([{...profiles[0],attendancePet:pet(1000,now-7*day+1)}],now).length,1,'strict seven-day boundary');
+});
+
+test('feeding grants XP every two hours but never postpones the attendance death deadline', () => {
+ const born=Date.UTC(2026,10,20),now=born+3600000;
+ let pet={...newAttendancePet(born),checkins:8,lastCheckinAt:born,lastCheckinDay:attendancePetDay(born)};
+ const diesAt=attendancePetView(pet,now).diesAt;
+ let change=transitionAttendancePet(pet,'feed',now);pet=change.pet;
+ assert.equal(pet.feedingXp,1);assert.equal(pet.checkins,8);assert.equal(pet.lastCheckinAt,born);
+ assert.equal(transitionAttendancePet(pet,'feed',now+7199999).changed,false);
+ change=transitionAttendancePet(pet,'feed',now+7200000);pet=change.pet;
+ assert.equal(pet.feedingXp,2);assert.equal(attendancePetView(pet,now+7200000).level,2);
+ assert.equal(attendancePetView(pet,now+7200000).diesAt,diesAt);
+ pet=transitionAttendancePet(pet,'feed',diesAt-1).pet;
+ assert.equal(attendancePetView(pet,diesAt).dead,true,'even eating a millisecond before the deadline cannot prevent death');
+ assert.equal(transitionAttendancePet(pet,'feed',diesAt).result,'dead');
+ const midnight=Date.parse('2026-11-21T00:15:00+07:00');
+ const lateFed={...newAttendancePet(midnight-5*3600000),lastFedAt:midnight-1800000,fedOn:'2026-11-20'};
+ assert.equal(transitionAttendancePet(lateFed,'feed',midnight).changed,false,'crossing midnight does not reset feeding cooldown');
+});
+
+test('household maximum level grants exactly one new egg and attendance cares for all living pets once a day', () => {
+ const now=Date.UTC(2026,10,20,6),lastDay=now-86400000;
+ let root={...newAttendancePet(now-7200000),checkins:278,feedingXp:1,branch:'fish',nickname:'Ocean',lastCheckinAt:lastDay,lastCheckinDay:attendancePetDay(lastDay)};
+ let change=transitionPetHousehold(root,'feed',now);root=change.pet;
+ assert.equal(change.spawned,1);assert.equal(attendancePetRecords(root,now).length,2);assert.equal(attendancePetView(root,now).egg,true);
+ let veteran=attendancePetRecords(root,now)[1];assert.equal(attendancePetView(veteran,now).maxed,true);assert.equal(veteran.nickname,'Ocean');
+ assert.equal(veteran.eggGrantedAt,now);assert.equal(veteran.lastCheckinAt,lastDay);
+ const originalVeteran=veteran.id,newborn=attendancePetRecords(root,now)[0].id;
+ change=transitionPetHousehold(root,'init',now+1000);assert.equal(change.changed,false);assert.equal(change.spawned,0);
+ change=transitionPetHousehold(root,'feed',now+7200000,originalVeteran);root=change.pet;
+ assert.equal(change.spawned,0);assert.equal(attendancePetRecords(root).length,2);
+ change=transitionPetHousehold(root,'checkin',now+7200000,newborn);root=change.pet;
+ assert.equal(change.result,'checked');for(const p of attendancePetRecords(root))assert.equal(p.lastCheckinAt,now+7200000);
+ assert.equal(attendancePetSelected(root,newborn).checkins,1);assert.equal(attendancePetSelected(root,originalVeteran).checkins,279);
+ assert.equal(transitionPetHousehold(root,'checkin',now+7200001,originalVeteran).changed,false);
+ const before=attendancePetSelected(root,originalVeteran).feedingXp;
+ root=transitionPetHousehold(root,'feed',now+14400000,newborn).pet;
+ assert.equal(attendancePetSelected(root,originalVeteran).feedingXp,before,'food affects only the selected pet');
+ assert.equal(transitionPetHousehold(root,'feed',now+14400001,'missing-id').result,'missing-pet');
+ const capped={...newAttendancePet(now-7200000),branch:'bird',checkins:280,lastCheckinAt:now};
+ const migrated=transitionPetHousehold(capped,'init',now);
+ assert.equal(migrated.spawned,1);assert.equal(transitionPetHousehold(migrated.pet,'init',now).spawned,0,'legacy max pets receive one egg across reloads');
+ const admin=transitionPetHousehold({...capped,checkins:0},'level',now,null,29);
+ assert.equal(admin.spawned,1,'admin level-up follows the same one-egg rule');
+ const expired={...root,companions:root.companions.map(p=>({...p,lastCheckinAt:now-73*3600000,bornAt:now-100*3600000}))};
+ const survivorId=attendancePetRecords(expired)[0].id;
+ const day2=now+86400000,updated=transitionPetHousehold(expired,'checkin',day2,survivorId).pet;
+ assert.equal(attendancePetView(attendancePetRecords(updated)[1],day2).dead,true,'daily attendance cannot revive already dead companions');
+});
+
+test('attendance pet checks in daily and feeds on a two-hour cooldown while aging offline', () => {
  const born=Date.parse('2026-11-01T09:00:00+07:00');
  let pet=newAttendancePet(born);
  assert.equal(attendancePetView(pet,born).egg,true);
@@ -943,9 +1057,9 @@ test('attendance pet checks in and feeds once per Bangkok day, evolves and reviv
  assert.equal(pet.checkins,0);assert.equal(attendancePetView(pet,death).level,0);assert.equal(pet.hatchAt,death+3600000);
  assert.equal(transitionAttendancePet(pet,'revive',death+1).changed,false,'another tab cannot restart the hatch timer');
  assert.equal(attendancePetView(pet,death+3600000).level,1,'resurrected egg hatches to first fish while offline');
- const fedBeforeDeath={...newAttendancePet(born-100*3600000),lastCheckinAt:born-73*3600000,fedOn:attendancePetDay(born)};
+ const fedBeforeDeath={...newAttendancePet(born-100*3600000),lastCheckinAt:born-73*3600000,fedOn:attendancePetDay(born),lastFedAt:born};
  const revivedSameDay=transitionAttendancePet(fedBeforeDeath,'revive',born).pet;
- assert.equal(transitionAttendancePet(revivedSameDay,'feed',born+3600000).result,'already-fed','resurrection does not bypass the daily feeding limit');
+ assert.equal(transitionAttendancePet(revivedSameDay,'feed',born+3600000).result,'already-fed','resurrection retains the two-hour feeding cooldown');
  assert.equal(attendancePetDay(Date.parse('2026-11-01T16:59:59Z')),'2026-11-01');
  assert.equal(attendancePetDay(Date.parse('2026-11-01T17:00:00Z')),'2026-11-02','daily actions reset at Bangkok midnight');
 });
@@ -1364,26 +1478,26 @@ test('weekly, biweekly and monthly recurrence stays anchored across cached range
 if (!process.env.ADMIN_UI_PREVIEW) await (async function () {
 const chrome = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(p => fs.existsSync(p));
 if (!chrome) { console.log('Browser UI smoke skipped: Chrome/Edge unavailable.'); process.exit(0); }
-const source = fs.readFileSync('app.js', 'utf8');
+const source = fs.readFileSync('app.js', 'utf8').replace(/\r\n/g,'\n');
 const extract = (start, end) => source.slice(source.indexOf(start), source.indexOf(end));
-const markup = fs.readFileSync('index.html', 'utf8').replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '').replace(/<link\b[^>]*>/gi, '');
+const markup = fs.readFileSync('index.html', 'utf8').replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '').replace(/<link\b(?:[^>"']|"[^"]*"|'[^']*')*>/gi, '');
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'workpic-ui-'));
 const script = `
 ${source.split('// BEGIN SHARED HELPERS\n')[1].split('// END SHARED HELPERS')[0]}
 
-const check = (value, message) => { if (!value) throw new Error(message); };
-const currentUser = { uid: 'me', personalCalendarEvents: [{id:'event',date:'2026-11-05',title:'Weekly appointment',repeat:'weekly',until:'2026-12-01'}], changeHistory: [{kind:'event',action:'Added',title:'Meeting',actor:'Me',detail:'Weekly',at:'2026-11-05T10:00:00Z'}] };
+const check = (value, message) => { document.body.dataset.uiStep=message; if (!value) throw new Error(message); };
+let currentUser = { uid: 'me', personalCalendarEvents: [{id:'event',date:'2026-11-05',title:'Weekly appointment',repeat:'weekly',until:'2026-12-01'}], changeHistory: [{kind:'event',action:'Added',title:'Meeting',actor:'Me',detail:'Weekly',at:'2026-11-05T10:00:00Z'}] };
 const accessControl = { can: () => true, requireAccess: () => true };
 const db = {}; let dayOffViewYear=2026, dayOffViewMonth=10, currentViewingJobId='job';
 let jobDayOverridesList = [], stored = {overrideDate:'2026-11-04',note:'Keep this',checklistDone:{}};
 let historyCalls = 0, denyWrite = false;
 const doc = (_, collection, id) => ({ collection, id });
 // Reproduce owner-based rules rejecting the read of a missing override.
-let petRecord={uid:'me',attendancePet:{...newAttendancePet(Date.now()-7200000)}},petWrites=0,petReject=false,petFeedAnimations=0;
-const runTransaction = async (_, callback) => callback({
+let petRecord={uid:'me',attendancePet:{...newAttendancePet(Date.now()-7200000)}},petWrites=0,petReject=false,petFeedAnimations=0,petTransactions=0,petTransactionGate=null,petTransactionOptions=[];
+const runTransaction = async (_, callback, options) => {petTransactions++;petTransactionOptions.push(options);if(petTransactionGate)await petTransactionGate;return callback({
     get: async ref => { if(ref.collection!=='users'||petReject)throw Object.assign(new Error('Missing or insufficient permissions.'),{code:'permission-denied'});return {exists:()=>true,data:()=>petRecord}; },
     update: (ref,patch) => {check(ref.collection==='users'&&Object.keys(patch).join(',')==='attendancePet','pet updates only own profile pet state');petRecord={...petRecord,...patch};petWrites++;}
-});
+});};
 const setDoc = async (ref, patch, options) => {
     if (denyWrite) throw Object.assign(new Error('Missing or insufficient permissions.'), {code:'permission-denied'});
     check(options.merge, 'checklist must merge');
@@ -1400,6 +1514,10 @@ ${extract('function getHolidayName(', 'function renderDayOffCalendars(')}
 ${extract('function renderChangeHistory(', 'function getDayOffJobPreview(')}
 ${extract('function renderJobChecklist(', "window.addEventListener('beforeunload'")}
 ${extract('let sharedNotesUnsubscribe =', 'function initQuickChatUi(')}
+let usersDirectorySnapshot=null;
+const auth={currentUser:{uid:'me',email:'chauchikil01@gmail.com'}};
+${extract('const canControlPets =', 'let attendancePetData =')}
+const createAttendancePet3D=()=>({start(){},stop(){},update(){},feed(){},thumbnail:async view=>'data:image/svg+xml;charset=utf-8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 144 104"><ellipse cx="72" cy="52" rx="40" ry="25" fill="'+view.form.color+'"/></svg>')});
 const AttendancePet3D={start(){},stop(){},update(){},preview(open){document.getElementById("attendancePetPreview").innerHTML=open?'<svg viewBox="0 0 140 100"><ellipse cx="70" cy="50" rx="30" ry="40"/></svg>':'';},feed(){petFeedAnimations++;}};
 ${extract('let attendancePetData =', 'let sharedNotesUnsubscribe =')}
 let noteSnapshot, noteWrites = [], noteUpdates = [], noteDeletes = [], noteUnsubscribed = 0, rejectNoteWrite = false;
@@ -1412,9 +1530,9 @@ const updateDoc = async (ref,data) => { if (rejectNoteWrite) throw new Error('de
 const deleteDoc = async ref => { if (rejectNoteWrite) throw new Error('denied'); noteDeletes.push(ref); };
 let quickChatPanelOpen = false, quickChatUnreadCount = 0;
 const updateQuickChatBadge = () => {};
-${extract('function openQuickChatPanel(', 'let sharedNotesUnsubscribe =')}
+${extract('function openQuickChatPanel(', 'function createAttendancePet3D(')}
 try {
-    const kept = ['dayOffModal','viewJobModal','changeHistoryModal','sharedNotesPanel','sharedNotesToggle','quickChatToggleBtn','quickChatPanel','sharedNoteImageDialog','attendancePetDialog','attendancePetBranchDialog','attendancePetToggle','attendancePetSwimmer'].map(id=>document.getElementById(id));
+    const kept = ['dayOffModal','viewJobModal','changeHistoryModal','sharedNotesPanel','sharedNotesToggle','quickChatToggleBtn','quickChatPanel','sharedNoteImageDialog','attendancePetDialog','attendancePetBranchDialog','petCompareDialog','petAdminDialog','petAdminOpen','attendancePetToggle','attendancePetSwimmer'].map(id=>document.getElementById(id));
     check(document.getElementById('scheduleActions').closest('#mainContent'),'job actions are inside schedule area');
     check(!document.getElementById('sidebar').contains(document.getElementById('addJobBtn')),'job actions leave sidebar');
     check(document.getElementById('jobColor')&&document.getElementById('settingsHideOutOfSchedule'),'color and hide-outside controls exist');
@@ -1429,8 +1547,10 @@ try {
     document.getElementById('attendancePetToggle').click();
     check(document.getElementById('attendancePetDialog').open,'pet care dialog opens');
     const petDialogRect=document.getElementById('attendancePetDialog').getBoundingClientRect();
-    check(Math.abs(petDialogRect.left+petDialogRect.width/2-innerWidth/2)<2&&Math.abs(petDialogRect.top+petDialogRect.height/2-innerHeight/2)<2,'pet care form is centered horizontally and vertically');
+    check(Math.abs(petDialogRect.left+petDialogRect.width/2-document.documentElement.clientWidth/2)<2&&Math.abs(petDialogRect.top+petDialogRect.height/2-innerHeight/2)<2,'pet care form is centered horizontally and vertically '+JSON.stringify({rect:petDialogRect.toJSON(),width:innerWidth,height:innerHeight,css:Array.from(['width','height','max-height','margin','position','transform','zoom']).map(k=>[k,getComputedStyle(document.getElementById('attendancePetDialog')).getPropertyValue(k)]),body:getComputedStyle(document.body).transform,sheets:Array.from(document.styleSheets).map(s=>s.cssRules.length),rules:(()=>{const out=[];function visit(rules,path){for(const r of rules){if(r.selectorText?.includes('attendance-pet-dialog'))out.push(path+' / '+r.selectorText);if(r.cssRules)visit(r.cssRules,path+' / '+(r.selectorText||r.conditionText||''));}}for(const s of document.styleSheets)visit(s.cssRules,'');return out;})()}));
     check(document.querySelector('#attendancePetPreview svg'),'pet care form displays current pet artwork');
+    check(document.getElementById('attendancePetDialog').scrollWidth<=document.getElementById('attendancePetDialog').clientWidth+1,'game form has no horizontal clipping');
+
     check(!document.getElementById('attendancePetBranchDialog').open&&document.getElementById('attendancePetBranchOpen').hidden,'branch form and button stay hidden below level nine');
     openAttendancePetBranch();check(!document.getElementById('attendancePetBranchDialog').open,'direct branch opening is blocked below level nine');
     const visibleSwitch=document.getElementById('attendancePetVisible'),writesBeforeVisibility=petWrites;
@@ -1442,7 +1562,9 @@ try {
 
     document.getElementById('attendancePetCheckin').click();await new Promise(resolve=>setTimeout(resolve,0));
     check(petRecord.attendancePet.checkins===1&&document.getElementById('attendancePetCheckin').disabled,'check-in is saved and same-day button disabled');
+    check(!document.querySelector('#attendancePetSwimmer .pet-hunger-bubble').hidden,'hungry pet displays a feeding speech bubble');
     document.getElementById('attendancePetFeed').click();await new Promise(resolve=>setTimeout(resolve,0));
+    check(document.querySelector('#attendancePetSwimmer .pet-hunger-bubble').hidden,'feeding hides hunger speech bubble');
     check(petWrites===2&&petFeedAnimations===1&&document.getElementById('attendancePetFeed').disabled,'feeding saves once and animates');
     attendancePetData={...attendancePetData,fedOn:null};await actOnAttendancePet('feed');
     check(petWrites===2&&petFeedAnimations===1,'stale tab rereads server state and cannot feed twice');
@@ -1450,6 +1572,7 @@ try {
     check(document.getElementById('attendancePetCheckin').disabled&&document.getElementById('attendancePetFeed').textContent.includes('Hồi sinh'),'dead pet exposes resurrection instead of feeding');
     document.getElementById('attendancePetFeed').click();await new Promise(resolve=>setTimeout(resolve,0));
     check(petRecord.attendancePet.checkins===0&&attendancePetView(petRecord.attendancePet).egg,'resurrection resets progress and starts new egg timer');
+    check(document.querySelector('#attendancePetSwimmer .pet-hunger-bubble').hidden,'eggs never ask for food');
     check(!document.getElementById('attendancePetEggTimer').hidden&&document.getElementById('attendancePetEggTimer').textContent.includes('Nở sau'),'egg shows countdown directly beneath swimmer');
     check(document.getElementById('attendancePetCountdown').textContent.includes('Dự kiến nở lúc'),'care dialog shows exact hatch date and time');
     petReject=true;await actOnAttendancePet('checkin');petReject=false;
@@ -1476,12 +1599,73 @@ try {
     check(petRecord.attendancePet.nickname==='<b>My pet</b>'&&document.getElementById('attendancePetName').textContent==='<b>My pet</b>'&&!document.querySelector('#attendancePetName b'),'nickname saves and renders as plain text');
     nameForm.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));await new Promise(resolve=>setTimeout(resolve,0));
     check(petWrites===beforeNameWrites+1,'saving same nickname does not write again');
+    petRecord.attendancePet={...newAttendancePet(Date.now()-7200000),branch:'bird',checkins:279,lastCheckinAt:Date.now(),lastCheckinDay:attendancePetDay(Date.now())};attendancePetData=petRecord.attendancePet;selectedAttendancePetId=null;renderAttendancePet();
+    await actOnAttendancePet('feed');
+    check(attendancePetRecords(petRecord.attendancePet).length===2&&document.querySelectorAll('#attendancePetRoster button').length===2,'reaching max creates one egg and keeps veteran in roster');
+    check(selectedAttendancePetView().egg&&document.getElementById('attendancePetCheckin').disabled,'new egg inherits account attendance status');
+    check(document.querySelectorAll('.attendance-pet-swimmer').length===2,'veteran and egg have independent floating renderers');
+    const veteran=attendancePetRecords(petRecord.attendancePet)[1];
+    document.querySelector('#attendancePetRoster [data-pet-id="'+veteran.id+'"]').click();
+    check(selectedAttendancePetView().maxed&&document.getElementById('petGameXp').textContent==='280 XP','roster selects veteran independently');
+    petRecord.attendancePet.companions[0].lastFedAt=Date.now()-7200000;attendancePetData=petRecord.attendancePet;renderAttendancePet();
+    await actOnAttendancePet('feed');
+    check(attendancePetRecords(petRecord.attendancePet).length===2,'feeding a max veteran does not create another reward egg');
+    document.getElementById('attendancePetVisible').checked=false;document.getElementById('attendancePetVisible').dispatchEvent(new Event('change'));
+    check(attendancePetFleet.size===0&&document.getElementById('attendancePetSwimmer').hidden,'hide preference disposes companion renderers');
+    document.getElementById('attendancePetVisible').checked=true;document.getElementById('attendancePetVisible').dispatchEvent(new Event('change'));
+    const currentWeight=selectedAttendancePetView().weightGrams;
+    check(document.getElementById('petGameWeight').textContent===petWeightLabel(currentWeight),'care form displays selected pet weight');
+    const comparisonNow=Date.now();
+    usersDirectorySnapshot={docs:[
+      {id:'active',data:()=>({uid:'active',displayName:'Active trainer',attendancePet:{...newAttendancePet(comparisonNow-7200000),weightGrams:9000,lastCheckinAt:comparisonNow-1000,branch:'fish',checkins:90}})},
+      {id:'inactive',data:()=>({uid:'inactive',displayName:'Inactive trainer',attendancePet:{...newAttendancePet(comparisonNow-10*86400000),weightGrams:90000,lastCheckinAt:comparisonNow-8*86400000}})}
+    ]};
+    const writesBeforeCompare=petWrites;
+    document.getElementById('petCompareOpen').click();
+    check(document.getElementById('petCompareDialog').open,'comparison opens a separate form');
+    await new Promise(resolve=>setTimeout(resolve,60));
+    check([...document.querySelectorAll('#petCompareRows img')].every(img=>!img.hidden&&img.src.startsWith('data:image/')&&img.alt.length>0),'each comparison row shows a cached image with pet identity');
+
+    check(document.getElementById('petCompareRows').textContent.includes('Active trainer')&&!document.getElementById('petCompareRows').textContent.includes('Inactive trainer'),'only recently active users are compared');
+    check(document.querySelector('#petCompareRows .pet-compare-weight').textContent==='9,0 kg','comparison sorts by weight');
+    check(document.querySelector('#petCompareRows .is-me'),'own pets are highlighted');
+    document.getElementById('petCompareBranch').value='fish';document.getElementById('petCompareBranch').dispatchEvent(new Event('change'));
+    check(document.querySelectorAll('#petCompareRows tr').length===1,'comparison filters pet branch');
+    check(petWrites===writesBeforeCompare,'comparison does not write Firebase');
+    document.getElementById('petCompareClose').click();document.getElementById('petCompareDialog').dispatchEvent(new Event('close'));check(!document.getElementById('petComparisonRenderWorker'),'closing comparison releases thumbnail renderer');document.getElementById('petCompareBranch').value='all';
+    petRecord.attendancePet={...newAttendancePet(Date.now()-7200000),branch:'bird',checkins:90,lastCheckinAt:Date.now()-3600000,lastCheckinDay:attendancePetDay(Date.now()),feeds:2};
+    attendancePetData=petRecord.attendancePet;selectedAttendancePetId=null;
+    usersDirectorySnapshot={docs:[{id:'me',ref:{collection:'users',id:'me'},data:()=>petRecord}]};
+    initPetAdminPanel();initPetAdminPanel();document.getElementById('petAdminOpen').click();await new Promise(resolve=>setTimeout(resolve,0));
+    const adminPanel=document.getElementById('petAdminPanel'),levelButton=adminPanel.querySelector('[data-pet-admin="level"]'),branchButton=document.getElementById('petAdminApplyBranch');
+    document.getElementById('petAdminLevel').value='12';document.getElementById('petAdminBranch').value='dino';
+    const adminBefore=JSON.parse(JSON.stringify(petRecord.attendancePet)),adminTx=petTransactions,adminWrites=petWrites;
+    let releaseAdmin;petTransactionGate=new Promise(resolve=>releaseAdmin=resolve);
+    levelButton.click();
+    check(petAdminBusy&&levelButton.disabled&&levelButton.classList.contains('pet-admin-pending'),'only clicked admin button shows processing');
+    check([...adminPanel.querySelectorAll('button')].filter(button=>button!==levelButton).every(button=>!button.disabled&&!button.classList.contains('pet-admin-pending')),'other admin buttons never toggle disabled styling');
+    branchButton.click();adminPanel.querySelector('[data-pet-admin="feed"]').click();levelButton.click();
+    check(petTransactions===adminTx+1,'rapid clicks and repeated initialization start exactly one transaction');
+    releaseAdmin();petTransactionGate=null;await new Promise(resolve=>setTimeout(resolve,0));
+    check(petWrites===adminWrites+1&&petTransactions===adminTx+1,'level click commits exactly one update');
+    check(attendancePetView(petRecord.attendancePet).level===12&&petRecord.attendancePet.branch==='bird'&&petRecord.attendancePet.feeds===adminBefore.feeds&&petRecord.attendancePet.lastCheckinAt===adminBefore.lastCheckinAt,'applying level does not apply branch, food, resurrection or attendance');
+    check(document.getElementById('petAdminBranch').value==='dino','unrelated pending branch selection is preserved');
+    check(petTransactionOptions.at(-1).maxAttempts===1,'admin transaction does not automatically retry');
+    check(!petAdminBusy&&!levelButton.disabled&&!levelButton.classList.contains('pet-admin-pending'),'clicked button is restored after completion');
+    levelButton.click();await new Promise(resolve=>setTimeout(resolve,0));check(petTransactions===adminTx+1&&petWrites===adminWrites+1,'same level does not read or write Firebase again');
+    const levelXp=petRecord.attendancePet.checkins;branchButton.click();await new Promise(resolve=>setTimeout(resolve,0));
+    check(petTransactions===adminTx+2&&petWrites===adminWrites+2&&petRecord.attendancePet.branch==='dino'&&petRecord.attendancePet.checkins===levelXp&&petRecord.attendancePet.lastCheckinAt===adminBefore.lastCheckinAt,'branch click performs one branch-only update');
+    branchButton.click();await new Promise(resolve=>setTimeout(resolve,0));check(petTransactions===adminTx+2,'same branch does not trigger another transaction');
+    petReject=true;document.getElementById('petAdminLevel').value='13';levelButton.click();await new Promise(resolve=>setTimeout(resolve,0));petReject=false;
+    check(petWrites===adminWrites+2&&!petAdminBusy&&!levelButton.disabled,'failed admin action writes nothing and releases the lock');
+    document.getElementById('petAdminClose').click();
     const quotaText=petQuotaErrorText({code:'resource-exhausted'});
     check(quotaText.includes('429'),'quota error is identified instead of reported as permission failure');
     let quotaBlocked=false;try{assertPetQuotaAvailable();}catch(error){quotaBlocked=error.code==='resource-exhausted';}
     check(quotaBlocked,'quota cooldown prevents repeated pet requests');
     petQuotaRetryAt=0;sessionStorage.removeItem('workpicPetQuotaRetryAt');
     stopAttendancePet();check(!document.getElementById('attendancePetDialog').open&&document.getElementById('attendancePetSwimmer').hidden,'sign-out clears the companion UI');
+    if(!${process.argv.includes('--pet-layout')}){
     const cleaned = sanitizeSharedNote('<scr'+'ipt>alert(1)</scr'+'ipt><table><tr><td onclick="alert(1)">Cell</td></tr></table><img src="https://example.com/x"><img src="data:image/png;base64,aGVsbG8=" onerror="alert(1)">');
     check(cleaned.includes('<td>Cell</td>'),'notes preserve pasted table cells');
     check(!/script|onclick|onerror|https:/.test(cleaned),'notes remove scripts, handlers and remote images');
@@ -1534,8 +1718,8 @@ try {
     check(imageDialog.classList.contains('zoomed')&&parseInt(fullImage.style.width)>fullImage.naturalWidth,'image can be zoomed to inspect details');
     document.querySelector('[data-note-image-zoom="fit"]').click();
     check(!imageDialog.classList.contains('zoomed'),'fit resets image to viewport');
-    document.getElementById('sharedNoteImageClose').click();await new Promise(resolve=>setTimeout(resolve,0));
-    check(!imageDialog.open&&sharedNotesOpen&&!fullImage.hasAttribute('src'),'closing viewer keeps notes panel and releases image');
+    document.getElementById('sharedNoteImageClose').click();imageDialog.dispatchEvent(new Event('close')); // Flush native dialog cleanup in the virtual-time harness.
+    check(!imageDialog.open&&sharedNotesOpen&&!fullImage.hasAttribute('src'),'closing viewer keeps notes panel and releases image '+JSON.stringify({open:imageDialog.open,notes:sharedNotesOpen,src:fullImage.hasAttribute('src')}));
     thumbnail.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));
     check(imageDialog.open,'image viewer supports keyboard activation');imageDialog.click();
     check(!imageDialog.open&&sharedNotesOpen,'clicking backdrop closes only image viewer');
@@ -1656,15 +1840,31 @@ try {
     }
     check(document.querySelector('#dayOffReasonPresets [data-reason="SO"]'),'SO reason is available');
     check(document.getElementById('dayOffYear').closest('.dayoff-period-picker')===document.getElementById('dayOffMonth').closest('.dayoff-period-picker'),'year and month share a picker group');
+    }
+    if(${process.argv.includes('--pet-layout')}){
+        document.querySelectorAll('dialog[open]').forEach(dialog=>dialog.close());
+        document.body.className='theme-dark';document.documentElement.dataset.theme='dark';
+        currentUser={uid:'me',displayName:'Trainer'};attendancePetReady=true;attendancePetBusy=false;attendancePetVisible=true;
+        attendancePetData=transitionPetHousehold({...newAttendancePet(Date.now()-7200000),checkins:280,branch:'dino',nickname:'Adventure companion',lastCheckinAt:Date.now()},'init').pet;
+        selectedAttendancePetId=attendancePetRecords(attendancePetData)[1].id;renderAttendancePet();
+        const care=document.getElementById('attendancePetDialog');care.showModal();AttendancePet3D.preview(true);
+        if(${process.argv.includes('--compare-layout')}){document.getElementById('petCompareOpen').click();const comparison=document.getElementById('petCompareDialog');check(comparison.scrollWidth<=comparison.clientWidth+1,'comparison fits viewport without horizontal clipping');}
+        check(care.scrollWidth<=care.clientWidth+1,'care preview has no horizontal overflow');
+        document.body.insertAdjacentHTML('beforeend','<pre id="smoke-result">PASS: pet game layout</pre>');
+    }else{
     document.body.innerHTML='<pre id="smoke-result">PASS: attendance pet (check-in, feeding, stale tabs, resurrection, write errors), shared notes, event editor, recurrence, history and checklist</pre>';
+    }
+
 } catch(error) {document.body.innerHTML='<pre id="smoke-result">FAIL: '+escapeHtml(error.stack)+'</pre>';}
 `;
 try {
-    const html = markup.replace('</body>', `<style>${fs.readFileSync('styles.css','utf8')}\n.d-none{display:none!important}</style><script type="module">${script}</script></body>`);
+    const html = markup.replace('</head>', `<style>${fs.readFileSync('styles.css','utf8')}\n.d-none{display:none!important}</style></head>`).replace('</body>', `<script type="module">${script}</script></body>`);
     const target = path.join(temp, 'smoke.html'); fs.writeFileSync(target, html);
-    const result = spawnSync(chrome, ['--headless', '--disable-gpu', '--no-first-run', '--disable-extensions', '--allow-file-access-from-files', `--user-data-dir=${path.join(temp, 'profile')}`, '--dump-dom', '--virtual-time-budget=2000', pathToFileURL(target).href], {encoding:'utf8', timeout:30000, windowsHide:true, maxBuffer:8*1024*1024});
-    const output = result.stdout?.match(/<pre id="smoke-result">([\s\S]*?)<\/pre>/)?.[1];
-    assert.ok(output?.startsWith('PASS:'), output || result.error?.message || result.stderr?.slice(-1500) || 'Browser smoke did not finish');
+    const layoutArgs=process.argv.includes('--pet-layout')?['--window-size='+(process.argv.includes('--laptop')?'1366,768':'800,600'),'--screenshot='+path.resolve('.artifacts/'+(process.argv.includes('--compare-layout')?'pet-comparison-':'pet-care-')+(process.argv.includes('--laptop')?'laptop':'compact')+'.png')]:[];
+    if(layoutArgs.length)fs.mkdirSync('.artifacts',{recursive:true});
+    const result = spawnSync(chrome, ['--window-size=1366,768',...layoutArgs,'--run-all-compositor-stages-before-draw','--disable-background-timer-throttling','--headless', '--disable-gpu', '--no-first-run', '--disable-extensions', '--allow-file-access-from-files', `--user-data-dir=${path.join(temp, 'profile')}`, '--dump-dom', '--virtual-time-budget=12000', pathToFileURL(target).href], {encoding:'utf8', timeout:60000, windowsHide:true, maxBuffer:8*1024*1024});
+    const output = result.stdout?.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'').match(/<pre id="smoke-result">([\s\S]*?)<\/pre>/)?.[1];
+    assert.ok(output?.startsWith('PASS:'), output || result.error?.message || 'Last UI step: '+result.stdout?.match(/data-ui-step="([^"]*)"/)?.[1]+' '+result.stderr?.slice(-500));
     console.log(output);
 } finally {
     const resolved = path.resolve(temp);
@@ -1681,8 +1881,8 @@ if(process.argv.includes('--pet')) await (async()=>{
   const response=await fetch('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js',{signal:AbortSignal.timeout(15000)});assert.ok(response.ok);fs.writeFileSync(path.join(temp,'three.module.js'),await response.text());
   const source=fs.readFileSync('app.js','utf8');
   const shared=source.split('// BEGIN SHARED HELPERS\n')[1].split('// END SHARED HELPERS')[0];
-  let code=source.slice(source.indexOf('const AttendancePet3D ='),source.indexOf('let attendancePetData ='));
-  code=code.replace("import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js')",'Promise.resolve(THREE)').replace('return {start,stop,update,preview,feed:','return {inspect:()=>state,start,stop,update,preview,feed:');
+  let code=source.slice(source.indexOf('function createAttendancePet3D('),source.indexOf('let attendancePetData ='));
+  code=code.replace("import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js')",'Promise.resolve(THREE)').replace('return {start,stop,update,preview,thumbnail,feed:','return {inspect:()=>state,start,stop,update,preview,thumbnail,feed:');
   const script=`import * as THREE from './three.module.js';
 ${shared}
 const renderAttendancePet=()=>{};
@@ -1702,9 +1902,11 @@ try {
   cards.push('<article><img src="'+s.renderer.domElement.toDataURL()+'"><strong>'+label+'</strong></article>');
  };
  capture(attendancePetView(newAttendancePet(now),now),'Trứng');
+ if(!${process.argv.includes('--pet-fleet-only')}){
  for(let index=0;index<ATTENDANCE_PET_FORMS.length;index++){pet={...pet,checkins:index*10};capture(attendancePetView(pet,now),'Cấp '+(index+1)+' · '+ATTENDANCE_PET_FORMS[index].name);}
  for(const [key,branch] of Object.entries(ATTENDANCE_PET_BRANCHES))for(let index=0;index<branch.forms.length;index++){
   pet={...pet,branch:key,checkins:(index+9)*10};capture(attendancePetView(pet,now),branch.name+' '+(index+1)+' - '+branch.forms[index].name);
+ }
  }
  const petDialog=document.createElement('dialog');petDialog.id='attendancePetDialog';petDialog.innerHTML='<div id="attendancePetPreview"></div>';document.body.appendChild(petDialog);petDialog.showModal();
  AttendancePet3D.preview(true);
@@ -1713,14 +1915,28 @@ try {
  s.renderer.render(s.scene,s.camera);
  petDialog.close();AttendancePet3D.preview(false);
  check(s.renderer.domElement.parentElement.id==='attendancePetArt','closing care form restores swimming model');
+ const peerButton=document.createElement('button');peerButton.id='fleet-test-pet';peerButton.className='attendance-pet-swimmer';peerButton.innerHTML='<span id="fleet-test-art"></span>';document.body.appendChild(peerButton);
+ const peerRenderer=createAttendancePet3D('fleet-test-pet','fleet-test-art',null);peerRenderer.start();
+ peerRenderer.update(attendancePetView({...newAttendancePet(now-7200000),branch:'dino',checkins:170,lastCheckinAt:now},now));
+ await new Promise(resolve=>setTimeout(resolve,150));
+ const peer=peerRenderer.inspect();check(peer.renderer&&peer.renderer!==s.renderer,'companions have independent WebGL renderers');
+ peer.renderer.render(peer.scene,peer.camera);
+ const peerGL=peer.renderer.getContext(),peerPixels=new Uint8Array(peer.renderer.domElement.width*peer.renderer.domElement.height*4);peerGL.readPixels(0,0,peer.renderer.domElement.width,peer.renderer.domElement.height,peerGL.RGBA,peerGL.UNSIGNED_BYTE,peerPixels);
+ check(peerPixels.some((value,index)=>index%4===3&&value>0),'companion paints visible pixels');
+ peerButton.hidden=true;
+ const creatureImage=await peerRenderer.thumbnail(attendancePetView({...newAttendancePet(now-7200000),branch:'bird',checkins:90,lastCheckinAt:now},now));
+ const eggImage=await peerRenderer.thumbnail(attendancePetView(newAttendancePet(now),now));
+ check(creatureImage.startsWith('data:image/png')&&eggImage.startsWith('data:image/png')&&creatureImage!==eggImage,'hidden renderer captures distinct real creature and egg images');
+ const decoded=new Image();decoded.src=creatureImage;await decoded.decode();check(decoded.naturalWidth>0&&decoded.naturalHeight>0,'thumbnail is a decodable image');
+ peerRenderer.stop();peerButton.remove();check(s.renderer.domElement.parentElement.id==='attendancePetArt','disposing companion preserves selected pet');
  AttendancePet3D.feed();AttendancePet3D.stop();check(!document.querySelector('#attendancePetArt canvas'),'renderer disposes on stop');
  document.body.innerHTML='<main class="pet-gallery">'+cards.join('')+'</main><pre id="pet-result">PASS: all real 3D pet forms render visible pixels; renderer cleanup works</pre>';
 }catch(error){document.body.innerHTML='<pre id="pet-result">FAIL: '+error.stack+'</pre>';}
 `;
   fs.writeFileSync(path.join(temp,'pet.html'),'<!doctype html><meta charset="utf-8"><style>'+fs.readFileSync('styles.css','utf8')+'body{background:#0c1524!important;color:white;padding:20px;height:auto;overflow:auto}.pet-gallery{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}.pet-gallery article{display:grid;justify-items:center;gap:8px;padding:15px;background:#172337;border:1px solid #29405c;border-radius:14px}.pet-gallery img{width:190px;height:137px;object-fit:contain}.pet-gallery strong{font:13px sans-serif}#pet-result{color:#7dd3fc}</style><body><button id="attendancePetSwimmer" class="attendance-pet-swimmer"><span id="attendancePetArt"></span></button><script type="module">'+script+'</script>');
   fs.mkdirSync('.artifacts',{recursive:true});
-  const result=spawnSync(chrome,['--headless','--no-first-run','--disable-extensions','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--allow-file-access-from-files','--user-data-dir='+path.join(temp,'profile'),'--window-size=1500,3900','--screenshot='+path.resolve('.artifacts/attendance-pet-stages.png'),'--dump-dom','--virtual-time-budget=12000',pathToFileURL(path.join(temp,'pet.html')).href],{encoding:'utf8',timeout:180000,windowsHide:true,maxBuffer:12*1024*1024});
-  const output=result.stdout?.match(/<pre id="pet-result">([\s\S]*?)<\/pre>/)?.[1];assert.ok(output?.startsWith('PASS:'),output||result.error?.message||result.stderr?.slice(-1500)||'No pet result');console.log(output);
+  const result=spawnSync(chrome,['--headless','--no-first-run','--disable-extensions','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--allow-file-access-from-files','--user-data-dir='+path.join(temp,'profile'),'--window-size=1500,3900','--screenshot='+path.resolve(process.argv.includes('--pet-fleet-only')?'.artifacts/attendance-pet-fleet.png':'.artifacts/attendance-pet-stages.png'),'--dump-dom','--virtual-time-budget=12000',pathToFileURL(path.join(temp,'pet.html')).href],{encoding:'utf8',timeout:180000,windowsHide:true,maxBuffer:12*1024*1024});
+  const output=result.stdout?.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'').match(/<pre id="pet-result">([\s\S]*?)<\/pre>/)?.[1];assert.ok(output?.startsWith('PASS:'),output||result.error?.message||result.stderr?.slice(-1500)||'No pet result');console.log(output);
  }finally{const resolved=path.resolve(temp);if(resolved.startsWith(path.resolve(os.tmpdir())+path.sep)&&path.basename(resolved).startsWith('workpic-pet-'))fs.rmSync(resolved,{recursive:true,force:true,maxRetries:5,retryDelay:200});}
 })();
 
@@ -1801,7 +2017,7 @@ try {
     const html = `<!doctype html><body><div id="fxFullscreen"></div><script type="module">${script}</script></body>`;
     const target=path.join(temp,'smoke.html');fs.writeFileSync(target,html);
     const result=spawnSync(chrome,['--headless','--use-angle=swiftshader','--enable-unsafe-swiftshader','--no-first-run','--disable-extensions','--allow-file-access-from-files',`--user-data-dir=${path.join(temp,'profile')}`,'--dump-dom','--virtual-time-budget=4000',pathToFileURL(target).href],{encoding:'utf8',timeout:40000,windowsHide:true,maxBuffer:8*1024*1024});
-    const output=result.stdout?.match(/<pre id="fx-result">([\s\S]*?)<\/pre>/)?.[1];
+    const output=result.stdout?.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'').match(/<pre id="fx-result">([\s\S]*?)<\/pre>/)?.[1];
     assert.ok(output?.startsWith('PASS:'),output||result.error?.message||result.stderr?.slice(-1500)||'GPU smoke did not finish');
     console.log(output);
 } finally {
