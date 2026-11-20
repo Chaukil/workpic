@@ -9520,6 +9520,8 @@ const PetBattleGame=(()=>{
         for(const id of wanted)if(!state.subs.has(id)){
             const uid=state.uid,unsubscribe=onSnapshot(doc(db,'petBattles',id),snapshot=>{
                 if(state.uid!==uid||!snapshot.exists())return;const data={id:snapshot.id,...snapshot.data()};if(!data.participantUids?.includes(uid))return;state.matches.set(id,data);
+                const inviteKey=id+':invite';
+                if(data.status==='invited'&&data.opponentUid===uid&&data.expiresAt>Date.now()&&!state.autoOpened.has(inviteKey)){state.autoOpened.add(inviteKey);open(id);}
                 if(['rps','fighting'].includes(data.status)&&!state.autoOpened.has(id)){state.autoOpened.add(id);open(id);}
                 updateInvites();render();process();
             },fail);state.subs.set(id,unsubscribe);
@@ -9665,7 +9667,7 @@ const PetBattleGame=(()=>{
         for(let i=0;i<2;i++){
             const p=m.players[i];el(`petBattleName${i}`).textContent=p?`${p.petName} · ${p.name}`:'Chờ chọn thú cưng';el(`petBattleStats${i}`).textContent=p?`Cấp ${p.appearance.level} · ATK ${p.stats.attack} / DEF ${p.stats.defense} / HP ${p.stats.health}`:'';
             el(`petBattleHp${i}`).max=full[i]||100;el(`petBattleHp${i}`).value=hp[i]??full[i]??100;el(`petBattleHpText${i}`).textContent=p?`${hp[i]??full[i]} / ${full[i]} HP`:'';
-            const at=petBattleTime(m.startedAt)+2000+(play.count-1)*PET_BATTLE_STEP_MS,attacking=play.last?.attacker===p?.uid,hit=play.last?.defender===p?.uid;
+            const at=petBattleTime(m.startedAt)+2000+(play.count-1)*PET_BATTLE_STEP_MS,attacking=!!p&&!!play.last&&play.last.attacker===p.uid,hit=!!p&&!!play.last&&play.last.defender===p.uid;
             state.models[i]?.duelPose({facing:i?Math.PI:0,attackAt:attacking?at:0,hitAt:hit?at+300:0,defeated:(hp[i]??1)<=0});
             el(`petBattleSide${i}`).classList.toggle('is-attacking',!!attacking&&Date.now()-at<1000);el(`petBattleSide${i}`).classList.toggle('is-hit',!!hit&&Date.now()-at<1000);
             el(`petBattleDamage${i}`).textContent=hit?`−${play.last.damage}`:'';
