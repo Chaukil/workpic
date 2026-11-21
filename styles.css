@@ -15731,6 +15731,14 @@ body.modal-open .attendance-pet-swimmer,body:has(dialog[open]) .attendance-pet-s
 .pet-battle-stat-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin:18px 0 12px; font-size:.82rem; }
 .pet-battle-stat-fields { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
 .pet-battle-stat-fields { grid-template-columns:repeat(4,minmax(0,1fr)); }
+.pet-battle-setup { padding:16px; border:1px solid var(--border); border-radius:14px; background:var(--surface-muted); }
+.pet-battle-setup .pet-battle-fields { grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
+.pet-battle-setup .pet-battle-stat-fields label { display:flex; flex-direction:column; justify-content:space-between; gap:5px; padding:10px; border:1px solid var(--border); border-radius:10px; background:var(--surface); font-size:.72rem; }
+.pet-battle-setup .pet-battle-stat-fields input { margin-top:0; padding:7px 9px; }
+.pet-battle-help { margin:12px 0; font-size:.73rem; color:var(--muted); }.pet-battle-help summary { cursor:pointer; }
+.pet-battle-draft-hint { display:block; color:var(--muted); font-size:.68rem; line-height:1.6; }
+.pet-battle-tabs { position:sticky; top:-22px; z-index:5; padding:8px 0; background:var(--surface); }
+.pet-battle-status:empty { display:none; }
 @media(max-width:700px) { .pet-battle-stat-fields { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 .pet-victory-halo { position:absolute; inset:8%; border:2px solid #ffe194; border-radius:50%; pointer-events:none; box-shadow:0 0 16px #fbbf24aa,inset 0 0 20px #fbbf2455; background:radial-gradient(ellipse,transparent 45%,#fbbf2428 70%,transparent 75%); animation:pet-victory-glow 3s ease-in-out infinite; }
 .pet-victory-halo[hidden] { display:none!important; }

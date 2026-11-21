@@ -2200,11 +2200,24 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
         <p id="petBattleStatus" class="pet-battle-status" role="status" aria-live="polite"></p>
         <section id="petBattleSetup" class="pet-battle-setup">
             <div class="pet-battle-fields"><label>Đối thủ<select id="petBattleOpponent"></select></label><label>Thú cưng ra trận<select id="petBattlePet"></select></label><label>Kg cược mỗi bên<input id="petBattleStake" type="number" min="0.1" step="0.1" value="0.2"></label></div>
+            <div class="pet-battle-fields">
+                <label hidden>Bổ trợ ngũ hành
+                    <select id="petBattleElement" required aria-describedby="petBattleElementHint">
+                        <option value="">Chọn bổ trợ</option>
+                        <option value="metal">Kim</option>
+                        <option value="wood">Mộc</option>
+                        <option value="water">Thủy</option>
+                        <option value="fire">Hỏa</option>
+                        <option value="earth">Thổ</option>
+                    </select>
+                </label>
+            </div>
+            <p id="petBattleElementHint" class="pet-battle-note" hidden>Kim → Thủy → Mộc → Hỏa → Thổ. Bên được tương sinh tăng 1% toàn bộ chỉ số trong trận.</p>
             <p id="petBattleBalance" class="pet-battle-note"></p>
             <div class="pet-battle-stat-head"><strong>Phân bổ chỉ số · <span id="petBattleBudget">100</span> điểm</strong><button type="button" id="petBattleBalanceStats">Chia cân bằng</button></div>
             <div class="pet-battle-stat-fields"><label>⚔ Sát thương vật lý<input type="number" id="petBattleAttack" min="1" step="1" value="13"></label><label>✦ Sát thương phép<input type="number" id="petBattleMagic" min="1" step="1" value="13"></label><label>🛡 Phòng thủ<input type="number" id="petBattleDefense" min="1" step="1" value="13"></label><label>Giảm sát thương phép<input type="number" id="petBattleMagicReduction" min="1" step="1" value="13"></label><label>Giảm sát thương vật lý<input type="number" id="petBattlePhysicalReduction" min="1" step="1" value="12"></label><label>💨 Né đòn<input type="number" id="petBattleDodge" min="1" step="1" value="12"></label><label>🍀 May mắn<input type="number" id="petBattleLuck" min="1" step="1" value="12"></label><label>♥ Máu<input type="number" id="petBattleHealth" min="1" step="1" value="12"></label></div>
-            <p class="pet-battle-note">Phòng thủ giảm cả hai loại sát thương; kháng vật lý và kháng phép giảm riêng từng loại. Né tối đa 40%; may mắn cho tối đa 35% chí mạng ×1,5. Máu = 100 + 8 × điểm máu. Tổng điểm vẫn là 100 + cấp − 1.</p>
-            <p id="petBattleRemaining" class="pet-battle-note"></p><p class="pet-battle-note">Cấp 1 có 100 điểm, mỗi cấp sau thêm 1 điểm. Máu trận = 100 + 8 × chỉ số máu. Sát thương = (10 + 2 × tấn công) × 100 / (100 + giảm sát thương), làm tròn và tối thiểu 1.</p>
+            <details class="pet-battle-help"><summary>Cách tính chỉ số</summary><p class="pet-battle-note">Phòng thủ giảm cả hai loại sát thương; kháng giảm riêng vật lý/phép. Né tối đa 40%; may mắn tối đa 35% chí mạng ×1,5. Máu = 100 + 8 × điểm máu.</p></details>
+            <p id="petBattleRemaining" class="pet-battle-note"></p><small class="pet-battle-draft-hint">Chỉ số tự lưu trên trình duyệt này cho từng thú cưng. Chọn Trận mới để mời đối thủ.</small>
             <div class="pet-battle-actions"><button type="button" id="petBattleCreate">Gửi thách đấu &amp; giữ kg cược</button><button type="button" id="petBattleAccept" hidden>Chấp nhận &amp; giữ kg cược</button><button type="button" id="petBattleReject" hidden>Từ chối</button></div>
         </section>
         <section id="petBattleRoom" class="pet-battle-room" hidden>
@@ -2343,7 +2356,7 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
     <div class="noel-room-decor" aria-hidden="true"><svg class="noel-ribbon-tree" viewBox="0 0 120 184"><use href="#noel-ribbon-tree"/></svg><svg class="noel-golden-deer" viewBox="0 0 150 156"><use href="#noel-golden-deer"/></svg></div>
     <div class="noel-fairy-lights noel-global-lights" aria-hidden="true"><svg viewBox="0 0 280 98" focusable="false"><use href="#noel-wire-strand"/></svg><svg viewBox="0 0 280 98" focusable="false"><use href="#noel-wire-strand"/></svg><svg viewBox="0 0 280 98" focusable="false"><use href="#noel-wire-strand"/></svg><svg viewBox="0 0 280 98" focusable="false"><use href="#noel-wire-strand"/></svg><svg viewBox="0 0 280 98" focusable="false"><use href="#noel-wire-strand"/></svg><svg viewBox="0 0 280 98" focusable="false"><use href="#noel-wire-strand"/></svg><svg viewBox="0 0 280 98" focusable="false"><use href="#noel-wire-strand"/></svg><svg viewBox="0 0 280 98" focusable="false"><use href="#noel-wire-strand"/></svg></div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20261121-battle-stats-5"></script>
+    <script type="module" src="app.js?v=20261121-pet-admin-feed"></script>
 </body>
 
 </html>

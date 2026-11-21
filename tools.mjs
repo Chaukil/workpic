@@ -1769,11 +1769,17 @@ try {
     document.getElementById('petAdminClose').click();
     document.getElementById('petBattleOpen').click();
     check(document.getElementById('petBattleDialog').open,'battle lobby opens from care screen');
+    check(document.getElementById('petBattleOpponent').closest('label').hidden&&document.getElementById('petBattleCreate').hidden,'opponent selector is shown only after choosing new match');
+    document.getElementById('petBattleNew').click();
+    check(!document.getElementById('petBattleOpponent').closest('label').hidden&&!document.getElementById('petBattleCreate').hidden,'new match reveals opponent and send action');
     const battlePet=attendancePetSelected(attendancePetData,document.getElementById('petBattlePet').value),battleView=attendancePetView(battlePet);
     const statsSum=()=>['petBattleAttack','petBattleMagic','petBattleDefense','petBattleMagicReduction','petBattlePhysicalReduction','petBattleDodge','petBattleLuck','petBattleHealth'].reduce((sum,id)=>sum+Number(document.getElementById(id).value),0);
     check(statsSum()===petBattleBudget(battleView.level),'battle allocation uses one bonus point per level');
     document.getElementById('petBattleAttack').value=Number(document.getElementById('petBattleAttack').value)+1;document.getElementById('petBattleAttack').dispatchEvent(new Event('input'));
     check(document.getElementById('petBattleRemaining').classList.contains('invalid'),'invalid stat total is visibly rejected');
+    const savedAttack=document.getElementById('petBattleAttack').value;
+    document.getElementById('petBattleClose').click();document.getElementById('petBattleOpen').click();
+    check(document.getElementById('petBattleAttack').value===savedAttack&&document.getElementById('petBattleRemaining').classList.contains('invalid'),'Chrome draft restores all edited points when room reopens without silently rebalancing');
     document.getElementById('petBattleBalanceStats').click();check(statsSum()===petBattleBudget(battleView.level),'balanced allocation restores exact point total');
     const fightMe=petBattleFighter({uid:'me',displayName:'Trainer',attendancePet:attendancePetData},'me',battlePet.id,Object.fromEntries(Object.entries({attack:'petBattleAttack',magic:'petBattleMagic',defense:'petBattleDefense',magicReduction:'petBattleMagicReduction',physicalReduction:'petBattlePhysicalReduction',dodge:'petBattleDodge',luck:'petBattleLuck',health:'petBattleHealth'}).map(([key,id])=>[key,Number(document.getElementById(id).value)])));
     const opponentRaw={...newAttendancePet(Date.now()-7200000),weightGrams:1000,lastCheckinAt:Date.now()},opponentId=attendancePetRecords(opponentRaw)[0].id;
