@@ -2223,10 +2223,10 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
                 <label><span>Giảm sát thương phép</span><span class="pet-battle-stat-value" aria-hidden="true">13</span><input type="range" id="petBattleMagicReduction" min="1" max="93" step="1" value="13"></label>
                 <label><span>Giảm sát thương vật lý</span><span class="pet-battle-stat-value" aria-hidden="true">12</span><input type="range" id="petBattlePhysicalReduction" min="1" max="93" step="1" value="12"></label>
                 <label><span>Né đòn</span><span class="pet-battle-stat-value" aria-hidden="true">12</span><input type="range" id="petBattleDodge" min="1" max="93" step="1" value="12"></label>
-                <label><span>May mắn</span><span class="pet-battle-stat-value" aria-hidden="true">12</span><input type="range" id="petBattleLuck" min="1" max="93" step="1" value="12"></label>
+                <label><span>Chí mạng</span><span class="pet-battle-stat-value" aria-hidden="true">12</span><input type="range" id="petBattleLuck" min="1" max="93" step="1" value="12"></label>
                 <label><span>Máu</span><span class="pet-battle-stat-value" aria-hidden="true">12</span><input type="range" id="petBattleHealth" min="1" max="93" step="1" value="12"></label>
             </div>
-            <details class="pet-battle-help"><summary>Cách tính chỉ số</summary><p class="pet-battle-note">Phòng thủ giảm cả hai loại sát thương; kháng giảm riêng vật lý/phép. Né tối đa 40%; may mắn tối đa 35% chí mạng ×1,5. Máu = 100 + 8 × điểm máu.</p></details>
+            <details class="pet-battle-help"><summary>Cách tính chỉ số</summary><p class="pet-battle-note">Phòng thủ giảm cả hai loại sát thương. Kháng giảm riêng vật lý hoặc phép. Né đòn tối đa 40%. Tỉ lệ chí mạng tối đa 35%, nhân sát thương ×1,5. Máu = 100 + 8 × điểm máu.</p></details>
             <p id="petBattleRemaining" class="pet-battle-note"></p><small class="pet-battle-draft-hint">Chỉ số tự lưu trên trình duyệt này cho từng thú cưng. Chọn Trận mới để mời đối thủ.</small>
             <div class="pet-battle-actions"><button type="button" id="petBattleCreate">Gửi thách đấu &amp; giữ kg cược</button><button type="button" id="petBattleAccept" hidden>Chấp nhận &amp; giữ kg cược</button><button type="button" id="petBattleReject" hidden>Từ chối</button></div>
         </section>
@@ -2244,7 +2244,7 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
         <header><div><small>ĐẤU TRƯỜNG THÚ CƯNG</small><h5 id="petCompareTitle">So sánh cân nặng</h5></div><button type="button" id="petCompareClose" aria-label="Đóng">✕</button></header>
         <p class="pet-compare-description">Chỉ hiện user có điểm danh hoặc cho ăn trong 7 ngày gần nhất. Đủ 7 ngày không hoạt động sẽ tự ẩn. Thú đã chết hiện cuối, không xếp hạng.</p>
         <div class="pet-compare-toolbar"><p id="petCompareSummary" role="status"></p><label for="petCompareBranch">Nhánh <select id="petCompareBranch"><option value="all">Tất cả</option><option value="base">Chưa chọn nhánh</option></select></label></div>
-        <div class="pet-compare-scroll"><table class="pet-compare-table"><thead><tr><th>Hạng</th><th>Thành viên</th><th>Thú cưng</th><th>Cấp / Nhánh</th><th>Cân nặng</th><th>Hoạt động gần nhất</th><th>Trạng thái</th></tr></thead><tbody id="petCompareRows"></tbody></table></div>
+        <div class="pet-compare-scroll"><table class="pet-compare-table"><thead><tr><th>Hạng</th><th>Thành viên</th><th>Thú cưng</th><th>Cấp / Nhánh / EXP</th><th>Cân nặng</th><th>Hoạt động gần nhất</th><th>Trạng thái</th></tr></thead><tbody id="petCompareRows"></tbody></table></div>
         <p id="petCompareEmpty" class="pet-compare-empty" hidden>Chưa có thú cưng hoạt động trong khoảng thời gian này.</p>
     </dialog>
     <dialog id="attendancePetBranchDialog" class="pet-branch-dialog" aria-labelledby="attendancePetBranchTitle"><header><div><small>MỞ KHÓA TỪ CẤP 9</small><h5 id="attendancePetBranchTitle">Chọn nhánh tiến hóa</h5></div><button type="button" id="attendancePetBranchClose" aria-label="Đóng">✕</button></header><section id="attendancePetBranchPanel" class="pet-branch-panel" hidden><p id="attendancePetBranchHint"></p><div class="pet-branch-options" id="attendancePetBranchOptions"></div><p id="attendancePetBranchStatus" class="attendance-pet-status" role="status"></p></section></dialog>
@@ -2367,7 +2367,7 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
     <div class="noel-room-decor" aria-hidden="true"><svg class="noel-ribbon-tree" viewBox="0 0 120 184"><use href="#noel-ribbon-tree"/></svg><svg class="noel-golden-deer" viewBox="0 0 150 156"><use href="#noel-golden-deer"/></svg></div>
     <div class="noel-fairy-lights noel-global-lights" aria-hidden="true"><svg viewBox="0 0 280 98" focusable="false"><use href="#noel-wire-strand"/></svg><svg viewBox="0 0 280 98" focusable="false"><use href="#noel-wire-strand"/></svg><svg viewBox="0 0 280 98" focusable="false"><use href="#noel-wire-strand"/></svg><svg viewBox="0 0 280 98" focusable="false"><use href="#noel-wire-strand"/></svg><svg viewBox="0 0 280 98" focusable="false"><use href="#noel-wire-strand"/></svg><svg viewBox="0 0 280 98" focusable="false"><use href="#noel-wire-strand"/></svg><svg viewBox="0 0 280 98" focusable="false"><use href="#noel-wire-strand"/></svg><svg viewBox="0 0 280 98" focusable="false"><use href="#noel-wire-strand"/></svg></div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20261121-pet-battle-exp"></script>
+    <script type="module" src="app.js?v=20261121-pet-compare-exp"></script>
 </body>
 
 </html>

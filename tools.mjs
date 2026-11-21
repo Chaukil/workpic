@@ -1003,7 +1003,17 @@ test('two-client battle escrow, hidden RPS, automatic fight, payout and refunds 
  const loserView=attendancePetView(profiles.get('b').attendancePet,clock);
  assert.equal(loserView.xp,0);assert.equal(loserView.feedingXp,1);
  assert.equal(petBattleSettleXp(profiles.get('b').attendancePet,loserView.pet.id,-1,clock).change,0);
+ const nearLevelUp={...profiles.get('a').attendancePet,feedingXp:8};
+ const petId=attendancePetRecords(nearLevelUp,clock)[0].id;
+ const promoted=petBattleSettleXp(nearLevelUp,petId,1,clock).pet;
+ assert.equal(attendancePetView(promoted,clock).xp,10);
+ assert.equal(attendancePetView(promoted,clock).level,2);
+ const demoted=petBattleSettleXp(promoted,petId,-1,clock).pet;
+ assert.equal(attendancePetView(demoted,clock).xp,9);
+ assert.equal(attendancePetView(demoted,clock).level,1);
  assert.equal(profiles.get('b').attendancePet.victoryAuraUntil,undefined,'loser does not receive victory aura');
+ assert.equal(profiles.get('b').attendancePet.defeatAuraUntil,auraUntil,'defeat aura expires one hour after combat ends');
+ assert.equal(profiles.get('b').attendancePet.defeatOpponentName,'a');
  assert.equal(attendancePetView(profiles.get('a').attendancePet,clock).weightGrams+attendancePetView(profiles.get('b').attendancePet,clock).weightGrams,2000,'kg is conserved');
  for(const uid of ['a','b'])assert.equal(Object.keys(profiles.get(uid).petBattleLocks).length,0);
  use('a');await game.mutate('create',payload('a',statsA));const cancelled=game.inspect().active;await game.mutate('cancel');assert.equal(battles.get(cancelled).status,'cancelled');assert.equal(attendancePetView(profiles.get('a').attendancePet,clock).weightGrams,1200);
@@ -1085,7 +1095,7 @@ test('pet comparison includes only actual feeding/attendance in seven days and r
  const pet=(weight,activity,extra={})=>({...newAttendancePet(now-10*day),weightGrams:weight,lastCheckinAt:activity,lastCheckinDay:attendancePetDay(activity),...extra});
  const profiles=[
   {id:'a',uid:'a',displayName:'A',attendancePet:pet(3000,now-3600000)},
-  {id:'b',uid:'b',displayName:'B',attendancePet:pet(5000,now-day,{branch:'bird',checkins:90})},
+  {id:'b',uid:'b',displayName:'B',attendancePet:pet(5000,now-day,{branch:'bird',checkins:90,battleXp:7})},
   {id:'z',uid:'a',displayName:'Duplicate',attendancePet:pet(99000,now-1)},
   {id:'c',uid:'c',displayName:'Expired',attendancePet:pet(9000,now-7*day)},
   {id:'d',uid:'d',displayName:'Dead but recently attended',attendancePet:pet(90000,now-6*day)},
@@ -1095,6 +1105,7 @@ test('pet comparison includes only actual feeding/attendance in seven days and r
  const rows=buildPetComparison(profiles,now);
  assert.equal(rows.length,4);assert.deepEqual(rows.map(row=>row.uid),['b','a','e','d']);
  assert.equal(rows[0].weightGrams,4500);assert.equal(rows[0].rank,1);assert.equal(rows.at(-1).rank,null);
+ assert.equal(rows[0].xpToNextLevel,3,'comparison includes battle EXP in the next-level progress');
  assert.equal(buildPetComparison(profiles,now,'bird').length,1);
  assert.equal(buildPetComparison(profiles,now,'dino').length,0);
  const adminOnly=transitionPetHousehold(pet(1000,now-8*day),'level',now,null,8).pet;
@@ -1742,6 +1753,7 @@ try {
 
     check(document.getElementById('petCompareRows').textContent.includes('Active trainer')&&!document.getElementById('petCompareRows').textContent.includes('Inactive trainer'),'only recently active users are compared');
     check(document.querySelector('#petCompareRows .pet-compare-weight').textContent==='9,0 kg','comparison sorts by weight');
+    check(document.querySelector('#petCompareRows .pet-compare-xp').textContent==='0/10 EXP · Còn 10 EXP','comparison shows EXP within the current level and remaining EXP');
     check(document.querySelector('#petCompareRows .is-me'),'own pets are highlighted');
     document.getElementById('petCompareBranch').value='fish';document.getElementById('petCompareBranch').dispatchEvent(new Event('change'));
     check(document.querySelectorAll('#petCompareRows tr').length===1,'comparison filters pet branch');
@@ -1793,9 +1805,14 @@ try {
     const timeline=petBattleSimulation([fightMe,fightOther],'me'),battleState=PetBattleGame.inspect();
     const auraButton=document.getElementById('attendancePetSwimmer'),auraPet={...battlePet,victoryAuraUntil:Date.now()+3600000};
     renderPetHungerBubble(auraButton,attendancePetView(auraPet));
-    check(auraButton.classList.contains('pet-victory-aura')&&!auraButton.querySelector('.pet-victory-halo').hidden,'winner displays a golden aura');
-    renderPetHungerBubble(auraButton,attendancePetView({...auraPet,victoryAuraUntil:Date.now()-1}));
-    check(!auraButton.classList.contains('pet-victory-aura')&&auraButton.querySelector('.pet-victory-halo').hidden,'aura disappears after expiry without a Firebase write');
+    check(auraButton.classList.contains('pet-victory-aura')&&!auraButton.querySelector('.pet-victory-halo'),'winner glows without a ring');
+    const defeatedPet={...auraPet,defeatAuraUntil:auraPet.victoryAuraUntil+1000,defeatOpponentName:'Rival'};
+    renderPetHungerBubble(auraButton,attendancePetView(defeatedPet));
+    check(auraButton.classList.contains('pet-defeat-aura')&&!auraButton.classList.contains('pet-victory-aura'),'newer loss displays the gray aura');
+    const defeatBubble=auraButton.querySelector('.pet-hunger-bubble');
+    check(!defeatBubble.hidden&&defeatBubble.textContent==='Tôi đã thua trận khi thách đấu Rival','defeat bubble names the opponent');
+    renderPetHungerBubble(auraButton,attendancePetView({...defeatedPet,victoryAuraUntil:Date.now()-1001,defeatAuraUntil:Date.now()-1}));
+    check(!auraButton.classList.contains('pet-victory-aura')&&!auraButton.classList.contains('pet-defeat-aura')&&!defeatBubble.textContent.includes('Rival'),'result aura and message disappear after expiry');
     const battleFixture={id:'ui-battle',status:'fighting',challengerUid:'me',opponentUid:'opponent',participantUids:['me','opponent'],players:[fightMe,fightOther],stakeGrams:200,createdMs:Date.now(),startedAt:Date.now()-3000,claims:{},commits:{},reveals:{},...timeline};
     const outgoing={...battleFixture,id:'ui-outgoing',status:'invited',players:[fightMe],turns:[],maxHp:[],startedAt:null,winnerUid:null,expiresAt:Date.now()+600000};
     battleState.matches.set(outgoing.id,outgoing);PetBattleGame.open(outgoing.id);

@@ -556,6 +556,7 @@ function buildPetComparison(profiles,now=Date.now(),branch='all'){
             if(branch!=='all'&&key!==branch)continue;
             rows.push({uid:profile.uid,ownerName:profile.displayName||String(profile.email||'').split('@')[0]||profile.uid,
                 petId:pet.id,petName:view.displayName,species:view.name,level:view.level,branchKey:key,branchName:view.branch?ATTENDANCE_PET_BRANCHES[view.branch].name:'Chưa chọn nhánh',
+                xpToNextLevel:view.maxed?0:Math.max(0,view.level*10-view.xp),maxed:view.maxed,
                 weightGrams:view.weightGrams,lastActiveAt:activity,dead:view.dead,egg:view.egg,
                 appearance:{form:view.form,level:view.level,branch:view.branch,egg:view.egg,dead:view.dead}});
         }
@@ -9172,7 +9173,12 @@ function renderPetComparison(force=false){
         picture.appendChild(image);identity.append(picture,name);pet.appendChild(identity);
         const generation=petComparisonImageGeneration;
         petComparisonThumbnail(row.appearance).then(source=>{if(source&&generation===petComparisonImageGeneration&&image.isConnected){image.src=source;image.hidden=false;picture.classList.remove('is-loading');}});
-        cell(`Cấp ${row.level} · ${row.branchName}`);
+        const level=cell(`Cấp ${row.level} · ${row.branchName}`);
+        const xp=document.createElement('small');
+        xp.className='pet-compare-xp';
+        xp.textContent=row.egg?'Đợi trứng nở':row.maxed?'Cấp tối đa'
+            :`${10-row.xpToNextLevel}/10 EXP · ${row.xpToNextLevel?`Còn ${row.xpToNextLevel} EXP`:'Chọn nhánh để lên cấp'}`;
+        level.appendChild(xp);
         cell(petWeightLabel(row.weightGrams)).className='pet-compare-weight';
         cell(new Date(row.lastActiveAt).toLocaleString('vi-VN',{timeZone:'Asia/Bangkok',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}));
         const status=cell(''),badge=document.createElement('span');badge.className='pet-compare-state '+(row.dead?'dead':row.egg?'egg':'alive');badge.textContent=row.dead?'Đã chết':row.egg?'Đang ấp':'Đang sống';status.appendChild(badge);
@@ -9221,11 +9227,17 @@ async function checkPetHungerNotifications(now=Date.now()){
     }
 }
 function renderPetHungerBubble(button,view){
-    const aura=!view.dead&&!view.egg&&Number(view.pet.victoryAuraUntil)>Date.now();button.classList.toggle('pet-victory-aura',aura);
-    let halo=button.querySelector('.pet-victory-halo');if(!halo){halo=document.createElement('span');halo.className='pet-victory-halo';halo.setAttribute('aria-hidden','true');button.appendChild(halo);}halo.hidden=!aura;
+    const now=Date.now(),victoryUntil=Number(view.pet.victoryAuraUntil)||0;
+    const defeatUntil=Number(view.pet.defeatAuraUntil)||0;
+    const defeated=!view.egg&&defeatUntil>now&&defeatUntil>=victoryUntil;
+    const victorious=!view.dead&&!view.egg&&victoryUntil>now&&victoryUntil>defeatUntil;
+    button.classList.toggle('pet-victory-aura',victorious);
+    button.classList.toggle('pet-defeat-aura',defeated);
     let bubble=button.querySelector('.pet-hunger-bubble');
-    if(!bubble){bubble=document.createElement('span');bubble.className='attendance-pet-bubble pet-hunger-bubble';bubble.textContent='Tôi đang đói, cho ăn lẹ đi!';bubble.setAttribute('aria-hidden','true');button.appendChild(bubble);}
-    bubble.hidden=!view.hungry||!attendancePetReady||!attendancePetVisible;
+    if(!bubble){bubble=document.createElement('span');bubble.className='attendance-pet-bubble pet-hunger-bubble';bubble.setAttribute('aria-hidden','true');button.appendChild(bubble);}
+    const message=defeated?`Tôi đã thua trận khi thách đấu ${view.pet.defeatOpponentName||'đối thủ'}`:'Tôi đang đói, cho ăn lẹ đi!';
+    if(bubble.textContent!==message)bubble.textContent=message;
+    bubble.hidden=(!defeated&&!view.hungry)||!attendancePetReady||!attendancePetVisible;
 }
 function stopAttendancePetFleet(){for(const entry of attendancePetFleet.values()){entry.renderer.stop();entry.button.remove();}attendancePetFleet.clear();}
 function renderAttendancePetFleet(){
@@ -9697,9 +9709,18 @@ const PetBattleGame=(()=>{
                             if(amount===null||!lock)throw new Error('Chưa có kết quả hoặc không có kg cần nhận.');
                             if(lock.stakeGrams!==next.stakeGrams||!next.players.some(player=>player.uid===uid&&player.petId===lock.petId))throw new Error('Thông tin cược không khớp.');
                             if(amount>0)patch.attendancePet=petBattleChangeWeight(user.attendancePet,lock.petId,amount,now);
-                            if(next.winnerUid===uid&&(next.status==='finished'||petBattlePlayback(next,now).finished)){
+                            if(next.status==='finished'&&next.winnerUid){
                                 const until=petBattleTime(next.startedAt)+(next.introMs===5000?5000:2000)+next.turns.length*PET_BATTLE_STEP_MS+3600000;
-                                const root=patch.attendancePet||user.attendancePet,records=attendancePetRecords(root,now).map(p=>p.id===lock.petId?{...p,victoryAuraUntil:Math.max(Number(p.victoryAuraUntil)||0,until)}:p);
+                                const won=next.winnerUid===uid;
+                                const outcome=won?{victoryAuraUntil:until}:{
+                                    defeatAuraUntil:until,
+                                    defeatOpponentName:next.players.find(p=>p.uid===next.winnerUid)?.name||'đối thủ'
+                                };
+                                const expiryField=won?'victoryAuraUntil':'defeatAuraUntil';
+                                const root=patch.attendancePet||user.attendancePet;
+                                const records=attendancePetRecords(root,now).map(p=>
+                                    p.id===lock.petId&&until>(Number(p[expiryField])||0)?{...p,...outcome}:p
+                                );
                                 patch.attendancePet={...root,...records[0],companions:records.slice(1)};
                             }
                             if(next.status==='finished'&&next.winnerUid&&Number.isSafeInteger(next.stakeXp)&&next.stakeXp>0){
