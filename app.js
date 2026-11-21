@@ -407,7 +407,9 @@ function attendancePetView(raw, now = Date.now()) {
     const dead = now >= diesAt;
     const egg = now < pet.hatchAt;
     const branch=Object.hasOwn(ATTENDANCE_PET_BRANCHES,pet.branch)?pet.branch:null;
-    const feedingXp=Math.max(0,Math.floor(Number(pet.feedingXp)||0)),xp=checkins+feedingXp;
+    const feedingXp=Math.max(0,Math.floor(Number(pet.feedingXp)||0));
+    const battleXp=Number.isSafeInteger(pet.battleXp)?pet.battleXp:0;
+    const xp=Math.max(0,checkins+feedingXp+battleXp);
     const earnedLevel=Math.min(ATTENDANCE_PET_MAX_LEVEL,1+Math.floor(xp/10));
     const level = egg ? 0 : Math.min(earnedLevel,branch?ATTENDANCE_PET_MAX_LEVEL:9);
     const form = attendancePetCatalog(branch)[Math.max(0,level-1)];
@@ -416,7 +418,7 @@ function attendancePetView(raw, now = Date.now()) {
     const lastFedAt=Number(pet.lastFedAt)||(/^[\d]{4}-[\d]{2}-[\d]{2}$/.test(pet.fedOn||'')?Date.parse(pet.fedOn+'T00:00:00+07:00'):0);
     const nextFeedAt=lastFedAt?lastFedAt+7200000:pet.hatchAt;
     const weight=attendancePetWeight(pet,now);
-    return {pet,dead,egg,level,diesAt,checkins,xp,feedingXp,nextFeedAt,hungry:!dead&&!egg&&now>=nextFeedAt,untilHungry:Math.max(0,nextFeedAt-now),branch,branchUnlocked,maxed,branchLevel:Math.max(0,level-9),needsBranch:branchUnlocked&&!branch,today:attendancePetDay(now),name,nickname,displayName:nickname||name,form,
+    return {pet,dead,egg,level,diesAt,checkins,xp,feedingXp,battleXp,nextFeedAt,hungry:!dead&&!egg&&now>=nextFeedAt,untilHungry:Math.max(0,nextFeedAt-now),branch,branchUnlocked,maxed,branchLevel:Math.max(0,level-9),needsBranch:branchUnlocked&&!branch,today:attendancePetDay(now),name,nickname,displayName:nickname||name,form,
         weightGrams:weight.weightGrams,missedDays:weight.missedDays,absencePenaltyGrams:weight.penaltyGrams,checkedToday:pet.lastCheckinDay===attendancePetDay(now),fedToday:pet.fedOn===attendancePetDay(now),untilHatch:Math.max(0,pet.hatchAt-now),nextEvolutionIn:maxed?0:10-xp%10};
 }
 
@@ -480,7 +482,7 @@ function adjustAdminPet(raw, action, level, now = Date.now()) {
         const next = action === 'evolve' ? Math.max(1,view.level+1) : Number(level);
         if (!Number.isInteger(next) || next<1 || next>ATTENDANCE_PET_MAX_LEVEL) throw new Error('Invalid pet level');
         if(next>9&&!view.branch)throw new Error('Choose pet branch first');
-        pet.checkins = (next-1)*10; pet.feedingXp=0; pet.hatchAt = Math.min(pet.hatchAt,now);
+        pet.checkins = (next-1)*10; pet.feedingXp=0; delete pet.battleXp; pet.hatchAt = Math.min(pet.hatchAt,now);
     } else throw new Error('Invalid pet action');
     return {...pet,updatedAt:now};
 }
@@ -674,6 +676,16 @@ function petBattleClaimAmount(match,uid,now=Date.now()){
     if(match.status==='cancelled'||match.status==='rejected'||match.status==='expired')return uid===match.challengerUid||match.players?.length===2?match.stakeGrams:0;
     if(match.status!=='finished'&&!petBattlePlayback(match,now).finished)return null;
     return match.winnerUid?match.winnerUid===uid?match.stakeGrams*2:0:match.stakeGrams;
+}
+function petBattleSettleXp(root,petId,delta,now){
+    const records=attendancePetRecords(root,now),index=records.findIndex(p=>p.id===petId);
+    if(index<0)throw new Error('Không tìm thấy thú cưng đã thi đấu.');
+    const view=attendancePetView(records[index],now);
+    const change=Math.max(-view.xp,delta);
+    if(!change)return {pet:root,change:0};
+    records[index]={...records[index],battleXp:view.battleXp+change,updatedAt:now};
+    const updated={...root,...records[0],companions:records.slice(1)};
+    return {pet:transitionPetHousehold(updated,'init',now).pet,change};
 }
 async function petBattleCommitment(id,uid,round,choice,nonce){
     const data=new TextEncoder().encode([id,uid,round,choice,nonce].join('|'));
@@ -9324,7 +9336,7 @@ function renderAttendancePet() {
     eggTimer.textContent = `Nở sau ${duration(view.untilHatch)}`;
     eggTimer.title = `Dự kiến nở lúc ${hatchTime}`;
     document.getElementById('attendancePetProgress').style.width = `${view.maxed?100:view.xp%10*10}%`;
-    document.getElementById('attendancePetProgressText').textContent = `${view.checkins} lần điểm danh + ${view.feedingXp} XP cho ăn · ${view.maxed?'Đã đạt cấp cuối của nhánh.':view.needsBranch?'Đã mở 4 nhánh tiến hóa! Chọn nhánh bên dưới để tiếp tục.':`Còn ${view.nextEvolutionIn} XP để tiến hóa.`}`;
+    document.getElementById('attendancePetProgressText').textContent = `${view.checkins} lần điểm danh + ${view.feedingXp} XP cho ăn${view.battleXp?` ${view.battleXp>0?'+':'−'} ${Math.abs(view.battleXp)} EXP thi đấu`:''} · ${view.maxed?'Đã đạt cấp cuối của nhánh.':view.needsBranch?'Đã mở 4 nhánh tiến hóa! Chọn nhánh bên dưới để tiếp tục.':`Còn ${view.nextEvolutionIn} XP để tiến hóa.`}`;
     renderAttendancePetBranches(view);
     const checkin = document.getElementById('attendancePetCheckin');
     const checkedToday=attendancePetHouseholdDay(attendancePetData)===attendancePetDay(Date.now());
@@ -9645,6 +9657,7 @@ const PetBattleGame=(()=>{
                     patch.attendancePet=petBattleChangeWeight(user.attendancePet,fighter.petId,-stake,now);
                     locks[id]={petId:fighter.petId,stakeGrams:stake,peerUid:payload.opponentUid,role:'challenger',createdAt:now,expiresAt:now+600000};patch.petBattleLocks=locks;
                     next={version:1,challengerUid:uid,opponentUid:payload.opponentUid,participantUids:[uid,payload.opponentUid],players:[fighter],stakeGrams:stake,status:'invited',createdMs:now,createdAt:serverTimestamp(),expiresAt:now+600000,rpsRound:0,commits:{},reveals:{},claims:{},turns:[],maxHp:[],winnerUid:null,startedAt:null};
+                    next.stakeXp=Math.floor(stake/200);
                 }else{
                     if(!next||next.version!==1||!next.participantUids?.includes(uid))throw new Error('Không có quyền xem trận này.');next={...next};
                     if(action==='accept'){
@@ -9688,6 +9701,12 @@ const PetBattleGame=(()=>{
                                 const until=petBattleTime(next.startedAt)+(next.introMs===5000?5000:2000)+next.turns.length*PET_BATTLE_STEP_MS+3600000;
                                 const root=patch.attendancePet||user.attendancePet,records=attendancePetRecords(root,now).map(p=>p.id===lock.petId?{...p,victoryAuraUntil:Math.max(Number(p.victoryAuraUntil)||0,until)}:p);
                                 patch.attendancePet={...root,...records[0],companions:records.slice(1)};
+                            }
+                            if(next.status==='finished'&&next.winnerUid&&Number.isSafeInteger(next.stakeXp)&&next.stakeXp>0){
+                                const delta=next.winnerUid===uid?next.stakeXp:-next.stakeXp;
+                                const result=petBattleSettleXp(patch.attendancePet||user.attendancePet,lock.petId,delta,now);
+                                if(result.change)patch.attendancePet=result.pet;
+                                next.xpChanges={...next.xpChanges,[uid]:result.change};
                             }
                             delete locks[id];patch.petBattleLocks=locks;next.claims={...next.claims,[uid]:true};
                         }
@@ -9828,7 +9847,9 @@ const PetBattleGame=(()=>{
             rpsResult.classList.toggle('is-revealing',Date.now()<introEnd);
         }
         const ended=m.status==='finished'||play.finished,closed=['cancelled','rejected','expired'].includes(m.status);
-        el('petBattleResult').textContent=ended?(m.winnerUid?(m.winnerUid===state.uid?'Bạn thắng! +':'Bạn thua! −')+petWeightLabel(m.stakeGrams):'Hòa trận: hoàn lại kg cược.')+(m.claims?.[state.uid]?' Đã cập nhật kg.':' Đang chờ cập nhật kg.'):(closed?'Hoàn lại kg đã giữ cho bên đặt cược.':'');
+        const xpChange=m.xpChanges?.[state.uid];
+        const xpResult=Number.isSafeInteger(xpChange)?` · ${xpChange>0?'+':xpChange<0?'−':''}${Math.abs(xpChange)} EXP`:'';
+        el('petBattleResult').textContent=ended?(m.winnerUid?(m.winnerUid===state.uid?'Bạn thắng! +':'Bạn thua! −')+petWeightLabel(m.stakeGrams)+xpResult:'Hòa trận: hoàn lại kg cược.')+(m.claims?.[state.uid]?' Đã cập nhật kết quả.':' Đang chờ cập nhật kết quả.'):(closed?'Hoàn lại kg đã giữ cho bên đặt cược.':'');
         const logKey=m.id+':'+play.count;if(state.lastTurn!==logKey){state.lastTurn=logKey;renderStrike(m,play);const energy=el('petBattleRoom').querySelector('.pet-battle-energy');energy.style.animation=play.last?`pet-battle-strike-${play.last.attacker===m.players[0].uid?'right':'left'} .65s ease-out both`:'';el('petBattleLog').replaceChildren(...(m.turns||[]).slice(Math.max(0,play.count-6),play.count).map(turn=>{const li=document.createElement('li');li.textContent=`Lượt ${turn.index}: ${m.players.find(p=>p.uid===turn.attacker).petName} ${turn.dodged?'bị né đòn':`gây ${turn.damage} sát thương${turn.critical?' (chí mạng)':''}`}.`;return li;}));}
         el('petBattleSetup').querySelectorAll('button').forEach(button=>button.disabled=state.busy);
     }
