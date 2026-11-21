@@ -194,16 +194,19 @@ require Firebase/Google Cloud Usage; no live usage console was accessed.
 | work hours, days off, departments | Explicit edit/import/delete actions; imports can write multiple records |
 | Pet animation, egg countdown, evolution status, rain water | No Firestore writes from timers; water uses local storage |
 
-Pet startup reuses the canonical profile read during authentication and does not
-run an initialization transaction for an already valid pet. The connection probe
-now limits its jobs read to one document. The admin picker reuses the existing
-users directory snapshot instead of rereading the full collection when available.
-Normal pet transactions use two attempts instead of the SDK default five; admin
-transactions use one attempt and never automatically retry an action. After a
-resource-exhausted response, new pet/admin requests are locally blocked for five
-minutes (also across reloads of that tab). This is retry throttling, not a quota
-reset; exhausted daily quota can outlast that interval. Draft names and unchanged
-name submissions do not write. Tests use fake backends, not live quota.
+Pet startup reuses the canonical profile from authentication. It subscribes to
+its profile separately only when the directory does not supply that document.
+The active jobs listener replaces the login connection probe. The admin picker,
+assignment, presenter picker, days-off picker and statistics reuse the directory
+snapshot when available. Shared notes retain a single listener capped at 100
+notes to support the unread badge. Quick jobs subscribe to open or invited jobs and
+jobs created in the last 30 days, with a compatibility fallback if Firestore
+reports a missing index. Duplicate days off are merged in the view and removed
+when explicitly deleting their day.
+
+After a resource-exhausted response, new pet requests are paused for five minutes
+across tabs in the same browser. The pause limits retries. Project quota is
+controlled by Firestore. Tests use fake backends and do not measure live usage.
 
 The existing realtime users-directory listener remains a read amplification point:
 each user document change (including a pet update) is read by clients listening to
@@ -220,7 +223,18 @@ claimant's profile and are idempotent; an offline player claims on returning.
 Unaccepted invitations expire after ten minutes; RPS expires after two minutes
 and refunds both stakes. Closing the dialog does not cancel an accepted match.
 Incoming invitations reuse directory lock metadata and individual battle document
-listeners, with no additional collection query or composite index.
+listeners. Successful settlements and dismissed invitations release their listeners.
+The simulated new-room flow uses 10 transaction document reads and 10 document
+writes across create, accept, both ready actions and both settlements. The earlier
+flow used 13 transaction reads for those actions. These counts exclude listeners,
+security-rule reads and retries. Repeated ready or claim actions already reflected
+locally launch no new transaction.
+
+Remaining broad reads include the live users directory, historical days off and
+the all-jobs statistics view. If the Firebase Usage chart shows reads concentrated
+around pet updates, move frequently updated pet state out of public user profiles
+and subscribe to invitations addressed to each participant. That requires a
+coordinated data and rules migration.
 
 Battle tests use two simulated clients and real browser/WebGL rendering. Live
 Firebase access has not been tested. Existing rules must permit participant access

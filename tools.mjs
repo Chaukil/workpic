@@ -818,20 +818,22 @@ test('job catalog keeps paused jobs last and statistics sort types and weekdays'
 test('pet startup reuses login profile, creates only missing pets and never writes on timer ticks', async () => {
  const source=fs.readFileSync('app.js','utf8');
  const code=source.slice(source.indexOf('async function startAttendancePet()'),source.indexOf('function stopAttendancePet()'));
- const now=Date.now(),elements=new Map();let state={uid:'me',attendancePet:newAttendancePet(now)},transactions=0,writes=0,tick;
+ const now=Date.now(),elements=new Map();let state={uid:'me',attendancePet:newAttendancePet(now)},transactions=0,writes=0,tick,extraListeners=0;
  const context={currentUser:{uid:'me'},attendancePetStarting:false,attendancePetGeneration:0,attendancePetReady:false,
-  authenticatedProfileSnapshot:{ref:{id:'me'},data:()=>state},db:{},Date,transitionAttendancePet,transitionPetHousehold,
+  authenticatedProfileSnapshot:{id:'me',ref:{id:'me'},data:()=>state},usersDirectorySnapshot:null,db:{},Date,transitionAttendancePet,transitionPetHousehold,
   document:{getElementById:id=>{if(!elements.has(id))elements.set(id,{});return elements.get(id);}},
   stopAttendancePet:()=>{context.attendancePetGeneration++;},assertPetQuotaAvailable:()=>{},loadAttendancePetVisibility:()=>true,PetBattleGame:{start(){},profile(){}},
   getDocs:()=>assert.fail('Existing login profile must not be queried again'),
   runTransaction:async (_,callback,options)=>{transactions++;assert.equal(options.maxAttempts,2);return callback({get:async()=>({exists:()=>true,data:()=>state}),update:(_,patch)=>{state={...state,...patch};writes++;}});},
-  onSnapshot:()=>()=>{},AttendancePet3D:{start:()=>{}},checkPetHungerNotifications:()=>{},renderAttendancePet:()=>{},setInterval:fn=>{tick=fn;return 1;},petQuotaErrorText:()=>''
+  watchAttendancePetProfile:()=>{extraListeners++;},AttendancePet3D:{start:()=>{}},checkPetHungerNotifications:()=>{},renderAttendancePet:()=>{},setInterval:fn=>{tick=fn;return 1;},petQuotaErrorText:()=>''
  };
  vm.createContext(context);vm.runInContext(code,context);await context.startAttendancePet();
  assert.equal(transactions,0);assert.equal(writes,0);
  for(let i=0;i<10;i++)tick();assert.equal(writes,0);
  state={uid:'me'};await context.startAttendancePet();assert.equal(transactions,1);assert.equal(writes,1);
- await context.startAttendancePet();assert.equal(transactions,1);assert.equal(writes,1);
+ context.usersDirectorySnapshot={docs:[context.authenticatedProfileSnapshot]};
+ const before=extraListeners;
+ await context.startAttendancePet();assert.equal(transactions,1);assert.equal(writes,1);assert.equal(extraListeners,before);
 });
 
 test('hungry pets send desktop reminders once per feeding cycle, survive refresh and retry failures', async()=>{
@@ -962,7 +964,7 @@ test('eight battle stats split damage and produce reproducible dodge and critica
 });
 
 test('two-client battle escrow, hidden RPS, automatic fight, payout and refunds commit atomically once', async () => {
- let clock=Date.UTC(2026,10,20),writes=0;const profiles=new Map(),battles=new Map(),nodes=new Map();
+ let clock=Date.UTC(2026,10,20),writes=0,reads=0;const profiles=new Map(),battles=new Map(),nodes=new Map();
  for(const uid of ['a','b'])profiles.set(uid,{uid,displayName:uid,attendancePet:{...newAttendancePet(clock-7200000),weightGrams:1000,feedingXp:uid==='b'?1:0,lastCheckinAt:clock,lastCheckinDay:attendancePetDay(clock)}});
  class Clock extends Date{constructor(...args){super(...(args.length?args:[clock]));}static now(){return clock;}}
  const context={Date:Clock,Math,Map,Set,Number,Object,Array,JSON,Promise,Infinity,crypto:globalThis.crypto,TextEncoder,PET_BATTLE_STEP_MS:1800,
@@ -971,7 +973,7 @@ test('two-client battle escrow, hidden RPS, automatic fight, payout and refunds 
   usersDirectorySnapshot:{docs:['a','b'].map(id=>({id,data:()=>structuredClone(profiles.get(id))}))},
   doc:(_,collection,id)=>({collection,id}),onSnapshot:()=>()=>{},serverTimestamp:()=>clock,assertPetQuotaAvailable(){},petQuotaErrorText:()=>'',renderAttendancePet(){},setInterval:()=>1,clearInterval(){},
   attendancePetRecords,attendancePetSelected,attendancePetView,petWeightLabel:g=>g/1000+' kg',petBattleBudget,petBattleStats,petBattleRps,petBattleSimulation,petBattlePlayback,petBattleTime:v=>Number(v)||0,petBattleChangeWeight,petBattleFighter,petBattleClaimAmount,petBattleSettleXp,petBattleCommitment,
-  runTransaction:async(_,callback)=>{const pending=[];const tx={get:async ref=>{const data=(ref.collection==='users'?profiles:battles).get(ref.id);return {exists:()=>!!data,data:()=>structuredClone(data)};},set:(ref,data)=>pending.push({ref,data,merge:false}),update:(ref,data)=>pending.push({ref,data,merge:true})};const result=await callback(tx);for(const p of pending){const store=p.ref.collection==='users'?profiles:battles;store.set(p.ref.id,p.merge?{...store.get(p.ref.id),...structuredClone(p.data)}:structuredClone(p.data));writes++;}return result;}
+  runTransaction:async(_,callback)=>{const pending=[];const tx={get:async ref=>{reads++;const data=(ref.collection==='users'?profiles:battles).get(ref.id);return {exists:()=>!!data,data:()=>structuredClone(data)};},set:(ref,data)=>pending.push({ref,data,merge:false}),update:(ref,data)=>pending.push({ref,data,merge:true})};const result=await callback(tx);for(const p of pending){const store=p.ref.collection==='users'?profiles:battles;store.set(p.ref.id,p.merge?{...store.get(p.ref.id),...structuredClone(p.data)}:structuredClone(p.data));writes++;}return result;}
  };
  const source=fs.readFileSync('app.js','utf8');let code=source.slice(source.indexOf('const PetBattleGame='),source.indexOf('let sharedNotesUnsubscribe ='));
  code=code.replace('return {init,start,stop,sync,profile,open};','return {init,start,stop,sync,profile,open,mutate,inspect:()=>state};');
@@ -1032,6 +1034,7 @@ test('two-client battle escrow, hidden RPS, automatic fight, payout and refunds 
  assert.equal(profiles.get('a').attendancePet.battleHistory.length,1,'expired matches do not add history');
  assert.equal(attendancePetView(profiles.get('a').attendancePet,clock).weightGrams,1200);assert.equal(attendancePetView(profiles.get('b').attendancePet,clock).weightGrams,800);
  const beforeBad=writes;use('a');await game.mutate('create',{...payload('a',statsA),stakeGrams:999999});assert.equal(writes,beforeBad,'failed reservation writes neither profile nor match');
+ const roomReads=reads,roomWrites=writes;
  use('a');await game.mutate('create',{...payload('a',statsA),roomFlow:true});const room=game.inspect().active;
  use('b',room);await game.mutate('accept',payload('b',statsB));
  assert.equal(battles.get(room).status,'ready');
@@ -1050,6 +1053,8 @@ test('two-client battle escrow, hidden RPS, automatic fight, payout and refunds 
  use('a',room);await game.mutate('claim');
  use('b',room);await game.mutate('claim');
  assert.deepEqual(battles.get(room).claims,{a:true,b:true});
+ assert.equal(reads-roomReads,10,'a complete room uses ten transaction reads, even with repeated ready clicks');
+ assert.equal(writes-roomWrites,10,'one room uses ten writes including both payouts');
  const priorWeights=['a','b'].map(uid=>attendancePetView(profiles.get(uid).attendancePet,clock).weightGrams);
  use('a');await game.mutate('create',{...payload('a',statsA),roomFlow:true});const waiting=game.inspect().active;
  use('b',waiting);await game.mutate('accept',payload('b',statsB));await game.mutate('ready');
@@ -2008,8 +2013,9 @@ try {
     rejectNoteWrite=true; noteEditor.innerHTML='<p>Keep draft</p>'; await submitNote();
     check(noteEditor.textContent==='Keep draft','failed note preserves draft');
     check(!document.getElementById('sharedNotesSend').disabled,'failed note re-enables send');
+    const listenersRemovedBeforeSignOut=noteUnsubscribed;
     stopSharedNotes();
-    check(noteUnsubscribed===1&&document.getElementById('sharedNotesToggle').hidden,'sign-out removes shared listener and button');
+    check(noteUnsubscribed===listenersRemovedBeforeSignOut+1&&document.getElementById('sharedNotesToggle').hidden,'sign-out removes shared listener and button');
     check(!noteEditor.innerHTML&&document.getElementById('sharedNotesPanel').inert,'sign-out clears notes and draft');
     noteSnapshot({docs:[{id:'late',data:()=>({content:'Late note'})}]});
     check(sharedNotesItems.length===0,'late snapshot from old session is ignored');

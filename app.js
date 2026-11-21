@@ -708,7 +708,7 @@ function jobColorStyle(job) {
 
 // Firebase Configuration - Chỉ sử dụng Firestore
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, getDocs, onSnapshot, query, where, writeBatch, runTransaction, orderBy, limit, serverTimestamp }
+import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, getDocs, onSnapshot, query, where, or, writeBatch, runTransaction, orderBy, limit, serverTimestamp }
     from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, EmailAuthProvider, reauthenticateWithCredential, updatePassword }
     from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -4286,26 +4286,23 @@ function handleSignedOut() {
 }
 
 function initializeAuthenticatedApp() {
-    const uid = currentUser?.uid;
+    if(!currentUser||auth.currentUser?.uid!==currentUser.uid)return;
     requestNotificationPermission();
     getSwRegistration();      // đăng ký sw.js sớm để thông báo có nút Hoàn thành / Đợi tí
     startUiRefreshLoop();
-    testFirestoreConnection().then(() => {
-        if (!uid || currentUser?.uid !== uid || auth.currentUser?.uid !== uid) return;
-        loadJobs();
-        startNotificationCheck();
-        listenTransferRequests();
-        listenUserNotifications();
-        listenQuickJobs();
-        listenSharedNotes();
-        listenQuickJobTransferRequests();
-        listenDayOffs();
-        listenDepartments();
-        listenWorkHours();
-        listenJobDayOverrides();
-        listenUsersAvatars();
-        startAttendancePet();
-    });
+    loadJobs();
+    startNotificationCheck();
+    listenTransferRequests();
+    listenUserNotifications();
+    listenQuickJobs();
+    listenSharedNotes();
+    listenQuickJobTransferRequests();
+    listenDayOffs();
+    listenDepartments();
+    listenWorkHours();
+    listenJobDayOverrides();
+    listenUsersAvatars();
+    startAttendancePet();
 }
 
 // Trong DOMContentLoaded event listener, THÊM CHECK NULL
@@ -4970,44 +4967,17 @@ function filterUserJobs(modal) {
     modal.querySelector('.user-jobs-filter-count').textContent = `Hiển thị ${shown} job`;
 }
 
-// Test Firestore Connection
-async function testFirestoreConnection() {
-    if (!accessControl.can('jobs')) { firestoreConnected = true; return true; }
-    try {
-        if (!currentUser) return false;
-        const testCollection = query(collection(db, 'jobs'), where('ownerId', '==', currentUser.uid),limit(1));
-        const snapshot = await getDocs(testCollection);
-
-        firestoreConnected = true;
-        //console.log(`📊 Số lượng jobs hiện tại: ${snapshot.size}`);
-
-        //showNotification('Kết nối thành công', `Đã kết nối với Firestore. Tìm thấy ${snapshot.size} jobs.`);
-        return true;
-    } catch (error) {
-        firestoreConnected = false;
-        console.error('❌ Lỗi kết nối Firestore:', error);
-
-        if (error.code === 'permission-denied') {
-            alert(`❌ LỖI FIRESTORE PERMISSIONS!\n\nVui lòng cập nhật Security Rules trong Firebase Console.`);
-        }
-        return false;
-    }
-}
-
-
 // Load Jobs from Firestore
 function loadJobs() {
-    if (!firestoreConnected || !currentUser) {
-        console.warn('⚠️ Chưa kết nối Firestore');
-        return;
-    }
-
-    if (!accessControl.can('jobs')) return;
+    if(!currentUser)return;
+    firestoreConnected=!accessControl.can('jobs');
+    if(firestoreConnected)return;
     const jobsCollection = query(collection(db, 'jobs'), where('ownerId', '==', currentUser.uid));
 
     if (unsubscribeJobs) unsubscribeJobs();
     unsubscribeJobs = onSnapshot(jobsCollection,
         (snapshot) => {
+            firestoreConnected=true;
             jobs = [];
             snapshot.forEach((doc) => {
                 const job = {
@@ -5033,6 +5003,7 @@ function loadJobs() {
             flushPendingNotifAction();
         },
         (error) => {
+            firestoreConnected=false;
             showNotification('Lỗi', 'Không thể tải dữ liệu từ Firestore!');
         }
     );
@@ -7564,13 +7535,15 @@ function nowTimeHHmm() {
 
 function listenQuickJobs() {
     if (!currentUser) return;
+    const uid=currentUser.uid;
     quickChatInitialLoadDone = false;
 
-    // Không lọc theo ngày trên server nữa: job "open" quá hạn vẫn cần hiển thị để cảnh báo đỏ.
-    const q = collection(db, 'quickJobs');
+    const jobsRef=collection(db,'quickJobs');
+    const recentSince=new Date(Date.now()-30*86400000).toISOString();
+    const q=query(jobsRef,or(where('status','in',['open','invited']),where('createdAt','>=',recentSince)));
 
     if (unsubscribeQuickJobs) unsubscribeQuickJobs();
-    unsubscribeQuickJobs = onSnapshot(q, (snapshot) => {
+    const onJobs=snapshot=>{
         const KEEP_DAYS = 30;
         const cutoff = Date.now() - KEEP_DAYS * 24 * 60 * 60 * 1000;
 
@@ -7609,8 +7582,14 @@ function listenQuickJobs() {
         renderQuickChat();
         checkPendingQuickInvite();
         renderNotifDropdown();
-    }, (error) => {
+    };
+    const reportError=error=>{
         console.error('Lỗi lắng nghe job trong ngày:', error);
+    };
+    unsubscribeQuickJobs=onSnapshot(q,onJobs,error=>{
+        if(error.code==='failed-precondition'&&currentUser?.uid===uid){
+            unsubscribeQuickJobs=onSnapshot(jobsRef,onJobs,reportError);
+        }else reportError(error);
     });
 }
 
@@ -8222,8 +8201,8 @@ function noSameDeptLabel() {
 }
 
 async function fetchUsersExceptMe(forceRefresh = false) {
-    if (!cachedUsersForAssign || forceRefresh) {
-        const snapshot = await getDocs(collection(db, 'users'));
+    if (usersDirectorySnapshot || !cachedUsersForAssign || forceRefresh) {
+        const snapshot = usersDirectorySnapshot || await getDocs(collection(db, 'users'));
         // Một uid có thể có nhiều doc → chỉ giữ doc cập nhật sau cùng
         const byUid = new Map();
         snapshot.forEach(d => {
@@ -8322,6 +8301,12 @@ function listenUsersAvatars() {
     if (unsubscribeUsersAvatar) unsubscribeUsersAvatar();
     unsubscribeUsersAvatar = onSnapshot(collection(db, 'users'), (snapshot) => {
         usersDirectorySnapshot=snapshot;
+        const ownPetProfile=snapshot.docChanges().find(change=>change.type!=='removed'&&change.doc.id===attendancePetRef?.id)?.doc;
+        if(ownPetProfile){
+            attendancePetUnsubscribe?.();attendancePetUnsubscribe=null;
+            applyAttendancePetProfile(ownPetProfile);
+            PetBattleGame.profile(ownPetProfile,false);
+        }
         PetBattleGame.sync();
         if(document.getElementById('petCompareDialog')?.open)renderPetComparison(true);
         usersAvatarCache = {};
@@ -8374,6 +8359,8 @@ function listenUsersAvatars() {
         }
     }, (error) => {
         console.error('Lỗi lắng nghe avatar users:', error);
+        usersDirectorySnapshot=null;
+        if(!petQuotaErrorText(error))watchAttendancePetProfile();
     });
 }
 
@@ -9320,12 +9307,12 @@ function openAttendancePetBranch(automatic=false){
 let attendancePetStarting=false;
 let petQuotaRetryAt=0;
 function assertPetQuotaAvailable(){
-    try{petQuotaRetryAt=Math.max(petQuotaRetryAt,Number(sessionStorage.getItem('workpicPetQuotaRetryAt'))||0);}catch{}
-    if(Date.now()<petQuotaRetryAt){const error=new Error('Firestore quota cooldown');error.code='resource-exhausted';error.cooldown=true;throw error;}
+    try{petQuotaRetryAt=Math.max(petQuotaRetryAt,Number(localStorage.getItem('workpicPetQuotaRetryAt'))||0);}catch{}
+    if(Date.now()<petQuotaRetryAt){const error=new Error('Firestore quota cooldown');error.code='resource-exhausted';error.cooldown=true;error.retryAt=petQuotaRetryAt;throw error;}
 }
 function petQuotaErrorText(error){
     if(String(error?.code||'').split('/').pop()!=='resource-exhausted')return '';
-    if(!error.cooldown){petQuotaRetryAt=Date.now()+300000;try{sessionStorage.setItem('workpicPetQuotaRetryAt',String(petQuotaRetryAt));}catch{}}
+    if(!error.cooldown){petQuotaRetryAt=Date.now()+300000;try{localStorage.setItem('workpicPetQuotaRetryAt',String(petQuotaRetryAt));}catch{}}
     return 'Firestore đang giới hạn yêu cầu (429). Thay đổi chưa được lưu. Tạm ngưng gửi yêu cầu thú cưng 5 phút; nếu hết quota ngày, cần chờ quota được cấp lại hoặc kiểm tra Usage trên Firebase.';
 }
 let attendancePetRef = null;
@@ -9464,6 +9451,29 @@ async function actOnAttendancePet(action) {
     }
 }
 
+function applyAttendancePetProfile(snapshot){
+    const data=snapshot?.data();
+    if(!currentUser||data?.uid!==currentUser.uid)return;
+    authenticatedProfileSnapshot=snapshot;
+    if(data.attendancePet){attendancePetData=data.attendancePet;renderAttendancePet();}
+}
+
+function watchAttendancePetProfile(){
+    if(!attendancePetReady||!attendancePetRef||attendancePetUnsubscribe)return;
+    const generation=attendancePetGeneration;
+    attendancePetUnsubscribe=onSnapshot(attendancePetRef,snapshot=>{
+        if(generation!==attendancePetGeneration)return;
+        applyAttendancePetProfile(snapshot);
+        PetBattleGame.profile(snapshot);
+    },error=>{
+        if(generation!==attendancePetGeneration)return;
+        attendancePetUnsubscribe=null;
+        attendancePetReady=false;renderAttendancePet();
+        document.getElementById('attendancePetStatus').textContent=petQuotaErrorText(error)||'Mất đồng bộ thú cưng. Bấm Thử kết nối lại.';
+        document.getElementById('attendancePetRetry').hidden=false;
+    });
+}
+
 async function startAttendancePet() {
     if(attendancePetStarting)return;
     stopAttendancePet();
@@ -9475,7 +9485,8 @@ async function startAttendancePet() {
     document.getElementById('attendancePetStatus').textContent='Đang đồng bộ thú cưng…';
     try {
         assertPetQuotaAvailable();
-        const cached=authenticatedProfileSnapshot?.data()?.uid===uid?authenticatedProfileSnapshot:null;
+        const loginProfile=authenticatedProfileSnapshot?.data()?.uid===uid?authenticatedProfileSnapshot:null;
+        const cached=usersDirectorySnapshot?.docs.find(snapshot=>snapshot.id===loginProfile?.id)||loginProfile;
         const profiles = cached ? {docs:[cached]} : await getDocs(query(collection(db,'users'),where('uid','==',uid)));
         if (generation!==attendancePetGeneration || currentUser?.uid!==uid) return;
         const profile = [...profiles.docs].sort((a,b)=>a.id.localeCompare(b.id))[0];
@@ -9498,17 +9509,7 @@ async function startAttendancePet() {
         PetBattleGame.start();
         checkPetHungerNotifications();
         attendancePetInterval=setInterval(()=>{renderAttendancePet();checkPetHungerNotifications();},1000);
-        attendancePetUnsubscribe=onSnapshot(profile.ref,snapshot=>{
-            if (generation!==attendancePetGeneration || currentUser?.uid!==uid) return;
-            authenticatedProfileSnapshot=snapshot;
-            PetBattleGame.profile(snapshot);
-            if (snapshot.exists() && snapshot.data().attendancePet) {attendancePetData=snapshot.data().attendancePet;renderAttendancePet();}
-        },error=>{
-            if (generation!==attendancePetGeneration) return;
-            attendancePetReady=false;renderAttendancePet();
-            document.getElementById('attendancePetStatus').textContent=petQuotaErrorText(error)||'Mất đồng bộ thú cưng. Bấm Thử kết nối lại.';
-            document.getElementById('attendancePetRetry').hidden=false;
-        });
+        if(!usersDirectorySnapshot?.docs.some(snapshot=>snapshot.id===profile.id))watchAttendancePetProfile();
     } catch (error) {
         if (generation!==attendancePetGeneration) return;
         document.getElementById('attendancePetStatus').textContent=petQuotaErrorText(error)||(error.code==='permission-denied'?'Firebase chưa cho phép đọc/cập nhật hồ sơ thú cưng.':'Chưa tải được thú cưng. Kiểm tra kết nối rồi thử lại.');
@@ -9605,7 +9606,7 @@ function initAttendancePetUi() {
 }
 
 const PetBattleGame=(()=>{
-    const state={uid:null,own:null,matches:new Map(),subs:new Map(),active:'',busy:false,message:'',cooldown:0,autoOpened:new Set(),models:[],lastTurn:'',setupKey:'',listKey:'',lastSync:0,timer:null};
+    const state={uid:null,own:null,matches:new Map(),subs:new Map(),failedSubs:new Set(),active:'',busy:false,message:'',cooldown:0,autoOpened:new Set(),models:[],lastTurn:'',setupKey:'',listKey:'',lastSync:0,timer:null};
     const el=id=>document.getElementById(id),mine=()=>currentUser&&state.uid===currentUser.uid;
     const ownRef=()=>attendancePetRef||authenticatedProfileSnapshot?.ref;
     const profileRows=()=>[...(usersDirectorySnapshot?.docs||[])].map(d=>({id:d.id,...d.data()}));
@@ -9620,28 +9621,33 @@ const PetBattleGame=(()=>{
     const secret=(id,round)=>{try{return JSON.parse(localStorage.getItem(secretKey(id,round))||'null');}catch{return null;}};
     function disposeModels(){state.models.forEach(model=>model.stop());state.models=[];state.modelKey='';}
     function stop(){
-        clearInterval(state.timer);state.timer=null;state.subs.forEach(unsubscribe=>unsubscribe());state.subs.clear();state.matches.clear();state.autoOpened.clear();disposeModels();
+        clearInterval(state.timer);state.timer=null;state.subs.forEach(unsubscribe=>unsubscribe());state.subs.clear();state.failedSubs.clear();state.matches.clear();state.autoOpened.clear();disposeModels();
         state.uid=null;state.own=null;state.active='';state.creating=false;state.busy=false;state.message='';state.setupKey='';state.listKey='';state.resultPrompt='';state.cooldown=0;state.lastSync=0;
         for(const id of ['petBattleExitDialog','petBattleInvitePicker','petBattleDialog','petBattleLobby'])if(el(id)?.open)el(id).close();
         if(el('petBattleInvite'))el('petBattleInvite').hidden=true;
     }
     function start(){stop();if(!currentUser||!attendancePetRef)return;state.uid=currentUser.uid;state.own=authenticatedProfileSnapshot?.data()||{uid:state.uid,attendancePet:attendancePetData};
         state.timer=setInterval(()=>{if(!mine())return;if(Date.now()-state.lastSync>15000)sync();process();if(el('petBattleDialog').open&&!document.hidden)render();},200);sync();}
-    function profile(snapshot){if(mine()&&snapshot?.exists()&&snapshot.data().uid===state.uid){state.own=snapshot.data();sync();}}
-    function fail(error){state.message=error.code==='permission-denied'?'Firebase chưa cho phép trận đấu petBattles hoặc hồ sơ của bạn. Thao tác thất bại không thay đổi kg.':petQuotaErrorText(error)||error.message||'Chưa đồng bộ được trận đấu.';state.cooldown=error.code==='resource-exhausted'?Date.now()+300000:Infinity;el('petBattleRetry').hidden=false;render();}
+    function profile(snapshot,refresh=true){if(mine()&&snapshot?.exists()&&snapshot.data().uid===state.uid){state.own=snapshot.data();if(refresh)sync();}}
+    function fail(error){state.message=error.code==='permission-denied'?'Firebase chưa cho phép trận đấu petBattles hoặc hồ sơ của bạn. Thao tác thất bại không thay đổi kg.':petQuotaErrorText(error)||error.message||'Chưa đồng bộ được trận đấu.';state.cooldown=error.code==='resource-exhausted'?(error.retryAt||Date.now()+300000):Infinity;el('petBattleRetry').hidden=false;render();}
     function sync(){
         if(!mine())return;state.lastSync=Date.now();const wanted=new Set(Object.keys(state.own?.petBattleLocks||{})),offers=[];
         for(const profile of profileRows())if(profile.uid!==state.uid)for(const [id,lock]of Object.entries(profile.petBattleLocks||{}))if(lock.role==='challenger'&&lock.peerUid===state.uid&&lock.expiresAt>Date.now())offers.push({id,at:lock.createdAt});
         offers.sort((a,b)=>b.at-a.at).slice(0,12).forEach(offer=>wanted.add(offer.id));
-        for(const [id,unsubscribe]of state.subs)if(!wanted.has(id)&&id!==state.active){unsubscribe();state.subs.delete(id);}
-        for(const id of wanted)if(!state.subs.has(id)){
+        for(const id of wanted){
+            const known=state.matches.get(id);
+            if(known?.claims?.[state.uid]||(['finished','cancelled','rejected','expired'].includes(known?.status)&&!state.own?.petBattleLocks?.[id]))wanted.delete(id);
+        }
+        for(const [id,unsubscribe]of state.subs)if(!wanted.has(id)){unsubscribe();state.subs.delete(id);}
+        for(const id of wanted)if(!state.subs.has(id)&&!state.failedSubs.has(id)&&Date.now()>=state.cooldown){
+            try{assertPetQuotaAvailable();}catch{break;}
             const uid=state.uid,unsubscribe=onSnapshot(doc(db,'petBattles',id),snapshot=>{
                 if(state.uid!==uid||!snapshot.exists())return;const data={id:snapshot.id,...snapshot.data()};if(!data.participantUids?.includes(uid))return;state.matches.set(id,data);
                 const inviteKey=id+':invite';
                 if(data.status==='invited'&&data.opponentUid===uid&&data.expiresAt>Date.now()&&!state.autoOpened.has(inviteKey)){state.autoOpened.add(inviteKey);open(id);}
                 if(['ready','rps','fighting'].includes(data.status)&&!state.autoOpened.has(id)){state.autoOpened.add(id);open(id);}
                 updateInvites();render();process();
-            },fail);state.subs.set(id,unsubscribe);
+            },error=>{state.subs.delete(id);state.failedSubs.add(id);fail(error);});state.subs.set(id,unsubscribe);
         }updateInvites();render();
     }
     function updateInvites(){
@@ -9717,6 +9723,8 @@ const PetBattleGame=(()=>{
     }
     async function mutate(action,payload={},targetId=state.active){
         if(!mine()||state.busy)return;const uid=state.uid,ref=ownRef();if(!ref){fail(new Error('Chưa tải được hồ sơ.'));return;}
+        const known=state.matches.get(targetId);
+        if(action==='ready'&&known?.ready?.[uid]||action==='claim'&&known?.claims?.[uid])return;
         if(action==='create'||action==='accept'){
             try{
                 const fighter=petBattleFighter({...state.own,uid,attendancePet:attendancePetData},ref.id,payload.petId,payload.stats,Date.now(),payload.element);
@@ -9730,11 +9738,18 @@ const PetBattleGame=(()=>{
         if(!id)return;state.busy=true;state.message='Đang đồng bộ…';render();
         try{
             assertPetQuotaAvailable();const result=await runTransaction(db,async tx=>{
-                const battleRef=doc(db,'petBattles',id),[userSnapshot,battleSnapshot]=await Promise.all([tx.get(ref),tx.get(battleRef)]);
-                if(!mine()||state.uid!==uid||!userSnapshot.exists()||userSnapshot.data().uid!==uid)throw new Error('Phiên đăng nhập đã thay đổi.');
-                const user=userSnapshot.data(),locks={...(user.petBattleLocks||{})},now=Date.now();let next=battleSnapshot.exists()?battleSnapshot.data():null,patch={},changed=true;
+                const battleRef=doc(db,'petBattles',id);
+                const usesProfile=['create','accept','cancel','claim'].includes(action);
+                const [userSnapshot,battleSnapshot]=await Promise.all([
+                    usesProfile?tx.get(ref):null,
+                    action==='create'?null:tx.get(battleRef)
+                ]);
+                const user=userSnapshot?.data();
+                if(!mine()||state.uid!==uid||(usesProfile&&user?.uid!==uid))throw new Error('Phiên đăng nhập đã thay đổi.');
+                const locks={...user?.petBattleLocks},now=Date.now();
+                let next=battleSnapshot?.data()||null,patch={},changed=true;
                 if(action==='create'){
-                    if(next)throw new Error('Trận đấu đã tồn tại.');if(Object.keys(locks).length>=6)throw new Error('Hãy hoàn tất hoặc hủy các lời mời đang giữ kg trước.');
+                    if(Object.keys(locks).length>=6)throw new Error('Hãy hoàn tất hoặc hủy các lời mời đang giữ kg trước.');
                     if(!payload.opponentUid||payload.opponentUid===uid)throw new Error('Chọn một đối thủ khác.');
                     const stake=payload.stakeGrams;if(!Number.isSafeInteger(stake)||stake<100||stake%100!==0)throw new Error('Cược tối thiểu 0,1 kg, theo bước 0,1 kg.');
                     const fighter=petBattleFighter(user,ref.id,payload.petId,payload.stats,now,payload.element);
@@ -9762,7 +9777,7 @@ const PetBattleGame=(()=>{
                     }else if(action==='ready'){
                         if(next.ready?.[uid])changed=false;
                         else{
-                            if(next.status!=='ready'||now>=next.readyDeadline||!locks[id])throw new Error('Phòng đã hết thời gian sẵn sàng.');
+                            if(next.status!=='ready'||now>=next.readyDeadline)throw new Error('Phòng đã hết thời gian sẵn sàng.');
                             next.ready={...next.ready,[uid]:true};
                             if(next.participantUids.every(player=>next.ready[player])){
                                 const firstUid=next.participantUids[parseInt(id.slice(-1),16)%2];
@@ -9830,7 +9845,7 @@ const PetBattleGame=(()=>{
                 }
                 if(changed){if(action==='create')tx.set(battleRef,next);else tx.update(battleRef,next);if(Object.keys(patch).length)tx.update(ref,patch);}
                 return {match:next,patch,changed};
-            },{maxAttempts:2});
+            },{maxAttempts:['ready','claim'].includes(action)?2:1});
             if(!mine()||state.uid!==uid)return;
             const previous=state.matches.get(id);
             if(result.match.status==='ready'&&previous?.ready&&(
@@ -10037,7 +10052,10 @@ const PetBattleGame=(()=>{
             mutate('create',{...draft,roomFlow:true});
         });
         el('petBattleAccept').addEventListener('click',()=>mutate('accept',payload()));el('petBattleReject').addEventListener('click',()=>mutate('reject'));el('petBattleCancel').addEventListener('click',()=>mutate('cancel'));el('petBattleClaim').addEventListener('click',()=>mutate('claim'));
-        dialog.querySelectorAll('[data-pet-rps]').forEach(button=>button.addEventListener('click',()=>choose(button.dataset.petRps)));el('petBattleRetry').addEventListener('click',()=>{state.cooldown=0;state.subs.forEach(unsubscribe=>unsubscribe());state.subs.clear();state.message='';sync();process();});
+        dialog.querySelectorAll('[data-pet-rps]').forEach(button=>button.addEventListener('click',()=>choose(button.dataset.petRps)));el('petBattleRetry').addEventListener('click',()=>{
+            try{assertPetQuotaAvailable();}catch(error){fail(error);return;}
+            state.cooldown=0;state.failedSubs.clear();state.message='';el('petBattleRetry').hidden=true;sync();process();
+        });
     }
     return {init,start,stop,sync,profile,open};
 })();
@@ -10189,8 +10207,7 @@ function renderSharedNotes() {
 }
 
 function listenSharedNotes() {
-    stopSharedNotes();
-    if (!currentUser) return;
+    if (!currentUser||sharedNotesUnsubscribe) return;
     const uid = currentUser.uid;
     const generation = sharedNotesGeneration;
     document.getElementById('sharedNotesToggle').hidden = false;
@@ -10201,6 +10218,7 @@ function listenSharedNotes() {
         renderSharedNotes();
     }, error => {
         if (currentUser?.uid !== uid || generation !== sharedNotesGeneration) return;
+        sharedNotesUnsubscribe=null;
         document.getElementById('sharedNotesStatus').textContent = error.code === 'permission-denied'
             ? 'Tài khoản chưa được cấp quyền đọc ghi chú chung. Liên hệ người quản lý ứng dụng.'
             : 'Không tải được ghi chú. Vui lòng thử lại sau.';
@@ -11465,7 +11483,7 @@ async function openPresenterSpinModal() {
     listEl.innerHTML = '<div class="empty-state"><i class="bi bi-hourglass-split"></i><br>Đang tải danh sách user...</div>';
 
     try {
-        const snapshot = await getDocs(collection(db, 'users'));
+        const snapshot = usersDirectorySnapshot || await getDocs(collection(db, 'users'));
         spinAllUsers = [];
         usersDeptLatest = {};
         snapshot.forEach(userDoc => {
@@ -13659,7 +13677,6 @@ let dayOffViewMonth = new Date().getMonth();
 // Mỗi (người, ngày) chỉ được có 1 lịch off. Gộp bản trùng (race giữa snapshot realtime và cập nhật local,
 // hoặc doc cũ id ngẫu nhiên): ưu tiên doc có id chuẩn `${uid}_${date}`, sau đó doc mới nhất.
 let dayOffExtraIds = {};              // `${uid}|${date}` -> [id các doc trùng bị loại]
-const dayOffCleaned = new Set();      // id đã gửi lệnh xóa dọn rác (tránh lặp)
 
 function normalizeDayOffs(list) {
     const best = {};
@@ -13679,19 +13696,6 @@ function normalizeDayOffs(list) {
     return Object.values(best);
 }
 
-// Dọn nền các doc trùng của CHÍNH MÌNH trong Firestore (không đụng doc người khác)
-function cleanupMyDuplicateDayOffs() {
-    if (!currentUser) return;
-    Object.entries(dayOffExtraIds).forEach(([k, ids]) => {
-        if (!k.startsWith(currentUser.uid + '|')) return;
-        ids.forEach(id => {
-            if (dayOffCleaned.has(id)) return;
-            dayOffCleaned.add(id);
-            deleteDoc(doc(db, DAYOFF_COLLECTION, id)).catch(() => { });
-        });
-    });
-}
-
 function dayOffAllIds(o) {
     return [o.id].concat(dayOffExtraIds[`${o.userId}|${o.date}`] || []);
 }
@@ -13703,7 +13707,6 @@ function listenDayOffs() {
     const q = collection(db, DAYOFF_COLLECTION);
     unsubscribeDayOffs = onSnapshot(q, (snapshot) => {
         dayOffsList = normalizeDayOffs(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-        cleanupMyDuplicateDayOffs();
         renderSchedule();
         if (dayOffModalOpen) renderDayOffModal();
         if (document.getElementById('statisticsModal')?.classList.contains('show')) renderStatisticsLineChart();
@@ -13834,7 +13837,7 @@ async function openDayOffModal() {
     renderDayOffModal();
 
     try {
-        const snapshot = await getDocs(collection(db, 'users'));
+        const snapshot = usersDirectorySnapshot || await getDocs(collection(db, 'users'));
         const users = [];
         // Đồng thời nạp cache avatar từ kết quả fetch này (đề phòng listener
         // listenUsersAvatars chưa fire xong hoặc chưa có user nào có avatar)
@@ -15841,7 +15844,7 @@ function getStatsUserColor(uid) {
 async function ensureUsersInfoCache() {
     if (Object.keys(usersInfoCache).length > 0) return;
     try {
-        const snap = await getDocs(collection(db, 'users'));
+        const snap = usersDirectorySnapshot || await getDocs(collection(db, 'users'));
         usersDeptLatest = {};
         snap.forEach(d => {
             const u = d.data();
