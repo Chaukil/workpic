@@ -428,7 +428,8 @@ function transitionAttendancePet(raw, action, now = Date.now(), { ignoreFeedingC
     if (action==='init') return {pet:view.pet,changed:!raw||raw.version!==1||!Number.isFinite(raw.bornAt)||!Number.isFinite(raw.hatchAt),result:'ready'};
     if (action==='revive') {
         if (!view.dead) return {pet,changed:false,result:'alive'};
-        return {pet:{...newAttendancePet(now),nickname:view.nickname,lastFedAt:pet.lastFedAt||null,fedOn:pet.fedOn===view.today?view.today:null,life:(Number(pet.life)||1)+1},changed:true,result:'revived'};
+        return {pet:{...newAttendancePet(now),nickname:view.nickname,lastFedAt:pet.lastFedAt||null,fedOn:pet.fedOn===view.today?view.today:null,life:(Number(pet.life)||1)+1,
+            ...(Array.isArray(pet.battleHistory)?{battleHistory:pet.battleHistory}:{})},changed:true,result:'revived'};
     }
     if(action.startsWith('rename:')){
         const nickname=normalizePetNickname(action.slice(7));
@@ -467,7 +468,8 @@ function adjustAdminPet(raw, action, level, now = Date.now()) {
     const view = attendancePetView(raw, now), pet = settleAttendancePetWeight(view.pet,now);
     if(unchangedPetAdminAction(view,action,level))return view.pet;
     const keepAlive = () => { pet.lastCheckinAt = now;pet.weightPenaltyGrams=0; };
-    if (action === 'egg') return {...newAttendancePet(now),nickname:view.nickname,life:(Number(pet.life)||1)+1};
+    if (action === 'egg') return {...newAttendancePet(now),nickname:view.nickname,life:(Number(pet.life)||1)+1,
+        ...(Array.isArray(pet.battleHistory)?{battleHistory:pet.battleHistory}:{})};
     if (action === 'checkin') {
         if (!view.checkedToday) pet.checkins = view.checkins + 1;
         pet.lastCheckinDay = view.today; keepAlive();
@@ -558,6 +560,7 @@ function buildPetComparison(profiles,now=Date.now(),branch='all'){
                 petId:pet.id,petName:view.displayName,species:view.name,level:view.level,branchKey:key,branchName:view.branch?ATTENDANCE_PET_BRANCHES[view.branch].name:'Chưa chọn nhánh',
                 xpToNextLevel:view.maxed?0:Math.max(0,view.level*10-view.xp),maxed:view.maxed,
                 weightGrams:view.weightGrams,lastActiveAt:activity,dead:view.dead,egg:view.egg,
+                battleHistory:Array.isArray(pet.battleHistory)?pet.battleHistory:[],
                 appearance:{form:view.form,level:view.level,branch:view.branch,egg:view.egg,dead:view.dead}});
         }
     }
@@ -9180,13 +9183,35 @@ function renderPetComparison(force=false){
             :`${10-row.xpToNextLevel}/10 EXP · ${row.xpToNextLevel?`Còn ${row.xpToNextLevel} EXP`:'Chọn nhánh để lên cấp'}`;
         level.appendChild(xp);
         cell(petWeightLabel(row.weightGrams)).className='pet-compare-weight';
-        cell(new Date(row.lastActiveAt).toLocaleString('vi-VN',{timeZone:'Asia/Bangkok',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}));
+        const history=document.createElement('button');
+        history.type='button';history.className='btn btn-outline-primary pet-compare-history-button';history.textContent='Xem lịch sử';
+        history.setAttribute('aria-label',`Xem lịch sử thách đấu của ${row.petName}`);
+        history.addEventListener('click',()=>openPetBattleHistory(row));
+        cell('').appendChild(history);
         const status=cell(''),badge=document.createElement('span');badge.className='pet-compare-state '+(row.dead?'dead':row.egg?'egg':'alive');badge.textContent=row.dead?'Đã chết':row.egg?'Đang ấp':'Đang sống';status.appendChild(badge);
         return tr;
     }));
     document.getElementById('petCompareEmpty').hidden=rows.length>0;
     const summary=`${new Set(rows.map(row=>row.uid)).size} thành viên · ${rows.length} thú cưng`;
     document.getElementById('petCompareSummary').textContent=usersDirectorySnapshot?summary:'Đang chờ dữ liệu thành viên khác · '+summary;
+}
+function openPetBattleHistory(row){
+    const dialog=document.getElementById('petBattleHistoryDialog');
+    const list=document.getElementById('petBattleHistoryList');
+    document.getElementById('petBattleHistoryPet').textContent=`${row.petName} · ${row.ownerName}`;
+    const results={win:'Thắng',loss:'Thua',draw:'Hòa'};
+    const signed=(delta,format)=>`${delta>0?'+':delta<0?'−':''}${format(Math.abs(delta))}`;
+    list.replaceChildren(...row.battleHistory.filter(entry=>entry&&Object.hasOwn(results,entry.result)).map(entry=>{
+        const item=document.createElement('li'),name=document.createElement('strong');
+        const details=document.createElement('small');
+        name.textContent=`${results[entry.result]} · ${entry.opponentName||'Đối thủ'}${entry.opponentPetName?` / ${entry.opponentPetName}`:''}`;
+        details.textContent=`${signed(Number(entry.xpDelta)||0,value=>`${value} EXP`)} · ${signed(Number(entry.weightDelta)||0,petWeightLabel)} · ${new Date(entry.endedAt).toLocaleString('vi-VN',{timeZone:'Asia/Bangkok',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}`;
+        item.dataset.result=entry.result;
+        item.append(name,details);
+        return item;
+    }));
+    document.getElementById('petBattleHistoryEmpty').hidden=list.childElementCount>0;
+    if(!dialog.open)dialog.showModal();
 }
 const attendancePetFleet=new Map();
 const petHungerNotificationPending=new Set();
@@ -9259,7 +9284,13 @@ function renderAttendancePetFleet(){
 }
 function selectAttendancePet(id){
     if(attendancePetBusy)return;
-    selectedAttendancePetId=id;const nickname=document.getElementById('attendancePetNickname');nickname.value='';delete nickname.dataset.dirty;renderAttendancePet();
+    if(id!==selectedAttendancePetId)closePetNicknameEditor();
+    selectedAttendancePetId=id;renderAttendancePet();
+}
+function closePetNicknameEditor(){
+    document.getElementById('attendancePetNicknameForm').hidden=true;
+    document.getElementById('attendancePetNicknameEdit').setAttribute('aria-expanded','false');
+    delete document.getElementById('attendancePetNickname').dataset.dirty;
 }
 function renderAttendancePetRoster(){
     const records=attendancePetRecords(attendancePetData),selected=attendancePetSelected(attendancePetData,selectedAttendancePetId).id;
@@ -9329,9 +9360,12 @@ function renderAttendancePet() {
     nicknameInput.disabled=!attendancePetReady||attendancePetBusy;
     if(!nicknameInput.dataset.dirty&&document.activeElement!==nicknameInput)nicknameInput.value=view.nickname;
     document.getElementById('attendancePetNicknameSave').disabled=!attendancePetReady||attendancePetBusy;
-    document.getElementById('attendancePetDescription').textContent = view.dead ? 'Bạn đã vắng điểm danh đủ 72 giờ. Bấm thú cưng hoặc Hồi sinh để bắt đầu một cuộc đời mới.'
+    document.getElementById('attendancePetNicknameEdit').disabled=!attendancePetReady||attendancePetBusy;
+    const description = document.getElementById('attendancePetDescription');
+    description.textContent = view.dead ? 'Bạn đã vắng điểm danh đủ 72 giờ. Bấm thú cưng hoặc Hồi sinh để bắt đầu một cuộc đời mới.'
         : view.egg ? 'Trứng đang ấp. Bạn vẫn có thể điểm danh hôm nay để tích ngày tiến hóa.'
-        : view.hungry ? 'Đang đói! Cho ăn để nhận +1 XP tiến hóa.' : `Đang no bụng. Có thể cho ăn lại sau ${duration(view.untilHungry)}.`;
+        : view.hungry ? 'Đang đói! Cho ăn để nhận +1 XP tiến hóa.' : '';
+    description.hidden = !description.textContent;
     document.getElementById('attendancePetPreview').dataset.mode=attendancePetMotion(view);
     document.getElementById('petGameXp').textContent=`${view.xp} XP`;
     document.getElementById('petGameWeight').textContent=petWeightLabel(view.weightGrams);
@@ -9342,7 +9376,9 @@ function renderAttendancePet() {
     document.getElementById('petGameSurvival').textContent=view.dead?'Cần hồi sinh':duration(view.diesAt-Date.now());
     document.getElementById('petGameSurvival').dataset.state=view.diesAt-Date.now()<86400000?'danger':'full';
     const hatchTime = new Date(view.pet.hatchAt).toLocaleString('vi-VN',{timeZone:'Asia/Bangkok'});
-    document.getElementById('attendancePetCountdown').textContent = view.dead ? 'Hồi sinh: trở về trứng, nở sau 1 giờ.' : view.egg ? `Nở sau ${duration(view.untilHatch)} · Dự kiến nở lúc ${hatchTime}. Thời gian vẫn tính khi đóng web.` : `Cần điểm danh trước ${new Date(view.diesAt).toLocaleString('vi-VN',{timeZone:'Asia/Bangkok'})}.`;
+    const countdown=document.getElementById('attendancePetCountdown');
+    countdown.textContent=view.dead?'Hồi sinh: trở về trứng, nở sau 1 giờ.':view.egg?`Nở sau ${duration(view.untilHatch)} · Dự kiến nở lúc ${hatchTime}. Thời gian vẫn tính khi đóng web.`:'';
+    countdown.hidden=!countdown.textContent;
     const eggTimer = document.getElementById('attendancePetEggTimer');
     eggTimer.hidden = !view.egg || view.dead || !attendancePetReady;
     eggTimer.textContent = `Nở sau ${duration(view.untilHatch)}`;
@@ -9355,7 +9391,7 @@ function renderAttendancePet() {
     checkin.textContent = checkedToday ? 'Đã điểm danh cả đàn hôm nay' : 'Điểm danh cả đàn · +1 XP';
     checkin.disabled = !attendancePetReady || attendancePetBusy || !attendancePetRecords(attendancePetData).some(p=>!attendancePetView(p).dead) || checkedToday;
     const feed = document.getElementById('attendancePetFeed');
-    feed.textContent = view.dead ? 'Hồi sinh thành trứng' : view.egg ? 'Đang ấp trứng' : view.hungry ? 'Cho ăn · +1 XP' : 'Chưa đói · '+duration(view.untilHungry);
+    feed.textContent = view.dead ? 'Hồi sinh thành trứng' : view.egg ? 'Đang ấp trứng' : view.hungry ? 'Cho ăn · +1 XP' : 'Chưa đói';
     feed.disabled = !attendancePetReady || attendancePetBusy || (!view.dead && !view.hungry);
     document.getElementById('attendancePetDot').hidden = checkedToday && !view.dead;
     const swimmer = document.getElementById('attendancePetSwimmer');
@@ -9496,6 +9532,8 @@ function stopAttendancePet() {
     petComparisonCache=null;
     stopPetComparisonThumbnails();
     const comparison=document.getElementById('petCompareDialog');if(comparison?.open)comparison.close();
+    const history=document.getElementById('petBattleHistoryDialog');if(history?.open)history.close();
+    document.getElementById('petBattleHistoryList')?.replaceChildren();
     document.getElementById('petCompareRows')?.replaceChildren();
     attendancePetBranchPrompted='';
     const branchDialog=document.getElementById('attendancePetBranchDialog');if(branchDialog?.open)branchDialog.close();
@@ -9505,7 +9543,7 @@ function stopAttendancePet() {
     if (dialog?.open) dialog.close();
     const toggle=document.getElementById('attendancePetToggle');if(toggle)toggle.hidden=true;
     const swimmer=document.getElementById('attendancePetSwimmer');if(swimmer)swimmer.hidden=true;
-    const nickname=document.getElementById('attendancePetNickname');if(nickname){nickname.value='';delete nickname.dataset.dirty;}
+    const nickname=document.getElementById('attendancePetNickname');if(nickname){nickname.value='';closePetNicknameEditor();}
 }
 
 function initAttendancePetUi() {
@@ -9514,7 +9552,7 @@ function initAttendancePetUi() {
     PetBattleGame.init();
     const dialog=document.getElementById('attendancePetDialog');
     toggle.addEventListener('click',()=>{renderAttendancePet();if(!dialog.open)dialog.showModal();AttendancePet3D.preview(true);openAttendancePetBranch(true);});
-    dialog.addEventListener('close',()=>{if(dialog.open)return;document.getElementById('attendancePetBranchDialog').close();document.getElementById('petCompareDialog').close();AttendancePet3D.preview(false);});
+    dialog.addEventListener('close',()=>{if(dialog.open)return;closePetNicknameEditor();document.getElementById('attendancePetBranchDialog').close();document.getElementById('petCompareDialog').close();AttendancePet3D.preview(false);});
     document.getElementById('attendancePetClose').addEventListener('click',()=>dialog.close());
     dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close();});
     document.getElementById('attendancePetCheckin').addEventListener('click',()=>actOnAttendancePet('checkin'));
@@ -9523,7 +9561,10 @@ function initAttendancePetUi() {
     document.getElementById('petCompareBranch').append(...Object.entries(ATTENDANCE_PET_BRANCHES).map(([key,branch])=>new Option(branch.name,key)));
     document.getElementById('petCompareOpen').addEventListener('click',()=>{if(!currentUser)return;if(!comparison.open)comparison.showModal();renderPetComparison(true);});
     document.getElementById('petCompareClose').addEventListener('click',()=>comparison.close());
-    comparison.addEventListener('close',()=>{if(!comparison.open)stopPetComparisonThumbnails();});
+    const history=document.getElementById('petBattleHistoryDialog');
+    document.getElementById('petBattleHistoryClose').addEventListener('click',()=>history.close());
+    history.addEventListener('click',event=>{if(event.target===history)history.close();});
+    comparison.addEventListener('close',()=>{if(!comparison.open){history.close();stopPetComparisonThumbnails();}});
     comparison.addEventListener('click',event=>{if(event.target===comparison)comparison.close();});
     document.getElementById('petCompareBranch').addEventListener('change',()=>renderPetComparison(true));
     const branchDialog=document.getElementById('attendancePetBranchDialog');
@@ -9536,13 +9577,24 @@ function initAttendancePetUi() {
         renderAttendancePet();
     });
     const nickname=document.getElementById('attendancePetNickname');
+    const nicknameForm=document.getElementById('attendancePetNicknameForm'),nicknameEdit=document.getElementById('attendancePetNicknameEdit');
+    const dismissNickname=()=>{closePetNicknameEditor();nicknameEdit.focus();};
+    nicknameEdit.addEventListener('click',()=>{
+        if(!nicknameForm.hidden){dismissNickname();return;}
+        nickname.value=selectedAttendancePetView().nickname;
+        nicknameForm.hidden=false;
+        nicknameEdit.setAttribute('aria-expanded','true');
+        nickname.focus();
+        nickname.select();
+    });
+    document.getElementById('attendancePetNicknameCancel').addEventListener('click',dismissNickname);
     nickname.addEventListener('input',()=>nickname.dataset.dirty='true');
-    document.getElementById('attendancePetNicknameForm').addEventListener('submit',async event=>{
+    nicknameForm.addEventListener('submit',async event=>{
         event.preventDefault();if(!attendancePetReady||attendancePetBusy)return;
         const value=normalizePetNickname(nickname.value);
-        if(value===selectedAttendancePetView().nickname){delete nickname.dataset.dirty;nickname.value=value;attendancePetMessage('Tên thú cưng không thay đổi.');return;}
+        if(value===selectedAttendancePetView().nickname){dismissNickname();return;}
         await actOnAttendancePet('rename:'+value);
-        if(selectedAttendancePetView().nickname===value)nickname.value=value;
+        if(dialog.open&&!nicknameForm.hidden&&selectedAttendancePetView().nickname===value)dismissNickname();
     });
     const interact=()=>{const view=selectedAttendancePetView();actOnAttendancePet(view.dead?'revive':'feed');};
     document.getElementById('attendancePetFeed').addEventListener('click',interact);
@@ -9560,17 +9612,18 @@ const PetBattleGame=(()=>{
     const match=()=>state.matches.get(state.active);
     function dismissed(){try{const ids=JSON.parse(localStorage.getItem('workpic-battle-dismissed:'+state.uid)||'[]');return Array.isArray(ids)?ids:[];}catch{return [];}}
     function finishRoom(){
-        const m=match();if(!m||!m.claims?.[state.uid]||!(['finished','cancelled','rejected','expired'].includes(m.status)||petBattlePlayback(m).finished))return;
+        const m=match();if(!m||state.busy||(!m.claims?.[state.uid]&&state.own?.petBattleLocks?.[m.id])||!(['finished','cancelled','rejected','expired'].includes(m.status)||petBattlePlayback(m).finished))return;
         try{localStorage.setItem('workpic-battle-dismissed:'+state.uid,JSON.stringify([...new Set([...dismissed(),m.id])].slice(-200)));}catch{state.message='Không lưu được danh sách trận đã kết thúc trên máy này.';render();return;}
-        state.subs.get(m.id)?.();state.subs.delete(m.id);state.matches.delete(m.id);state.active='';state.listKey='';disposeModels();el('petBattleDialog').close();
+        state.subs.get(m.id)?.();state.subs.delete(m.id);state.matches.delete(m.id);state.active='';state.listKey='';disposeModels();el('petBattleExitDialog').close();el('petBattleDialog').close();openLobby();
     }
     const secretKey=(id,round)=>`workpic-battle-rps:${state.uid}:${id}:${round}`;
     const secret=(id,round)=>{try{return JSON.parse(localStorage.getItem(secretKey(id,round))||'null');}catch{return null;}};
     function disposeModels(){state.models.forEach(model=>model.stop());state.models=[];state.modelKey='';}
     function stop(){
         clearInterval(state.timer);state.timer=null;state.subs.forEach(unsubscribe=>unsubscribe());state.subs.clear();state.matches.clear();state.autoOpened.clear();disposeModels();
-        state.uid=null;state.own=null;state.active='';state.creating=false;state.busy=false;state.message='';state.setupKey='';state.listKey='';state.cooldown=0;state.lastSync=0;
-        if(el('petBattleDialog')?.open)el('petBattleDialog').close();if(el('petBattleInvite'))el('petBattleInvite').hidden=true;
+        state.uid=null;state.own=null;state.active='';state.creating=false;state.busy=false;state.message='';state.setupKey='';state.listKey='';state.resultPrompt='';state.cooldown=0;state.lastSync=0;
+        for(const id of ['petBattleExitDialog','petBattleInvitePicker','petBattleDialog','petBattleLobby'])if(el(id)?.open)el(id).close();
+        if(el('petBattleInvite'))el('petBattleInvite').hidden=true;
     }
     function start(){stop();if(!currentUser||!attendancePetRef)return;state.uid=currentUser.uid;state.own=authenticatedProfileSnapshot?.data()||{uid:state.uid,attendancePet:attendancePetData};
         state.timer=setInterval(()=>{if(!mine())return;if(Date.now()-state.lastSync>15000)sync();process();if(el('petBattleDialog').open&&!document.hidden)render();},200);sync();}
@@ -9586,7 +9639,7 @@ const PetBattleGame=(()=>{
                 if(state.uid!==uid||!snapshot.exists())return;const data={id:snapshot.id,...snapshot.data()};if(!data.participantUids?.includes(uid))return;state.matches.set(id,data);
                 const inviteKey=id+':invite';
                 if(data.status==='invited'&&data.opponentUid===uid&&data.expiresAt>Date.now()&&!state.autoOpened.has(inviteKey)){state.autoOpened.add(inviteKey);open(id);}
-                if(['rps','fighting'].includes(data.status)&&!state.autoOpened.has(id)){state.autoOpened.add(id);open(id);}
+                if(['ready','rps','fighting'].includes(data.status)&&!state.autoOpened.has(id)){state.autoOpened.add(id);open(id);}
                 updateInvites();render();process();
             },fail);state.subs.set(id,unsubscribe);
         }updateInvites();render();
@@ -9596,7 +9649,24 @@ const PetBattleGame=(()=>{
         el('petBattleBadge').textContent=incoming.length?String(incoming.length):'';el('petBattleInvite').hidden=!incoming.length;
         if(incoming.length){el('petBattleInviteText').textContent=`${incoming[0].players[0].name} thách đấu ${petWeightLabel(incoming[0].stakeGrams)} mỗi bên.`;el('petBattleViewInvite').dataset.matchId=incoming[0].id;}
     }
-    function open(id=''){if(!currentUser)return;if(!attendancePetReady){attendancePetMessage('Chờ đồng bộ thú cưng trước khi vào đấu trường.');return;}if(!mine())start();state.active=id;state.creating=false;state.setupKey='';state.lastTurn='';state.message='';if(!el('petBattleDialog').open)el('petBattleDialog').showModal();render();}
+    function canOpen(){
+        if(!currentUser)return false;
+        if(!attendancePetReady){attendancePetMessage('Chờ đồng bộ thú cưng trước khi vào đấu trường.');return false;}
+        if(!mine())start();
+        return true;
+    }
+    function openLobby(){
+        if(!canOpen())return;
+        if(!el('petBattleLobby').open)el('petBattleLobby').showModal();
+        render();
+    }
+    function open(id=''){
+        if(!canOpen())return;
+        el('petBattleLobby').close();el('petBattleInvitePicker').close();el('petBattleExitDialog').close();
+        state.active=id;state.creating=!id;state.setupKey='';state.lastTurn='';state.message='';
+        if(!el('petBattleDialog').open)el('petBattleDialog').showModal();
+        render();
+    }
     const statInputs={attack:'petBattleAttack',magic:'petBattleMagic',defense:'petBattleDefense',magicReduction:'petBattleMagicReduction',physicalReduction:'petBattlePhysicalReduction',dodge:'petBattleDodge',luck:'petBattleLuck',health:'petBattleHealth'};
     function draftBudget(){
         const pet=attendancePetSelected(attendancePetData,el('petBattlePet').value);
@@ -9630,20 +9700,22 @@ const PetBattleGame=(()=>{
         Object.entries(statInputs).forEach(([key,id])=>{
             el(id).previousElementSibling.textContent=stats[key];
         });
+        el('petBattleDraftPet').textContent=el('petBattlePet').value?view.displayName:'Chưa có thú cưng sẵn sàng';
         el('petBattleBalance').textContent=`${view.displayName} · Cấp ${view.level} · Có ${petWeightLabel(view.weightGrams)} để cược. Kg cược được giữ trước, không trừ thêm khi thua.`;
     }
     function setup(m){
         const key=(m?.id||'new')+':'+state.uid;if(state.setupKey===key)return;state.setupKey=key;
         const users=new Map();for(const p of profileRows())if(p.uid!==state.uid&&!users.has(p.uid))users.set(p.uid,p);
-        el('petBattleOpponent').replaceChildren(...[...users.values()].sort((a,b)=>(a.displayName||a.email||'').localeCompare(b.displayName||b.email||'','vi')).map(p=>new Option(p.displayName||p.email||p.uid,p.uid)));
+        el('petBattleOpponent').replaceChildren(new Option('Chọn thành viên',''),...[...users.values()].sort((a,b)=>(a.displayName||a.email||'').localeCompare(b.displayName||b.email||'','vi')).map(p=>new Option(p.displayName||p.email||p.uid,p.uid)));
         const records=attendancePetRecords(attendancePetData).filter(p=>{const v=attendancePetView(p);return !v.egg&&!v.dead&&!Object.values(state.own?.petBattleLocks||{}).some(lock=>lock.petId===p.id);});
         el('petBattlePet').replaceChildren(...records.map(p=>{const v=attendancePetView(p);return new Option(`${v.displayName} · Cấp ${v.level} · ${petWeightLabel(v.weightGrams)}`,p.id);}));
         if(records.some(p=>p.id===selectedAttendancePetId))el('petBattlePet').value=selectedAttendancePetId;
-        el('petBattleOpponent').disabled=!!m;el('petBattleStake').disabled=!!m;if(m){el('petBattleOpponent').value=m.challengerUid;el('petBattleStake').value=m.stakeGrams/1000;}
+        el('petBattleStake').disabled=!!m;
+        el('petBattleStake').value=m?m.stakeGrams/1000:0.2;
         el('petBattleElement').value='';
         loadStatsDraft();
     }
-    async function mutate(action,payload={}){
+    async function mutate(action,payload={},targetId=state.active){
         if(!mine()||state.busy)return;const uid=state.uid,ref=ownRef();if(!ref){fail(new Error('Chưa tải được hồ sơ.'));return;}
         if(action==='create'||action==='accept'){
             try{
@@ -9653,8 +9725,8 @@ const PetBattleGame=(()=>{
                 petBattleChangeWeight(attendancePetData,fighter.petId,-stake,Date.now());
             }catch(error){state.message=error.message;render();return;}
         }
-        if(action==='create'&&(!globalThis.crypto?.subtle||typeof crypto.randomUUID!=='function')){fail(new Error('Đấu trường cần HTTPS hoặc localhost để giữ kín oẳn tù tì.'));return;}
-        const id=action==='create'?`battle-${Date.now().toString(36)}-${crypto.randomUUID()}`:state.active;
+        if(action==='create'&&typeof globalThis.crypto?.randomUUID!=='function'){fail(new Error('Đấu trường cần HTTPS hoặc localhost để tạo phòng.'));return;}
+        const id=action==='create'?`battle-${Date.now().toString(36)}-${crypto.randomUUID()}`:targetId;
         if(!id)return;state.busy=true;state.message='Đang đồng bộ…';render();
         try{
             assertPetQuotaAvailable();const result=await runTransaction(db,async tx=>{
@@ -9670,6 +9742,7 @@ const PetBattleGame=(()=>{
                     locks[id]={petId:fighter.petId,stakeGrams:stake,peerUid:payload.opponentUid,role:'challenger',createdAt:now,expiresAt:now+600000};patch.petBattleLocks=locks;
                     next={version:1,challengerUid:uid,opponentUid:payload.opponentUid,participantUids:[uid,payload.opponentUid],players:[fighter],stakeGrams:stake,status:'invited',createdMs:now,createdAt:serverTimestamp(),expiresAt:now+600000,rpsRound:0,commits:{},reveals:{},claims:{},turns:[],maxHp:[],winnerUid:null,startedAt:null};
                     next.stakeXp=Math.floor(stake/200);
+                    next.roomFlow=payload.roomFlow===true;
                 }else{
                     if(!next||next.version!==1||!next.participantUids?.includes(uid))throw new Error('Không có quyền xem trận này.');next={...next};
                     if(action==='accept'){
@@ -9680,7 +9753,22 @@ const PetBattleGame=(()=>{
                         const fighter=petBattleFighter(user,ref.id,payload.petId,payload.stats,now,payload.element),stake=next.stakeGrams;
                         patch.attendancePet=petBattleChangeWeight(user.attendancePet,fighter.petId,-stake,now);
                         locks[id]={petId:fighter.petId,stakeGrams:stake,peerUid:next.challengerUid,role:'opponent',createdAt:now,expiresAt:now+600000};patch.petBattleLocks=locks;
-                        next.players=[next.players[0],fighter];next.status='rps';next.acceptedAt=serverTimestamp();next.rpsDeadline=now+120000;
+                        next.players=[next.players[0],fighter];next.acceptedAt=serverTimestamp();
+                        if(next.roomFlow){
+                            next.status='ready';next.ready={};next.readyDeadline=now+120000;
+                        }else{
+                            next.status='rps';next.rpsDeadline=now+120000;
+                        }
+                    }else if(action==='ready'){
+                        if(next.ready?.[uid])changed=false;
+                        else{
+                            if(next.status!=='ready'||now>=next.readyDeadline||!locks[id])throw new Error('Phòng đã hết thời gian sẵn sàng.');
+                            next.ready={...next.ready,[uid]:true};
+                            if(next.participantUids.every(player=>next.ready[player])){
+                                const firstUid=next.participantUids[parseInt(id.slice(-1),16)%2];
+                                next={...next,...petBattleSimulation(next.players,firstUid),status:'fighting',firstUid,startedAt:serverTimestamp()};
+                            }
+                        }
                     }else if(action==='reject'||action==='cancel'){
                         if(next.status!=='invited'||uid!==(action==='reject'?next.opponentUid:next.challengerUid))throw new Error('Không thể hủy lời mời này.');
                         next.status=action==='reject'?'rejected':'cancelled';
@@ -9703,31 +9791,38 @@ const PetBattleGame=(()=>{
                     }else if(action==='claim'){
                         if(next.claims?.[uid])changed=false;
                         else{
-                            if(next.status==='invited'&&now>=next.expiresAt||next.status==='rps'&&now>=next.rpsDeadline)next.status='expired';
+                            if(roomExpired(next,now))next.status='expired';
                             if(next.status==='fighting'&&petBattlePlayback(next,now).finished)next.status='finished';
                             const amount=petBattleClaimAmount(next,uid,now),lock=locks[id];
                             if(amount===null||!lock)throw new Error('Chưa có kết quả hoặc không có kg cần nhận.');
                             if(lock.stakeGrams!==next.stakeGrams||!next.players.some(player=>player.uid===uid&&player.petId===lock.petId))throw new Error('Thông tin cược không khớp.');
                             if(amount>0)patch.attendancePet=petBattleChangeWeight(user.attendancePet,lock.petId,amount,now);
-                            if(next.status==='finished'&&next.winnerUid){
-                                const until=petBattleTime(next.startedAt)+(next.introMs===5000?5000:2000)+next.turns.length*PET_BATTLE_STEP_MS+3600000;
-                                const won=next.winnerUid===uid;
-                                const outcome=won?{victoryAuraUntil:until}:{
-                                    defeatAuraUntil:until,
-                                    defeatOpponentName:next.players.find(p=>p.uid===next.winnerUid)?.name||'đối thủ'
-                                };
-                                const expiryField=won?'victoryAuraUntil':'defeatAuraUntil';
-                                const root=patch.attendancePet||user.attendancePet;
-                                const records=attendancePetRecords(root,now).map(p=>
-                                    p.id===lock.petId&&until>(Number(p[expiryField])||0)?{...p,...outcome}:p
-                                );
-                                patch.attendancePet={...root,...records[0],companions:records.slice(1)};
-                            }
                             if(next.status==='finished'&&next.winnerUid&&Number.isSafeInteger(next.stakeXp)&&next.stakeXp>0){
                                 const delta=next.winnerUid===uid?next.stakeXp:-next.stakeXp;
                                 const result=petBattleSettleXp(patch.attendancePet||user.attendancePet,lock.petId,delta,now);
                                 if(result.change)patch.attendancePet=result.pet;
                                 next.xpChanges={...next.xpChanges,[uid]:result.change};
+                            }
+                            if(next.status==='finished'){
+                                const endedAt=petBattleTime(next.startedAt)+(next.introMs===5000?5000:2000)+next.turns.length*PET_BATTLE_STEP_MS;
+                                const opponent=next.players.find(p=>p.uid!==uid);
+                                const won=next.winnerUid===uid,until=endedAt+3600000;
+                                const entry={id,endedAt,result:next.winnerUid?(won?'win':'loss'):'draw',
+                                    opponentName:opponent?.name||'Đối thủ',opponentPetName:opponent?.petName||'',
+                                    xpDelta:next.xpChanges?.[uid]||0,weightDelta:amount-lock.stakeGrams};
+                                const root=patch.attendancePet||user.attendancePet;
+                                const records=attendancePetRecords(root,now).map(p=>{
+                                    if(p.id!==lock.petId)return p;
+                                    const history=Array.isArray(p.battleHistory)?p.battleHistory:[];
+                                    const battleHistory=[entry,...history.filter(item=>item&&item.id!==id)]
+                                        .sort((a,b)=>b.endedAt-a.endedAt).slice(0,30);
+                                    const expiryField=won?'victoryAuraUntil':'defeatAuraUntil';
+                                    const aura=next.winnerUid&&until>(Number(p[expiryField])||0)
+                                        ?won?{victoryAuraUntil:until}:{defeatAuraUntil:until,defeatOpponentName:entry.opponentName}
+                                        :{};
+                                    return {...p,battleHistory,...aura};
+                                });
+                                patch.attendancePet={...root,...records[0],companions:records.slice(1)};
                             }
                             delete locks[id];patch.petBattleLocks=locks;next.claims={...next.claims,[uid]:true};
                         }
@@ -9737,11 +9832,22 @@ const PetBattleGame=(()=>{
                 return {match:next,patch,changed};
             },{maxAttempts:2});
             if(!mine()||state.uid!==uid)return;
-            const previous=state.matches.get(id);if(previous&&petBattleTime(previous.startedAt)&&!petBattleTime(result.match.startedAt))result.match.startedAt=previous.startedAt;
-            state.matches.set(id,{id,...result.match});state.active=id;state.own={...state.own,...result.patch};state.message=action==='create'?'Đã gửi lời thách đấu. Kg cược đang được giữ.':action==='claim'?'Đã cập nhật kết quả và kg, không thể nhận lặp.':'Đã đồng bộ với đối thủ.';state.cooldown=0;el('petBattleRetry').hidden=true;
+            const previous=state.matches.get(id);
+            if(result.match.status==='ready'&&previous?.ready&&(
+                previous.status!=='ready'||Object.keys(previous.ready).length>Object.keys(result.match.ready).length
+            ))result.match=previous;
+            if(previous&&petBattleTime(previous.startedAt)&&!petBattleTime(result.match.startedAt))result.match.startedAt=previous.startedAt;
+            state.matches.set(id,{id,...result.match});
+            if(action==='create'){state.active=id;state.creating=false;}
+            state.own={...state.own,...result.patch};state.message=action==='create'?'Đã gửi lời mời. Kg cược đang được giữ.':action==='claim'?'Đã cập nhật kết quả.':'';state.cooldown=0;el('petBattleRetry').hidden=true;
             if(result.patch.attendancePet){attendancePetData=result.patch.attendancePet;renderAttendancePet();}
             sync();
         }catch(error){fail(error);}finally{state.busy=false;render();}
+    }
+    function roomExpired(m,now=Date.now()){
+        if(m.status==='invited')return now>=m.expiresAt;
+        if(m.status==='ready')return now>=m.readyDeadline;
+        return m.status==='rps'&&now>=m.rpsDeadline;
     }
     async function choose(choice){
         const m=match();if(!m||m.status!=='rps'||state.busy)return;let saved=secret(m.id,m.rpsRound);
@@ -9753,11 +9859,10 @@ const PetBattleGame=(()=>{
         if(!mine()||state.busy||Date.now()<state.cooldown)return;
         for(const m of state.matches.values()){
             if(m.status==='rps'&&m.participantUids.every(uid=>m.commits?.[uid])&&!m.reveals?.[state.uid]){
-                const saved=secret(m.id,m.rpsRound);if(saved){state.active=m.id;const hash=await petBattleCommitment(m.id,state.uid,m.rpsRound,saved.choice,saved.nonce);if(state.busy)return;await mutate('reveal',{...saved,hash,round:m.rpsRound});return;}
+                const saved=secret(m.id,m.rpsRound);if(saved){const hash=await petBattleCommitment(m.id,state.uid,m.rpsRound,saved.choice,saved.nonce);if(state.busy)return;await mutate('reveal',{...saved,hash,round:m.rpsRound},m.id);return;}
             }
             if(state.own?.petBattleLocks?.[m.id]&&!m.claims?.[state.uid]){
-                const expired=m.status==='invited'&&Date.now()>=m.expiresAt||m.status==='rps'&&Date.now()>=m.rpsDeadline;
-                if(expired||petBattleClaimAmount(m,state.uid)!==null){state.active=m.id;await mutate('claim');return;}
+                if(roomExpired(m)||petBattleClaimAmount(m,state.uid)!==null){await mutate('claim',{},m.id);return;}
             }
         }
     }
@@ -9819,27 +9924,48 @@ const PetBattleGame=(()=>{
         comparison.replaceChildren(heading,...rows);
     }
     function render(){
-        if(!mine()||!el('petBattleDialog').open)return;
-        el('petBattleStatus').textContent=state.message;el('petBattleDialog').setAttribute('aria-busy',String(state.busy));
+        if(!mine()||(!el('petBattleDialog').open&&!el('petBattleLobby').open))return;
         const hidden=dismissed();const matches=[...state.matches.values()].filter(m=>!hidden.includes(m.id)).sort((a,b)=>b.createdMs-a.createdMs),listKey=JSON.stringify(matches.map(m=>[m.id,m.status]));
-        if(state.listKey!==listKey){state.listKey=listKey;el('petBattleMatches').replaceChildren(new Option('Chọn trận / lời mời',''),...matches.map(m=>new Option(`${m.players[0].name} ↔ ${m.players[1]?.name||m.opponentUid} · ${{invited:'Lời mời',rps:'Oẳn tù tì',fighting:'Đang đấu',finished:'Kết thúc',cancelled:'Đã hủy',rejected:'Từ chối',expired:'Hết hạn'}[m.status]}`,m.id)));}
-        el('petBattleMatches').value=state.active;const m=match(),incoming=m?.status==='invited'&&m.opponentUid===state.uid&&m.expiresAt>Date.now();
-        el('petBattleSetup').hidden=!!m&&!incoming;el('petBattleRoom').hidden=!m;el('petBattleCreate').hidden=!!m||!state.creating;el('petBattleAccept').hidden=!incoming;el('petBattleReject').hidden=!incoming;
-        el('petBattleOpponent').closest('label').hidden=!!m||!state.creating;
+        if(state.listKey!==listKey){state.listKey=listKey;el('petBattleMatches').replaceChildren(new Option('Chọn phòng đấu',''),...matches.map(m=>new Option(`${m.players[0].name} ↔ ${m.players[1]?.name||m.opponentUid} · ${{invited:'Lời mời',ready:'Chờ sẵn sàng',rps:'Oẳn tù tì',fighting:'Đang đấu',finished:'Kết thúc',cancelled:'Đã hủy',rejected:'Từ chối',expired:'Hết hạn'}[m.status]}`,m.id)));}
+        el('petBattleMatches').value='';
+        if(!el('petBattleDialog').open)return;
+        el('petBattleStatus').textContent=state.message;el('petBattleDialog').setAttribute('aria-busy',String(state.busy));
+        const m=match(),incoming=m?.status==='invited'&&m.opponentUid===state.uid&&m.expiresAt>Date.now();
+        const draft=!m&&state.creating;
+        el('petBattleSetup').hidden=!draft&&!incoming;el('petBattleRoom').hidden=!m;el('petBattleAccept').hidden=!incoming;el('petBattleReject').hidden=!incoming;
+        el('petBattleDraftSlots').hidden=!draft;
         el('petBattleStake').closest('label').hidden=!m&&!state.creating;
         el('petBattleElement').closest('label').hidden=!incoming&&!state.creating;
         el('petBattleElement').disabled=state.busy;
         el('petBattleElementHint').hidden=!incoming&&!state.creating;
         el('petBattleCancel').hidden=!(m?.status==='invited'&&m.challengerUid===state.uid);
         const terminal=!!m&&(['finished','cancelled','rejected','expired'].includes(m.status)||petBattlePlayback(m).finished);
-        el('petBattleFinish').hidden=!terminal;el('petBattleFinish').disabled=state.busy||!m?.claims?.[state.uid];
-        el('petBattleFinish').title=m?.claims?.[state.uid]?'Dọn trận khỏi danh sách trên thiết bị này':'Chờ cập nhật kg trước khi kết thúc';
-        el('petBattleClaim').hidden=!m||!state.own?.petBattleLocks?.[m.id]||!(petBattleClaimAmount(m,state.uid)!==null||m.status==='invited'&&Date.now()>=m.expiresAt||m.status==='rps'&&Date.now()>=m.rpsDeadline);
-        if(!m||incoming)setup(m);el('petBattleSetup').querySelectorAll('button').forEach(button=>button.disabled=state.busy);if(!m){disposeModels();return;}
+        const awaitingClaim=!!m&&!m.claims?.[state.uid]&&!!state.own?.petBattleLocks?.[m.id];
+        el('petBattleFinish').hidden=!terminal;el('petBattleFinish').disabled=state.busy||awaitingClaim;
+        el('petBattleClaim').hidden=!awaitingClaim||!(petBattleClaimAmount(m,state.uid)!==null||roomExpired(m));
+        if(draft||incoming)setup(m);
+        el('petBattleAddOpponent').disabled=state.busy||!el('petBattlePet').value;
+        el('petBattleSetup').querySelectorAll('button').forEach(button=>button.disabled=state.busy);
+        if(!m){disposeModels();return;}
         const effectiveStats=m.players.map((p,i)=>petBattleEffectiveStats(p,m.players[1-i]));
         renderStatComparison(m.players,effectiveStats);
         ensureModels(m);const play=petBattlePlayback(m),full=m.maxHp?.length?m.maxHp:effectiveStats.map(petBattleMaxHp),hp=play.hp.length?play.hp:full;
-        el('petBattlePhase').textContent={invited:'Đang chờ đối thủ chấp nhận',rps:`Oẳn tù tì · Vòng ${m.rpsRound+1}`,fighting:play.finished?'Trận đấu đã kết thúc':`Lượt ${play.count}/${m.turns.length} · Tự động luân phiên`,finished:'Trận đấu đã kết thúc',cancelled:'Lời mời đã hủy',rejected:'Đối thủ đã từ chối',expired:'Hết thời gian'}[m.status];
+        const ready=m.status==='ready';
+        el('petBattleReadyPanel').hidden=!ready;
+        if(ready){
+            const remaining=Math.max(0,Math.ceil((m.readyDeadline-Date.now())/1000));
+            el('petBattlePhase').textContent=`Chờ sẵn sàng · ${remaining}s`;
+            [...el('petBattleReadyStatuses').children].forEach((badge,i)=>{
+                const player=m.players[i],isReady=!!m.ready?.[player.uid];
+                const label=`${player.name} · ${isReady?'Đã sẵn sàng':'Chưa sẵn sàng'}`;
+                if(badge.textContent!==label)badge.textContent=label;
+                badge.classList.toggle('is-ready',isReady);
+            });
+            el('petBattleReady').disabled=state.busy||!!m.ready?.[state.uid]||remaining===0;
+            el('petBattleReady').textContent=m.ready?.[state.uid]?'Đang chờ đối thủ':'Sẵn sàng';
+        }else{
+            el('petBattlePhase').textContent={invited:'Đang chờ đối thủ chấp nhận',rps:`Oẳn tù tì · Vòng ${m.rpsRound+1}`,fighting:play.finished?'Trận đấu đã kết thúc':play.count?`Lượt ${play.count}/${m.turns.length}`:'Chuẩn bị giao đấu…',finished:'Trận đấu đã kết thúc',cancelled:'Lời mời đã hủy',rejected:'Đối thủ đã từ chối',expired:'Hết thời gian'}[m.status];
+        }
         el('petBattlePot').textContent=`Mỗi bên ${petWeightLabel(m.stakeGrams)} · Quỹ ${petWeightLabel(m.stakeGrams*2)}`;
         for(let i=0;i<2;i++){
             const p=m.players[i],element=PET_BATTLE_ELEMENTS.get(p?.element);
@@ -9848,9 +9974,10 @@ const PetBattleGame=(()=>{
             model.classList.toggle('has-element-aura',!!element);
             if(element)model.style.setProperty('--pet-battle-element-color',element.color);
             else model.style.removeProperty('--pet-battle-element-color');
-            el(`petBattleName${i}`).textContent=p?`${p.petName} · ${p.name}`:'Chờ chọn thú cưng';
+            el(`petBattleName${i}`).textContent=p?`${p.petName} · ${p.name}`:'Chờ đối thủ vào phòng';
             el(`petBattleStats${i}`).textContent=p?`Cấp ${p.appearance.level}${element?` · ${element.label}`:''}${bonus}`:'';
             el(`petBattleHp${i}`).max=full[i]||100;el(`petBattleHp${i}`).value=hp[i]??full[i]??100;el(`petBattleHpText${i}`).textContent=p?`${hp[i]??full[i]} / ${full[i]} HP`:'';
+            el(`petBattleHp${i}`).hidden=!p;
             const at=petBattleTime(m.startedAt)+(m.introMs===5000?5000:2000)+(play.count-1)*PET_BATTLE_STEP_MS,attacking=!!p&&!!play.last&&play.last.attacker===p.uid,hit=!!p&&!!play.last&&play.last.defender===p.uid;
             state.models[i]?.duelPose({facing:i?Math.PI:0,attackAt:attacking?at:0,hitAt:hit?at+300:0,defeated:(hp[i]??1)<=0,kind:p?.appearance.form.kind,level:p?.appearance.level});
             el(`petBattleSide${i}`).classList.toggle('is-attacking',!!attacking&&Date.now()-at<1000);el(`petBattleSide${i}`).classList.toggle('is-hit',!!hit&&Date.now()-at<1000);
@@ -9859,8 +9986,8 @@ const PetBattleGame=(()=>{
         el('petBattleRps').hidden=m.status!=='rps';el('petBattleRpsStatus').textContent=m.commits?.[state.uid]?'Đã khóa lựa chọn. Chờ cả hai bên để mở kết quả.':m.rpsRound?'Vừa hòa. Cả hai cùng chọn lại.':'Lựa chọn được giữ kín đến khi cả hai đã chọn.';
         el('petBattleRps').querySelectorAll('button').forEach(button=>button.disabled=state.busy||!!m.commits?.[state.uid]);
         const symbols={rock:'✊',paper:'🖐',scissors:'✌'},rpsResult=el('petBattleRpsReveal');
-        rpsResult.hidden=!m.firstUid;
-        if(m.firstUid){
+        rpsResult.hidden=m.roomFlow||!m.firstUid;
+        if(!rpsResult.hidden){
             const winner=m.players.find(p=>p.uid===m.firstUid),introEnd=petBattleTime(m.startedAt)+(m.introMs===5000?5000:2000);
             el('petBattleRpsHands').textContent=m.players.map(p=>`${p.name} ${symbols[m.reveals?.[p.uid]?.choice]||'✊'}`).join('  VS  ');
             el('petBattleRpsWinner').textContent=`${winner?.name||'Người thắng'} thắng oẳn tù tì — đánh trước!`;
@@ -9871,18 +9998,45 @@ const PetBattleGame=(()=>{
         const xpChange=m.xpChanges?.[state.uid];
         const xpResult=Number.isSafeInteger(xpChange)?` · ${xpChange>0?'+':xpChange<0?'−':''}${Math.abs(xpChange)} EXP`:'';
         el('petBattleResult').textContent=ended?(m.winnerUid?(m.winnerUid===state.uid?'Bạn thắng! +':'Bạn thua! −')+petWeightLabel(m.stakeGrams)+xpResult:'Hòa trận: hoàn lại kg cược.')+(m.claims?.[state.uid]?' Đã cập nhật kết quả.':' Đang chờ cập nhật kết quả.'):(closed?'Hoàn lại kg đã giữ cho bên đặt cược.':'');
+        if(ended){
+            const winner=m.players.find(p=>p.uid===m.winnerUid);
+            el('petBattleExitWinner').textContent=winner?`${winner.name} thắng trận!`:'Hòa trận';
+            el('petBattleExitResult').textContent=el('petBattleResult').textContent;
+            el('petBattleExitConfirm').disabled=state.busy||awaitingClaim;
+            if(state.resultPrompt!==m.id){
+                state.resultPrompt=m.id;
+                el('petBattleExitDialog').showModal();
+            }
+        }
         const logKey=m.id+':'+play.count;if(state.lastTurn!==logKey){state.lastTurn=logKey;renderStrike(m,play);const energy=el('petBattleRoom').querySelector('.pet-battle-energy');energy.style.animation=play.last?`pet-battle-strike-${play.last.attacker===m.players[0].uid?'right':'left'} .65s ease-out both`:'';el('petBattleLog').replaceChildren(...(m.turns||[]).slice(Math.max(0,play.count-6),play.count).map(turn=>{const li=document.createElement('li');li.textContent=`Lượt ${turn.index}: ${m.players.find(p=>p.uid===turn.attacker).petName} ${turn.dodged?'bị né đòn':`gây ${turn.damage} sát thương${turn.critical?' (chí mạng)':''}`}.`;return li;}));}
-        el('petBattleSetup').querySelectorAll('button').forEach(button=>button.disabled=state.busy);
     }
     function init(){
         const dialog=el('petBattleDialog');if(!dialog||dialog.dataset.ready)return;dialog.dataset.ready='true';
-        el('petBattleOpen').addEventListener('click',()=>open());el('petBattleClose').addEventListener('click',()=>{disposeModels();dialog.close();});dialog.addEventListener('close',()=>{if(!dialog.open)disposeModels();});
-        el('petBattleFinish').addEventListener('click',finishRoom);
-        el('petBattleNew').addEventListener('click',()=>{state.active='';state.creating=true;state.setupKey='';render();});el('petBattleMatches').addEventListener('change',event=>open(event.target.value));
+        el('petBattleOpen').addEventListener('click',openLobby);
+        el('petBattleLobbyClose').addEventListener('click',()=>el('petBattleLobby').close());
+        el('petBattleClose').addEventListener('click',()=>{disposeModels();dialog.close();openLobby();});
+        dialog.addEventListener('close',()=>{if(!dialog.open)disposeModels();});
+        el('petBattleFinish').addEventListener('click',()=>{
+            const m=match();
+            if(m&&(m.status==='finished'||petBattlePlayback(m).finished))el('petBattleExitDialog').showModal();
+            else finishRoom();
+        });
+        el('petBattleStay').addEventListener('click',()=>el('petBattleExitDialog').close());
+        el('petBattleExitConfirm').addEventListener('click',finishRoom);
+        el('petBattleNew').addEventListener('click',()=>open());el('petBattleMatches').addEventListener('change',event=>{if(event.target.value)open(event.target.value);});
+        el('petBattleAddOpponent').addEventListener('click',()=>el('petBattleInvitePicker').showModal());
+        el('petBattleInvitePickerClose').addEventListener('click',()=>el('petBattleInvitePicker').close());
+        el('petBattleReady').addEventListener('click',()=>mutate('ready'));
         el('petBattleViewInvite').addEventListener('click',event=>open(event.currentTarget.dataset.matchId));el('petBattlePet').addEventListener('change',loadStatsDraft);el('petBattleBalanceStats').addEventListener('click',()=>{balanceStats();saveStatsDraft();});
         Object.values(statInputs).forEach(id=>el(id).addEventListener('input',()=>{renderDraft();saveStatsDraft();}));
         const payload=()=>({petId:el('petBattlePet').value,stats:draftStats(),element:el('petBattleElement').value,opponentUid:el('petBattleOpponent').value,stakeGrams:Math.round(Number(el('petBattleStake').value)*1000)});
-        el('petBattleCreate').addEventListener('click',()=>mutate('create',payload()));el('petBattleAccept').addEventListener('click',()=>mutate('accept',payload()));el('petBattleReject').addEventListener('click',()=>mutate('reject'));el('petBattleCancel').addEventListener('click',()=>mutate('cancel'));el('petBattleClaim').addEventListener('click',()=>mutate('claim'));
+        el('petBattleCreate').addEventListener('click',()=>{
+            const draft=payload();
+            if(!draft.opponentUid){el('petBattleOpponent').focus();return;}
+            el('petBattleInvitePicker').close();
+            mutate('create',{...draft,roomFlow:true});
+        });
+        el('petBattleAccept').addEventListener('click',()=>mutate('accept',payload()));el('petBattleReject').addEventListener('click',()=>mutate('reject'));el('petBattleCancel').addEventListener('click',()=>mutate('cancel'));el('petBattleClaim').addEventListener('click',()=>mutate('claim'));
         dialog.querySelectorAll('[data-pet-rps]').forEach(button=>button.addEventListener('click',()=>choose(button.dataset.petRps)));el('petBattleRetry').addEventListener('click',()=>{state.cooldown=0;state.subs.forEach(unsubscribe=>unsubscribe());state.subs.clear();state.message='';sync();process();});
     }
     return {init,start,stop,sync,profile,open};

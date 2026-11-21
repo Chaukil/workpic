@@ -2175,31 +2175,77 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
     <button type="button" id="attendancePetSwimmer" class="attendance-pet-swimmer" aria-label="Thú cưng" hidden><span id="attendancePetArt"></span><span id="attendancePetEggTimer" class="attendance-pet-egg-timer" hidden></span><span id="attendancePetBubble" class="attendance-pet-bubble" role="status"></span></button>
     <dialog id="attendancePetDialog" class="attendance-pet-dialog" aria-labelledby="attendancePetTitle">
         <header><div><small>VƯƠNG QUỐC THÚ CƯNG</small><h5 id="attendancePetTitle">Điểm danh và thú cưng</h5></div><button type="button" id="attendancePetClose" aria-label="Đóng">✕</button></header>
-        <section class="pet-stable"><div class="pet-stable-heading"><div><small>BỘ SƯU TẬP CỦA BẠN</small><h6>Đàn thú cưng <span id="attendancePetRosterCount">1</span></h6></div><span>Chọn một bạn để chăm sóc</span></div><div id="attendancePetRoster" class="pet-roster" aria-label="Đàn thú cưng"></div></section>
-        <div class="pet-compare-launch-row"><button type="button" id="petCompareOpen" class="btn btn-outline-primary"><i class="bi bi-trophy" aria-hidden="true"></i> So sánh thú cưng</button><button type="button" id="petBattleOpen" class="btn btn-outline-primary"><i class="bi bi-lightning-charge" aria-hidden="true"></i> Thách đấu <span id="petBattleBadge"></span></button><small>Nuôi lớn · So tài · Đấu theo lượt</small></div>
+        <section class="pet-stable">
+            <div class="pet-stable-heading">
+                <h6>Đàn thú cưng <span id="attendancePetRosterCount">1</span></h6>
+                <label class="pet-visibility-setting" for="attendancePetVisible">
+                    <span>Hiện thú cưng trên màn hình</span>
+                    <input type="checkbox" role="switch" id="attendancePetVisible" checked>
+                </label>
+            </div>
+            <div id="attendancePetRoster" class="pet-roster" aria-label="Đàn thú cưng"></div>
+        </section>
+        <div class="pet-compare-launch-row"><button type="button" id="petCompareOpen" class="btn btn-outline-primary"><i class="bi bi-trophy" aria-hidden="true"></i> Xếp hạng</button><button type="button" id="petBattleOpen" class="btn btn-outline-primary"><i class="bi bi-lightning-charge" aria-hidden="true"></i> Thách đấu <span id="petBattleBadge"></span></button><small>Nuôi lớn · So tài · Đấu theo lượt</small></div>
         <div class="attendance-pet-layout"><div class="attendance-pet-care">
         <div id="attendancePetPreview" class="attendance-pet-preview" role="img" aria-label="Thú cưng hiện tại"></div>
+        <div class="pet-preview-name">
+            <h4 id="attendancePetName">Đang tải…</h4>
+            <button type="button" class="btn btn-outline-primary" id="attendancePetNicknameEdit" aria-controls="attendancePetNicknameForm" aria-expanded="false" aria-label="Edit tên thú cưng"><i class="bi bi-pencil" aria-hidden="true"></i> Edit</button>
+        </div>
+        <form id="attendancePetNicknameForm" class="pet-nickname-form" hidden>
+            <label class="visually-hidden" for="attendancePetNickname">Tên riêng của thú cưng</label>
+            <div>
+                <input id="attendancePetNickname" type="text" maxlength="60" autocomplete="off" placeholder="Tên riêng của thú cưng" aria-describedby="attendancePetNicknameHint">
+                <button type="submit" class="btn btn-outline-primary" id="attendancePetNicknameSave">Lưu tên</button>
+                <button type="button" class="btn btn-outline-secondary" id="attendancePetNicknameCancel">Hủy</button>
+            </div>
+            <small id="attendancePetNicknameHint">Tối đa 30 ký tự. Để trống để dùng tên loài.</small>
+        </form>
         <div class="pet-game-hud"><div><small>ĐIỂM TIẾN HÓA</small><strong id="petGameXp">0 XP</strong></div><div><small>ĐỘ NO</small><strong id="petGameHunger">Đang tải…</strong><progress id="petGameFullness" max="100" value="0"></progress></div><div><small>ĐIỂM DANH TRƯỚC</small><strong id="petGameSurvival">Đang tải…</strong></div></div>
         <div class="pet-weight-card"><div><small>CÂN NẶNG HIỆN TẠI</small><strong id="petGameWeight">0 kg</strong></div><p id="petGameWeightHint">Mỗi lần ăn +0,2 kg · Điểm danh không tăng cân.</p></div>
-        <section class="attendance-pet-summary"><span id="attendancePetLevel" class="attendance-pet-level">Trứng</span><h4 id="attendancePetName">Đang tải…</h4><p id="attendancePetDescription"></p><p id="attendancePetCountdown"></p></section>
-        <div class="attendance-pet-progress"><div id="attendancePetProgress"></div></div><p id="attendancePetProgressText" class="text-muted"></p>
-        <form id="attendancePetNicknameForm" class="pet-nickname-form"><label for="attendancePetNickname">Tên riêng của thú cưng</label><div><input id="attendancePetNickname" type="text" maxlength="60" autocomplete="off" placeholder="Đặt tên cho người bạn của bạn…" aria-describedby="attendancePetNicknameHint"><button type="submit" class="btn btn-outline-primary" id="attendancePetNicknameSave">Lưu tên</button></div><small id="attendancePetNicknameHint">Tối đa 30 ký tự. Để trống để dùng tên loài. Chỉ lưu khi bấm Lưu tên.</small></form>
+        <section class="attendance-pet-summary">
+            <span id="attendancePetLevel" class="attendance-pet-level">Trứng</span>
+            <p id="attendancePetDescription" hidden></p>
+            <div class="attendance-pet-exp">
+                <div class="attendance-pet-progress" aria-hidden="true"><div id="attendancePetProgress"></div></div>
+                <p id="attendancePetProgressText" class="text-muted"></p>
+            </div>
+            <p id="attendancePetCountdown"></p>
+        </section>
         <div class="attendance-pet-actions"><button type="button" id="attendancePetCheckin" class="btn btn-primary">Điểm danh hôm nay</button><button type="button" id="attendancePetFeed" class="btn btn-outline-primary">Cho ăn</button><button type="button" id="attendancePetRetry" class="btn btn-outline-secondary" hidden>Thử kết nối lại</button></div>
         <p id="attendancePetStatus" class="attendance-pet-status" role="status"></p>
         <button type="button" id="attendancePetBranchOpen" class="btn btn-outline-primary pet-branch-launch" hidden>Chọn nhánh tiến hóa</button>
-        <label class="pet-visibility-setting" for="attendancePetVisible"><span><strong>Hiện thú cưng trên màn hình</strong><small>Khi ẩn, bạn vẫn điểm danh và chăm sóc tại đây.</small></span><input type="checkbox" role="switch" id="attendancePetVisible" checked></label>
         </div><aside class="attendance-pet-guide" aria-label="Hành trình tiến hóa và cách chăm sóc">
             <section class="attendance-pet-guide-card"><h6><i class="bi bi-heart-pulse" aria-hidden="true"></i> Nhiệm vụ chăm sóc</h6><ul class="attendance-pet-tips"><li><strong>Điểm danh cả đàn · 1 lần/ngày</strong><span>+1 XP cho mỗi thú cưng còn sống, không cộng cân nặng. Ngày mới tính theo giờ Việt Nam.</span></li><li><strong>Cho ăn khi đói · mỗi 2 giờ</strong><span>Mỗi lần ăn +0,2 kg và +1 XP. Đủ 10 XP lên một cấp.</span></li><li><strong>Vắng 1 ngày −0,5 kg · 2 ngày −2 kg</strong><span>Mức giảm ngày 2 là 2 kg tổng cộng, cân nặng không âm. Đủ 72 giờ không điểm danh sẽ chết, dù vẫn cho ăn. Hồi sinh trở về trứng, nở sau 1 giờ.</span></li><li><strong>Đạt cấp tối đa · nhận trứng mới</strong><span>Mỗi thú cưng tặng một trứng khi đạt cấp 29. Giữ thú trưởng thành và nuôi trứng mới song song.</span></li></ul></section>
             <section class="attendance-pet-guide-card attendance-pet-journey"><h6><i class="bi bi-stars" aria-hidden="true"></i> Hành trình tiến hóa</h6><p>Từ quả trứng nhỏ đến người bạn khổng lồ</p><ol id="attendancePetRoad"></ol></section>
         </aside></div>
     </dialog>
     <div id="petBattleInvite" class="pet-battle-invite" hidden><span id="petBattleInviteText"></span><button type="button" id="petBattleViewInvite">Xem lời thách đấu</button></div>
+    <dialog id="petBattleLobby" class="pet-battle-dialog pet-battle-overlay" aria-labelledby="petBattleLobbyTitle">
+        <header><h5 id="petBattleLobbyTitle">Đấu trường thú cưng</h5><button type="button" id="petBattleLobbyClose" aria-label="Đóng">✕</button></header>
+        <div class="pet-battle-tabs"><button type="button" id="petBattleNew">Tạo phòng</button><select id="petBattleMatches" aria-label="Phòng đấu và lời mời"><option value="">Chọn phòng đấu</option></select></div>
+    </dialog>
+    <dialog id="petBattleInvitePicker" class="pet-battle-dialog pet-battle-overlay" aria-labelledby="petBattleInvitePickerTitle">
+        <header><h5 id="petBattleInvitePickerTitle">Mời đối thủ</h5><button type="button" id="petBattleInvitePickerClose" aria-label="Đóng">✕</button></header>
+        <label for="petBattleOpponent">Thành viên</label>
+        <select id="petBattleOpponent"></select>
+        <div class="pet-battle-actions"><button type="button" id="petBattleCreate">Gửi lời mời</button></div>
+    </dialog>
+    <dialog id="petBattleExitDialog" class="pet-battle-dialog pet-battle-overlay pet-battle-exit" aria-labelledby="petBattleExitWinner" aria-describedby="petBattleExitResult">
+        <h5 id="petBattleExitWinner"></h5>
+        <p id="petBattleExitResult"></p>
+        <p>Bạn có muốn rời phòng đấu?</p>
+        <div class="pet-battle-actions"><button type="button" id="petBattleStay">Ở lại</button><button type="button" id="petBattleExitConfirm">Rời phòng</button></div>
+    </dialog>
     <dialog id="petBattleDialog" class="pet-battle-dialog" aria-labelledby="petBattleTitle">
-        <header><div><small>ĐẤU TRƯỜNG THÚ CƯNG</small><h5 id="petBattleTitle">Thách đấu</h5></div><button type="button" id="petBattleClose" aria-label="Đóng">✕</button></header>
-        <div class="pet-battle-tabs"><button type="button" id="petBattleNew">Trận mới</button><select id="petBattleMatches" aria-label="Lời mời và trận đấu"><option value="">Chọn một trận đấu</option></select></div>
+        <header><div><small>ĐẤU TRƯỜNG THÚ CƯNG</small><h5 id="petBattleTitle">Phòng đấu</h5></div><button type="button" id="petBattleClose" aria-label="Đóng">✕</button></header>
         <p id="petBattleStatus" class="pet-battle-status" role="status" aria-live="polite"></p>
+        <div id="petBattleDraftSlots" class="pet-battle-draft-slots" hidden>
+            <div class="pet-battle-draft-host"><small>Chủ phòng</small><strong id="petBattleDraftPet"></strong></div>
+            <button type="button" id="petBattleAddOpponent" class="pet-battle-add-opponent"><span aria-hidden="true">+</span> Mời đối thủ</button>
+        </div>
         <section id="petBattleSetup" class="pet-battle-setup">
-            <div class="pet-battle-fields"><label>Đối thủ<select id="petBattleOpponent"></select></label><label>Thú cưng ra trận<select id="petBattlePet"></select></label><label>Kg cược mỗi bên<input id="petBattleStake" type="number" min="0.1" step="0.1" value="0.2"></label></div>
+            <div class="pet-battle-fields"><label>Thú cưng ra trận<select id="petBattlePet"></select></label><label>Kg cược mỗi bên<input id="petBattleStake" type="number" min="0.1" step="0.1" value="0.2"></label></div>
             <div class="pet-battle-fields">
                 <label hidden>Bổ trợ ngũ hành
                     <select id="petBattleElement" required aria-describedby="petBattleElementHint">
@@ -2227,25 +2273,34 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
                 <label><span>Máu</span><span class="pet-battle-stat-value" aria-hidden="true">12</span><input type="range" id="petBattleHealth" min="1" max="93" step="1" value="12"></label>
             </div>
             <details class="pet-battle-help"><summary>Cách tính chỉ số</summary><p class="pet-battle-note">Phòng thủ giảm cả hai loại sát thương. Kháng giảm riêng vật lý hoặc phép. Né đòn tối đa 40%. Tỉ lệ chí mạng tối đa 35%, nhân sát thương ×1,5. Máu = 100 + 8 × điểm máu.</p></details>
-            <p id="petBattleRemaining" class="pet-battle-note"></p><small class="pet-battle-draft-hint">Chỉ số tự lưu trên trình duyệt này cho từng thú cưng. Chọn Trận mới để mời đối thủ.</small>
-            <div class="pet-battle-actions"><button type="button" id="petBattleCreate">Gửi thách đấu &amp; giữ kg cược</button><button type="button" id="petBattleAccept" hidden>Chấp nhận &amp; giữ kg cược</button><button type="button" id="petBattleReject" hidden>Từ chối</button></div>
+            <p id="petBattleRemaining" class="pet-battle-note"></p><small class="pet-battle-draft-hint">Chỉ số tự lưu trên trình duyệt này cho từng thú cưng.</small>
+            <div class="pet-battle-actions"><button type="button" id="petBattleAccept" hidden>Chấp nhận &amp; giữ kg cược</button><button type="button" id="petBattleReject" hidden>Từ chối</button></div>
         </section>
         <section id="petBattleRoom" class="pet-battle-room" hidden>
             <div id="petBattleRpsReveal" class="pet-battle-rps-reveal" hidden><div id="petBattleRpsHands"></div><strong id="petBattleRpsWinner"></strong><small id="petBattleRpsCountdown"></small></div><div class="pet-battle-room-head"><strong id="petBattlePhase"></strong><span id="petBattlePot"></span></div>
             <div class="pet-battle-arena"><div class="pet-battle-side" id="petBattleSide0"><h6 id="petBattleName0"></h6><small id="petBattleStats0"></small><div id="petBattleModel0" class="pet-battle-model"><span id="petBattleArt0"></span></div><progress id="petBattleHp0" max="100" value="100"></progress><strong id="petBattleHpText0"></strong><span id="petBattleDamage0" class="pet-battle-damage"></span></div><div class="pet-battle-versus">VS<span class="pet-battle-energy"></span></div><div class="pet-battle-side" id="petBattleSide1"><h6 id="petBattleName1"></h6><small id="petBattleStats1"></small><div id="petBattleModel1" class="pet-battle-model"><span id="petBattleArt1"></span></div><progress id="petBattleHp1" max="100" value="100"></progress><strong id="petBattleHpText1"></strong><span id="petBattleDamage1" class="pet-battle-damage"></span></div></div>
+            <div id="petBattleReadyPanel" class="pet-battle-ready-panel" hidden>
+                <div id="petBattleReadyStatuses" class="pet-battle-ready-statuses" aria-live="polite"><span></span><span></span></div>
+                <button type="button" id="petBattleReady">Sẵn sàng</button>
+            </div>
             <section id="petBattleStatComparison" class="pet-battle-stat-comparison" aria-label="So sánh chỉ số hai thú cưng" hidden></section>
             <div id="petBattleRps" class="pet-battle-rps" hidden><strong>Oẳn tù tì · người thắng đánh trước</strong><p id="petBattleRpsStatus"></p><div><button type="button" data-pet-rps="rock">✊ Búa</button><button type="button" data-pet-rps="paper">🖐 Bao</button><button type="button" data-pet-rps="scissors">✌ Kéo</button></div></div>
             <p id="petBattleResult" class="pet-battle-result"></p><ol id="petBattleLog" class="pet-battle-log"></ol>
         </section>
-        <div class="pet-battle-actions"><button type="button" id="petBattleCancel" hidden>Hủy lời mời &amp; nhận lại cược</button><button type="button" id="petBattleClaim" hidden>Nhận kết quả / hoàn cược</button><button type="button" id="petBattleFinish" hidden>Kết thúc trận</button><button type="button" id="petBattleRetry" hidden>Thử đồng bộ lại</button></div>
-        <footer class="pet-battle-note">Cược bằng kg trong game. Kg được giữ khi gửi/chấp nhận; thắng nhận cả quỹ, hòa hoặc hết hạn được hoàn cược. Thua chỉ mất số kg đã cược. Lời mời hết hạn sau 10 phút; oẳn tù tì quá 2 phút được hoàn cược. Đóng form không hủy trận.</footer>
+        <div class="pet-battle-actions"><button type="button" id="petBattleCancel" hidden>Hủy lời mời &amp; nhận lại cược</button><button type="button" id="petBattleClaim" hidden>Nhận kết quả / hoàn cược</button><button type="button" id="petBattleFinish" hidden>Rời phòng</button><button type="button" id="petBattleRetry" hidden>Thử đồng bộ lại</button></div>
+        <footer class="pet-battle-note">Kg cược được giữ khi gửi hoặc chấp nhận lời mời. Lời mời hết hạn sau 10 phút. Sau khi vào phòng, cả hai có 2 phút để sẵn sàng. Hòa hoặc hết hạn sẽ hoàn cược.</footer>
     </dialog>
     <dialog id="petCompareDialog" class="pet-compare-dialog" aria-labelledby="petCompareTitle">
-        <header><div><small>ĐẤU TRƯỜNG THÚ CƯNG</small><h5 id="petCompareTitle">So sánh cân nặng</h5></div><button type="button" id="petCompareClose" aria-label="Đóng">✕</button></header>
+        <header><div><small>ĐẤU TRƯỜNG THÚ CƯNG</small><h5 id="petCompareTitle">Xếp hạng</h5></div><button type="button" id="petCompareClose" aria-label="Đóng">✕</button></header>
         <p class="pet-compare-description">Chỉ hiện user có điểm danh hoặc cho ăn trong 7 ngày gần nhất. Đủ 7 ngày không hoạt động sẽ tự ẩn. Thú đã chết hiện cuối, không xếp hạng.</p>
         <div class="pet-compare-toolbar"><p id="petCompareSummary" role="status"></p><label for="petCompareBranch">Nhánh <select id="petCompareBranch"><option value="all">Tất cả</option><option value="base">Chưa chọn nhánh</option></select></label></div>
-        <div class="pet-compare-scroll"><table class="pet-compare-table"><thead><tr><th>Hạng</th><th>Thành viên</th><th>Thú cưng</th><th>Cấp / Nhánh / EXP</th><th>Cân nặng</th><th>Hoạt động gần nhất</th><th>Trạng thái</th></tr></thead><tbody id="petCompareRows"></tbody></table></div>
+        <div class="pet-compare-scroll"><table class="pet-compare-table"><thead><tr><th>Hạng</th><th>Thành viên</th><th>Thú cưng</th><th>Cấp / Nhánh / EXP</th><th>Cân nặng</th><th>Lịch sử thách đấu</th><th>Trạng thái</th></tr></thead><tbody id="petCompareRows"></tbody></table></div>
         <p id="petCompareEmpty" class="pet-compare-empty" hidden>Chưa có thú cưng hoạt động trong khoảng thời gian này.</p>
+    </dialog>
+    <dialog id="petBattleHistoryDialog" class="pet-battle-dialog pet-battle-overlay" aria-labelledby="petBattleHistoryTitle">
+        <header><div><h5 id="petBattleHistoryTitle">Lịch sử thách đấu</h5><p id="petBattleHistoryPet"></p></div><button type="button" id="petBattleHistoryClose" aria-label="Đóng">✕</button></header>
+        <ul id="petBattleHistoryList" class="pet-battle-history-list"></ul>
+        <p id="petBattleHistoryEmpty" class="pet-battle-note" hidden>Chưa có trận đấu nào được ghi vào lịch sử.</p>
     </dialog>
     <dialog id="attendancePetBranchDialog" class="pet-branch-dialog" aria-labelledby="attendancePetBranchTitle"><header><div><small>MỞ KHÓA TỪ CẤP 9</small><h5 id="attendancePetBranchTitle">Chọn nhánh tiến hóa</h5></div><button type="button" id="attendancePetBranchClose" aria-label="Đóng">✕</button></header><section id="attendancePetBranchPanel" class="pet-branch-panel" hidden><p id="attendancePetBranchHint"></p><div class="pet-branch-options" id="attendancePetBranchOptions"></div><p id="attendancePetBranchStatus" class="attendance-pet-status" role="status"></p></section></dialog>
     <button type="button" class="quick-chat-toggle" id="quickChatToggleBtn" title="Job trong ngày">
@@ -2367,7 +2422,7 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
     <div class="noel-room-decor" aria-hidden="true"><svg class="noel-ribbon-tree" viewBox="0 0 120 184"><use href="#noel-ribbon-tree"/></svg><svg class="noel-golden-deer" viewBox="0 0 150 156"><use href="#noel-golden-deer"/></svg></div>
     <div class="noel-fairy-lights noel-global-lights" aria-hidden="true"><svg viewBox="0 0 280 98" focusable="false"><use href="#noel-wire-strand"/></svg><svg viewBox="0 0 280 98" focusable="false"><use href="#noel-wire-strand"/></svg><svg viewBox="0 0 280 98" focusable="false"><use href="#noel-wire-strand"/></svg><svg viewBox="0 0 280 98" focusable="false"><use href="#noel-wire-strand"/></svg><svg viewBox="0 0 280 98" focusable="false"><use href="#noel-wire-strand"/></svg><svg viewBox="0 0 280 98" focusable="false"><use href="#noel-wire-strand"/></svg><svg viewBox="0 0 280 98" focusable="false"><use href="#noel-wire-strand"/></svg><svg viewBox="0 0 280 98" focusable="false"><use href="#noel-wire-strand"/></svg></div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20261121-pet-compare-exp"></script>
+    <script type="module" src="app.js?v=20261121-pet-battle-history"></script>
 </body>
 
 </html>

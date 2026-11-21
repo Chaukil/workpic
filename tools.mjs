@@ -999,6 +999,11 @@ test('two-client battle escrow, hidden RPS, automatic fight, payout and refunds 
  assert.equal(profiles.get('a').attendancePet.victoryAuraUntil,auraUntil,'repeat claim never extends aura');
  use('b',id);await game.mutate('claim');assert.equal(attendancePetView(profiles.get('b').attendancePet,clock).weightGrams,800);
  assert.deepEqual(battles.get(id).xpChanges,{a:1,b:-1});
+ for(const [uid,result,opponentName,xpDelta,weightDelta] of [['a','win','b',1,200],['b','loss','a',-1,-200]]){
+  const history=profiles.get(uid).attendancePet.battleHistory;
+  assert.equal(history.length,1);
+  assert.deepEqual(history.map(({id:matchId,result,opponentName,xpDelta,weightDelta})=>[matchId,result,opponentName,xpDelta,weightDelta]),[[id,result,opponentName,xpDelta,weightDelta]]);
+ }
  assert.equal(attendancePetView(profiles.get('a').attendancePet,clock).xp,1);
  const loserView=attendancePetView(profiles.get('b').attendancePet,clock);
  assert.equal(loserView.xp,0);assert.equal(loserView.feedingXp,1);
@@ -1024,8 +1029,35 @@ test('two-client battle escrow, hidden RPS, automatic fight, payout and refunds 
  assert.equal(battles.get(expired).rpsRound,1);assert.deepEqual(battles.get(expired).commits,{});assert.equal(battles.get(expired).status,'rps','tied RPS opens a fresh committed round');clock+=120001;
  use('a',expired);await game.mutate('claim');use('b',expired);await game.mutate('claim');assert.equal(battles.get(expired).status,'expired');
  assert.equal(battles.get(expired).xpChanges,undefined,'expired matches do not award or deduct EXP');
+ assert.equal(profiles.get('a').attendancePet.battleHistory.length,1,'expired matches do not add history');
  assert.equal(attendancePetView(profiles.get('a').attendancePet,clock).weightGrams,1200);assert.equal(attendancePetView(profiles.get('b').attendancePet,clock).weightGrams,800);
  const beforeBad=writes;use('a');await game.mutate('create',{...payload('a',statsA),stakeGrams:999999});assert.equal(writes,beforeBad,'failed reservation writes neither profile nor match');
+ use('a');await game.mutate('create',{...payload('a',statsA),roomFlow:true});const room=game.inspect().active;
+ use('b',room);await game.mutate('accept',payload('b',statsB));
+ assert.equal(battles.get(room).status,'ready');
+ assert.equal(battles.get(room).players.length,2);
+ use('a',room);await game.mutate('ready');
+ assert.deepEqual(battles.get(room).ready,{a:true});
+ assert.equal(battles.get(room).startedAt,null,'one ready player cannot start the match');
+ const readyWrites=writes;await game.mutate('ready');assert.equal(writes,readyWrites);
+ use('b',room);await game.mutate('ready');
+ m=battles.get(room);
+ assert.equal(m.status,'fighting');assert.deepEqual(m.ready,{a:true,b:true});
+ assert.equal(m.startedAt,clock);
+ assert.deepEqual(m.turns,petBattleSimulation(m.players,m.firstUid).turns);
+ const startedWrites=writes;await game.mutate('ready');assert.equal(writes,startedWrites);
+ clock+=2000+m.turns.length*1800+1;
+ use('a',room);await game.mutate('claim');
+ use('b',room);await game.mutate('claim');
+ assert.deepEqual(battles.get(room).claims,{a:true,b:true});
+ const priorWeights=['a','b'].map(uid=>attendancePetView(profiles.get(uid).attendancePet,clock).weightGrams);
+ use('a');await game.mutate('create',{...payload('a',statsA),roomFlow:true});const waiting=game.inspect().active;
+ use('b',waiting);await game.mutate('accept',payload('b',statsB));await game.mutate('ready');
+ clock=battles.get(waiting).readyDeadline;
+ use('a',waiting);await game.mutate('ready');assert.equal(battles.get(waiting).startedAt,null);
+ await game.mutate('claim');use('b',waiting);await game.mutate('claim');
+ assert.equal(battles.get(waiting).status,'expired');
+ assert.deepEqual(['a','b'].map(uid=>attendancePetView(profiles.get(uid).attendancePet,clock).weightGrams),priorWeights);
 });
 
 test('admin actions affect only their own fields and unchanged choices do not produce a write', () => {
@@ -1657,7 +1689,7 @@ let quickChatPanelOpen = false, quickChatUnreadCount = 0;
 const updateQuickChatBadge = () => {};
 ${extract('function openQuickChatPanel(', 'function createAttendancePet3D(')}
 try {
-    const kept = ['dayOffModal','viewJobModal','changeHistoryModal','sharedNotesPanel','sharedNotesToggle','quickChatToggleBtn','quickChatPanel','sharedNoteImageDialog','attendancePetDialog','attendancePetBranchDialog','petCompareDialog','petAdminDialog','petAdminOpen','petBattleDialog','petBattleInvite','attendancePetToggle','attendancePetSwimmer'].map(id=>document.getElementById(id));
+    const kept = ['dayOffModal','viewJobModal','changeHistoryModal','sharedNotesPanel','sharedNotesToggle','quickChatToggleBtn','quickChatPanel','sharedNoteImageDialog','attendancePetDialog','attendancePetBranchDialog','petCompareDialog','petBattleHistoryDialog','petAdminDialog','petAdminOpen','petBattleDialog','petBattleLobby','petBattleInvitePicker','petBattleExitDialog','petBattleInvite','attendancePetToggle','attendancePetSwimmer'].map(id=>document.getElementById(id));
     check(document.getElementById('scheduleActions').closest('#mainContent'),'job actions are inside schedule area');
     check(!document.getElementById('sidebar').contains(document.getElementById('addJobBtn')),'job actions leave sidebar');
     check(document.getElementById('jobColor')&&document.getElementById('settingsHideOutOfSchedule'),'color and hide-outside controls exist');
@@ -1718,10 +1750,14 @@ try {
     document.querySelector('[data-pet-branch="bird"]').click();await new Promise(resolve=>setTimeout(resolve,0));
     check(petRecord.attendancePet.branch==='bird'&&attendancePetView(petRecord.attendancePet).level===10,'switching branch keeps earned level');
     const nickname=document.getElementById('attendancePetNickname'),nameForm=document.getElementById('attendancePetNicknameForm'),beforeNameWrites=petWrites;
+    check(nameForm.hidden&&document.getElementById('attendancePetCountdown').hidden&&document.getElementById('attendancePetVisible').closest('.pet-stable'),'roster contains visibility and living care hides the redundant deadline');
+    document.getElementById('attendancePetNicknameEdit').click();
+    check(!nameForm.hidden&&document.activeElement===nickname,'Edit opens the nickname field below the preview');
     nickname.value='<b>My pet</b>';nickname.dispatchEvent(new Event('input'));renderAttendancePet();
     check(petWrites===beforeNameWrites&&nickname.value==='<b>My pet</b>','typing a nickname does not write or get overwritten by timer');
     nameForm.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));await new Promise(resolve=>setTimeout(resolve,0));
     check(petRecord.attendancePet.nickname==='<b>My pet</b>'&&document.getElementById('attendancePetName').textContent==='<b>My pet</b>'&&!document.querySelector('#attendancePetName b'),'nickname saves and renders as plain text');
+    check(nameForm.hidden,'saving closes the nickname editor');
     nameForm.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));await new Promise(resolve=>setTimeout(resolve,0));
     check(petWrites===beforeNameWrites+1,'saving same nickname does not write again');
     petRecord.attendancePet={...newAttendancePet(Date.now()-7200000),branch:'bird',checkins:279,lastCheckinAt:Date.now(),lastCheckinDay:attendancePetDay(Date.now())};attendancePetData=petRecord.attendancePet;selectedAttendancePetId=null;renderAttendancePet();
@@ -1742,7 +1778,7 @@ try {
     check(document.getElementById('petGameWeight').textContent===petWeightLabel(currentWeight),'care form displays selected pet weight');
     const comparisonNow=Date.now();
     usersDirectorySnapshot={docs:[
-      {id:'active',data:()=>({uid:'active',displayName:'Active trainer',attendancePet:{...newAttendancePet(comparisonNow-7200000),weightGrams:9000,lastCheckinAt:comparisonNow-1000,branch:'fish',checkins:90}})},
+      {id:'active',data:()=>({uid:'active',displayName:'Active trainer',attendancePet:{...newAttendancePet(comparisonNow-7200000),weightGrams:9000,lastCheckinAt:comparisonNow-1000,branch:'fish',checkins:90,battleHistory:[{id:'example',result:'win',opponentName:'Rival',xpDelta:1,weightDelta:200,endedAt:comparisonNow-1000}]}})},
       {id:'inactive',data:()=>({uid:'inactive',displayName:'Inactive trainer',attendancePet:{...newAttendancePet(comparisonNow-10*86400000),weightGrams:90000,lastCheckinAt:comparisonNow-8*86400000}})}
     ]};
     const writesBeforeCompare=petWrites;
@@ -1753,6 +1789,10 @@ try {
 
     check(document.getElementById('petCompareRows').textContent.includes('Active trainer')&&!document.getElementById('petCompareRows').textContent.includes('Inactive trainer'),'only recently active users are compared');
     check(document.querySelector('#petCompareRows .pet-compare-weight').textContent==='9,0 kg','comparison sorts by weight');
+    document.querySelector('#petCompareRows .pet-compare-history-button').click();
+    const historyText=document.getElementById('petBattleHistoryList').textContent;
+    check(document.getElementById('petBattleHistoryDialog').open&&historyText.includes('Thắng · Rival')&&historyText.includes('+1 EXP · +0,2 kg'),'ranking opens the selected pet history with signed totals');
+    document.getElementById('petBattleHistoryClose').click();
     check(document.querySelector('#petCompareRows .pet-compare-xp').textContent==='0/10 EXP · Còn 10 EXP','comparison shows EXP within the current level and remaining EXP');
     check(document.querySelector('#petCompareRows .is-me'),'own pets are highlighted');
     document.getElementById('petCompareBranch').value='fish';document.getElementById('petCompareBranch').dispatchEvent(new Event('change'));
@@ -1786,17 +1826,19 @@ try {
     check(petWrites===adminWrites+2&&!petAdminBusy&&!levelButton.disabled,'failed admin action writes nothing and releases the lock');
     document.getElementById('petAdminClose').click();
     document.getElementById('petBattleOpen').click();
-    check(document.getElementById('petBattleDialog').open,'battle lobby opens from care screen');
-    check(document.getElementById('petBattleOpponent').closest('label').hidden&&document.getElementById('petBattleCreate').hidden,'opponent selector is shown only after choosing new match');
+    check(document.getElementById('petBattleLobby').open&&!document.getElementById('petBattleDialog').open,'lobby opens from care screen');
     document.getElementById('petBattleNew').click();
-    check(!document.getElementById('petBattleOpponent').closest('label').hidden&&!document.getElementById('petBattleCreate').hidden,'new match reveals opponent and send action');
+    check(document.getElementById('petBattleDialog').open&&!document.getElementById('petBattleDraftSlots').hidden,'create opens a dedicated room with an opponent slot');
+    document.getElementById('petBattleAddOpponent').click();
+    check(document.getElementById('petBattleInvitePicker').open,'plus opens the opponent picker');
+    document.getElementById('petBattleInvitePickerClose').click();
     const battlePet=attendancePetSelected(attendancePetData,document.getElementById('petBattlePet').value),battleView=attendancePetView(battlePet);
     const statsSum=()=>['petBattleAttack','petBattleMagic','petBattleDefense','petBattleMagicReduction','petBattlePhysicalReduction','petBattleDodge','petBattleLuck','petBattleHealth'].reduce((sum,id)=>sum+Number(document.getElementById(id).value),0);
     check(statsSum()===petBattleBudget(battleView.level),'battle allocation uses one bonus point per level');
     document.getElementById('petBattleAttack').value=Number(document.getElementById('petBattleAttack').value)+1;document.getElementById('petBattleAttack').dispatchEvent(new Event('input'));
     check(document.getElementById('petBattleRemaining').classList.contains('invalid'),'invalid stat total is visibly rejected');
     const savedAttack=document.getElementById('petBattleAttack').value;
-    document.getElementById('petBattleClose').click();document.getElementById('petBattleOpen').click();
+    document.getElementById('petBattleClose').click();document.getElementById('petBattleNew').click();
     check(document.getElementById('petBattleAttack').value===savedAttack&&document.getElementById('petBattleRemaining').classList.contains('invalid'),'Chrome draft restores all edited points when room reopens without silently rebalancing');
     document.getElementById('petBattleBalanceStats').click();check(statsSum()===petBattleBudget(battleView.level),'balanced allocation restores exact point total');
     const fightMe=petBattleFighter({uid:'me',displayName:'Trainer',attendancePet:attendancePetData},'me',battlePet.id,Object.fromEntries(Object.entries({attack:'petBattleAttack',magic:'petBattleMagic',defense:'petBattleDefense',magicReduction:'petBattleMagicReduction',physicalReduction:'petBattlePhysicalReduction',dodge:'petBattleDodge',luck:'petBattleLuck',health:'petBattleHealth'}).map(([key,id])=>[key,Number(document.getElementById(id).value)])));
@@ -1830,7 +1872,7 @@ try {
     document.getElementById('petBattleViewInvite').click();check(document.getElementById('petBattleDialog').open,'banner reopens invitation after dismissal');
     inviteSnapshot({id:incoming.id,exists:()=>true,data:()=>({...incoming,status:'rps',players:[fightOther,fightMe]})});
     check(document.getElementById('petBattleInvite').hidden&&!document.getElementById('petBattleRps').hidden,'acceptance clears invite and shows RPS without a combat turn');
-    document.getElementById('petBattleClose').click();PetBattleGame.open();
+    document.getElementById('petBattleClose').click();
     const battleSelect=document.getElementById('petBattleMatches');battleSelect.value=incoming.id;battleSelect.dispatchEvent(new Event('change'));
     check(document.getElementById('petBattleDialog').open&&!document.getElementById('petBattleRps').hidden&&document.getElementById('petBattleDamage0').textContent===''&&document.getElementById('petBattleDamage1').textContent==='','reopening accepted room from match selector is safe before either RPS move');
     for(const commits of [{opponent:'pending-hash'},{opponent:'pending-hash',me:'pending-hash'}]){
@@ -1849,11 +1891,18 @@ try {
     battleState.matches.set(revealFixture.id,revealFixture);PetBattleGame.open(revealFixture.id);
     check(!document.getElementById('petBattleRpsReveal').hidden&&document.getElementById('petBattleRpsWinner').textContent.includes('Trainer')&&document.getElementById('petBattleRpsHands').textContent.includes('✌'),'RPS reveal shows both hands and first attacker');
     check(petBattlePlayback(revealFixture).count===0&&document.getElementById('petBattleRpsCountdown').textContent.includes('5'),'five second reveal precedes combat');
+    const readyFixture={...battleFixture,id:'ui-ready',roomFlow:true,status:'ready',startedAt:null,turns:[],maxHp:[],winnerUid:null,ready:{me:true},readyDeadline:Date.now()+120000};
+    battleState.matches.set(readyFixture.id,readyFixture);PetBattleGame.open(readyFixture.id);
+    check(!document.getElementById('petBattleReadyPanel').hidden&&document.getElementById('petBattleReady').disabled&&document.getElementById('petBattleReadyStatuses').textContent.includes('Đã sẵn sàng'),'shared waiting room marks own readiness and waits for the other player');
     const done={...battleFixture,id:'ui-done',status:'finished',startedAt:Date.now()-999999};battleState.matches.set(done.id,done);PetBattleGame.open(done.id);
-    check(!document.getElementById('petBattleFinish').hidden&&document.getElementById('petBattleFinish').disabled,'cannot dismiss before payout');
+    const exitDialog=document.getElementById('petBattleExitDialog');
+    check(exitDialog.open&&document.getElementById('petBattleExitWinner').textContent.length>0,'finished room automatically opens a result form');
+    document.getElementById('petBattleStay').click();
+    check(!exitDialog.open&&document.getElementById('petBattleDialog').open,'stay closes only the result form');
     done.claims={me:true};PetBattleGame.open(done.id);document.getElementById('petBattleFinish').click();
+    document.getElementById('petBattleExitConfirm').click();
     check(!document.getElementById('petBattleDialog').open&&!battleState.matches.has(done.id),'finish clears room after own payout');
-    PetBattleGame.open();check(![...document.getElementById('petBattleMatches').options].some(option=>option.value===done.id),'finished room no longer appears in list');
+    check(document.getElementById('petBattleLobby').open&&![...document.getElementById('petBattleMatches').options].some(option=>option.value===done.id),'finished room returns to lobby and no longer appears in list');
     PetBattleGame.open('ui-battle');
     document.getElementById('petBattleClose').click();check(battleState.models.length===0,'closing battle releases both renderers without cancelling match');PetBattleGame.stop();
     const quotaText=petQuotaErrorText({code:'resource-exhausted'});
