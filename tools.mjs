@@ -936,11 +936,36 @@ test('battle stats, RPS and automatic turn timeline are deterministic for both v
  assert.notEqual(await petBattleCommitment('id','a',0,'rock','nonce'),await petBattleCommitment('id','a',1,'rock','nonce'));
 });
 
+test('eight battle stats split damage and produce reproducible dodge and critical turns',()=>{
+ const stats={attack:20,magic:20,defense:10,physicalReduction:10,magicReduction:10,dodge:10,luck:10,health:10};
+ assert.equal(Object.keys(petBattleStats(stats,1)).length,8);
+ assert.throws(()=>petBattleStats({...stats,magic:21},1));assert.throws(()=>petBattleStats({...stats,dodge:0,health:20},1));
+ const players=[{uid:'a',stats,appearance:{level:1}},{uid:'b',stats:{...stats},appearance:{level:1}}];
+ const battle=petBattleSimulation(players,'a');assert.deepEqual(battle,petBattleSimulation(JSON.parse(JSON.stringify(players)),'a'));
+ let sawDodge=false,sawCritical=false;
+ for(let i=0;i<60;i++){
+  const result=petBattleSimulation([{...players[0],petId:String(i)},players[1]],'a');
+  let hp=[...result.maxHp];for(const turn of result.turns){const defender=turn.defender==='a'?0:1;
+   if(turn.dodged){sawDodge=true;assert.equal(turn.damage,0);assert.equal(turn.hp[defender],hp[defender]);}
+   else {assert.ok(turn.physical>0&&turn.magic>0);assert.equal(turn.damage,Math.max(1,Math.round(turn.physical+turn.magic)));}
+   if(turn.critical&&!turn.dodged)sawCritical=true;
+   assert.ok(turn.hp.every(value=>value>=0));hp=turn.hp;
+  }
+ }
+ assert.ok(sawDodge&&sawCritical);
+ const changed=petBattleSimulation([{...players[0],stats:{...stats,attack:1,magic:39}},players[1]],'a');
+ const hit=changed.turns.find(t=>t.attacker==='a'&&!t.dodged);assert.ok(hit.magic>hit.physical,'magic build deals predominantly magic damage');
+ const resistant=petBattleSimulation([players[0],{...players[1],stats:{...stats,physicalReduction:19,magicReduction:1}}],'a').turns.find(t=>t.attacker==='a'&&!t.dodged);
+ const baseHit=battle.turns.find(t=>t.attacker==='a'&&!t.dodged);
+ assert.ok(resistant.physical/(resistant.critical?1.5:1)<baseHit.physical/(baseHit.critical?1.5:1),'physical resistance specifically reduces physical damage');
+ assert.ok(resistant.magic/(resistant.critical?1.5:1)>baseHit.magic/(baseHit.critical?1.5:1),'lower magic resistance allows more magic damage');
+});
+
 test('two-client battle escrow, hidden RPS, automatic fight, payout and refunds commit atomically once', async () => {
  let clock=Date.UTC(2026,10,20),writes=0;const profiles=new Map(),battles=new Map(),nodes=new Map();
  for(const uid of ['a','b'])profiles.set(uid,{uid,displayName:uid,attendancePet:{...newAttendancePet(clock-7200000),weightGrams:1000,lastCheckinAt:clock,lastCheckinDay:attendancePetDay(clock)}});
  class Clock extends Date{constructor(...args){super(...(args.length?args:[clock]));}static now(){return clock;}}
- const context={Date:Clock,Math,Map,Set,Number,Object,Array,JSON,Promise,Infinity,crypto:globalThis.crypto,TextEncoder,
+ const context={Date:Clock,Math,Map,Set,Number,Object,Array,JSON,Promise,Infinity,crypto:globalThis.crypto,TextEncoder,PET_BATTLE_STEP_MS:1800,
   db:{},currentUser:{uid:'a'},attendancePetRef:{collection:'users',id:'a'},authenticatedProfileSnapshot:null,attendancePetData:profiles.get('a').attendancePet,
   document:{getElementById:id=>{if(!nodes.has(id))nodes.set(id,{open:false,hidden:true,textContent:'',dataset:{},close(){this.open=false;}});return nodes.get(id);}},
   usersDirectorySnapshot:{docs:['a','b'].map(id=>({id,data:()=>structuredClone(profiles.get(id))}))},
@@ -965,10 +990,15 @@ test('two-client battle escrow, hidden RPS, automatic fight, payout and refunds 
  await game.mutate('reveal',{choice:'rock',nonce:'secret-a',hash:hashA,round:0});
  use('b',id);await game.mutate('reveal',{choice:'scissors',nonce:'secret-b',hash:hashB,round:0});
  let m=battles.get(id);assert.equal(m.status,'fighting');assert.equal(m.firstUid,'a');assert.equal(m.winnerUid,'a');
- const writesDuringFight=writes;clock+=2000+m.turns.length*1800+1;assert.equal(writes,writesDuringFight,'no writes occur per automatic turn');
+ assert.equal(m.introMs,5000);assert.equal(petBattlePlayback(m,clock+4999).count,0,'RPS result is displayed before automatic attacks');
+ const writesDuringFight=writes;clock+=5000+m.turns.length*1800+1;assert.equal(writes,writesDuringFight,'no writes occur per automatic turn');
  use('a',id);await game.mutate('claim');assert.equal(attendancePetView(profiles.get('a').attendancePet,clock).weightGrams,1200);
+ const auraUntil=profiles.get('a').attendancePet.victoryAuraUntil;
+ assert.equal(auraUntil,m.startedAt+5000+m.turns.length*1800+3600000,'aura expires one hour from combat end, not claim or refresh');
  const claimed=writes;await game.mutate('claim');assert.equal(writes,claimed,'refresh/double claim cannot pay twice');
+ assert.equal(profiles.get('a').attendancePet.victoryAuraUntil,auraUntil,'repeat claim never extends aura');
  use('b',id);await game.mutate('claim');assert.equal(attendancePetView(profiles.get('b').attendancePet,clock).weightGrams,800);
+ assert.equal(profiles.get('b').attendancePet.victoryAuraUntil,undefined,'loser does not receive victory aura');
  assert.equal(attendancePetView(profiles.get('a').attendancePet,clock).weightGrams+attendancePetView(profiles.get('b').attendancePet,clock).weightGrams,2000,'kg is conserved');
  for(const uid of ['a','b'])assert.equal(Object.keys(profiles.get(uid).petBattleLocks).length,0);
  use('a');await game.mutate('create',payload('a',statsA));const cancelled=game.inspect().active;await game.mutate('cancel');assert.equal(battles.get(cancelled).status,'cancelled');assert.equal(attendancePetView(profiles.get('a').attendancePet,clock).weightGrams,1200);
@@ -1740,15 +1770,20 @@ try {
     document.getElementById('petBattleOpen').click();
     check(document.getElementById('petBattleDialog').open,'battle lobby opens from care screen');
     const battlePet=attendancePetSelected(attendancePetData,document.getElementById('petBattlePet').value),battleView=attendancePetView(battlePet);
-    const statsSum=()=>['petBattleAttack','petBattleDefense','petBattleHealth'].reduce((sum,id)=>sum+Number(document.getElementById(id).value),0);
+    const statsSum=()=>['petBattleAttack','petBattleMagic','petBattleDefense','petBattleMagicReduction','petBattlePhysicalReduction','petBattleDodge','petBattleLuck','petBattleHealth'].reduce((sum,id)=>sum+Number(document.getElementById(id).value),0);
     check(statsSum()===petBattleBudget(battleView.level),'battle allocation uses one bonus point per level');
     document.getElementById('petBattleAttack').value=Number(document.getElementById('petBattleAttack').value)+1;document.getElementById('petBattleAttack').dispatchEvent(new Event('input'));
     check(document.getElementById('petBattleRemaining').classList.contains('invalid'),'invalid stat total is visibly rejected');
     document.getElementById('petBattleBalanceStats').click();check(statsSum()===petBattleBudget(battleView.level),'balanced allocation restores exact point total');
-    const fightMe=petBattleFighter({uid:'me',displayName:'Trainer',attendancePet:attendancePetData},'me',battlePet.id,{attack:Number(document.getElementById('petBattleAttack').value),defense:Number(document.getElementById('petBattleDefense').value),health:Number(document.getElementById('petBattleHealth').value)});
+    const fightMe=petBattleFighter({uid:'me',displayName:'Trainer',attendancePet:attendancePetData},'me',battlePet.id,Object.fromEntries(Object.entries({attack:'petBattleAttack',magic:'petBattleMagic',defense:'petBattleDefense',magicReduction:'petBattleMagicReduction',physicalReduction:'petBattlePhysicalReduction',dodge:'petBattleDodge',luck:'petBattleLuck',health:'petBattleHealth'}).map(([key,id])=>[key,Number(document.getElementById(id).value)])));
     const opponentRaw={...newAttendancePet(Date.now()-7200000),weightGrams:1000,lastCheckinAt:Date.now()},opponentId=attendancePetRecords(opponentRaw)[0].id;
     const fightOther=petBattleFighter({uid:'opponent',displayName:'Rival',attendancePet:opponentRaw},'opponent',opponentId,{attack:34,defense:33,health:33});
     const timeline=petBattleSimulation([fightMe,fightOther],'me'),battleState=PetBattleGame.inspect();
+    const auraButton=document.getElementById('attendancePetSwimmer'),auraPet={...battlePet,victoryAuraUntil:Date.now()+3600000};
+    renderPetHungerBubble(auraButton,attendancePetView(auraPet));
+    check(auraButton.classList.contains('pet-victory-aura')&&!auraButton.querySelector('.pet-victory-halo').hidden,'winner displays a golden aura');
+    renderPetHungerBubble(auraButton,attendancePetView({...auraPet,victoryAuraUntil:Date.now()-1}));
+    check(!auraButton.classList.contains('pet-victory-aura')&&auraButton.querySelector('.pet-victory-halo').hidden,'aura disappears after expiry without a Firebase write');
     const battleFixture={id:'ui-battle',status:'fighting',challengerUid:'me',opponentUid:'opponent',participantUids:['me','opponent'],players:[fightMe,fightOther],stakeGrams:200,createdMs:Date.now(),startedAt:Date.now()-3000,claims:{},commits:{},reveals:{},...timeline};
     const outgoing={...battleFixture,id:'ui-outgoing',status:'invited',players:[fightMe],turns:[],maxHp:[],startedAt:null,winnerUid:null,expiresAt:Date.now()+600000};
     battleState.matches.set(outgoing.id,outgoing);PetBattleGame.open(outgoing.id);
@@ -1780,6 +1815,17 @@ try {
     check(!document.getElementById('petBattleRoom').hidden&&battleState.models.length===2,'accepted battle displays both pet renderers');
     const fightPlay=petBattlePlayback(battleFixture);check(Number(document.getElementById('petBattleHp0').value)===fightPlay.hp[0]&&Number(document.getElementById('petBattleHp1').value)===fightPlay.hp[1],'room HP follows shared automatic turn timeline');
     check(document.getElementById('petBattleDialog').scrollWidth<=document.getElementById('petBattleDialog').clientWidth+1,'battle room has no horizontal clipping');
+    check(document.querySelector('.pet-battle-skill')?.classList.contains('skill-fire'),'dinosaur attack has its own elemental visual');
+    const revealFixture={...battleFixture,id:'ui-rps-result',firstUid:'me',introMs:5000,startedAt:Date.now(),reveals:{me:{choice:'rock'},opponent:{choice:'scissors'}}};
+    battleState.matches.set(revealFixture.id,revealFixture);PetBattleGame.open(revealFixture.id);
+    check(!document.getElementById('petBattleRpsReveal').hidden&&document.getElementById('petBattleRpsWinner').textContent.includes('Trainer')&&document.getElementById('petBattleRpsHands').textContent.includes('✌'),'RPS reveal shows both hands and first attacker');
+    check(petBattlePlayback(revealFixture).count===0&&document.getElementById('petBattleRpsCountdown').textContent.includes('5'),'five second reveal precedes combat');
+    const done={...battleFixture,id:'ui-done',status:'finished',startedAt:Date.now()-999999};battleState.matches.set(done.id,done);PetBattleGame.open(done.id);
+    check(!document.getElementById('petBattleFinish').hidden&&document.getElementById('petBattleFinish').disabled,'cannot dismiss before payout');
+    done.claims={me:true};PetBattleGame.open(done.id);document.getElementById('petBattleFinish').click();
+    check(!document.getElementById('petBattleDialog').open&&!battleState.matches.has(done.id),'finish clears room after own payout');
+    PetBattleGame.open();check(![...document.getElementById('petBattleMatches').options].some(option=>option.value===done.id),'finished room no longer appears in list');
+    PetBattleGame.open('ui-battle');
     document.getElementById('petBattleClose').click();check(battleState.models.length===0,'closing battle releases both renderers without cancelling match');PetBattleGame.stop();
     const quotaText=petQuotaErrorText({code:'resource-exhausted'});
     check(quotaText.includes('429'),'quota error is identified instead of reported as permission failure');

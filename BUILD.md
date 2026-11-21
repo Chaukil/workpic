@@ -228,3 +228,20 @@ to `petBattles` and owned profile updates; no deployed rules were overwritten.
 This client implementation prevents accidental duplicate settlements, but is not
 server-authoritative anti-cheat. Adversarial play requires server-side validation
 and restrictive rules; virtual pet weight has no monetary value.
+
+New battles include a five-second RPS result intro (`introMs: 5000`) anchored
+to `startedAt`; older battles retain their two-second intro. The finish button
+is enabled only after the current player's claim has settled. It dismisses the
+room on the current device using account-scoped local storage, rather than deleting
+the shared document before an offline opponent can claim. Skill particles remain
+bounded to 4–16 per turn; species control the effect and model lunge, while levels
+increase particle density and glow. Reduced-motion preferences suppress particles.
+
+New allocations use eight fields (attack, magic, defense, physicalReduction,
+magicReduction, dodge, luck, health) within the original total budget. Existing
+three-field battles remain supported. New combat sums separately mitigated physical
+and magic damage; deterministic seeded rolls apply capped dodge (40%) and critical
+chance (35%, 1.5x damage), each at 0.5 percentage points per allocated point.
+Winner claims set the participating pet's `victoryAuraUntil` in the same profile
+transaction as payment. Expiry is combat end plus one hour, independent of claim
+time; timers merely render it and never extend it or write to Firestore.
