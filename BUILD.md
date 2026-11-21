@@ -229,6 +229,22 @@ This client implementation prevents accidental duplicate settlements, but is not
 server-authoritative anti-cheat. Adversarial play requires server-side validation
 and restrictive rules; virtual pet weight has no monetary value.
 
+### Pet Control Center permissions
+
+The control center updates `attendancePet` in the selected member's profile.
+In [Firestore Rules](https://console.firebase.google.com/project/workpic-eb555/firestore/rules),
+add this rule inside the existing `match /users/{userId}` block and publish.
+Replace `ADMIN_AUTH_UID` with the Firebase Authentication UID for
+`chauchikil01@gmail.com` from the Authentication Users tab. Keep the existing
+rules for profile owners and other collections.
+
+```firestore
+allow update: if request.auth != null
+  && request.auth.uid == "ADMIN_AUTH_UID"
+  && request.resource.data.attendancePet is map
+  && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['attendancePet']);
+```
+
 New battles include a five-second RPS result intro (`introMs: 5000`) anchored
 to `startedAt`; older battles retain their two-second intro. The finish button
 is enabled only after the current player's claim has settled. It dismisses the

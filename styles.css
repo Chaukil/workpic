@@ -15729,12 +15729,59 @@ body.modal-open .attendance-pet-swimmer,body:has(dialog[open]) .attendance-pet-s
 .pet-battle-fields label,.pet-battle-stat-fields label { min-width:0; font-size:.76rem; font-weight:600; }
 .pet-battle-setup { border:1px solid var(--border); border-radius:14px; padding:16px; margin:12px 0; }
 .pet-battle-stat-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin:18px 0 12px; font-size:.82rem; }
-.pet-battle-stat-fields { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
-.pet-battle-stat-fields { grid-template-columns:repeat(4,minmax(0,1fr)); }
+.pet-battle-stat-fields { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
 .pet-battle-setup { padding:16px; border:1px solid var(--border); border-radius:14px; background:var(--surface-muted); }
 .pet-battle-setup .pet-battle-fields { grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
-.pet-battle-setup .pet-battle-stat-fields label { display:flex; flex-direction:column; justify-content:space-between; gap:5px; padding:10px; border:1px solid var(--border); border-radius:10px; background:var(--surface); font-size:.72rem; }
-.pet-battle-setup .pet-battle-stat-fields input { margin-top:0; padding:7px 9px; }
+.pet-battle-setup .pet-battle-stat-fields label {
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    align-items:center;
+    gap:5px 8px;
+    padding:10px;
+    border:1px solid var(--border);
+    border-radius:10px;
+    background:var(--surface);
+    font-size:.72rem;
+}
+.pet-battle-stat-value { color:var(--primary); font-size:.85rem; font-weight:700; font-variant-numeric:tabular-nums; }
+.pet-battle-setup .pet-battle-stat-fields input[type=range] {
+    grid-column:1 / -1;
+    height:28px;
+    margin:0;
+    padding:0;
+    border:0;
+    background:transparent;
+    accent-color:var(--primary);
+    cursor:pointer;
+}
+.pet-battle-stat-comparison {
+    margin-top:12px;
+    padding:8px 14px;
+    border:1px solid var(--border);
+    border-radius:14px;
+    background:var(--surface-muted);
+}
+.pet-battle-stat-row {
+    display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(88px,24%) minmax(0,1fr);
+    align-items:center;
+    gap:10px;
+    min-height:32px;
+    font-size:.72rem;
+}
+.pet-battle-stat-row + .pet-battle-stat-row { border-top:1px solid var(--border); }
+.pet-battle-stat-row > :nth-child(2) { text-align:center; color:var(--muted); }
+.pet-battle-stat-heading > strong { overflow-wrap:anywhere; }
+.pet-battle-stat-heading > :last-child { text-align:right; }
+.pet-battle-stat-cell { display:flex; align-items:center; gap:6px; min-width:0; font-variant-numeric:tabular-nums; }
+.pet-battle-stat-cell.side-0 { flex-direction:row-reverse; }
+.pet-battle-stat-cell progress { flex:1; width:100%; min-width:0; height:8px; accent-color:#0284c7; }
+.pet-battle-stat-cell.side-0 progress { direction:rtl; }
+.pet-battle-stat-cell.side-1 progress { accent-color:#d97706; }
+@media(max-width:480px) {
+    .pet-battle-stat-comparison { padding-inline:8px; }
+    .pet-battle-stat-row { gap:5px; font-size:.65rem; }
+}
 .pet-battle-help { margin:12px 0; font-size:.73rem; color:var(--muted); }.pet-battle-help summary { cursor:pointer; }
 .pet-battle-draft-hint { display:block; color:var(--muted); font-size:.68rem; line-height:1.6; }
 .pet-battle-tabs { position:sticky; top:-22px; z-index:5; padding:8px 0; background:var(--surface); }
@@ -15755,8 +15802,37 @@ body.modal-open .attendance-pet-swimmer,body:has(dialog[open]) .attendance-pet-s
 .pet-battle-side { min-width:0; position:relative; text-align:center; border:1px solid transparent; border-radius:14px; padding:10px; transition:box-shadow .2s,border-color .2s; }
 .pet-battle-side h6 { margin:0 0 6px; overflow-wrap:anywhere; font-size:.88rem; line-height:1.5; }
 .pet-battle-side > small { display:block; font-size:.65rem; color:var(--muted); }
-.pet-battle-model { display:flex; align-items:center; justify-content:center; max-width:100%; margin:auto; height:220px; background:radial-gradient(ellipse at 50% 85%,#5da1b825,transparent 45%); }
-.pet-battle-model > span { display:flex; align-items:center; justify-content:center; width:100%; max-width:100%; height:100%; }
+.pet-battle-model { position:relative; isolation:isolate; display:flex; align-items:center; justify-content:center; max-width:100%; margin:auto; height:220px; background:radial-gradient(ellipse at 50% 85%,#5da1b825,transparent 45%); }
+.pet-battle-model > span { position:relative; z-index:1; display:flex; align-items:center; justify-content:center; width:100%; max-width:100%; height:100%; }
+.pet-battle-model.has-element-aura::before,
+.pet-battle-model.has-element-aura::after {
+    content:'';
+    position:absolute;
+    top:74%;
+    left:50%;
+    width:min(90%, 152px);
+    aspect-ratio:1;
+    border-radius:50%;
+    color:var(--pet-battle-element-color);
+    pointer-events:none;
+    transform:translate(-50%, -50%) rotateX(68deg);
+}
+.pet-battle-model.has-element-aura::before {
+    background:radial-gradient(circle, transparent 44%, currentColor 67%, transparent 72%);
+    filter:blur(4px);
+    opacity:.45;
+}
+.pet-battle-model.has-element-aura::after {
+    background:repeating-conic-gradient(transparent 0 10deg, currentColor 12deg 30deg, transparent 42deg 60deg);
+    mask-image:radial-gradient(circle, transparent 52%, #000 54% 57%, transparent 59% 62%, #000 64% 69%, transparent 71%);
+    animation:pet-battle-aura-spin 4s linear infinite;
+}
+@keyframes pet-battle-aura-spin {
+    to { transform:translate(-50%, -50%) rotateX(68deg) rotate(360deg); }
+}
+@media(prefers-reduced-motion:reduce) {
+    .pet-battle-model.has-element-aura::after { animation:none; }
+}
 .pet-battle-model canvas,.pet-battle-model svg { max-width:100%; max-height:220px; object-fit:contain; filter:drop-shadow(0 10px 10px #02061755); }
 .pet-battle-side progress { display:block; width:100%; height:12px; accent-color:#34d399; border-radius:10px; }
 .pet-battle-side > strong { display:block; font-size:.73rem; margin-top:7px; font-variant-numeric:tabular-nums; }
