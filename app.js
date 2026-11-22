@@ -304,7 +304,7 @@ const ATTENDANCE_PET_BRANCHES={
         petForm('Cá voi sát thủ','whale','orca','#172033',1.25),
         petForm('Cá voi lưng gù','whale','humpback','#476a7c',1.35),
         petForm('Cá nhà táng','whale','sperm','#536878',1.4),
-        petForm('Cá mập voi','shark','whaleshark','#456f83',1.45,{spots:true}),
+        petForm('Nàng tiên cá','fish','mermaid','#50b4a7',1.45),
         petForm('Cá voi xanh','whale','blue','#3788ad',1.5),
         petForm('Cá mập Megalodon','shark','megalodon','#495d66',1.6),
         petForm('Cá voi xanh khổng lồ','whale','blue','#285c7a',1.7,{crest:true}),
@@ -343,7 +343,13 @@ const ATTENDANCE_PET_BRANCHES={
         petForm('Sư tử trắng','beast','lion','#d8d0b7',1.4),
         petForm('Hổ răng kiếm','beast','sabertooth','#b58c54',1.5,{stripes:true})]}
 };
-// Every species has a juvenile and mature form, ordered by branch growth.
+const PET_BRANCH_FINALS={
+    fish:petForm('Huyền Vũ','dino','tortoise','#57a59a',1.85),
+    dino:petForm('Chu Tước','bird','phoenix','#f27639',1.78,{crest:true}),
+    bird:petForm('Khổng Tước','bird','peacock','#4298b3',1.68,{crest:true}),
+    beast:petForm('Bạch Hổ','beast','tiger','#ece5df',1.65,{stripes:true,crest:true})
+};
+// Every regular branch species has a juvenile and mature form.
 for(const [key,branch] of Object.entries(ATTENDANCE_PET_BRANCHES)){
     const [small,large]={fish:[.65,1.8],dino:[.6,1.75],bird:[.5,1.6],beast:[.5,1.5]}[key];
     const stages=branch.forms.flatMap(form=>[
@@ -351,6 +357,7 @@ for(const [key,branch] of Object.entries(ATTENDANCE_PET_BRANCHES)){
         {...form,juvenile:false}
     ]);
     branch.forms=stages.map((form,index)=>({...form,scale:Number((small+(large-small)*index/(stages.length-1)).toFixed(3))}));
+    branch.forms.push(PET_BRANCH_FINALS[key]);
 }
 const ATTENDANCE_PET_MAX_LEVEL=ATTENDANCE_PET_FORMS.length+Math.max(...Object.values(ATTENDANCE_PET_BRANCHES).map(branch=>branch.forms.length));
 function attendancePetCatalog(branch){return ATTENDANCE_PET_FORMS.concat(ATTENDANCE_PET_BRANCHES[branch]?.forms||[]);}
@@ -378,21 +385,12 @@ function attendancePetDay(now) {
 }
 
 function newAttendancePet(now) {
-    return {version:1,bornAt:now,hatchAt:now+3600000,checkins:0,feedingXp:0,weightGrams:0,weightPenaltyGrams:0,lastFedAt:null,lastCheckinAt:null,lastCheckinDay:null,fedOn:null,feeds:0,life:1,branch:null,updatedAt:now};
+    return {version:1,bornAt:now,hatchAt:now+3600000,checkins:0,feedingXp:0,weightGrams:0,lastFedAt:null,lastCheckinAt:null,lastCheckinDay:null,fedOn:null,feeds:0,life:1,branch:null,updatedAt:now};
 }
 
-function attendancePetWeight(raw,now=Date.now()){
-    const reference=Math.max(Number(raw.bornAt)||0,Number(raw.lastCheckinAt)||Number(raw.bornAt)||0);
-    const absence=Math.max(0,now-reference);
-    const penaltyGrams=absence>=172800000?2000:absence>=86400000?500:0;
+function attendancePetWeight(raw){
     const feeds=Number(raw.feeds);
-    const base=Number.isFinite(raw.weightGrams)?Math.max(0,Math.round(raw.weightGrams)):Math.max(0,Math.floor(Number.isFinite(feeds)?feeds:0))*200;
-    const applied=Math.max(0,Math.round(Number(raw.weightPenaltyGrams)||0));
-    return {weightGrams:Math.max(0,base-Math.max(0,penaltyGrams-applied)),penaltyGrams,missedDays:Math.min(3,Math.floor(absence/86400000))};
-}
-function settleAttendancePetWeight(raw,now=Date.now()){
-    const weight=attendancePetWeight(raw,now);
-    return {...raw,weightGrams:weight.weightGrams,weightPenaltyGrams:weight.penaltyGrams};
+    return Number.isFinite(raw.weightGrams)?Math.max(0,Math.round(raw.weightGrams)):Math.max(0,Math.floor(Number.isFinite(feeds)?feeds:0))*200;
 }
 
 function normalizePetNickname(value){
@@ -417,14 +415,13 @@ function attendancePetView(raw, now = Date.now()) {
     const name=egg?'Trứng đại dương':form.name,nickname=normalizePetNickname(pet.nickname);
     const lastFedAt=Number(pet.lastFedAt)||(/^[\d]{4}-[\d]{2}-[\d]{2}$/.test(pet.fedOn||'')?Date.parse(pet.fedOn+'T00:00:00+07:00'):0);
     const nextFeedAt=lastFedAt?lastFedAt+7200000:pet.hatchAt;
-    const weight=attendancePetWeight(pet,now);
     return {pet,dead,egg,level,diesAt,checkins,xp,feedingXp,battleXp,nextFeedAt,hungry:!dead&&!egg&&now>=nextFeedAt,untilHungry:Math.max(0,nextFeedAt-now),branch,branchUnlocked,maxed,branchLevel:Math.max(0,level-9),needsBranch:branchUnlocked&&!branch,today:attendancePetDay(now),name,nickname,displayName:nickname||name,form,
-        weightGrams:weight.weightGrams,missedDays:weight.missedDays,absencePenaltyGrams:weight.penaltyGrams,checkedToday:pet.lastCheckinDay===attendancePetDay(now),fedToday:pet.fedOn===attendancePetDay(now),untilHatch:Math.max(0,pet.hatchAt-now),nextEvolutionIn:maxed?0:10-xp%10};
+        weightGrams:attendancePetWeight(pet),checkedToday:pet.lastCheckinDay===attendancePetDay(now),fedToday:pet.fedOn===attendancePetDay(now),untilHatch:Math.max(0,pet.hatchAt-now),nextEvolutionIn:maxed?0:10-xp%10};
 }
 
 function transitionAttendancePet(raw, action, now = Date.now(), { ignoreFeedingCooldown = false } = {}) {
     const view = attendancePetView(raw,now);
-    const pet = settleAttendancePetWeight(view.pet,now);
+    const pet = {...view.pet,weightGrams:view.weightGrams};
     if (action==='init') return {pet:view.pet,changed:!raw||raw.version!==1||!Number.isFinite(raw.bornAt)||!Number.isFinite(raw.hatchAt),result:'ready'};
     if (action==='revive') {
         if (!view.dead) return {pet,changed:false,result:'alive'};
@@ -445,7 +442,7 @@ function transitionAttendancePet(raw, action, now = Date.now(), { ignoreFeedingC
     }
     if (action==='checkin') {
         if (view.checkedToday) return {pet,changed:false,result:'already-checked'};
-        pet.checkins=view.checkins+1;pet.lastCheckinAt=now;pet.lastCheckinDay=view.today;pet.weightPenaltyGrams=0;pet.updatedAt=now;
+        pet.checkins=view.checkins+1;pet.lastCheckinAt=now;pet.lastCheckinDay=view.today;pet.updatedAt=now;
         return {pet,changed:true,result:'checked'};
     }
     if (action==='feed') {
@@ -465,9 +462,9 @@ function unchangedPetAdminAction(view,action,level){
         ||action==='egg'&&view.egg&&!view.dead;
 }
 function adjustAdminPet(raw, action, level, now = Date.now()) {
-    const view = attendancePetView(raw, now), pet = settleAttendancePetWeight(view.pet,now);
+    const view = attendancePetView(raw, now), pet = {...view.pet,weightGrams:view.weightGrams};
     if(unchangedPetAdminAction(view,action,level))return view.pet;
-    const keepAlive = () => { pet.lastCheckinAt = now;pet.weightPenaltyGrams=0; };
+    const keepAlive = () => { pet.lastCheckinAt = now; };
     if (action === 'egg') return {...newAttendancePet(now),nickname:view.nickname,life:(Number(pet.life)||1)+1,
         ...(Array.isArray(pet.battleHistory)?{battleHistory:pet.battleHistory}:{})};
     if (action === 'checkin') {
@@ -564,7 +561,7 @@ function buildPetComparison(profiles,now=Date.now(),branch='all'){
                 appearance:{form:view.form,level:view.level,branch:view.branch,egg:view.egg,dead:view.dead}});
         }
     }
-    rows.sort((a,b)=>Number(a.dead)-Number(b.dead)||b.weightGrams-a.weightGrams||b.level-a.level||a.ownerName.localeCompare(b.ownerName,'vi')||a.petId.localeCompare(b.petId));
+    rows.sort((a,b)=>Number(a.dead)-Number(b.dead)||b.level-a.level||b.weightGrams-a.weightGrams||a.ownerName.localeCompare(b.ownerName,'vi')||a.petId.localeCompare(b.petId));
     let rank=0;return rows.map(row=>({...row,rank:row.dead?null:++rank}));
 }
 
@@ -616,11 +613,14 @@ function petBattleEffectiveStats(player,opponent){
 }
 function petBattleNumber(value){return Number(value.toFixed(2));}
 function petBattleMaxHp(stats){return petBattleNumber(100+stats.health*8);}
-function petBattleBudget(level){return 100+Math.max(0,Math.min(ATTENDANCE_PET_MAX_LEVEL,Math.floor(Number(level)||1))-1);}
-function petBattleStats(stats,level){
+function petBattleBudget(level,legacy=false){
+    const validLevel=Math.max(1,Math.min(ATTENDANCE_PET_MAX_LEVEL,Math.floor(Number(level)||1)));
+    return 100+validLevel-1+(legacy?0:Math.max(0,validLevel-9));
+}
+function petBattleStats(stats,level,legacy=false){
     const keys=Object.hasOwn(stats||{},'magic')?['attack','magic','defense','magicReduction','physicalReduction','dodge','luck','health']:['attack','defense','health'];
     const values=keys.map(key=>Number(stats?.[key]));
-    if(values.some(value=>!Number.isInteger(value)||value<1)||values.reduce((a,b)=>a+b,0)!==petBattleBudget(level))throw new Error('Tổng chỉ số phải bằng điểm được cấp; mỗi chỉ số tối thiểu 1.');
+    if(values.some(value=>!Number.isInteger(value)||value<1)||values.reduce((a,b)=>a+b,0)!==petBattleBudget(level,legacy))throw new Error('Tổng chỉ số phải bằng điểm được cấp; mỗi chỉ số tối thiểu 1.');
     return Object.fromEntries(keys.map((key,i)=>[key,values[i]]));
 }
 function petBattleRps(first,second){
@@ -629,7 +629,8 @@ function petBattleRps(first,second){
 }
 function petBattleSimulation(players,firstUid){
     if(players.length!==2||players[0].uid===players[1].uid||!players.some(p=>p.uid===firstUid))throw new Error('Trận đấu cần hai người khác nhau.');
-    players.forEach(p=>petBattleStats(p.stats,p.appearance.level));
+    players.forEach(p=>petBattleStats(p.stats,p.appearance.level,
+        !p.budgetVersion&&Object.values(p.stats||{}).reduce((sum,value)=>sum+Number(value),0)===petBattleBudget(p.appearance.level,true)));
     const stats=players.map((player,index)=>petBattleEffectiveStats(player,players[1-index]));
     const hp=stats.map(petBattleMaxHp),maxHp=[...hp],turns=[];
     let attacker=players.findIndex(p=>p.uid===firstUid);
@@ -660,9 +661,9 @@ function petBattleChangeWeight(root,petId,delta,now=Date.now()){
     if(!Number.isSafeInteger(delta))throw new Error('Số kg không hợp lệ.');
     const records=attendancePetRecords(root,now),index=records.findIndex(p=>p.id===petId);
     if(index<0)throw new Error('Không tìm thấy thú cưng đã chọn.');
-    const pet=settleAttendancePetWeight(records[index],now);
-    if(pet.weightGrams+delta<0)throw new Error('Thú cưng không đủ kg để cược.');
-    records[index]={...pet,weightGrams:pet.weightGrams+delta,updatedAt:now};
+    const pet=records[index],weightGrams=attendancePetWeight(pet)+delta;
+    if(weightGrams<0)throw new Error('Thú cưng không đủ kg để cược.');
+    records[index]={...pet,weightGrams,updatedAt:now};
     return {...root,...records[0],companions:records.slice(1)};
 }
 function petBattleFighter(profile,profileId,petId,stats,now=Date.now(),element){
@@ -672,7 +673,7 @@ function petBattleFighter(profile,profileId,petId,stats,now=Date.now(),element){
     const view=attendancePetView(record,now);
     if(view.dead||view.egg)throw new Error('Chỉ thú cưng đã nở và còn sống mới được ra trận.');
     if(Object.values(profile.petBattleLocks||{}).some(lock=>lock.petId===petId))throw new Error('Thú cưng đang có một lời thách đấu hoặc trận đấu chưa hoàn tất.');
-    return {uid:profile.uid,profileId,name:profile.displayName||profile.email?.split('@')[0]||'Thành viên',petId,petName:view.displayName,stats:petBattleStats(stats,view.level),
+    return {uid:profile.uid,profileId,name:profile.displayName||profile.email?.split('@')[0]||'Thành viên',petId,petName:view.displayName,budgetVersion:2,stats:petBattleStats(stats,view.level),
         appearance:{form:view.form,level:view.level,branch:view.branch,egg:false,dead:false},...(element===undefined?{}:{element})};
 }
 function petBattleClaimAmount(match,uid,now=Date.now()){
@@ -691,6 +692,53 @@ function petBattleSettleXp(root,petId,delta,now){
     const updated={...root,...records[0],companions:records.slice(1)};
     return {pet:transitionPetHousehold(updated,'init',now).pet,change};
 }
+function makePetBattleBot(level){
+    const branch=Object.keys(ATTENDANCE_PET_BRANCHES)[Math.floor(Math.random()*4)];
+    const stats={attack:1,magic:1,defense:1,magicReduction:1,physicalReduction:1,dodge:1,luck:1,health:1};
+    const keys=Object.keys(stats);
+    for(let i=keys.length;i<petBattleBudget(level);i++)stats[keys[Math.floor(Math.random()*keys.length)]]++;
+    const form=attendancePetCatalog(branch)[level-1],elements=[...PET_BATTLE_ELEMENTS.keys()];
+    return {uid:'workpic-bot',name:'Bot',petName:form.name,budgetVersion:2,stats,
+        element:elements[Math.floor(Math.random()*elements.length)],
+        appearance:{form,level,branch,dead:false,egg:false}};
+}
+function petBattleCompletePet(root,petId,match,uid,xpDelta,weightDelta,now){
+    const endedAt=petBattleTime(match.startedAt)+(match.introMs===5000?5000:2000)+match.turns.length*PET_BATTLE_STEP_MS;
+    const opponent=match.players.find(p=>p.uid!==uid);
+    const won=match.winnerUid===uid,until=endedAt+10800000;
+    const entry={id:match.id,endedAt,result:match.winnerUid?(won?'win':'loss'):'draw',
+        opponentName:opponent?.name||'Đối thủ',opponentPetName:opponent?.petName||'',xpDelta,weightDelta};
+    const records=attendancePetRecords(root,now).map(p=>{
+        if(p.id!==petId)return p;
+        const history=Array.isArray(p.battleHistory)?p.battleHistory:[];
+        const battleHistory=[entry,...history.filter(item=>item&&item.id!==match.id)].sort((a,b)=>b.endedAt-a.endedAt).slice(0,30);
+        const battleWinStreak=won?(Number(p.battleWinStreak)||0)+1:0;
+        const expiryField=won?'victoryAuraUntil':'defeatAuraUntil';
+        const aura=match.winnerUid&&until>(Number(p[expiryField])||0)
+            ?won?{victoryAuraUntil:until}:{defeatAuraUntil:until,defeatOpponentName:entry.opponentName}
+            :{};
+        return {...p,battleHistory,battleWinStreak,...aura};
+    });
+    return {...root,...records[0],companions:records.slice(1)};
+}
+const PET_BATTLE_SKILL_NAMES={
+    base:['Bọt Ngân','Vẫy Kim Lân','Vũ Điệu San Hô','Cánh Nước','Đuôi Chớp','Gai Xoáy','Cầu Gai','Mũi Kiếm','Lướt Đáy Biển'],
+    fish:['Búa Xé Sóng','Hàm Trắng','Vây Sát Thủ','Đuôi Lưng Gù','Âm Vang Đại Dương','Khúc Ca Biển','Sóng Lam','Nanh Cổ Đại','Đại Triều Xanh','Vực Leviathan','Mai Huyền Vũ'],
+    dino:['Cú Đạp Non','Tam Giác Xung Kích','Phiến Giáp','Chùy Giáp','Móng Liềm','Hàm Bạo Chúa','Sống Gai','Quật Cổ Dài','Hơi Thở Rồng','Long Viêm Cổ','Chu Tước Hỏa Vũ'],
+    bird:['Mũi Mổ Lam','Lông Vũ Ngũ Sắc','Đêm Tuyết','Ưng Lao','Hạc Xuyên Mây','Quạt Công','Sải Cánh Andes','Gió Hải Âu','Phượng Hỏa','Thiên Hỏa','Khổng Tước Khai Bình'],
+    beast:['Vồ Cỏ','Chớp Tai Nhọn','Vuốt Hoa Mai','Bóng Đen','Vồ Vách Đá','Hổ Vồ Xé Gió','Vuốt Băng','Sư Tử Gầm','Bờm Ánh Trăng','Nanh Kiếm','Bạch Hổ Phá Sơn']
+};
+function petBattleSkill({form,level,branch}){
+    const branchLevel=level-ATTENDANCE_PET_FORMS.length-1;
+    const key=branchLevel>=0&&PET_BATTLE_SKILL_NAMES[branch]?branch:'base';
+    const index=key==='base'?level-1:Math.floor(branchLevel/2);
+    const label=PET_BATTLE_SKILL_NAMES[key][index]||form.name;
+    const variant=Object.keys(PET_BATTLE_SKILL_NAMES).indexOf(key)*32+Math.max(0,index)*2+Number(!form.juvenile);
+    const motion=form.kind==='bird'?'dive':form.kind==='beast'?'claw':form.shape==='tortoise'?'shield'
+        :form.shape==='mermaid'?'song':form.kind==='dino'?'slam':form.kind==='shark'?'bite':'swim';
+    const effect={dive:'wind',claw:'claw',shield:'wave',song:'water',slam:'fire',bite:'fang',swim:form.kind==='whale'?'wave':'water'}[motion];
+    return {label:form.juvenile?`${label} Non`:label,motion,effect,variant};
+}
 async function petBattleCommitment(id,uid,round,choice,nonce){
     const data=new TextEncoder().encode([id,uid,round,choice,nonce].join('|'));
     return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',data)),value=>value.toString(16).padStart(2,'0')).join('');
@@ -708,7 +756,7 @@ function jobColorStyle(job) {
 
 // Firebase Configuration - Chỉ sử dụng Firestore
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, getDocs, onSnapshot, query, where, or, writeBatch, runTransaction, orderBy, limit, serverTimestamp }
+import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, where, or, writeBatch, runTransaction, orderBy, limit, serverTimestamp }
     from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, EmailAuthProvider, reauthenticateWithCredential, updatePassword }
     from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -769,6 +817,24 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const PET_CLOUD_ENABLED = globalThis.WORKPIC_PET_BACKEND === 'cloud';
+let workpicPets;
+async function petCloudRequest(kind, data = {}){
+    assertPetQuotaAvailable();
+    try{
+        if(!workpicPets){
+            const {getFunctions,httpsCallable}=await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js');
+            workpicPets=httpsCallable(getFunctions(app,'us-central1'),'workpicPets');
+        }
+        const response=await workpicPets({...data,kind});
+        return response.data;
+    }catch(error){
+        if(error.code==='functions/internal'||error.code==='functions/unavailable'){
+            throw Object.assign(new Error('Không kết nối được Firebase Functions workpicPets. Kiểm tra function đã triển khai ở us-central1 hoặc xem nhật ký Functions.'),{code:error.code,cause:error});
+        }
+        throw error;
+    }
+}
 const auth = getAuth(app);
 const accessControl = createSessionAccess(auth);
 // Global Variables
@@ -8301,14 +8367,14 @@ function listenUsersAvatars() {
     if (unsubscribeUsersAvatar) unsubscribeUsersAvatar();
     unsubscribeUsersAvatar = onSnapshot(collection(db, 'users'), (snapshot) => {
         usersDirectorySnapshot=snapshot;
-        const ownPetProfile=snapshot.docChanges().find(change=>change.type!=='removed'&&change.doc.id===attendancePetRef?.id)?.doc;
+        const ownPetProfile=!PET_CLOUD_ENABLED&&snapshot.docChanges().find(change=>change.type!=='removed'&&change.doc.id===attendancePetRef?.id)?.doc;
         if(ownPetProfile){
             attendancePetUnsubscribe?.();attendancePetUnsubscribe=null;
             applyAttendancePetProfile(ownPetProfile);
             PetBattleGame.profile(ownPetProfile,false);
         }
         PetBattleGame.sync();
-        if(document.getElementById('petCompareDialog')?.open)renderPetComparison(true);
+        if(!PET_CLOUD_ENABLED&&document.getElementById('petCompareDialog')?.open)renderPetComparison(true);
         usersAvatarCache = {};
         usersInfoCache = {};
         usersDeptLatest = {};
@@ -8630,6 +8696,7 @@ function toggleQuickChatPanel() {
 
 function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendancePetArt',previewId='attendancePetPreview',presentation='roam'){
     let state=null,generation=0;
+    const staged=presentation!=='roam';
     const fallback = view => {
         const art=document.getElementById(artId);
         if (!art) return;
@@ -8638,6 +8705,7 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
             :view.form.kind==='beast'?`<svg viewBox="0 0 140 100" aria-hidden="true"><path d="M28 51Q4 30 10 60M35 58 31 88 42 88 48 62 80 62 85 88 96 88 92 57" fill="none" stroke="${color}" stroke-width="9" stroke-linecap="round"/><ellipse cx="63" cy="51" rx="37" ry="19" fill="${color}"/><circle cx="101" cy="41" r="21" fill="${color}"/><path d="m87 27-3-15 16 11 13-12 4 18" fill="${color}"/><ellipse cx="111" cy="47" rx="12" ry="8" fill="#e4d7b8"/><circle cx="107" cy="35" r="3" fill="#18212a"/></svg>`
             :view.form.kind==='bird'?`<svg viewBox="0 0 140 100" aria-hidden="true"><path d="M70 54Q27 8 8 25L46 65 19 77 72 68Q100 72 110 52L133 48 116 40Q102 23 90 46Z" fill="${color}"/><path d="M62 53Q68 5 95 13L83 57" fill="${color}" stroke="#ffffff55" stroke-width="2"/><circle cx="108" cy="43" r="3" fill="#18212a"/></svg>`
             :view.form.kind==='dino'&&view.form.shape!=='sea'?`<svg viewBox="0 0 140 100" aria-hidden="true"><path d="M20 66 4 51 35 59Q45 31 77 43L91 29 116 28 131 42 125 56 103 53 92 68 91 88 80 88 76 69 57 70 51 88 40 88 43 66Z" fill="${color}"/><path d="m47 45 5-13 8 9 9-16 8 19" fill="#fbbf24"/><circle cx="115" cy="38" r="3" fill="#0f172a"/></svg>`
+            :view.form.shape==='clown'?`<svg viewBox="0 0 140 100" aria-hidden="true" ${view.dead?'style="filter:grayscale(1)"':''}><g transform="translate(140 0) scale(-1 1)" fill="${color}" stroke="#251a1b" stroke-width="2.5" stroke-linejoin="round"><path class="pet-fallback-tail" d="M104 46Q114 36 125 39Q133 48 125 63Q113 65 104 54Z"/><path d="M48 31Q48 14 62 18Q76 20 82 32M45 63Q45 81 59 81Q66 79 62 68"/><path d="M15 50Q20 28 55 28Q84 25 108 44L110 55Q81 75 53 73Q22 70 15 50Z"/><path fill="#fff6e8" d="M27 35L38 31Q51 49 36 69L25 63Q37 52 27 35ZM60 28L75 29Q65 45 73 71L59 73Q51 55 60 28ZM96 35L105 41Q101 50 107 58L98 63Q90 50 96 35Z"/><path d="M47 48Q60 51 55 61Q51 67 45 58"/><circle cx="25" cy="48" r="3" fill="#231c21" stroke="none"/><circle cx="24" cy="47" r="1" fill="white" stroke="none"/></g></svg>`
             :`<svg viewBox="0 0 140 100" aria-hidden="true"><defs><radialGradient id="pet-fish-light"><stop stop-color="#ecfeff"/><stop offset="1" stop-color="${color}"/></radialGradient></defs><path class="pet-fallback-tail" d="m42 50-28-24 4 24-4 24Z" fill="${color}"/><ellipse cx="76" cy="50" rx="42" ry="${view.form.kind==='whale'?25:29}" fill="url(#pet-fish-light)"/><path d="m61 26 19-16 12 21M61 73l22 13 7-15" fill="${color}"/><circle cx="101" cy="41" r="7" fill="white"/><circle cx="104" cy="42" r="4" fill="#0f172a"/><path d="M113 58q-8 4-12 0" fill="none" stroke="#0f172a" stroke-width="2"/></svg>`;
         art.innerHTML=art.innerHTML.replaceAll('pet-egg-light',artId+'-egg-light').replaceAll('pet-fish-light',artId+'-fish-light');
         if(state?.previewMode)document.getElementById(previewId).innerHTML=art.innerHTML.replaceAll(artId+'-egg-light',previewId+'-egg-light').replaceAll(artId+'-fish-light',previewId+'-fish-light');
@@ -8665,7 +8733,15 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
         let seed=37;const random=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
         const base=mainColor.clone();
         ctx.fillStyle='#'+base.getHexString();ctx.fillRect(0,0,512,256);
-        for(let row=0;row<32;row++)for(let col=0;col<64;col++){
+        const clown=!view.egg&&view.form.shape==='clown';
+        if(clown)for(const [center,halfWidth,bend] of [[.12,.042,.019],[.50,.072,-.036],[.77,.079,.058]]){
+            for(let x=0;x<512;x++){
+                const angle=x/512*Math.PI*2,y=(1-center+Math.cos(angle*2)*bend)*256;
+                ctx.fillStyle=view.dead?'#454955':'#21171a';ctx.fillRect(x,Math.round(y-halfWidth*256-3),1,Math.round(halfWidth*512+6));
+                ctx.fillStyle=view.dead?'#a7b2bf':'#fff5e6';ctx.fillRect(x,Math.round(y-halfWidth*256),1,Math.round(halfWidth*512));
+            }
+        }
+        else for(let row=0;row<32;row++)for(let col=0;col<64;col++){
             const x=col*8+(row%2)*4,y=row*8;
             const shade=base.clone().multiplyScalar(.64+random()*.58);
             ctx.fillStyle='#'+shade.getHexString();ctx.strokeStyle='rgba(10,20,10,.22)';ctx.lineWidth=.7;
@@ -8683,8 +8759,12 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
         const skin=new T.CanvasTexture(skinCanvas);skin.colorSpace=T.SRGBColorSpace;skin.anisotropy=4;
         const relief=skin.clone();relief.colorSpace=T.NoColorSpace;relief.needsUpdate=true;
         if(!view.egg&&view.form.kind!=='bird'){
-            bodyMat.color.set('#ffffff');bodyMat.map=skin;bodyMat.bumpMap=relief;bodyMat.bumpScale=reptile?.045:.018;
-            finMat.bumpMap=relief;finMat.bumpScale=.018;
+            bodyMat.color.set('#ffffff');bodyMat.map=skin;
+            if(clown)relief.dispose();
+            else{
+                bodyMat.bumpMap=relief;bodyMat.bumpScale=reptile?.045:.018;
+                finMat.bumpMap=relief;finMat.bumpScale=.018;
+            }
         }else{skin.dispose();relief.dispose();}
         const sphere=(parent,x,y,z,sx,sy,sz,mat)=>{const geometry=new T.SphereGeometry(1,48,32);const mesh=new T.Mesh(geometry,mat);mesh.position.set(x,y,z);mesh.scale.set(sx,sy,sz);parent.add(mesh);return mesh;};
         const cone=(parent,x,y,z,radius,length,mat,angle=0)=>{const mesh=new T.Mesh(new T.ConeGeometry(radius*(view.form.juvenile?.8:1),length*(view.form.juvenile?.7:1),32,4),mat);mesh.position.set(x,y,z);mesh.rotation.z=angle;parent.add(mesh);return mesh;};
@@ -8740,6 +8820,36 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
             group.rotation.z=.07;return;
         }
         const shape=view.form.shape,kind=view.form.kind;
+        if(shape==='tortoise'){
+            const shell=material('#294b47'),rim=material('#acd7b6');
+            sphere(group,-.23,.09,0,.92,.47,.55,shell);
+            sphere(group,-.18,-.22,0,.87,.18,.53,bodyMat);
+            for(let i=0;i<8;i++){
+                const angle=i*Math.PI/4;
+                sphere(group,-.24+Math.cos(angle)*.57,.39,Math.sin(angle)*.32,.15,.055,.12,rim);
+            }
+            tube(group,[[.45,.06,0],[.68,.25,0],[.89,.37,0]],[.21,.16,.12],bodyMat);
+            sphere(group,.98,.39,0,.25,.17,.19,bodyMat);eyes(group,1.03,.44,.16);
+            for(const side of [-1,1])for(const x of [-.67,.37]){
+                const foot=sphere(group,x,-.34,side*.41,.26,.12,.19,finMat);
+                s.rig.push({mesh:foot,axis:'z',amount:.22,phase:x+side});
+            }
+            tube(group,[[-.85,.04,0],[-1.12,.16,.22],[-1.26,.43,.3],[-1.1,.62,.18]],[.13,.095,.066,.024],finMat);
+            return;
+        }
+        if(shape==='mermaid'){
+            const skinTone=material(view.dead?'#8b929b':'#e8b99d'),hair=material('#6b404b'),tailMat=material(mainColor);
+            sphere(group,.54,.29,0,.31,.28,.20,skinTone);
+            sphere(group,.84,.56,0,.22,.24,.2,skinTone);
+            sphere(group,.72,.66,0,.25,.23,.23,hair);eyes(group,.94,.59,.15);
+            sphere(group,.55,.20,0,.23,.14,.22,tailMat);
+            for(const side of [-1,1])tube(group,[[.54,.42,side*.14],[.75,.25,side*.34],[.99,.32,side*.39]],[.065,.048,.025],skinTone);
+            const tail=new T.Group();group.add(tail);
+            tube(tail,[[.31,.12,0],[-.11,-.11,0],[-.62,-.28,.04],[-1.07,-.13,0]],[.21,.17,.12,.065],tailMat);
+            fin(tail,[[-.97,-.15],[-1.44,.20],[-1.7,.27],[-1.41,-.11],[-1.68,-.43],[-1.31,-.36]],material('#9ce4d8'));
+            s.rig.push({mesh:tail,axis:'y',amount:.26,phase:0});
+            return;
+        }
         if(kind==='beast'){
             organicBody([[-.2,.02,0,.8,.34,.27],[.42,.12,0,.36,.38,.29],[.64,.29,0,.26,.34,.25],[.93,.38,0,.32,.28,.26]],bodyMat);
             sphere(group,1.12,.25,0,.25,.14,.23,cream);sphere(group,1.3,.29,0,.07,.045,.11,black);eyes(group,1.05,.48,.235);
@@ -8868,6 +8978,35 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
             if(shape==='dragon')[-1,1].forEach(side=>{const wing=fin(group,[[-.4,.2],[-.8,1.3],[.15,.95],[.45,.25]],material('#c4b5fd'),side*.35);wing.rotation.x=side*.8;s.rig.push({mesh:wing,axis:'x',base:side*.8,amount:.2,phase:side});});
             return;
         }
+        if(clown){
+            const profile=new T.SplineCurve([[-1.03,.025],[-.88,.115],[-.60,.32],[-.18,.48],[.28,.46],[.59,.36],[.82,.23],[.96,.025]].map(([x,r])=>new T.Vector2(r,x)));
+            const body=new T.LatheGeometry(profile.getPoints(72),48);
+            body.rotateZ(-Math.PI/2);body.scale(1,1,.70);body.computeVertexNormals();group.add(new T.Mesh(body,bodyMat));
+            const orange=material(mainColor),lip=material(view.dead?'#738293':'#a9381c');
+            const trimmedFin=(parent,points)=>{
+                fin(parent,points,black,-.018);
+                const centerX=points.reduce((sum,p)=>sum+p[0],0)/points.length;
+                const centerY=points.reduce((sum,p)=>sum+p[1],0)/points.length;
+                const inset=points.map(([x,y])=>[centerX+(x-centerX)*.85,centerY+(y-centerY)*.82]);
+                fin(parent,inset,orange,.014);fin(parent,inset,orange,-.050);
+            };
+            const tail=new T.Group();tail.position.set(-.94,0,0);group.add(tail);
+            trimmedFin(tail,[[.05,0],[-.27,.22],[-.53,.29],[-.68,.10],[-.63,-.22],[-.45,-.28],[-.26,-.19]]);
+            s.rig.push({mesh:tail,axis:'y',amount:.36,phase:0});
+            trimmedFin(group,[[.38,.33],[.30,.63],[.07,.72],[-.34,.65],[-.59,.32]]);
+            trimmedFin(group,[[.13,-.34],[-.12,-.64],[-.39,-.61],[-.54,-.31]]);
+            for(const side of [-1,1]){
+                const flipper=new T.Group();flipper.position.set(.43,-.10,side*.26);group.add(flipper);
+                trimmedFin(flipper,[[.07,.08],[-.13,.11],[-.34,-.05],[-.33,-.24],[-.13,-.20]]);
+                flipper.rotation.x=side*.45;
+                s.rig.push({mesh:flipper,axis:'x',base:side*.45,amount:.17,phase:side});
+                sphere(group,.68,.045,side*.218,.104,.103,.043,orange);
+                sphere(group,.696,.051,side*.250,.068,.073,.028,black);
+                sphere(group,.718,.082,side*.273,.023,.021,.010,cream);
+            }
+            tube(group,[[.84,-.096,-.101],[.918,-.105,0],[.84,-.096,.101]],[.014,.023,.014],lip);
+            return;
+        }
         const round=shape==='puffer',disc=['angel','tang'].includes(shape),whale=kind==='whale',ray=shape==='ray';
         const size=shape==='small'?.78:whale?1.2:1;
         if(round||disc||ray)sphere(group,.05,0,0,size,ray?.2:round?.72:.76,ray?.86:round?.63:.3,bodyMat);
@@ -8894,7 +9033,6 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
         if(ray)[-1,1].forEach(side=>{const wing=sphere(group,-.05,0,side*.72,.75,.08,.8,bodyMat);s.rig.push({mesh:wing,axis:'x',amount:.16,phase:side});});
         if(shape==='hammer'){sphere(group,.85,.03,0,.26,.19,.86,bodyMat);eyes(group,.95,.1,.81);}else eyes(group,size*.69,.13,round?.55:disc?.28:.35);
         if(shape==='sword')cone(group,1.35,-.06,0,.06,.95,bodyMat,-Math.PI/2);
-        if(shape==='clown')for(const x of [-.55,.1,.65]){const ring=new T.Mesh(new T.TorusGeometry(.42,.055,8,30),cream);ring.rotation.y=Math.PI/2;ring.position.x=x;ring.scale.y=1.13;group.add(ring);}
         if(shape==='lion'||round)for(let i=0;i<14;i++){const angle=i/14*Math.PI*2;cone(group,Math.sin(angle)*.75,Math.cos(angle)*.63,0,.035,shape==='lion'?.65:.22,finMat,-angle);}
         if(round)for(let i=0;i<12;i++)sphere(group,Math.sin(i*2.4)*.68,Math.cos(i*1.7)*.5,.5,.035,.04,.025,finMat);
         if(shape==='orca')for(const side of [-1,1])sphere(group,.65,.28,side*.39,.21,.13,.025,cream);
@@ -8905,31 +9043,66 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
     function stop(){
         generation++;const s=state;state=null;if(!s)return;
         cancelAnimationFrame(s.raf);document.removeEventListener('visibilitychange',s.visibility);
+        delete s.button.dataset.modelLoading;
+        const preview=document.getElementById(previewId);if(preview)delete preview.dataset.modelLoading;
         s.button.removeEventListener('mouseenter',s.enter);s.button.removeEventListener('mouseleave',s.leave);s.button.removeEventListener('focus',s.enter);s.button.removeEventListener('blur',s.leave);
-        if(s.renderer){disposeModel(s);s.renderer.dispose();s.renderer.domElement.remove();}
+        if(s.renderer){disposeBattleBurst(s);disposeModel(s);s.renderer.dispose();s.renderer.forceContextLoss();s.renderer.domElement.remove();}
         document.getElementById(artId)?.replaceChildren();
         document.getElementById(previewId)?.replaceChildren();
     }
+    function disposeBattleBurst(s){
+        if(!s.burst)return;
+        s.scene.remove(s.burst.group);s.burst.geometry.dispose();s.burst.material.dispose();s.burst=null;
+    }
+    function updateBattleBurst(s,pose,age,direction,reduced){
+        if(reduced||!pose.skill||age<0||age>=.9){disposeBattleBurst(s);return;}
+        const {motion,variant}=pose.skill,T=s.THREE;
+        if(s.burst?.at!==pose.attackAt){
+            disposeBattleBurst(s);
+            const group=new T.Group();
+            const geometry=motion==='shield'||motion==='song'?new T.TorusGeometry(.1,.025,6,12):new T.OctahedronGeometry(.12);
+            const material=new T.MeshBasicMaterial({color:pose.skillColor||'#7dd3fc',transparent:true,depthWrite:false,blending:T.AdditiveBlending});
+            for(let i=0;i<9+variant%6;i++)group.add(new T.Mesh(geometry,material));
+            s.scene.add(group);s.burst={at:pose.attackAt,group,geometry,material};
+        }
+        const progress=age/.9;
+        s.burst.material.opacity=Math.sin(Math.PI*progress)*.9;
+        s.burst.group.children.forEach((mesh,i)=>{
+            const angle=i*2.399+progress*(3+variant%7),spread=.15+progress*(.38+(variant%11)*.035);
+            const lift=motion==='dive'?(1-progress)*.9:motion==='claw'?Math.sin(progress*Math.PI)*.7:0;
+            const travel=motion==='shield'?.26:progress*(.95+(variant%13)*.035);
+            mesh.position.set(direction*travel+Math.cos(angle)*spread,lift+Math.sin(angle)*spread,Math.sin(angle*1.8)*spread);
+            mesh.rotation.set(angle,angle+progress,angle*.5);
+            mesh.scale.setScalar((1-progress*.5)*(.65+i%4*.18));
+        });
+    }
     function resizePet(s){
-        const scale=Math.min(s.view?attendancePetScale(s.view):1,Math.max(.35,(window.innerWidth-16)/144),Math.max(.35,(window.innerHeight-16)/104));
-        s.width=Math.round(144*scale);s.height=Math.round(104*scale);
-        s.button.style.width=s.width+'px';s.button.style.height=s.height+'px';
+        if(!staged){
+            const scale=Math.min(s.view?attendancePetScale(s.view):1,Math.max(.35,(window.innerWidth-16)/144),Math.max(.35,(window.innerHeight-16)/104));
+            s.width=Math.round(144*scale);s.height=Math.round(104*scale);
+            s.button.style.width=s.width+'px';s.button.style.height=s.height+'px';
+        }
         if(!s.renderer)return;
-        const width=presentation==='arena'?Math.round(Math.min(330,window.innerWidth*.38)):s.previewMode?320:s.width,height=presentation==='arena'?220:s.previewMode?220:s.height,key=width+':'+height;
-        if(presentation==='arena'){s.button.style.width='100%';s.button.style.height='220px';}
+        const width=staged?Math.min(360,s.button.clientWidth):s.previewMode?320:s.width;
+        const height=staged?s.button.clientHeight:s.previewMode?220:s.height;
+        if(!width||!height)return;
+        const key=width+':'+height;
         if(s.sizeKey===key)return;s.sizeKey=key;
-        s.renderer.setSize(width,height);s.camera.aspect=width/height;s.camera.updateProjectionMatrix();
+        s.renderer.setSize(width,height);s.camera.aspect=width/height;
+        s.camera.zoom=staged?Math.min(1,width/height):1;
+        s.camera.updateProjectionMatrix();
     }
     function start(){
         stop();const token=generation,button=document.getElementById(buttonId);
         if(!button)return;
         const s={button,raf:0,renderer:null,view:null,signature:'',x:12+Math.random()*Math.max(1,window.innerWidth-180),y:80+Math.random()*Math.max(1,window.innerHeight-240),targetX:80,targetY:150,last:0,t:0,hover:false,fedAt:-100,nextTarget:0,facingAngle:0};state=s;
+        button.dataset.modelLoading='true';
         s.enter=()=>{s.hover=true;};s.leave=()=>{s.hover=false;};button.addEventListener('mouseenter',s.enter);button.addEventListener('mouseleave',s.leave);button.addEventListener('focus',s.enter);button.addEventListener('blur',s.leave);
         const frame=now=>{
             if(state!==s||document.hidden)return;s.raf=requestAnimationFrame(frame);
             if(s.last&&now-s.last<32)return;const dt=s.last?Math.min(.06,(now-s.last)/1000):.033;s.last=now;s.t+=dt;
             const petDialogOpen=document.getElementById('attendancePetDialog')?.open;
-            if(presentation!=='arena'&&(document.body.classList.contains('modal-open')||(document.querySelector('dialog[open]')&&!s.previewMode)))return;
+            if(!staged&&(document.body.classList.contains('modal-open')||(document.querySelector('dialog[open]')&&!s.previewMode)))return;
             if(button.hidden&&!s.previewMode)return;
             const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
             resizePet(s);
@@ -8946,7 +9119,7 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
             s.x=Math.max(8,Math.min(maxX,s.x));s.y=Math.max(minY,Math.min(maxY,s.y));
             const walking=mode==='walk'&&Math.abs(s.x-previousX)>.01;
             const bob=reduced||mode==='rest'?0:mode==='walk'?(walking?Math.abs(Math.sin(s.t*5))*1.5:0):Math.sin(s.t*(mode==='fly'?3:1.7))*(mode==='fly'?7:4);
-            if(presentation!=='arena')button.style.transform=`translate3d(${s.x}px,${Math.max(minY,Math.min(maxY,s.y+bob))}px,0)`;
+            if(!staged)button.style.transform=`translate3d(${s.x}px,${Math.max(minY,Math.min(maxY,s.y+bob))}px,0)`;
             const bubbleHalf=Math.min(190,window.innerWidth-16)/2;
             button.style.setProperty('--pet-hunger-center',`${Math.max(bubbleHalf+8,Math.min(window.innerWidth-bubbleHalf-8,s.x+s.width/2))-s.x}px`);
             if(s.renderer&&s.model){
@@ -8962,35 +9135,62 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
                     const pose=s.duel||{},attackAge=(Date.now()-(pose.attackAt||0))/1000,hitAge=(Date.now()-(pose.hitAt||0))/1000;
                     const lunge=attackAge>=0&&attackAge<.9?Math.sin(attackAge/.9*Math.PI):0,hurt=hitAge>=0&&hitAge<.5?(1-hitAge/.5):0;
                     const direction=pose.facing? -1:1;s.model.rotation.y=pose.facing||0;
-                    const aerial=pose.kind==='bird',heavy=['dino','beast','whale'].includes(pose.kind),power=1+Math.min(3,Math.floor((pose.level||1)/8))*.15;
-                    s.model.position.set(reduced?0:direction*lunge*(heavy?.7:.45)*power+(Math.sin(s.t*65)*hurt*.035),reduced?0:(aerial?lunge*.5:heavy?Math.abs(Math.sin(lunge*Math.PI))*.12:lunge*.08)+Math.sin(s.t*2)*.025,0);
-                    s.model.rotation.z=pose.defeated?Math.PI*.65:reduced?0:Math.sin(s.t*50)*hurt*.04+(aerial?direction*lunge*.3:heavy?-direction*lunge*.12:direction*lunge*.08);
+                    const motion=pose.skill?.motion,variant=pose.skill?.variant||0;
+                    const aerial=motion==='dive',claw=motion==='claw',heavy=motion==='slam'||pose.kind==='whale';
+                    const power=1+Math.min(3,Math.floor((pose.level||1)/8))*.15;
+                    const peak=aerial?.74:claw?.61:heavy?.18:.10;
+                    const reach=motion==='shield'?.22:heavy?.72:.48+(variant%11)*.017;
+                    const dive=aerial&&attackAge>=0&&attackAge<.9?Math.sin(Math.PI*Math.min(1,attackAge/.61)):lunge;
+                    s.model.position.set(reduced?0:direction*lunge*reach*power+(Math.sin(s.t*65)*hurt*.035),reduced?0:dive*peak+Math.sin(s.t*2)*.025,0);
+                    s.model.rotation.z=pose.defeated?Math.PI*.65:reduced?0:Math.sin(s.t*50)*hurt*.04+(aerial?-direction*lunge*.60:claw?direction*lunge*.32:-direction*lunge*.12);
+                    updateBattleBurst(s,pose,attackAge,direction,reduced);
+                }else if(staged){
+                    s.model.rotation.y=reduced?-.28:presentation==='showcase'?s.t*.62-.28:Math.sin(s.t*1.3)*.24-.2;
+                    s.model.position.y=reduced?0:Math.sin(s.t*2)*.055;
                 }
                 s.renderer.render(s.scene,s.camera);
             }
         };
         s.visibility=()=>{cancelAnimationFrame(s.raf);if(!document.hidden){s.last=0;s.raf=requestAnimationFrame(frame);renderAttendancePet();}};
         document.addEventListener('visibilitychange',s.visibility);s.raf=requestAnimationFrame(frame);
+        const endLoading=()=>{
+            delete button.dataset.modelLoading;
+            const preview=document.getElementById(previewId);if(preview)delete preview.dataset.modelLoading;
+        };
         s.ready=import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js').then(T=>{
             if(state!==s||token!==generation)return;
             try{
                 const renderer=new T.WebGLRenderer({alpha:true,antialias:true,powerPreference:'low-power'});renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.75));renderer.setSize(144,104);renderer.setClearColor(0,0);renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;
                 s.THREE=T;s.renderer=renderer;s.scene=new T.Scene();s.camera=new T.PerspectiveCamera(38,144/104,.1,30);s.camera.position.set(.2,.35,5.7);s.camera.lookAt(0,0,0);
                 s.scene.add(new T.HemisphereLight('#e5f8ff','#344b6a',2));const light=new T.DirectionalLight('#fff7d6',3);light.position.set(2,4,5);s.scene.add(light);const rim=new T.DirectionalLight('#67d8ff',2);rim.position.set(-3,1,-3);s.scene.add(rim);
-                document.getElementById(artId).replaceChildren(renderer.domElement);
                 if(s.view)build(s,s.view);
+                resizePet(s);
+                renderer.render(s.scene,s.camera);
+                document.getElementById(artId).replaceChildren(renderer.domElement);
                 if(s.previewMode)preview(true);
-            }catch(error){if(s.view)fallback(s.view);}
-        }).catch(()=>{if(state===s&&s.view)fallback(s.view);});
+                endLoading();
+            }catch(error){
+                if(s.renderer){disposeModel(s);s.renderer.dispose();s.renderer.forceContextLoss();s.renderer=null;}
+                throw error;
+            }
+        }).catch(()=>{
+            if(state!==s)return;
+            s.loadFailed=true;endLoading();
+            if(s.view)fallback(s.view);
+        });
     }
-    function update(view){const s=state;if(!s)return;s.view=view;resizePet(s);const key=`${view.egg?'egg':view.level}:${view.branch}:${view.form.name}:${view.dead}`;if(s.signature===key)return;s.signature=key;if(s.renderer)build(s,view);else fallback(view);}
+    function update(view){const s=state;if(!s)return;s.view=view;resizePet(s);const key=`${view.egg?'egg':view.level}:${view.branch}:${view.form.name}:${view.dead}`;if(s.signature===key)return;s.signature=key;if(s.renderer)build(s,view);else if(s.loadFailed)fallback(view);}
     function preview(open){
         const s=state;if(!s)return;s.previewMode=open;
         const container=document.getElementById(open?previewId:artId);
         if(!container)return;
         if(s.renderer){container.replaceChildren(s.renderer.domElement);resizePet(s);}
-        else if(s.view)fallback(s.view);
-        if(!open)document.getElementById(previewId)?.replaceChildren();
+        else if(s.loadFailed&&s.view)fallback(s.view);
+        else if(open)container.dataset.modelLoading='true';
+        if(!open){
+            const preview=document.getElementById(previewId);
+            if(preview){delete preview.dataset.modelLoading;preview.replaceChildren();}
+        }
     }
     async function thumbnail(view){
         const s=state;if(!s)return null;update(view);await s.ready;
@@ -9038,18 +9238,35 @@ async function loadPetAdminProfiles() {
         const previous=document.getElementById('petAdminUser').value, seen=new Set();
         petAdminProfiles=[...result.docs].sort((a,b)=>a.id.localeCompare(b.id)).filter(snapshot=>{
             const data=snapshot.data();if(!data.uid||seen.has(data.uid))return false;seen.add(data.uid);return true;
-        }).map(snapshot=>({id:snapshot.id,ref:snapshot.ref,uid:snapshot.data().uid,name:snapshot.data().displayName||snapshot.data().email||snapshot.id,pet:snapshot.data().attendancePet}));
+        }).map(snapshot=>({id:snapshot.id,ref:snapshot.ref,uid:snapshot.data().uid,name:snapshot.data().displayName||snapshot.data().email||snapshot.id,pet:PET_CLOUD_ENABLED?null:snapshot.data().attendancePet}));
         petAdminProfiles.sort((a,b)=>a.name.localeCompare(b.name,'vi'));
         const select=document.getElementById('petAdminUser');select.replaceChildren(...petAdminProfiles.map(item=>new Option(item.name,item.id)));
         select.value=petAdminProfiles.some(item=>item.id===previous)?previous:(petAdminProfiles.find(item=>item.uid===uid)?.id||petAdminProfiles[0]?.id||'');
+        if(PET_CLOUD_ENABLED){await loadSelectedCloudPetAdminProfile();return;}
         renderPetAdminSummary();status.textContent='Đã tải danh sách. Thay đổi sẽ được lưu vào hồ sơ thành viên.';
     }catch(error){if(token===petAdminLoad)status.textContent=petQuotaErrorText(error)||'Không tải được danh sách. Kiểm tra kết nối và quyền đọc hồ sơ hiện tại.';}
+}
+async function loadSelectedCloudPetAdminProfile(){
+    const token=++petAdminLoad,select=document.getElementById('petAdminUser');
+    const item=petAdminProfiles.find(profile=>profile.id===select.value);
+    if(!item)return;
+    const status=document.getElementById('petAdminStatus');
+    const pets=document.getElementById('petAdminPet');
+    item.pet=null;pets.replaceChildren();delete pets.dataset.optionsKey;
+    status.textContent='Đang tải thú cưng…';
+    try{
+        const profile=await petCloudRequest('admin-open',{uid:item.uid});
+        if(token!==petAdminLoad||!canControlPets()||select.value!==item.id)return;
+        item.pet=profile.attendancePet;renderPetAdminSummary();status.textContent='';
+    }catch(error){
+        if(token===petAdminLoad)status.textContent=petQuotaErrorText(error)||error.message||'Không tải được hồ sơ thú cưng.';
+    }
 }
 async function applyPetAdminAction(action,trigger=null) {
     if(!canControlPets()||petAdminBusy)return;
     if(!['checkin','feed','hatch','evolve','revive','egg','level'].includes(action)&&!(action.startsWith('branch:')&&Object.hasOwn(ATTENDANCE_PET_BRANCHES,action.slice(7))))return;
     const item=petAdminProfiles.find(item=>item.id===document.getElementById('petAdminUser').value);
-    if(!item)return;
+    if(!item||PET_CLOUD_ENABLED&&!item.pet)return;
     const targetId=document.getElementById('petAdminPet').value;
     const before=attendancePetView(attendancePetSelected(item.pet,targetId));
     if(unchangedPetAdminAction(before,action,Number(document.getElementById('petAdminLevel').value))){document.getElementById('petAdminStatus').textContent='Thú cưng đã ở trạng thái này, không có thay đổi cần lưu.';return;}
@@ -9067,7 +9284,7 @@ async function applyPetAdminAction(action,trigger=null) {
     status.textContent=`Đang thực hiện: ${trigger?.textContent.trim()||action}…`;
     try{
         assertPetQuotaAvailable();
-        const result=await runTransaction(db,async transaction=>{
+        const result=PET_CLOUD_ENABLED?await petCloudRequest('admin-care',{uid:item.uid,action,petId:targetId,level}):await runTransaction(db,async transaction=>{
             if(!canControlPets()||auth.currentUser.uid!==uid)throw new Error('Session changed');
             const snapshot=await transaction.get(item.ref);
             if(!snapshot.exists()||snapshot.data().uid!==item.uid)throw new Error('Profile changed');
@@ -9106,7 +9323,7 @@ function initPetAdminPanel() {
         dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close();});
         document.getElementById('petAdminBranch').replaceChildren(...Object.entries(ATTENDANCE_PET_BRANCHES).map(([key,branch])=>new Option(branch.name,key)));
         document.getElementById('petAdminApplyBranch').addEventListener('click',event=>applyPetAdminAction('branch:'+document.getElementById('petAdminBranch').value,event.currentTarget));
-        document.getElementById('petAdminUser').addEventListener('change',renderPetAdminSummary);
+        document.getElementById('petAdminUser').addEventListener('change',()=>PET_CLOUD_ENABLED?loadSelectedCloudPetAdminProfile():renderPetAdminSummary());
         document.getElementById('petAdminPet').addEventListener('change',renderPetAdminSummary);
         document.getElementById('petAdminRefresh').addEventListener('click',loadPetAdminProfiles);
         panel.querySelectorAll('[data-pet-admin]').forEach(button=>button.addEventListener('click',event=>applyPetAdminAction(button.dataset.petAdmin,event.currentTarget)));
@@ -9118,8 +9335,49 @@ let selectedAttendancePetId=null;
 function selectedAttendancePetView(){return attendancePetView(attendancePetSelected(attendancePetData,selectedAttendancePetId));}
 const petWeightLabel=grams=>new Intl.NumberFormat('vi-VN',{minimumFractionDigits:1,maximumFractionDigits:1}).format(grams/1000)+' kg';
 let petComparisonCache=null;
+const petRankingByBranch=new Map(),petHistoryById=new Map();
+let petHistoryRequest=0;
+async function loadPetRanking(more=false){
+    const dialog=document.getElementById('petCompareDialog');
+    if(!currentUser||!dialog.open)return;
+    const branch=document.getElementById('petCompareBranch').value;
+    let page=petRankingByBranch.get(branch);
+    if(page?.loading||more&&page?.nextOffset==null||!more&&page?.expiresAt>Date.now()){
+        renderPetComparison(true);return;
+    }
+    page={rows:page?.rows||[],nextOffset:page?.nextOffset??null,loading:true};
+    petRankingByBranch.set(branch,page);
+    renderPetComparison(true);
+    try{
+        const result=await petCloudRequest('ranking',{branch,offset:more?page.nextOffset:0});
+        if(petRankingByBranch.get(branch)!==page)return;
+        const rows=more?[...page.rows,...result.rows]:result.rows;
+        page.rows=[...new Map(rows.map(row=>[JSON.stringify([row.uid,row.petId]),row])).values()];
+        page.nextOffset=result.nextOffset;page.expiresAt=Date.now()+60000;
+    }catch(error){
+        if(petRankingByBranch.get(branch)===page)page.error=petQuotaErrorText(error)||error.message;
+    }finally{
+        page.loading=false;
+        if(petRankingByBranch.get(branch)===page&&document.getElementById('petCompareBranch').value===branch)renderPetComparison(true);
+    }
+}
 const petComparisonImageCache=new Map(),petComparisonImagePending=new Map();
 let petComparisonImageWorker=null,petComparisonImageQueue=Promise.resolve(),petComparisonImageGeneration=0;
+let petRankingPreview=null;
+function closePetRankingPreview(){
+    petRankingPreview?.stop();petRankingPreview=null;
+    const dialog=document.getElementById('petRankingPreviewDialog');
+    if(dialog?.open)dialog.close();
+}
+function openPetRankingPreview(row){
+    const dialog=document.getElementById('petRankingPreviewDialog');
+    document.getElementById('petRankingPreviewName').textContent=`${row.petName} · Cấp ${row.level}`;
+    if(!dialog.open)dialog.showModal();
+    petRankingPreview?.stop();
+    petRankingPreview=createAttendancePet3D('petRankingPreviewModel','petRankingPreviewArt',null,'showcase');
+    petRankingPreview.start();
+    petRankingPreview.update(row.appearance);
+}
 function stopPetComparisonThumbnails(){
     petComparisonImageGeneration++;petComparisonImageWorker?.renderer.stop();petComparisonImageWorker?.button.remove();
     petComparisonImageWorker=null;petComparisonImageQueue=Promise.resolve();petComparisonImagePending.clear();
@@ -9147,20 +9405,31 @@ function renderPetComparison(force=false){
     const dialog=document.getElementById('petCompareDialog');if(!dialog?.open||!currentUser)return;
     const filter=document.getElementById('petCompareBranch').value,minute=Math.floor(Date.now()/60000);
     const cached=petComparisonCache;
-    if(!force&&cached&&cached.directory===usersDirectorySnapshot&&cached.pet===attendancePetData&&cached.filter===filter&&cached.minute===minute)return;
-    petComparisonCache={directory:usersDirectorySnapshot,pet:attendancePetData,filter,minute};
-    const profiles=(usersDirectorySnapshot?.docs||[]).map(snapshot=>({id:snapshot.id,...snapshot.data()})).filter(profile=>profile.uid!==currentUser.uid);
-    if(attendancePetData)profiles.push({id:'local-current',uid:currentUser.uid,displayName:currentUser.displayName||currentUser.email?.split('@')[0]||'Bạn',attendancePet:attendancePetData});
-    const rows=buildPetComparison(profiles,Date.now(),filter),body=document.getElementById('petCompareRows');
+    const page=petRankingByBranch.get(filter);
+    if(!force&&cached&&cached.filter===filter&&(PET_CLOUD_ENABLED
+        ?cached.page===page:cached.directory===usersDirectorySnapshot&&cached.pet===attendancePetData&&cached.minute===minute))return;
+    petComparisonCache={directory:usersDirectorySnapshot,pet:attendancePetData,filter,minute,page};
+    let rows=page?.rows||[];
+    if(!PET_CLOUD_ENABLED){
+        const profiles=(usersDirectorySnapshot?.docs||[]).map(snapshot=>({id:snapshot.id,...snapshot.data()})).filter(profile=>profile.uid!==currentUser.uid);
+        if(attendancePetData)profiles.push({id:'local-current',uid:currentUser.uid,displayName:currentUser.displayName||currentUser.email?.split('@')[0]||'Bạn',attendancePet:attendancePetData});
+        rows=buildPetComparison(profiles,Date.now(),filter);
+    }
+    const body=document.getElementById('petCompareRows');
     body.replaceChildren(...rows.map(row=>{
         const tr=document.createElement('tr');if(row.uid===currentUser.uid)tr.classList.add('is-me');if(row.dead)tr.classList.add('is-dead');
         const cell=text=>{const td=document.createElement('td');td.textContent=text;tr.appendChild(td);return td;};
         cell(row.rank?(['🥇','🥈','🥉'][row.rank-1]||String(row.rank)):'—').className='pet-compare-rank';
         const owner=cell(row.ownerName);if(row.uid===currentUser.uid){const badge=document.createElement('small');badge.className='pet-compare-me';badge.textContent='Bạn';owner.appendChild(badge);}
-        const pet=cell(''),identity=document.createElement('div'),picture=document.createElement('span'),image=document.createElement('img'),name=document.createElement('span');
+        const pet=cell(''),identity=document.createElement('div'),picture=document.createElement('button'),image=document.createElement('img'),name=document.createElement('span');
         identity.className='pet-compare-identity';picture.className='pet-compare-picture is-loading';image.alt=`${row.petName} · ${row.species} · Cấp ${row.level}`;image.width=76;image.height=56;image.decoding='async';image.hidden=true;name.className='pet-compare-name';name.textContent=row.petName;
+        picture.type='button';
+        picture.setAttribute('aria-label',`Xem mô hình 3D của ${row.petName}`);
+        picture.setAttribute('aria-haspopup','dialog');
+        picture.addEventListener('click',()=>openPetRankingPreview(row));
+        const previewBadge=document.createElement('span');previewBadge.textContent='3D';previewBadge.setAttribute('aria-hidden','true');
         if(row.petName!==row.species){const species=document.createElement('small');species.className='pet-compare-species';species.textContent=row.species;name.appendChild(species);}
-        picture.appendChild(image);identity.append(picture,name);pet.appendChild(identity);
+        picture.append(image,previewBadge);identity.append(picture,name);pet.appendChild(identity);
         const generation=petComparisonImageGeneration;
         petComparisonThumbnail(row.appearance).then(source=>{if(source&&generation===petComparisonImageGeneration&&image.isConnected){image.src=source;image.hidden=false;picture.classList.remove('is-loading');}});
         const level=cell(`Cấp ${row.level} · ${row.branchName}`);
@@ -9178,17 +9447,46 @@ function renderPetComparison(force=false){
         const status=cell(''),badge=document.createElement('span');badge.className='pet-compare-state '+(row.dead?'dead':row.egg?'egg':'alive');badge.textContent=row.dead?'Đã chết':row.egg?'Đang ấp':'Đang sống';status.appendChild(badge);
         return tr;
     }));
-    document.getElementById('petCompareEmpty').hidden=rows.length>0;
+    document.getElementById('petCompareEmpty').hidden=rows.length>0||!!page?.loading||!!page?.error;
     const summary=`${new Set(rows.map(row=>row.uid)).size} thành viên · ${rows.length} thú cưng`;
-    document.getElementById('petCompareSummary').textContent=usersDirectorySnapshot?summary:'Đang chờ dữ liệu thành viên khác · '+summary;
+    document.getElementById('petCompareSummary').textContent=PET_CLOUD_ENABLED
+        ?page?.loading?'Đang tải xếp hạng…':page?.error||summary
+        :usersDirectorySnapshot?summary:'Đang chờ dữ liệu thành viên khác · '+summary;
+    const more=document.getElementById('petCompareMore');
+    more.hidden=!PET_CLOUD_ENABLED||page?.nextOffset==null;
+    more.disabled=!!page?.loading;
+    document.getElementById('petCompareRetry').hidden=!page?.error;
 }
-function openPetBattleHistory(row){
+async function openPetBattleHistory(row){
     const dialog=document.getElementById('petBattleHistoryDialog');
     const list=document.getElementById('petBattleHistoryList');
+    const status=document.getElementById('petBattleHistoryEmpty'),token=++petHistoryRequest;
     document.getElementById('petBattleHistoryPet').textContent=`${row.petName} · ${row.ownerName}`;
+    list.replaceChildren();
+    status.hidden=false;
+    status.textContent='Đang tải lịch sử…';
+    if(!dialog.open)dialog.showModal();
+    let entries=row.battleHistory||[];
+    if(PET_CLOUD_ENABLED){
+        const key=JSON.stringify([row.uid,row.petId]);
+        let cached=petHistoryById.get(key);
+        if(!cached||Date.now()>=cached.until){
+            const pending=petCloudRequest('history',{uid:row.uid,petId:row.petId});
+            cached={pending,until:Date.now()+60000};
+            petHistoryById.set(key,cached);
+            while(petHistoryById.size>60)petHistoryById.delete(petHistoryById.keys().next().value);
+        }
+        try{entries=(await cached.pending).entries;}
+        catch(error){
+            if(petHistoryById.get(key)===cached)petHistoryById.delete(key);
+            if(token===petHistoryRequest&&dialog.open)status.textContent=petQuotaErrorText(error)||error.message;
+            return;
+        }
+    }
+    if(token!==petHistoryRequest||!dialog.open)return;
     const results={win:'Thắng',loss:'Thua',draw:'Hòa'};
     const signed=(delta,format)=>`${delta>0?'+':delta<0?'−':''}${format(Math.abs(delta))}`;
-    list.replaceChildren(...row.battleHistory.filter(entry=>entry&&Object.hasOwn(results,entry.result)).map(entry=>{
+    list.replaceChildren(...entries.filter(entry=>entry&&Object.hasOwn(results,entry.result)).map(entry=>{
         const item=document.createElement('li'),name=document.createElement('strong');
         const details=document.createElement('small');
         name.textContent=`${results[entry.result]} · ${entry.opponentName||'Đối thủ'}${entry.opponentPetName?` / ${entry.opponentPetName}`:''}`;
@@ -9197,8 +9495,8 @@ function openPetBattleHistory(row){
         item.append(name,details);
         return item;
     }));
-    document.getElementById('petBattleHistoryEmpty').hidden=list.childElementCount>0;
-    if(!dialog.open)dialog.showModal();
+    status.hidden=list.childElementCount>0;
+    status.textContent='Chưa có trận đấu nào được ghi vào lịch sử.';
 }
 const attendancePetFleet=new Map();
 const petHungerNotificationPending=new Set();
@@ -9244,6 +9542,7 @@ function renderPetHungerBubble(button,view){
     const defeated=!view.egg&&defeatUntil>now&&defeatUntil>=victoryUntil;
     const victorious=!view.dead&&!view.egg&&victoryUntil>now&&victoryUntil>defeatUntil;
     button.classList.toggle('pet-victory-aura',victorious);
+    button.classList.toggle('pet-victory-aura-strong',victorious&&(Number(view.pet.battleWinStreak)||0)>=3);
     button.classList.toggle('pet-defeat-aura',defeated);
     let bubble=button.querySelector('.pet-hunger-bubble');
     if(!bubble){bubble=document.createElement('span');bubble.className='attendance-pet-bubble pet-hunger-bubble';bubble.setAttribute('aria-hidden','true');button.appendChild(bubble);}
@@ -9281,12 +9580,15 @@ function closePetNicknameEditor(){
 }
 function renderAttendancePetRoster(){
     const records=attendancePetRecords(attendancePetData),selected=attendancePetSelected(attendancePetData,selectedAttendancePetId).id;
-    const host=document.getElementById('attendancePetRoster'),key=JSON.stringify(records.map(p=>{const v=attendancePetView(p);return [p.id,v.displayName,v.level,v.dead,v.egg,v.hungry,v.weightGrams];}))+':'+selected;
+    const host=document.getElementById('attendancePetRoster'),key=JSON.stringify(records.map(p=>{const v=attendancePetView(p);return [p.id,v.displayName,v.level,v.dead,v.egg,v.hungry,v.weightGrams];}))+':'+selected+':'+attendancePetVisible;
     document.getElementById('attendancePetRosterCount').textContent=records.length;
     if(host.dataset.signature!==key){
         host.dataset.signature=key;host.replaceChildren(...records.map(p=>{
-            const v=attendancePetView(p),button=document.createElement('button');button.type='button';button.dataset.petId=p.id;button.className='pet-roster-card'+(p.id===selected?' is-selected':'');button.setAttribute('aria-pressed',String(p.id===selected));
-            const icon=document.createElement('span'),name=document.createElement('strong'),meta=document.createElement('small');icon.className='pet-roster-icon';icon.textContent=v.dead?'💤':v.egg?'🥚':{fish:'🐠',shark:'🦈',whale:'🐋',dino:'🦖',bird:'🦅',beast:'🦁'}[v.form.kind];name.textContent=v.displayName;meta.textContent=`Cấp ${v.level} · ${petWeightLabel(v.weightGrams)} · ${v.dead?'Đã chết':v.egg?'Đang ấp':v.maxed?'Hoàn thành':v.hungry?'Đang đói':'No bụng'}`;button.append(icon,name,meta);return button;
+            const v=attendancePetView(p),card=document.createElement('div'),button=document.createElement('button'),eye=document.createElement('button');
+            card.className='pet-roster-card'+(p.id===selected?' is-selected':'');button.type='button';button.dataset.petId=p.id;button.className='pet-roster-select';button.setAttribute('aria-pressed',String(p.id===selected));
+            const icon=document.createElement('span'),name=document.createElement('strong'),meta=document.createElement('small');icon.className='pet-roster-icon';icon.textContent=v.dead?'💤':v.egg?'🥚':{fish:'🐠',shark:'🦈',whale:'🐋',dino:'🦖',bird:'🦅',beast:'🦁'}[v.form.kind];name.textContent=v.displayName;meta.textContent=`Cấp ${v.level} · ${petWeightLabel(v.weightGrams)} · ${v.dead?'Đã chết':v.egg?'Đang ấp':v.maxed?'Hoàn thành':v.hungry?'Đang đói':'No bụng'}`;button.append(icon,name,meta);
+            eye.type='button';eye.className='pet-roster-eye';eye.dataset.petVisibility='';eye.innerHTML=`<i class="bi ${attendancePetVisible?'bi-eye-fill':'bi-eye-slash'}" aria-hidden="true"></i>`;eye.setAttribute('aria-label',attendancePetVisible?'Ẩn thú cưng trên màn hình':'Hiện thú cưng trên màn hình');eye.setAttribute('aria-pressed',String(attendancePetVisible));
+            card.append(button,eye);return card;
         }));
     }
     host.querySelectorAll('button').forEach(button=>button.disabled=attendancePetBusy);
@@ -9316,6 +9618,7 @@ function petQuotaErrorText(error){
     return 'Firestore đang giới hạn yêu cầu (429). Thay đổi chưa được lưu. Tạm ngưng gửi yêu cầu thú cưng 5 phút; nếu hết quota ngày, cần chờ quota được cấp lại hoặc kiểm tra Usage trên Firebase.';
 }
 let attendancePetRef = null;
+let attendanceCloudProfile = null;
 let attendancePetUnsubscribe = null;
 let attendancePetInterval = null;
 let attendancePetGeneration = 0;
@@ -9356,7 +9659,7 @@ function renderAttendancePet() {
     document.getElementById('attendancePetPreview').dataset.mode=attendancePetMotion(view);
     document.getElementById('petGameXp').textContent=`${view.xp} XP`;
     document.getElementById('petGameWeight').textContent=petWeightLabel(view.weightGrams);
-    document.getElementById('petGameWeightHint').textContent=view.dead?'Đã chết vì vắng điểm danh đủ 72 giờ.':view.missedDays?`Vắng điểm danh ${view.missedDays} ngày: mức giảm tổng ${petWeightLabel(view.absencePenaltyGrams)}. Cân nặng không âm.`:'Mỗi lần ăn +0,2 kg · Điểm danh không tăng cân.';
+    document.getElementById('petGameWeightHint').textContent=view.dead?'Đã chết vì vắng điểm danh đủ 72 giờ.':'Mỗi lần ăn +0,2 kg.';
     document.getElementById('petGameHunger').textContent=view.dead?'Đã chết':view.egg?'Đang ấp':view.hungry?'Đang đói':duration(view.untilHungry);
     document.getElementById('petGameHunger').dataset.state=view.dead?'danger':view.hungry?'hungry':'full';
     document.getElementById('petGameFullness').value=view.dead?0:view.egg?100:Math.min(100,view.untilHungry/7200000*100);
@@ -9402,7 +9705,7 @@ function renderAttendancePetBranches(view){
     launch.textContent=view.branch?'Đổi nhánh tiến hóa':'Chọn nhánh tiến hóa';
     const dialog=document.getElementById('attendancePetBranchDialog');
     if((!view.branchUnlocked||view.dead)&&dialog.open)dialog.close();
-    document.getElementById('attendancePetBranchHint').textContent=view.branch?`Nhánh ${ATTENDANCE_PET_BRANCHES[view.branch].name} · Bậc ${view.branchLevel}/${ATTENDANCE_PET_BRANCHES[view.branch].forms.length}. Đổi nhánh vẫn giữ số ngày điểm danh.`:'Từ cá đuối cấp 9, chọn 1 trong 4 nhánh. Mỗi nhánh có 20 dạng tiến hóa, từ cấp 10 đến 29.';
+    document.getElementById('attendancePetBranchHint').textContent=view.branch?`Nhánh ${ATTENDANCE_PET_BRANCHES[view.branch].name} · Bậc ${view.branchLevel}/${ATTENDANCE_PET_BRANCHES[view.branch].forms.length}. Đổi nhánh vẫn giữ số ngày điểm danh.`:'Từ cá đuối cấp 9, chọn 1 trong 4 nhánh. Mỗi nhánh tiến hóa từ cấp 10 đến cấp 30.';
     panel.querySelectorAll('[data-pet-branch]').forEach(button=>{
         const selected=button.dataset.petBranch===view.branch;
         button.classList.toggle('is-selected',selected);button.setAttribute('aria-pressed',String(selected));
@@ -9411,7 +9714,27 @@ function renderAttendancePetBranches(view){
     const road=document.getElementById('attendancePetRoad'),key=`${view.branch}:${view.level}`;
     if(road.dataset.path!==key){
         road.dataset.path=key;
-        road.innerHTML='<li>Trứng · nở sau 1 giờ</li>'+attendancePetCatalog(view.branch).map((form,index)=>`<li class="${index+1===view.level?'is-current':index+1<view.level?'is-complete':''}" ${index+1===view.level?'aria-current="step"':''}>Cấp ${index+1} · ${form.name}${index?` · ${index*10} XP`:''}</li>`).join('')+(!view.branch?'<li class="pet-road-unlock">Cấp 9: mở 4 nhánh, mỗi nhánh 20 cấp</li>':'');
+        const shared=attendancePetCatalog(null);
+        const sharedNodes=[{name:'Trứng'},...shared].map((form,level)=>`
+            <li class="pet-road-node${level===view.level?' is-current':''}" ${level===view.level?'aria-current="step"':''}>
+                <small>${level?`Cấp ${level}`:'Nở sau 1 giờ'}</small><strong>${form.name}</strong>
+            </li>`).join('');
+        const branches=Object.entries(ATTENDANCE_PET_BRANCHES).map(([branchKey,branch])=>{
+            const steps=branch.forms.filter(form=>!form.juvenile).map((form,index)=>{
+                const firstLevel=shared.length+1+index*2,lastLevel=Math.min(ATTENDANCE_PET_MAX_LEVEL,firstLevel+1);
+                const current=branchKey===view.branch&&view.level>=firstLevel&&view.level<=lastLevel;
+                return `<li class="pet-road-node${current?' is-current':''}" ${current?'aria-current="step"':''}>
+                    <small>Cấp ${firstLevel}${lastLevel!==firstLevel?`–${lastLevel}`:''}</small><strong>${form.name}</strong>
+                </li>`;
+            }).join('');
+            return `<section class="pet-road-branch" data-branch="${branchKey}" aria-labelledby="pet-road-${branchKey}">
+                <h6 id="pet-road-${branchKey}"><i class="bi ${branch.icon}" aria-hidden="true"></i> ${branch.name}${branchKey===view.branch?' <small>Đang chọn</small>':''}</h6>
+                <ol>${steps}</ol>
+            </section>`;
+        }).join('');
+        road.innerHTML=`<ol class="pet-road-shared" aria-label="Các cấp tiến hóa chung">${sharedNodes}</ol>
+            <div class="pet-road-fork"><strong>Cá đuối cấp ${shared.length} mở 4 nhánh</strong><small>Từ cấp 10 đến 29 có dạng non và trưởng thành. Cấp 30 là dạng cuối.</small></div>
+            <div class="pet-road-branches">${branches}</div>`;
     }
 }
 
@@ -9422,7 +9745,7 @@ async function actOnAttendancePet(action) {
     attendancePetBusy = true; renderAttendancePet();
     try {
         assertPetQuotaAvailable();
-        const result = await runTransaction(db, async transaction => {
+        const result = PET_CLOUD_ENABLED ? await petCloudRequest('care',{action,petId:targetId}) : await runTransaction(db, async transaction => {
             const snapshot = await transaction.get(ref);
             if (!snapshot.exists() || snapshot.data().uid !== uid) throw new Error('Không đọc được hồ sơ thú cưng.');
             const change = transitionPetHousehold(snapshot.data().attendancePet,action,Date.now(),targetId);
@@ -9454,7 +9777,8 @@ async function actOnAttendancePet(action) {
 function applyAttendancePetProfile(snapshot){
     const data=snapshot?.data();
     if(!currentUser||data?.uid!==currentUser.uid)return;
-    authenticatedProfileSnapshot=snapshot;
+    if(PET_CLOUD_ENABLED)attendanceCloudProfile=data;
+    else authenticatedProfileSnapshot=snapshot;
     if(data.attendancePet){attendancePetData=data.attendancePet;renderAttendancePet();}
 }
 
@@ -9474,6 +9798,39 @@ function watchAttendancePetProfile(){
     });
 }
 
+function openCloudAttendancePet(uid,generation){
+    attendancePetRef=doc(db,'petProfiles',uid);
+    return new Promise((resolve,reject)=>{
+        let initialized=false,migrating=false;
+        const finish=profile=>{
+            if(initialized)return;
+            initialized=true;resolve(profile);
+        };
+        const unsubscribe=onSnapshot(attendancePetRef,{includeMetadataChanges:true},snapshot=>{
+            if(generation!==attendancePetGeneration)return;
+            if(initialized){
+                applyAttendancePetProfile(snapshot);
+                PetBattleGame.profile(snapshot);
+                return;
+            }
+            if(snapshot.exists()){finish(snapshot.data());return;}
+            if(migrating||snapshot.metadata.fromCache)return;
+            migrating=true;
+            petCloudRequest('open').then(finish).catch(error=>{
+                if(!initialized){unsubscribe();attendancePetUnsubscribe=null;reject(error);}
+            });
+        },error=>{
+            if(generation!==attendancePetGeneration)return;
+            attendancePetUnsubscribe=null;
+            if(!initialized){reject(error);return;}
+            attendancePetReady=false;renderAttendancePet();
+            document.getElementById('attendancePetStatus').textContent=petQuotaErrorText(error)||'Mất đồng bộ thú cưng. Bấm Thử kết nối lại.';
+            document.getElementById('attendancePetRetry').hidden=false;
+        });
+        attendancePetUnsubscribe=()=>{unsubscribe();finish(null);};
+    });
+}
+
 async function startAttendancePet() {
     if(attendancePetStarting)return;
     stopAttendancePet();
@@ -9485,21 +9842,35 @@ async function startAttendancePet() {
     document.getElementById('attendancePetStatus').textContent='Đang đồng bộ thú cưng…';
     try {
         assertPetQuotaAvailable();
-        const loginProfile=authenticatedProfileSnapshot?.data()?.uid===uid?authenticatedProfileSnapshot:null;
-        const cached=usersDirectorySnapshot?.docs.find(snapshot=>snapshot.id===loginProfile?.id)||loginProfile;
-        const profiles = cached ? {docs:[cached]} : await getDocs(query(collection(db,'users'),where('uid','==',uid)));
-        if (generation!==attendancePetGeneration || currentUser?.uid!==uid) return;
-        const profile = [...profiles.docs].sort((a,b)=>a.id.localeCompare(b.id))[0];
-        if (!profile) throw new Error('Missing profile');
-        attendancePetRef = profile.ref;
-        const initial=transitionPetHousehold(profile.data().attendancePet,'init',Date.now());
-        const pet = !initial.changed ? initial.pet : await runTransaction(db,async transaction=>{
-            const snapshot=await transaction.get(profile.ref);
-            if (!snapshot.exists() || snapshot.data().uid!==uid) throw new Error('Missing profile');
-            const change=transitionPetHousehold(snapshot.data().attendancePet,'init',Date.now());
-            if (change.changed) transaction.update(profile.ref,{attendancePet:change.pet});
-            return change.pet;
-        },{maxAttempts:2});
+        let pet;
+        if(PET_CLOUD_ENABLED){
+            const profile=await openCloudAttendancePet(uid,generation);
+            if(!profile||generation!==attendancePetGeneration||currentUser?.uid!==uid)return;
+            attendanceCloudProfile=profile;
+            pet=profile.attendancePet;
+        }else{
+            const loginProfile=authenticatedProfileSnapshot?.data()?.uid===uid?authenticatedProfileSnapshot:null;
+            const cached=usersDirectorySnapshot?.docs.find(snapshot=>snapshot.id===loginProfile?.id)||loginProfile;
+            const profiles=cached?{docs:[cached]}:await getDocs(query(collection(db,'users'),where('uid','==',uid)));
+            if(generation!==attendancePetGeneration||currentUser?.uid!==uid)return;
+            const profile=[...profiles.docs].sort((a,b)=>a.id.localeCompare(b.id))[0];
+            if(!profile)throw new Error('Missing profile');
+            attendancePetRef=profile.ref;
+            const storedPet=profile.data().attendancePet;
+            if(!storedPet){
+                const migrated=await getDoc(doc(db,'petProfiles',uid));
+                if(generation!==attendancePetGeneration||currentUser?.uid!==uid)return;
+                if(migrated.exists())throw new Error('Hồ sơ thú cưng đã được chuyển sang petProfiles. Cần khôi phục hồ sơ về users trước khi dùng chế độ Firestore trực tiếp.');
+            }
+            const initial=transitionPetHousehold(storedPet,'init',Date.now());
+            pet=!initial.changed?initial.pet:await runTransaction(db,async transaction=>{
+                const snapshot=await transaction.get(profile.ref);
+                if(!snapshot.exists()||snapshot.data().uid!==uid)throw new Error('Missing profile');
+                const change=transitionPetHousehold(snapshot.data().attendancePet,'init',Date.now());
+                if(change.changed)transaction.update(profile.ref,{attendancePet:change.pet});
+                return change.pet;
+            },{maxAttempts:2});
+        }
         if (generation!==attendancePetGeneration || currentUser?.uid!==uid) return;
         attendancePetData=pet;attendancePetReady=true;
         document.getElementById('attendancePetRetry').hidden=true;
@@ -9509,10 +9880,10 @@ async function startAttendancePet() {
         PetBattleGame.start();
         checkPetHungerNotifications();
         attendancePetInterval=setInterval(()=>{renderAttendancePet();checkPetHungerNotifications();},1000);
-        if(!usersDirectorySnapshot?.docs.some(snapshot=>snapshot.id===profile.id))watchAttendancePetProfile();
+        if(!PET_CLOUD_ENABLED&&!usersDirectorySnapshot?.docs.some(snapshot=>snapshot.id===attendancePetRef.id))watchAttendancePetProfile();
     } catch (error) {
         if (generation!==attendancePetGeneration) return;
-        document.getElementById('attendancePetStatus').textContent=petQuotaErrorText(error)||(error.code==='permission-denied'?'Firebase chưa cho phép đọc/cập nhật hồ sơ thú cưng.':'Chưa tải được thú cưng. Kiểm tra kết nối rồi thử lại.');
+        document.getElementById('attendancePetStatus').textContent=petQuotaErrorText(error)||(error.code?.split('/').pop()==='permission-denied'?'Firebase chưa cho phép đọc/cập nhật hồ sơ thú cưng.':error.message||'Chưa tải được thú cưng. Kiểm tra kết nối rồi thử lại.');
         document.getElementById('attendancePetRetry').hidden=false;renderAttendancePet();
     } finally {
         if(generation===attendancePetGeneration)attendancePetStarting=false;
@@ -9528,11 +9899,13 @@ function stopAttendancePet() {
     attendancePetGeneration++;attendancePetUnsubscribe?.();attendancePetUnsubscribe=null;
     attendancePetStarting=false;
     clearInterval(attendancePetInterval);clearTimeout(attendancePetBubbleTimer);
-    attendancePetData=null;attendancePetRef=null;attendancePetReady=false;attendancePetBusy=false;
+    attendancePetData=null;attendancePetRef=null;attendanceCloudProfile=null;attendancePetReady=false;attendancePetBusy=false;
     selectedAttendancePetId=null;
     petComparisonCache=null;
+    petRankingByBranch.clear();petHistoryById.clear();petHistoryRequest++;
     stopPetComparisonThumbnails();
     const comparison=document.getElementById('petCompareDialog');if(comparison?.open)comparison.close();
+    closePetRankingPreview();
     const history=document.getElementById('petBattleHistoryDialog');if(history?.open)history.close();
     document.getElementById('petBattleHistoryList')?.replaceChildren();
     document.getElementById('petCompareRows')?.replaceChildren();
@@ -9542,6 +9915,7 @@ function stopAttendancePet() {
     stopAttendancePetFleet();
     const dialog=document.getElementById('attendancePetDialog');
     if (dialog?.open) dialog.close();
+    const guide=document.getElementById('petGuideDialog');if(guide?.open)guide.close();
     const toggle=document.getElementById('attendancePetToggle');if(toggle)toggle.hidden=true;
     const swimmer=document.getElementById('attendancePetSwimmer');if(swimmer)swimmer.hidden=true;
     const nickname=document.getElementById('attendancePetNickname');if(nickname){nickname.value='';closePetNicknameEditor();}
@@ -9552,22 +9926,43 @@ function initAttendancePetUi() {
     if (!toggle || toggle.dataset.ready) return;toggle.dataset.ready='true';
     PetBattleGame.init();
     const dialog=document.getElementById('attendancePetDialog');
+    const guide=document.getElementById('petGuideDialog');
+    document.querySelectorAll('[data-pet-guide]').forEach(button=>button.addEventListener('click',()=>{
+        const battle=button.dataset.petGuide==='battle';
+        guide.dataset.topic=battle?'battle':'care';
+        document.getElementById('petGuideCare').hidden=battle;
+        document.getElementById('petGuideBattle').hidden=!battle;
+        const balance=document.getElementById('petBattleBalance');
+        balance.hidden=button.closest('dialog')?.id!=='petBattleDialog'||document.getElementById('petBattleSetup').hidden||!balance.textContent;
+        guide.scrollTop=0;
+        if(!guide.open)guide.showModal();
+    }));
+    document.getElementById('petGuideClose').addEventListener('click',()=>guide.close());
     toggle.addEventListener('click',()=>{renderAttendancePet();if(!dialog.open)dialog.showModal();AttendancePet3D.preview(true);openAttendancePetBranch(true);});
     dialog.addEventListener('close',()=>{if(dialog.open)return;closePetNicknameEditor();document.getElementById('attendancePetBranchDialog').close();document.getElementById('petCompareDialog').close();AttendancePet3D.preview(false);});
     document.getElementById('attendancePetClose').addEventListener('click',()=>dialog.close());
     dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close();});
     document.getElementById('attendancePetCheckin').addEventListener('click',()=>actOnAttendancePet('checkin'));
-    document.getElementById('attendancePetRoster').addEventListener('click',event=>{const button=event.target.closest('[data-pet-id]');if(button&&!button.disabled)selectAttendancePet(button.dataset.petId);});
+    document.getElementById('attendancePetRoster').addEventListener('click',event=>{
+        const eye=event.target.closest('[data-pet-visibility]');
+        if(eye&&!eye.disabled){const input=document.getElementById('attendancePetVisible');input.checked=!input.checked;input.dispatchEvent(new Event('change'));return;}
+        const button=event.target.closest('[data-pet-id]');if(button&&!button.disabled)selectAttendancePet(button.dataset.petId);
+    });
     const comparison=document.getElementById('petCompareDialog');
     document.getElementById('petCompareBranch').append(...Object.entries(ATTENDANCE_PET_BRANCHES).map(([key,branch])=>new Option(branch.name,key)));
-    document.getElementById('petCompareOpen').addEventListener('click',()=>{if(!currentUser)return;if(!comparison.open)comparison.showModal();renderPetComparison(true);});
+    document.getElementById('petCompareOpen').addEventListener('click',()=>{if(!currentUser)return;if(!comparison.open)comparison.showModal();if(PET_CLOUD_ENABLED)loadPetRanking();else renderPetComparison(true);});
     document.getElementById('petCompareClose').addEventListener('click',()=>comparison.close());
     const history=document.getElementById('petBattleHistoryDialog');
+    const preview=document.getElementById('petRankingPreviewDialog');
+    document.getElementById('petRankingPreviewClose').addEventListener('click',closePetRankingPreview);
+    preview.addEventListener('close',()=>{if(!preview.open)closePetRankingPreview();});
     document.getElementById('petBattleHistoryClose').addEventListener('click',()=>history.close());
     history.addEventListener('click',event=>{if(event.target===history)history.close();});
-    comparison.addEventListener('close',()=>{if(!comparison.open){history.close();stopPetComparisonThumbnails();}});
+    comparison.addEventListener('close',()=>{if(!comparison.open){history.close();closePetRankingPreview();stopPetComparisonThumbnails();}});
     comparison.addEventListener('click',event=>{if(event.target===comparison)comparison.close();});
-    document.getElementById('petCompareBranch').addEventListener('change',()=>renderPetComparison(true));
+    document.getElementById('petCompareBranch').addEventListener('change',()=>PET_CLOUD_ENABLED?loadPetRanking():renderPetComparison(true));
+    document.getElementById('petCompareMore').addEventListener('click',()=>loadPetRanking(true));
+    document.getElementById('petCompareRetry').addEventListener('click',()=>loadPetRanking());
     const branchDialog=document.getElementById('attendancePetBranchDialog');
     document.getElementById('attendancePetBranchOpen').addEventListener('click',()=>openAttendancePetBranch());
     document.getElementById('attendancePetBranchClose').addEventListener('click',()=>branchDialog.close());
@@ -9611,6 +10006,41 @@ const PetBattleGame=(()=>{
     const ownRef=()=>attendancePetRef||authenticatedProfileSnapshot?.ref;
     const profileRows=()=>[...(usersDirectorySnapshot?.docs||[])].map(d=>({id:d.id,...d.data()}));
     const match=()=>state.matches.get(state.active);
+    function setElementAura(model,key){
+        const element=PET_BATTLE_ELEMENTS.get(key);
+        model.classList.toggle('has-element-aura',!!element);
+        if(element)model.style.setProperty('--pet-battle-element-color',element.color);
+        else model.style.removeProperty('--pet-battle-element-color');
+    }
+    function stopDraftModel(){
+        state.draftModel?.stop();state.draftModel=null;
+        state.botModel?.stop();state.botModel=null;
+        const model=el('petBattleDraftModel');if(model)model.hidden=true;
+    }
+    function updateDraftModel(view){
+        if(!state.creating||match()||!el('petBattlePet').value){stopDraftModel();return;}
+        const model=el('petBattleDraftModel');
+        model.hidden=false;
+        if(!state.draftModel){
+            state.draftModel=createAttendancePet3D('petBattleDraftModel','petBattleDraftArt',null,'draft');
+            state.draftModel.start();
+        }
+        state.draftModel.update(view);
+        setElementAura(model,el('petBattleElement').value);
+        if(state.botDraft){
+            const key=`${view.pet.id}:${view.level}`;
+            if(state.botKey!==key){state.botKey=key;state.bot=makePetBattleBot(view.level);}
+            if(!state.botModel){
+                state.botModel=createAttendancePet3D('petBattleBotModel','petBattleBotArt',null,'draft');
+                state.botModel.start();
+            }
+            state.botModel.update(state.bot.appearance);
+            setElementAura(el('petBattleBotModel'),state.bot.element);
+            el('petBattleBotName').textContent=`${state.bot.petName} · Cấp ${state.bot.appearance.level}`;
+            const host={petName:view.displayName,stats:draftStats(),element:el('petBattleElement').value};
+            renderStatComparison([host,state.bot],[petBattleEffectiveStats(host,state.bot),petBattleEffectiveStats(state.bot,host)]);
+        }
+    }
     function dismissed(){try{const ids=JSON.parse(localStorage.getItem('workpic-battle-dismissed:'+state.uid)||'[]');return Array.isArray(ids)?ids:[];}catch{return [];}}
     function finishRoom(){
         const m=match();if(!m||state.busy||(!m.claims?.[state.uid]&&state.own?.petBattleLocks?.[m.id])||!(['finished','cancelled','rejected','expired'].includes(m.status)||petBattlePlayback(m).finished))return;
@@ -9621,18 +10051,50 @@ const PetBattleGame=(()=>{
     const secret=(id,round)=>{try{return JSON.parse(localStorage.getItem(secretKey(id,round))||'null');}catch{return null;}};
     function disposeModels(){state.models.forEach(model=>model.stop());state.models=[];state.modelKey='';}
     function stop(){
-        clearInterval(state.timer);state.timer=null;state.subs.forEach(unsubscribe=>unsubscribe());state.subs.clear();state.failedSubs.clear();state.matches.clear();state.autoOpened.clear();disposeModels();
+        clearInterval(state.timer);state.timer=null;state.subs.forEach(unsubscribe=>unsubscribe());state.subs.clear();state.failedSubs.clear();state.matches.clear();state.autoOpened.clear();disposeModels();stopDraftModel();
+        state.inviteUnsubscribe?.();state.inviteUnsubscribe=null;state.inviteFailed=false;state.invites=new Set();
         state.uid=null;state.own=null;state.active='';state.creating=false;state.busy=false;state.message='';state.setupKey='';state.listKey='';state.resultPrompt='';state.cooldown=0;state.lastSync=0;
         for(const id of ['petBattleExitDialog','petBattleInvitePicker','petBattleDialog','petBattleLobby'])if(el(id)?.open)el(id).close();
         if(el('petBattleInvite'))el('petBattleInvite').hidden=true;
     }
-    function start(){stop();if(!currentUser||!attendancePetRef)return;state.uid=currentUser.uid;state.own=authenticatedProfileSnapshot?.data()||{uid:state.uid,attendancePet:attendancePetData};
+    function start(){stop();if(!currentUser||!attendancePetRef)return;state.uid=currentUser.uid;state.own=(PET_CLOUD_ENABLED?attendanceCloudProfile:authenticatedProfileSnapshot?.data())||{uid:state.uid,attendancePet:attendancePetData};
         state.timer=setInterval(()=>{if(!mine())return;if(Date.now()-state.lastSync>15000)sync();process();if(el('petBattleDialog').open&&!document.hidden)render();},200);sync();}
     function profile(snapshot,refresh=true){if(mine()&&snapshot?.exists()&&snapshot.data().uid===state.uid){state.own=snapshot.data();if(refresh)sync();}}
-    function fail(error){state.message=error.code==='permission-denied'?'Firebase chưa cho phép trận đấu petBattles hoặc hồ sơ của bạn. Thao tác thất bại không thay đổi kg.':petQuotaErrorText(error)||error.message||'Chưa đồng bộ được trận đấu.';state.cooldown=error.code==='resource-exhausted'?(error.retryAt||Date.now()+300000):Infinity;el('petBattleRetry').hidden=false;render();}
+    function fail(error){const code=error.code?.split('/').pop();state.message=code==='permission-denied'?'Firebase chưa cho phép truy cập phòng đấu hoặc hồ sơ của bạn.':petQuotaErrorText(error)||error.message||'Chưa đồng bộ được trận đấu.';state.cooldown=code==='resource-exhausted'?(error.retryAt||Date.now()+300000):Infinity;el('petBattleRetry').hidden=false;render();}
+    function receiveMatch(data){
+        const id=data.id,uid=state.uid;
+        if(!data.participantUids?.includes(uid))return;
+        state.matches.set(id,data);
+        const inviteKey=id+':invite';
+        if(data.status==='invited'&&data.opponentUid===uid&&data.expiresAt>Date.now()&&!state.autoOpened.has(inviteKey)){state.autoOpened.add(inviteKey);open(id);}
+        if(['ready','rps','fighting'].includes(data.status)&&!state.autoOpened.has(id)){state.autoOpened.add(id);open(id);}
+        updateInvites();render();process();
+    }
+    function listenCloudInvites(){
+        if(state.inviteUnsubscribe||state.inviteFailed||Date.now()<state.cooldown)return;
+        try{assertPetQuotaAvailable();}catch{return;}
+        const uid=state.uid;
+        const invitations=query(collection(db,'petCloudBattles'),where('opponentUid','==',uid),where('status','==','invited'),limit(12));
+        state.inviteUnsubscribe=onSnapshot(invitations,snapshot=>{
+            if(!mine()||state.uid!==uid)return;
+            const next=new Set(snapshot.docs.map(doc=>doc.id));
+            for(const id of state.invites)if(!next.has(id)&&!state.subs.has(id)&&state.matches.get(id)?.status==='invited')state.matches.delete(id);
+            for(const doc of snapshot.docs){
+                const match=state.matches.get(doc.id);
+                if(!match||match.status==='invited')receiveMatch({id:doc.id,...doc.data()});
+            }
+            state.invites=next;updateInvites();render();
+        },error=>{state.inviteUnsubscribe=null;state.inviteFailed=true;fail(error);});
+    }
     function sync(){
-        if(!mine())return;state.lastSync=Date.now();const wanted=new Set(Object.keys(state.own?.petBattleLocks||{})),offers=[];
-        for(const profile of profileRows())if(profile.uid!==state.uid)for(const [id,lock]of Object.entries(profile.petBattleLocks||{}))if(lock.role==='challenger'&&lock.peerUid===state.uid&&lock.expiresAt>Date.now())offers.push({id,at:lock.createdAt});
+        if(!mine())return;state.lastSync=Date.now();const wanted=new Set(Object.keys(state.own?.petBattleLocks||{}).filter(id=>!id.startsWith('bot-'))),offers=[];
+        const botBattle=state.own?.petBotBattle;
+        if(botBattle&&!dismissed().includes(botBattle.id))state.matches.set(botBattle.id,botBattle);
+        if(PET_CLOUD_ENABLED){
+            listenCloudInvites();
+            const current=match();
+            if(current&&['invited','ready','fighting'].includes(current.status)&&state.active)wanted.add(state.active);
+        }else for(const profile of profileRows())if(profile.uid!==state.uid)for(const [id,lock]of Object.entries(profile.petBattleLocks||{}))if(lock.role==='challenger'&&lock.peerUid===state.uid&&lock.expiresAt>Date.now())offers.push({id,at:lock.createdAt});
         offers.sort((a,b)=>b.at-a.at).slice(0,12).forEach(offer=>wanted.add(offer.id));
         for(const id of wanted){
             const known=state.matches.get(id);
@@ -9641,12 +10103,9 @@ const PetBattleGame=(()=>{
         for(const [id,unsubscribe]of state.subs)if(!wanted.has(id)){unsubscribe();state.subs.delete(id);}
         for(const id of wanted)if(!state.subs.has(id)&&!state.failedSubs.has(id)&&Date.now()>=state.cooldown){
             try{assertPetQuotaAvailable();}catch{break;}
-            const uid=state.uid,unsubscribe=onSnapshot(doc(db,'petBattles',id),snapshot=>{
-                if(state.uid!==uid||!snapshot.exists())return;const data={id:snapshot.id,...snapshot.data()};if(!data.participantUids?.includes(uid))return;state.matches.set(id,data);
-                const inviteKey=id+':invite';
-                if(data.status==='invited'&&data.opponentUid===uid&&data.expiresAt>Date.now()&&!state.autoOpened.has(inviteKey)){state.autoOpened.add(inviteKey);open(id);}
-                if(['ready','rps','fighting'].includes(data.status)&&!state.autoOpened.has(id)){state.autoOpened.add(id);open(id);}
-                updateInvites();render();process();
+            const uid=state.uid,unsubscribe=onSnapshot(doc(db,PET_CLOUD_ENABLED?'petCloudBattles':'petBattles',id),snapshot=>{
+                if(state.uid!==uid||!snapshot.exists())return;
+                receiveMatch({id:snapshot.id,...snapshot.data()});
             },error=>{state.subs.delete(id);state.failedSubs.add(id);fail(error);});state.subs.set(id,unsubscribe);
         }updateInvites();render();
     }
@@ -9666,10 +10125,10 @@ const PetBattleGame=(()=>{
         if(!el('petBattleLobby').open)el('petBattleLobby').showModal();
         render();
     }
-    function open(id=''){
+    function open(id='',bot=false){
         if(!canOpen())return;
         el('petBattleLobby').close();el('petBattleInvitePicker').close();el('petBattleExitDialog').close();
-        state.active=id;state.creating=!id;state.setupKey='';state.lastTurn='';state.message='';
+        state.active=id;state.creating=!id;state.botDraft=bot;state.botKey='';state.bot=null;state.setupKey='';state.lastTurn='';state.message='';
         if(!el('petBattleDialog').open)el('petBattleDialog').showModal();
         render();
     }
@@ -9702,17 +10161,59 @@ const PetBattleGame=(()=>{
     }
     function renderDraft(){
         const record=attendancePetSelected(attendancePetData,el('petBattlePet').value),view=attendancePetView(record),budget=petBattleBudget(view.level),stats=draftStats(),used=Object.values(stats).reduce((sum,value)=>sum+value,0);
-        el('petBattleBudget').textContent=budget;el('petBattleRemaining').textContent=`Đã dùng ${used}/${budget} · Còn ${budget-used} điểm`;el('petBattleRemaining').classList.toggle('invalid',used!==budget);
+        const remaining=budget-used;
+        state.draftPointsValid=remaining===0;
+        el('petBattleBudget').textContent=budget;
+        el('petBattleUsed').textContent=`Đã phân bổ ${used} / ${budget} điểm`;
+        el('petBattleRemaining').textContent=remaining===0?'Đủ điểm':remaining>0?`Thiếu ${remaining} điểm`:`Dư ${Math.abs(remaining)} điểm`;
+        el('petBattleAllocation').dataset.state=remaining===0?'complete':remaining>0?'short':'over';
+        el('petBattleRemaining').classList.toggle('invalid',remaining!==0);
+        const meter=el('petBattleAllocationMeter');meter.max=budget;meter.value=Math.min(used,budget);
         Object.entries(statInputs).forEach(([key,id])=>{
             el(id).previousElementSibling.textContent=stats[key];
         });
         el('petBattleDraftPet').textContent=el('petBattlePet').value?view.displayName:'Chưa có thú cưng sẵn sàng';
-        el('petBattleBalance').textContent=`${view.displayName} · Cấp ${view.level} · Có ${petWeightLabel(view.weightGrams)} để cược. Kg cược được giữ trước, không trừ thêm khi thua.`;
+        updateDraftModel(view);
+        el('petBattleBalance').textContent=el('petBattlePet').value?`${view.displayName} · Cấp ${view.level} · Có ${petWeightLabel(view.weightGrams)} để cược.`:'';
+        syncDraftControls();
+    }
+    function syncDraftControls(){
+        const pet=el('petBattlePet'),element=el('petBattleElement').value;
+        const canSubmit=!!pet.value&&state.draftPointsValid&&PET_BATTLE_ELEMENTS.has(element)&&!state.busy;
+        el('petBattleAccept').disabled=!canSubmit;
+        el('petBattleBotStart').hidden=!state.botDraft||!canSubmit;
+        el('petBattleBotStart').disabled=!canSubmit;
+        el('petBattleInviteHint').hidden=canSubmit;
+        for(const button of el('petBattleOpponentList').querySelectorAll('button')){
+            button.disabled=state.busy;
+            button.setAttribute('aria-disabled',String(!canSubmit));
+            button.title=canSubmit?'Gửi lời mời':'Cần chọn bổ trợ và phân bổ đủ điểm trước';
+        }
+        el('petBattleCycleHost').disabled=el('petBattleCycleGuest').disabled=state.busy||pet.options.length<2;
+        for(const button of el('petBattleSetup').querySelectorAll('[data-battle-element]')){
+            button.setAttribute('aria-pressed',String(button.dataset.battleElement===element));
+        }
+    }
+    function cyclePet(){
+        const pet=el('petBattlePet');
+        if(state.busy||pet.options.length<2)return;
+        pet.selectedIndex=(pet.selectedIndex+1)%pet.options.length;
+        pet.dispatchEvent(new Event('change'));
     }
     function setup(m){
         const key=(m?.id||'new')+':'+state.uid;if(state.setupKey===key)return;state.setupKey=key;
         const users=new Map();for(const p of profileRows())if(p.uid!==state.uid&&!users.has(p.uid))users.set(p.uid,p);
-        el('petBattleOpponent').replaceChildren(new Option('Chọn thành viên',''),...[...users.values()].sort((a,b)=>(a.displayName||a.email||'').localeCompare(b.displayName||b.email||'','vi')).map(p=>new Option(p.displayName||p.email||p.uid,p.uid)));
+        const opponents=[...users.values()].sort((a,b)=>(a.displayName||a.email||'').localeCompare(b.displayName||b.email||'','vi'));
+        const list=el('petBattleOpponentList');
+        list.replaceChildren(...opponents.map(profile=>{
+            const row=document.createElement('div'),info=document.createElement('span'),name=document.createElement('strong'),meta=document.createElement('small'),invite=document.createElement('button');
+            const label=profile.displayName||profile.email||profile.uid;
+            const rival=attendancePetRecords(profile.attendancePet||{},Date.now()).map(p=>attendancePetView(p)).find(v=>!v.dead&&!v.egg);
+            name.textContent=label;meta.textContent=rival?`${rival.displayName} · Cấp ${rival.level} · ${petWeightLabel(rival.weightGrams)}`:'Chưa có thú cưng sẵn sàng';info.append(name,meta);invite.type='button';invite.textContent='+';
+            invite.dataset.inviteUid=profile.uid;invite.setAttribute('aria-label',`Mời ${label}`);
+            row.append(info,invite);return row;
+        }));
+        if(!opponents.length)list.textContent='Chưa có thành viên để mời.';
         const records=attendancePetRecords(attendancePetData).filter(p=>{const v=attendancePetView(p);return !v.egg&&!v.dead&&!Object.values(state.own?.petBattleLocks||{}).some(lock=>lock.petId===p.id);});
         el('petBattlePet').replaceChildren(...records.map(p=>{const v=attendancePetView(p);return new Option(`${v.displayName} · Cấp ${v.level} · ${petWeightLabel(v.weightGrams)}`,p.id);}));
         if(records.some(p=>p.id===selectedAttendancePetId))el('petBattlePet').value=selectedAttendancePetId;
@@ -9733,11 +10234,13 @@ const PetBattleGame=(()=>{
                 petBattleChangeWeight(attendancePetData,fighter.petId,-stake,Date.now());
             }catch(error){state.message=error.message;render();return;}
         }
-        if(action==='create'&&typeof globalThis.crypto?.randomUUID!=='function'){fail(new Error('Đấu trường cần HTTPS hoặc localhost để tạo phòng.'));return;}
-        const id=action==='create'?`battle-${Date.now().toString(36)}-${crypto.randomUUID()}`:targetId;
-        if(!id)return;state.busy=true;state.message='Đang đồng bộ…';render();
+        if(!PET_CLOUD_ENABLED&&action==='create'&&typeof globalThis.crypto?.randomUUID!=='function'){fail(new Error('Đấu trường cần HTTPS hoặc localhost để tạo phòng.'));return;}
+        let id=action==='create'&&!PET_CLOUD_ENABLED?`battle-${Date.now().toString(36)}-${crypto.randomUUID()}`:targetId;
+        if(action!=='create'&&!id)return;state.busy=true;state.message='Đang đồng bộ…';render();
         try{
-            assertPetQuotaAvailable();const result=await runTransaction(db,async tx=>{
+            assertPetQuotaAvailable();const result=PET_CLOUD_ENABLED
+                ?await petCloudRequest('battle',{...payload,id,action})
+                :await runTransaction(db,async tx=>{
                 const battleRef=doc(db,'petBattles',id);
                 const usesProfile=['create','accept','cancel','claim'].includes(action);
                 const [userSnapshot,battleSnapshot]=await Promise.all([
@@ -9819,25 +10322,8 @@ const PetBattleGame=(()=>{
                                 next.xpChanges={...next.xpChanges,[uid]:result.change};
                             }
                             if(next.status==='finished'){
-                                const endedAt=petBattleTime(next.startedAt)+(next.introMs===5000?5000:2000)+next.turns.length*PET_BATTLE_STEP_MS;
-                                const opponent=next.players.find(p=>p.uid!==uid);
-                                const won=next.winnerUid===uid,until=endedAt+3600000;
-                                const entry={id,endedAt,result:next.winnerUid?(won?'win':'loss'):'draw',
-                                    opponentName:opponent?.name||'Đối thủ',opponentPetName:opponent?.petName||'',
-                                    xpDelta:next.xpChanges?.[uid]||0,weightDelta:amount-lock.stakeGrams};
-                                const root=patch.attendancePet||user.attendancePet;
-                                const records=attendancePetRecords(root,now).map(p=>{
-                                    if(p.id!==lock.petId)return p;
-                                    const history=Array.isArray(p.battleHistory)?p.battleHistory:[];
-                                    const battleHistory=[entry,...history.filter(item=>item&&item.id!==id)]
-                                        .sort((a,b)=>b.endedAt-a.endedAt).slice(0,30);
-                                    const expiryField=won?'victoryAuraUntil':'defeatAuraUntil';
-                                    const aura=next.winnerUid&&until>(Number(p[expiryField])||0)
-                                        ?won?{victoryAuraUntil:until}:{defeatAuraUntil:until,defeatOpponentName:entry.opponentName}
-                                        :{};
-                                    return {...p,battleHistory,...aura};
-                                });
-                                patch.attendancePet={...root,...records[0],companions:records.slice(1)};
+                                patch.attendancePet=petBattleCompletePet(patch.attendancePet||user.attendancePet,lock.petId,
+                                    {...next,id},uid,next.xpChanges?.[uid]||0,amount-lock.stakeGrams,now);
                             }
                             delete locks[id];patch.petBattleLocks=locks;next.claims={...next.claims,[uid]:true};
                         }
@@ -9847,6 +10333,8 @@ const PetBattleGame=(()=>{
                 return {match:next,patch,changed};
             },{maxAttempts:['ready','claim'].includes(action)?2:1});
             if(!mine()||state.uid!==uid)return;
+            if(PET_CLOUD_ENABLED)id=result.match.id;
+            result.patch||={};
             const previous=state.matches.get(id);
             if(result.match.status==='ready'&&previous?.ready&&(
                 previous.status!=='ready'||Object.keys(previous.ready).length>Object.keys(result.match.ready).length
@@ -9864,6 +10352,54 @@ const PetBattleGame=(()=>{
         if(m.status==='ready')return now>=m.readyDeadline;
         return m.status==='rps'&&now>=m.rpsDeadline;
     }
+    async function mutateBot(action,payload={},targetId=state.active){
+        if(PET_CLOUD_ENABLED||!mine()||state.busy)return;
+        const uid=state.uid,ref=ownRef(),bot=state.bot;
+        if(!ref||action==='start'&&!bot)return;
+        if(action==='start'&&typeof globalThis.crypto?.randomUUID!=='function'){fail(new Error('Đấu Bot cần HTTPS hoặc localhost.'));return;}
+        const id=action==='start'?'bot-'+globalThis.crypto.randomUUID():targetId;
+        state.busy=true;state.message='Đang đồng bộ…';render();
+        try{
+            assertPetQuotaAvailable();
+            const result=await runTransaction(db,async tx=>{
+                const profile=(await tx.get(ref)).data(),now=Date.now();
+                if(!mine()||profile?.uid!==uid)throw new Error('Phiên đăng nhập đã thay đổi.');
+                const locks={...profile.petBattleLocks},pending=profile.petBotBattle;
+                let root=profile.attendancePet,room;
+                if(action==='start'){
+                    if(pending?.status==='fighting')throw new Error('Hãy nhận kết quả trận Bot đang diễn ra.');
+                    const stake=payload.stakeGrams;
+                    if(!Number.isSafeInteger(stake)||stake<100||stake%100!==0)throw new Error('Cược tối thiểu 0,1 kg, theo bước 0,1 kg.');
+                    const player=petBattleFighter(profile,ref.id,payload.petId,payload.stats,now,payload.element);
+                    if(player.appearance.level!==bot.appearance.level)throw new Error('Cấp thú cưng đã thay đổi. Hãy mở lại phòng Bot.');
+                    root=petBattleChangeWeight(root,player.petId,-stake,now);
+                    const players=[player,bot],firstUid=players[Math.random()<.5?0:1].uid;
+                    room={id,bot:true,roomFlow:true,createdMs:now,players,participantUids:players.map(p=>p.uid),
+                        status:'fighting',stakeGrams:stake,stakeXp:Math.floor(stake/200),firstUid,
+                        startedAt:now,claims:{},...petBattleSimulation(players,firstUid)};
+                    locks[id]={petId:player.petId,stakeGrams:stake,role:'bot'};
+                }else{
+                    if(pending?.id!==id)throw new Error('Không tìm thấy trận Bot.');
+                    if(pending.claims?.[uid])return {room:pending,patch:{}};
+                    const lock=locks[id],amount=petBattleClaimAmount(pending,uid,now);
+                    if(!lock||amount===null||lock.stakeGrams!==pending.stakeGrams||lock.petId!==pending.players[0].petId)throw new Error('Trận Bot chưa kết thúc hoặc cược không khớp.');
+                    if(amount)root=petBattleChangeWeight(root,lock.petId,amount,now);
+                    const delta=pending.winnerUid?(pending.winnerUid===uid?pending.stakeXp:-pending.stakeXp):0;
+                    const xp=petBattleSettleXp(root,lock.petId,delta,now);
+                    room={...pending,status:'finished',claims:{[uid]:true},xpChanges:{[uid]:xp.change}};
+                    root=xp.pet;
+                    delete locks[id];
+                }
+                const patch={attendancePet:root,petBattleLocks:locks,petBotBattle:room};
+                tx.update(ref,patch);return {room,patch};
+            },{maxAttempts:2});
+            if(!mine()||state.uid!==uid)return;
+            state.matches.set(id,result.room);state.own={...state.own,...result.patch};
+            if(action==='start'){state.active=id;state.creating=false;state.botDraft=false;}
+            state.cooldown=0;state.message=action==='claim'?'Đã cập nhật kết quả.':'';
+            if(result.patch.attendancePet){attendancePetData=result.patch.attendancePet;renderAttendancePet();}
+        }catch(error){fail(error);}finally{state.busy=false;render();}
+    }
     async function choose(choice){
         const m=match();if(!m||m.status!=='rps'||state.busy)return;let saved=secret(m.id,m.rpsRound);
         if(!globalThis.crypto?.subtle||typeof crypto.randomUUID!=='function'){fail(new Error('Cần HTTPS hoặc localhost để chơi oẳn tù tì.'));return;}
@@ -9871,33 +10407,45 @@ const PetBattleGame=(()=>{
         try{const hash=await petBattleCommitment(m.id,state.uid,m.rpsRound,saved.choice,saved.nonce);await mutate('commit',{hash,round:m.rpsRound});}catch(error){fail(error);}
     }
     async function process(){
+        if(PET_CLOUD_ENABLED)return;
         if(!mine()||state.busy||Date.now()<state.cooldown)return;
         for(const m of state.matches.values()){
             if(m.status==='rps'&&m.participantUids.every(uid=>m.commits?.[uid])&&!m.reveals?.[state.uid]){
                 const saved=secret(m.id,m.rpsRound);if(saved){const hash=await petBattleCommitment(m.id,state.uid,m.rpsRound,saved.choice,saved.nonce);if(state.busy)return;await mutate('reveal',{...saved,hash,round:m.rpsRound},m.id);return;}
             }
             if(state.own?.petBattleLocks?.[m.id]&&!m.claims?.[state.uid]){
-                if(roomExpired(m)||petBattleClaimAmount(m,state.uid)!==null){await mutate('claim',{},m.id);return;}
+                if(roomExpired(m)||petBattleClaimAmount(m,state.uid)!==null){
+                    if(m.bot)await mutateBot('claim',{},m.id);
+                    else await mutate('claim',{},m.id);
+                    return;
+                }
             }
         }
     }
-    function ensureModels(m){
-        const key=m.id+':'+m.players.map(p=>p.uid+p.petId+p.appearance.level).join('|');if(state.modelKey===key)return;disposeModels();state.modelKey=key;
-        m.players.forEach((player,index)=>{const renderer=createAttendancePet3D(`petBattleModel${index}`,`petBattleArt${index}`,null,'arena');state.models.push(renderer);renderer.start();renderer.update(player.appearance);});
+    function ensureModels(m,guestView){
+        const key=JSON.stringify([m.id,m.players.map(p=>[p.uid,p.petId,p.appearance.level]),guestView&&[guestView.pet.id,guestView.level,guestView.branch]]);
+        if(state.modelKey===key)return;
+        disposeModels();state.modelKey=key;
+        const views=m.players.map(player=>player.appearance);
+        if(guestView)views.push(guestView);
+        views.forEach((view,index)=>{
+            const renderer=createAttendancePet3D(`petBattleModel${index}`,`petBattleArt${index}`,null,'arena');
+            state.models.push(renderer);renderer.start();renderer.update(view);
+        });
     }
     function renderStrike(m,play){
         const stage=el('petBattleRoom').querySelector('.pet-battle-arena');
         stage.querySelector('.pet-battle-skill')?.remove();
         if(!play.last||Date.now()-petBattleTime(m.startedAt)-(m.introMs===5000?5000:2000)-(play.count-1)*PET_BATTLE_STEP_MS>1200)return;
         const attacker=m.players.find(p=>p.uid===play.last.attacker);if(!attacker)return;
-        const kind=attacker.appearance.form.kind,level=attacker.appearance.level,tier=Math.min(3,Math.floor((level-1)/8));
-        const skills={fish:['water','○','Dòng nước'],shark:['fang','⟫','Hàm cá mập'],whale:['wave','≋','Sóng thần'],dino:['fire','✦','Địa chấn'],bird:['wind','❯','Lốc cánh'],beast:['claw','╱','Vuốt mãnh thú']};
-        const [effect,glyph,label]=skills[kind]||skills.fish;
+        const level=attacker.appearance.level,tier=Math.min(3,Math.floor((level-1)/8));
+        const {effect,label,variant}=petBattleSkill(attacker.appearance);
+        const glyph={water:'○',fang:'⟫',wave:'≋',fire:'✦',wind:'❯',claw:'╱'}[effect];
         const fx=document.createElement('div');fx.className=`pet-battle-skill skill-${effect} tier-${tier}`;fx.dataset.direction=play.last.attacker===m.players[0].uid?'right':'left';fx.setAttribute('aria-hidden','true');
         fx.style.setProperty('--power',String(1+tier*.35));
         const element=PET_BATTLE_ELEMENTS.get(attacker.element);
         if(element)fx.style.setProperty('--skill-color',element.color);
-        for(let i=0;i<4+tier*4;i++){const spark=document.createElement('span');spark.textContent=glyph;spark.style.setProperty('--i',String(i));spark.style.setProperty('--y',`${(i%5-2)*18}px`);fx.appendChild(spark);}
+        for(let i=0;i<4+tier*4;i++){const spark=document.createElement('span');spark.textContent=glyph;spark.style.setProperty('--i',String(i));spark.style.setProperty('--y',`${Math.sin(i*2.399+variant)*(28+variant%15)}px`);fx.appendChild(spark);}
         const caption=document.createElement('strong');caption.textContent=`${label} · Cấp ${level}`;fx.appendChild(caption);stage.appendChild(fx);
     }
     function renderStatComparison(players,stats){
@@ -9941,62 +10489,81 @@ const PetBattleGame=(()=>{
     function render(){
         if(!mine()||(!el('petBattleDialog').open&&!el('petBattleLobby').open))return;
         const hidden=dismissed();const matches=[...state.matches.values()].filter(m=>!hidden.includes(m.id)).sort((a,b)=>b.createdMs-a.createdMs),listKey=JSON.stringify(matches.map(m=>[m.id,m.status]));
-        if(state.listKey!==listKey){state.listKey=listKey;el('petBattleMatches').replaceChildren(new Option('Chọn phòng đấu',''),...matches.map(m=>new Option(`${m.players[0].name} ↔ ${m.players[1]?.name||m.opponentUid} · ${{invited:'Lời mời',ready:'Chờ sẵn sàng',rps:'Oẳn tù tì',fighting:'Đang đấu',finished:'Kết thúc',cancelled:'Đã hủy',rejected:'Từ chối',expired:'Hết hạn'}[m.status]}`,m.id)));}
+        if(state.listKey!==listKey){
+            state.listKey=listKey;
+            const options=[new Option('Chọn phòng đấu','')];
+            if(!PET_CLOUD_ENABLED)options.push(new Option('Đánh Bot','bot:new'));
+            options.push(...matches.map(m=>new Option(`${m.players[0].name} ↔ ${m.players[1]?.name||m.opponentUid} · ${{invited:'Lời mời',ready:'Chờ sẵn sàng',rps:'Oẳn tù tì',fighting:'Đang đấu',finished:'Kết thúc',cancelled:'Đã hủy',rejected:'Từ chối',expired:'Hết hạn'}[m.status]}`,m.id)));
+            el('petBattleMatches').replaceChildren(...options);
+        }
         el('petBattleMatches').value='';
         if(!el('petBattleDialog').open)return;
         el('petBattleStatus').textContent=state.message;el('petBattleDialog').setAttribute('aria-busy',String(state.busy));
         const m=match(),incoming=m?.status==='invited'&&m.opponentUid===state.uid&&m.expiresAt>Date.now();
         const draft=!m&&state.creating;
+        if(!draft&&state.draftModel)stopDraftModel();
         el('petBattleSetup').hidden=!draft&&!incoming;el('petBattleRoom').hidden=!m;el('petBattleAccept').hidden=!incoming;el('petBattleReject').hidden=!incoming;
         el('petBattleDraftSlots').hidden=!draft;
+        el('petBattleAddOpponent').hidden=!!state.botDraft;
+        el('petBattleBotSlot').hidden=!draft||!state.botDraft;
         el('petBattleStake').closest('label').hidden=!m&&!state.creating;
-        el('petBattleElement').closest('label').hidden=!incoming&&!state.creating;
-        el('petBattleElement').disabled=state.busy;
-        el('petBattleElementHint').hidden=!incoming&&!state.creating;
+        el('petBattleCycleGuest').hidden=!incoming;
         el('petBattleCancel').hidden=!(m?.status==='invited'&&m.challengerUid===state.uid);
         const terminal=!!m&&(['finished','cancelled','rejected','expired'].includes(m.status)||petBattlePlayback(m).finished);
-        const awaitingClaim=!!m&&!m.claims?.[state.uid]&&!!state.own?.petBattleLocks?.[m.id];
+        const awaitingClaim=!!m&&!m.claims?.[state.uid]&&(PET_CLOUD_ENABLED
+            ?m.players.some(p=>p.uid===state.uid)&&!m.settledAt
+            :!!state.own?.petBattleLocks?.[m.id]);
         el('petBattleFinish').hidden=!terminal;el('petBattleFinish').disabled=state.busy||awaitingClaim;
-        el('petBattleClaim').hidden=!awaitingClaim||!(petBattleClaimAmount(m,state.uid)!==null||roomExpired(m));
+        const endDelay=PET_CLOUD_ENABLED&&m?.status==='fighting'
+            ?Date.now()-petBattleTime(m.startedAt)-2000-m.turns.length*PET_BATTLE_STEP_MS:Infinity;
+        el('petBattleClaim').hidden=!awaitingClaim||endDelay<15000||!(petBattleClaimAmount(m,state.uid)!==null||roomExpired(m));
         if(draft||incoming)setup(m);
         el('petBattleAddOpponent').disabled=state.busy||!el('petBattlePet').value;
         el('petBattleSetup').querySelectorAll('button').forEach(button=>button.disabled=state.busy);
-        if(!m){disposeModels();return;}
+        if(draft||incoming)syncDraftControls();
+        if(!m){disposeModels();if(!state.botDraft||!state.bot)renderStatComparison([],[]);return;}
         const effectiveStats=m.players.map((p,i)=>petBattleEffectiveStats(p,m.players[1-i]));
         renderStatComparison(m.players,effectiveStats);
-        ensureModels(m);const play=petBattlePlayback(m),full=m.maxHp?.length?m.maxHp:effectiveStats.map(petBattleMaxHp),hp=play.hp.length?play.hp:full;
+        const guestPetId=incoming&&el('petBattlePet').value;
+        const guestView=guestPetId?attendancePetView(attendancePetSelected(attendancePetData,guestPetId)):null;
+        ensureModels(m,guestView);const play=petBattlePlayback(m),full=m.maxHp?.length?m.maxHp:effectiveStats.map(petBattleMaxHp),hp=play.hp.length?play.hp:full;
         const ready=m.status==='ready';
         el('petBattleReadyPanel').hidden=!ready;
         if(ready){
             const remaining=Math.max(0,Math.ceil((m.readyDeadline-Date.now())/1000));
             el('petBattlePhase').textContent=`Chờ sẵn sàng · ${remaining}s`;
-            [...el('petBattleReadyStatuses').children].forEach((badge,i)=>{
-                const player=m.players[i],isReady=!!m.ready?.[player.uid];
-                const label=`${player.name} · ${isReady?'Đã sẵn sàng':'Chưa sẵn sàng'}`;
-                if(badge.textContent!==label)badge.textContent=label;
-                badge.classList.toggle('is-ready',isReady);
-            });
-            el('petBattleReady').disabled=state.busy||!!m.ready?.[state.uid]||remaining===0;
-            el('petBattleReady').textContent=m.ready?.[state.uid]?'Đang chờ đối thủ':'Sẵn sàng';
+            const isReady=!!m.ready?.[state.uid];
+            el('petBattleReady').hidden=isReady||remaining===0;
+            el('petBattleReady').disabled=state.busy;
+            el('petBattleReadyWaiting').hidden=!isReady||remaining===0;
         }else{
             el('petBattlePhase').textContent={invited:'Đang chờ đối thủ chấp nhận',rps:`Oẳn tù tì · Vòng ${m.rpsRound+1}`,fighting:play.finished?'Trận đấu đã kết thúc':play.count?`Lượt ${play.count}/${m.turns.length}`:'Chuẩn bị giao đấu…',finished:'Trận đấu đã kết thúc',cancelled:'Lời mời đã hủy',rejected:'Đối thủ đã từ chối',expired:'Hết thời gian'}[m.status];
         }
         el('petBattlePot').textContent=`Mỗi bên ${petWeightLabel(m.stakeGrams)} · Quỹ ${petWeightLabel(m.stakeGrams*2)}`;
         for(let i=0;i<2;i++){
-            const p=m.players[i],element=PET_BATTLE_ELEMENTS.get(p?.element);
+            const p=m.players[i],guest=i===1?guestView:null;
+            const elementKey=p?.element||(guest?el('petBattleElement').value:'');
+            const element=PET_BATTLE_ELEMENTS.get(elementKey);
             const bonus=p&&petBattleReceivesBonus(p,m.players[1-i])?' · Tương sinh +1%':'';
-            const model=el(`petBattleModel${i}`);
-            model.classList.toggle('has-element-aura',!!element);
-            if(element)model.style.setProperty('--pet-battle-element-color',element.color);
-            else model.style.removeProperty('--pet-battle-element-color');
-            el(`petBattleName${i}`).textContent=p?`${p.petName} · ${p.name}`:'Chờ đối thủ vào phòng';
-            el(`petBattleStats${i}`).textContent=p?`Cấp ${p.appearance.level}${element?` · ${element.label}`:''}${bonus}`:'';
+            setElementAura(el(`petBattleModel${i}`),elementKey);
+            el(`petBattleName${i}`).textContent=p?`${p.petName} · ${p.name}`:guest?.displayName||'Chờ đối thủ vào phòng';
+            const view=p?.appearance||guest;
+            el(`petBattleStats${i}`).textContent=view?`Cấp ${view.level}${element?` · ${element.label}`:''}${bonus}`:'';
+            const badge=el(`petBattleReady${i}`),isReady=!!m.ready?.[p?.uid];
+            badge.hidden=!ready||!p;
+            badge.classList.toggle('is-ready',isReady);
+            const label=isReady?'Đã sẵn sàng':'Chưa sẵn sàng';
+            if(badge.textContent!==label)badge.textContent=label;
             el(`petBattleHp${i}`).max=full[i]||100;el(`petBattleHp${i}`).value=hp[i]??full[i]??100;el(`petBattleHpText${i}`).textContent=p?`${hp[i]??full[i]} / ${full[i]} HP`:'';
             el(`petBattleHp${i}`).hidden=!p;
             const at=petBattleTime(m.startedAt)+(m.introMs===5000?5000:2000)+(play.count-1)*PET_BATTLE_STEP_MS,attacking=!!p&&!!play.last&&play.last.attacker===p.uid,hit=!!p&&!!play.last&&play.last.defender===p.uid;
-            state.models[i]?.duelPose({facing:i?Math.PI:0,attackAt:attacking?at:0,hitAt:hit?at+300:0,defeated:(hp[i]??1)<=0,kind:p?.appearance.form.kind,level:p?.appearance.level});
+            state.models[i]?.duelPose({facing:i?Math.PI:0,attackAt:attacking?at:0,hitAt:hit?at+300:0,defeated:(hp[i]??1)<=0,
+                kind:p?.appearance.form.kind,level:p?.appearance.level,skill:attacking?petBattleSkill(p.appearance):null,
+                skillColor:element?.color||p?.appearance.form.color});
             el(`petBattleSide${i}`).classList.toggle('is-attacking',!!attacking&&Date.now()-at<1000);el(`petBattleSide${i}`).classList.toggle('is-hit',!!hit&&Date.now()-at<1000);
-            el(`petBattleDamage${i}`).textContent=hit&&play.last?.dodged?'Né!':hit&&Number.isFinite(play.last?.damage)?`${play.last.critical?'Chí mạng! ':''}−${play.last?.damage}`:'';
+            const damage=el(`petBattleDamage${i}`),dodged=hit&&play.last?.dodged,critical=hit&&!dodged&&play.last?.critical;
+            damage.textContent=dodged?'NÉ ĐÒN':hit&&Number.isFinite(play.last?.damage)?`${critical?'CHÍ MẠNG · ':''}−${play.last.damage}`:'';
+            damage.classList.toggle('is-dodged',!!dodged);damage.classList.toggle('is-critical',!!critical);
         }
         el('petBattleRps').hidden=m.status!=='rps';el('petBattleRpsStatus').textContent=m.commits?.[state.uid]?'Đã khóa lựa chọn. Chờ cả hai bên để mở kết quả.':m.rpsRound?'Vừa hòa. Cả hai cùng chọn lại.':'Lựa chọn được giữ kín đến khi cả hai đã chọn.';
         el('petBattleRps').querySelectorAll('button').forEach(button=>button.disabled=state.busy||!!m.commits?.[state.uid]);
@@ -10029,8 +10596,8 @@ const PetBattleGame=(()=>{
         const dialog=el('petBattleDialog');if(!dialog||dialog.dataset.ready)return;dialog.dataset.ready='true';
         el('petBattleOpen').addEventListener('click',openLobby);
         el('petBattleLobbyClose').addEventListener('click',()=>el('petBattleLobby').close());
-        el('petBattleClose').addEventListener('click',()=>{disposeModels();dialog.close();openLobby();});
-        dialog.addEventListener('close',()=>{if(!dialog.open)disposeModels();});
+        el('petBattleClose').addEventListener('click',()=>{disposeModels();stopDraftModel();dialog.close();openLobby();});
+        dialog.addEventListener('close',()=>{if(!dialog.open){disposeModels();stopDraftModel();}});
         el('petBattleFinish').addEventListener('click',()=>{
             const m=match();
             if(m&&(m.status==='finished'||petBattlePlayback(m).finished))el('petBattleExitDialog').showModal();
@@ -10038,23 +10605,51 @@ const PetBattleGame=(()=>{
         });
         el('petBattleStay').addEventListener('click',()=>el('petBattleExitDialog').close());
         el('petBattleExitConfirm').addEventListener('click',finishRoom);
-        el('petBattleNew').addEventListener('click',()=>open());el('petBattleMatches').addEventListener('change',event=>{if(event.target.value)open(event.target.value);});
+        el('petBattleNew').addEventListener('click',()=>open());
+        el('petBattleMatches').addEventListener('change',event=>{
+            const id=event.target.value;
+            if(id==='bot:new'&&!PET_CLOUD_ENABLED)open('',true);
+            else if(id)open(id);
+        });
         el('petBattleAddOpponent').addEventListener('click',()=>el('petBattleInvitePicker').showModal());
         el('petBattleInvitePickerClose').addEventListener('click',()=>el('petBattleInvitePicker').close());
         el('petBattleReady').addEventListener('click',()=>mutate('ready'));
-        el('petBattleViewInvite').addEventListener('click',event=>open(event.currentTarget.dataset.matchId));el('petBattlePet').addEventListener('change',loadStatsDraft);el('petBattleBalanceStats').addEventListener('click',()=>{balanceStats();saveStatsDraft();});
-        Object.values(statInputs).forEach(id=>el(id).addEventListener('input',()=>{renderDraft();saveStatsDraft();}));
-        const payload=()=>({petId:el('petBattlePet').value,stats:draftStats(),element:el('petBattleElement').value,opponentUid:el('petBattleOpponent').value,stakeGrams:Math.round(Number(el('petBattleStake').value)*1000)});
-        el('petBattleCreate').addEventListener('click',()=>{
-            const draft=payload();
-            if(!draft.opponentUid){el('petBattleOpponent').focus();return;}
-            el('petBattleInvitePicker').close();
-            mutate('create',{...draft,roomFlow:true});
+        el('petBattleViewInvite').addEventListener('click',event=>open(event.currentTarget.dataset.matchId));
+        el('petBattlePet').addEventListener('change',()=>{loadStatsDraft();render();});
+        el('petBattleCycleHost').addEventListener('click',cyclePet);
+        el('petBattleCycleGuest').addEventListener('click',cyclePet);
+        el('petBattleBalanceStats').addEventListener('click',()=>{balanceStats();saveStatsDraft();});
+        for(const button of el('petBattleSetup').querySelectorAll('[data-battle-element]')){
+            const key=button.dataset.battleElement;
+            button.style.setProperty('--element-color',PET_BATTLE_ELEMENTS.get(key).color);
+            button.addEventListener('click',()=>{
+                const input=el('petBattleElement');input.value=key;
+                input.dispatchEvent(new Event('change'));
+            });
+        }
+        el('petBattleElement').addEventListener('change',()=>{
+            if(match()){syncDraftControls();render();}
+            else renderDraft();
         });
-        el('petBattleAccept').addEventListener('click',()=>mutate('accept',payload()));el('petBattleReject').addEventListener('click',()=>mutate('reject'));el('petBattleCancel').addEventListener('click',()=>mutate('cancel'));el('petBattleClaim').addEventListener('click',()=>mutate('claim'));
+        Object.values(statInputs).forEach(id=>el(id).addEventListener('input',()=>{renderDraft();saveStatsDraft();}));
+        const payload=()=>({petId:el('petBattlePet').value,stats:draftStats(),element:el('petBattleElement').value,stakeGrams:Math.round(Number(el('petBattleStake').value)*1000)});
+        el('petBattleOpponentList').addEventListener('click',event=>{
+            const button=event.target.closest('[data-invite-uid]');
+            if(!button||button.disabled)return;
+            if(!el('petBattlePet').value||!state.draftPointsValid||!PET_BATTLE_ELEMENTS.has(el('petBattleElement').value)){
+                el('petBattleInviteHint').hidden=false;el('petBattleInviteHint').classList.add('invalid');return;
+            }
+            const previous=state.active;
+            mutate('create',{...payload(),opponentUid:button.dataset.inviteUid,roomFlow:true}).then(()=>{
+                if(state.active!==previous&&el('petBattleInvitePicker').open)el('petBattleInvitePicker').close();
+            });
+        });
+        el('petBattleBotStart').addEventListener('click',()=>mutateBot('start',payload()));
+        el('petBattleAccept').addEventListener('click',()=>mutate('accept',payload()));el('petBattleReject').addEventListener('click',()=>mutate('reject'));el('petBattleCancel').addEventListener('click',()=>mutate('cancel'));
+        el('petBattleClaim').addEventListener('click',()=>match()?.bot?mutateBot('claim'):mutate('claim'));
         dialog.querySelectorAll('[data-pet-rps]').forEach(button=>button.addEventListener('click',()=>choose(button.dataset.petRps)));el('petBattleRetry').addEventListener('click',()=>{
             try{assertPetQuotaAvailable();}catch(error){fail(error);return;}
-            state.cooldown=0;state.failedSubs.clear();state.message='';el('petBattleRetry').hidden=true;sync();process();
+            state.cooldown=0;state.failedSubs.clear();state.inviteFailed=false;state.message='';el('petBattleRetry').hidden=true;sync();process();
         });
     }
     return {init,start,stop,sync,profile,open};

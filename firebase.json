@@ -1,0 +1,12 @@
+{
+  "functions": {
+    "source": ".",
+    "codebase": "workpic-pets",
+    "runtime": "nodejs22",
+    "ignore": [
+      ".git", ".agents", ".codex", ".aws", ".firebase", "node_modules",
+      "dist", ".artifacts", "*.log", "*.html", "*.css", "*.md",
+      "*.ps1", "*.pyw", "tools.mjs", "sw.js", "firebase.json"
+    ]
+  }
+}

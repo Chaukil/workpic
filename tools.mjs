@@ -50,8 +50,8 @@ console.log(`Deploy dist/: index.html (${((await stat('dist/index.html')).size /
 
     "test": async () => {
 const helperSource = fs.readFileSync('app.js', 'utf8').split('// BEGIN SHARED HELPERS\n')[1].split('// END SHARED HELPERS')[0];
-const helperModule = helperSource + '\nexport { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater, attendancePetDay, newAttendancePet, attendancePetView, transitionAttendancePet, adjustAdminPet, attendancePetMotion, attendancePetTravelBounds, attendancePetCatalog, attendancePetScale, ATTENDANCE_PET_BRANCHES, normalizePetNickname, attendancePetRecords, attendancePetSelected, attendancePetHouseholdDay, transitionPetHousehold, attendancePetWeight, settleAttendancePetWeight, attendancePetActivityTime, buildPetComparison, unchangedPetAdminAction, petBattleBudget, petBattleStats, petBattleRps, petBattleSimulation, petBattlePlayback, petBattleChangeWeight, petBattleFighter, petBattleClaimAmount, petBattleSettleXp, petBattleCommitment };';
-const { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater, attendancePetDay, newAttendancePet, attendancePetView, transitionAttendancePet, adjustAdminPet, attendancePetMotion, attendancePetTravelBounds, attendancePetCatalog, attendancePetScale, ATTENDANCE_PET_BRANCHES, normalizePetNickname, attendancePetRecords, attendancePetSelected, attendancePetHouseholdDay, transitionPetHousehold, attendancePetWeight, settleAttendancePetWeight, attendancePetActivityTime, buildPetComparison, unchangedPetAdminAction, petBattleBudget, petBattleStats, petBattleRps, petBattleSimulation, petBattlePlayback, petBattleChangeWeight, petBattleFighter, petBattleClaimAmount, petBattleSettleXp, petBattleCommitment } = await import('data:text/javascript;base64,' + Buffer.from(helperModule).toString('base64'));
+const helperModule = helperSource + '\nexport { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater, attendancePetDay, newAttendancePet, attendancePetView, transitionAttendancePet, adjustAdminPet, attendancePetMotion, attendancePetTravelBounds, attendancePetCatalog, attendancePetScale, ATTENDANCE_PET_BRANCHES, normalizePetNickname, attendancePetRecords, attendancePetSelected, attendancePetHouseholdDay, transitionPetHousehold, attendancePetWeight, attendancePetActivityTime, buildPetComparison, unchangedPetAdminAction, petBattleBudget, petBattleStats, petBattleRps, petBattleSimulation, petBattlePlayback, petBattleChangeWeight, petBattleFighter, petBattleClaimAmount, petBattleSettleXp, petBattleCompletePet, makePetBattleBot, petBattleSkill, petBattleCommitment };';
+const { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater, attendancePetDay, newAttendancePet, attendancePetView, transitionAttendancePet, adjustAdminPet, attendancePetMotion, attendancePetTravelBounds, attendancePetCatalog, attendancePetScale, ATTENDANCE_PET_BRANCHES, normalizePetNickname, attendancePetRecords, attendancePetSelected, attendancePetHouseholdDay, transitionPetHousehold, attendancePetWeight, attendancePetActivityTime, buildPetComparison, unchangedPetAdminAction, petBattleBudget, petBattleStats, petBattleRps, petBattleSimulation, petBattlePlayback, petBattleChangeWeight, petBattleFighter, petBattleClaimAmount, petBattleSettleXp, petBattleCompletePet, makePetBattleBot, petBattleSkill, petBattleCommitment } = await import('data:text/javascript;base64,' + Buffer.from(helperModule).toString('base64'));
 
 
 
@@ -819,11 +819,12 @@ test('pet startup reuses login profile, creates only missing pets and never writ
  const source=fs.readFileSync('app.js','utf8');
  const code=source.slice(source.indexOf('async function startAttendancePet()'),source.indexOf('function stopAttendancePet()'));
  const now=Date.now(),elements=new Map();let state={uid:'me',attendancePet:newAttendancePet(now)},transactions=0,writes=0,tick,extraListeners=0;
- const context={currentUser:{uid:'me'},attendancePetStarting:false,attendancePetGeneration:0,attendancePetReady:false,
+ const context={PET_CLOUD_ENABLED:false,currentUser:{uid:'me'},attendancePetStarting:false,attendancePetGeneration:0,attendancePetReady:false,
   authenticatedProfileSnapshot:{id:'me',ref:{id:'me'},data:()=>state},usersDirectorySnapshot:null,db:{},Date,transitionAttendancePet,transitionPetHousehold,
   document:{getElementById:id=>{if(!elements.has(id))elements.set(id,{});return elements.get(id);}},
   stopAttendancePet:()=>{context.attendancePetGeneration++;},assertPetQuotaAvailable:()=>{},loadAttendancePetVisibility:()=>true,PetBattleGame:{start(){},profile(){}},
   getDocs:()=>assert.fail('Existing login profile must not be queried again'),
+  doc:(_,collection,id)=>({collection,id}),getDoc:async()=>({exists:()=>false}),
   runTransaction:async (_,callback,options)=>{transactions++;assert.equal(options.maxAttempts,2);return callback({get:async()=>({exists:()=>true,data:()=>state}),update:(_,patch)=>{state={...state,...patch};writes++;}});},
   watchAttendancePetProfile:()=>{extraListeners++;},AttendancePet3D:{start:()=>{}},checkPetHungerNotifications:()=>{},renderAttendancePet:()=>{},setInterval:fn=>{tick=fn;return 1;},petQuotaErrorText:()=>''
  };
@@ -834,6 +835,28 @@ test('pet startup reuses login profile, creates only missing pets and never writ
  context.usersDirectorySnapshot={docs:[context.authenticatedProfileSnapshot]};
  const before=extraListeners;
  await context.startAttendancePet();assert.equal(transactions,1);assert.equal(writes,1);assert.equal(extraListeners,before);
+});
+
+test('cloud startup reuses the profile listener and migrates only after a server-confirmed miss', async()=>{
+ const source=fs.readFileSync('app.js','utf8');
+ let deliver,calls=0,unsubscribes=0;
+ const profile={uid:'me',attendancePet:newAttendancePet(Date.now())};
+ const context={attendancePetGeneration:1,attendancePetRef:null,attendancePetUnsubscribe:null,db:{},
+  doc:(_,name,uid)=>({name,uid}),onSnapshot:(ref,options,callback)=>{
+   assert.equal(ref.name,'petProfiles');assert.equal(ref.uid,'me');assert.equal(options.includeMetadataChanges,true);
+   deliver=callback;return ()=>unsubscribes++;
+  },petCloudRequest:async kind=>{assert.equal(kind,'open');calls++;return profile;}};
+ vm.createContext(context);
+ vm.runInContext(source.slice(source.indexOf('function openCloudAttendancePet('),source.indexOf('async function startAttendancePet()')),context);
+ const snapshot=(exists,fromCache=false)=>({exists:()=>exists,data:()=>profile,metadata:{fromCache}});
+ let pending=context.openCloudAttendancePet('me',1);
+ deliver(snapshot(true));assert.equal(await pending,profile);assert.equal(calls,0);
+ context.attendancePetUnsubscribe();
+ pending=context.openCloudAttendancePet('me',1);
+ deliver(snapshot(false,true));assert.equal(calls,0);
+ deliver(snapshot(false));deliver(snapshot(false));assert.equal(await pending,profile);assert.equal(calls,1);
+ context.attendancePetUnsubscribe();
+ assert.equal(unsubscribes,2);
 });
 
 test('hungry pets send desktop reminders once per feeding cycle, survive refresh and retry failures', async()=>{
@@ -876,26 +899,34 @@ test('four evolution branches unlock at ray level and preserve progress through 
  assert.equal(attendancePetView(pet,now).needsBranch,true);
  assert.equal(transitionAttendancePet({...pet,checkins:79},'branch:fish',now).result,'branch-locked');
  for(const branch of Object.keys(ATTENDANCE_PET_BRANCHES)){
-  assert.equal(ATTENDANCE_PET_BRANCHES[branch].forms.length,20);
-  assert.equal(new Set(ATTENDANCE_PET_BRANCHES[branch].forms.map(f=>f.name)).size,20);
-  assert.equal(attendancePetCatalog(branch).length,29);
+  assert.equal(ATTENDANCE_PET_BRANCHES[branch].forms.length,21);
+  assert.equal(new Set(ATTENDANCE_PET_BRANCHES[branch].forms.map(f=>f.name)).size,21);
+  assert.equal(attendancePetCatalog(branch).length,30);
   const stages=ATTENDANCE_PET_BRANCHES[branch].forms;
   for(let i=1;i<stages.length;i++)assert.ok(stages[i].scale>stages[i-1].scale,'each evolution grows larger');
-  for(let i=0;i<stages.length;i+=2){assert.equal(stages[i].juvenile,true);assert.equal(stages[i+1].juvenile,false);}
+  for(let i=0;i+1<stages.length;i+=2){assert.equal(stages[i].juvenile,true);assert.equal(stages[i+1].juvenile,false);}
 
   const change=transitionAttendancePet(pet,'branch:'+branch,now);
   assert.equal(change.pet.checkins,80);assert.equal(change.pet.branch,branch);
   assert.equal(attendancePetView(JSON.parse(JSON.stringify(change.pet)),now).branch,branch);
-  const first=attendancePetView({...change.pet,checkins:90},now),last=attendancePetView({...change.pet,checkins:280},now);
-  assert.equal(first.branchLevel,1);assert.equal(last.branchLevel,20);assert.equal(last.maxed,true);
+  const first=attendancePetView({...change.pet,checkins:90},now),last=attendancePetView({...change.pet,checkins:290},now);
+  assert.equal(first.branchLevel,1);assert.equal(last.branchLevel,21);assert.equal(last.maxed,true);
   const previousCap=attendancePetView({...change.pet,checkins:180},now);
   assert.equal(previousCap.level,19);assert.equal(previousCap.maxed,false,'old capped pets can continue growing without rewriting progress');
   assert.equal(attendancePetView(adjustAdminPet(change.pet,'level',29,now),now).branchLevel,20);
-  assert.throws(()=>adjustAdminPet(change.pet,'level',30,now));
+  assert.equal(attendancePetView(adjustAdminPet(change.pet,'level',30,now),now).level,30);
 
-  assert.equal(attendancePetView({...change.pet,checkins:999},now).level,29);
+  assert.equal(attendancePetView({...change.pet,checkins:999},now).level,30);
   const switched=transitionAttendancePet({...change.pet,checkins:120},'branch:'+(branch==='bird'?'beast':'bird'),now);
   assert.equal(switched.pet.checkins,120);assert.equal(attendancePetView(switched.pet,now).branchLevel,4);
+ }
+ const moves=new Set();
+ const common=attendancePetCatalog(null).map((form,index)=>({form,level:index+1}));
+ const branchMoves=Object.entries(ATTENDANCE_PET_BRANCHES).flatMap(([branch,data])=>data.forms.map((form,index)=>({form,level:10+index,branch})));
+ for(const appearance of [...common,...branchMoves]){
+  const label=petBattleSkill(appearance).label;
+  assert.ok(!moves.has(label),'each evolution has its own attack name');
+  moves.add(label);
  }
  const old={...pet,checkins:220};assert.equal(attendancePetView(old,now).level,9);assert.equal(old.checkins,220);
  assert.equal(attendancePetView(transitionAttendancePet(old,'branch:dino',now).pet,now).level,23);
@@ -926,7 +957,7 @@ test('pet motion respects species, floor, sky and small viewport bounds', () => 
 });
 
 test('battle stats, RPS and automatic turn timeline are deterministic for both viewers', async () => {
- assert.equal(petBattleBudget(1),100);assert.equal(petBattleBudget(9),108);assert.equal(petBattleBudget(29),128);
+ assert.equal(petBattleBudget(1),100);assert.equal(petBattleBudget(9),108);assert.equal(petBattleBudget(10),110);assert.equal(petBattleBudget(29),148);assert.equal(petBattleBudget(30),150);
  assert.throws(()=>petBattleStats({attack:100,defense:0,health:0},1));assert.throws(()=>petBattleStats({attack:34,defense:33,health:34},1));
  const players=[{uid:'a',stats:{attack:60,defense:20,health:20},appearance:{level:1}},{uid:'b',stats:{attack:20,defense:20,health:60},appearance:{level:1}}];
  assert.equal(petBattleRps('rock','scissors'),0);assert.equal(petBattleRps('paper','scissors'),1);assert.equal(petBattleRps('rock','rock'),null);
@@ -967,16 +998,16 @@ test('two-client battle escrow, hidden RPS, automatic fight, payout and refunds 
  let clock=Date.UTC(2026,10,20),writes=0,reads=0;const profiles=new Map(),battles=new Map(),nodes=new Map();
  for(const uid of ['a','b'])profiles.set(uid,{uid,displayName:uid,attendancePet:{...newAttendancePet(clock-7200000),weightGrams:1000,feedingXp:uid==='b'?1:0,lastCheckinAt:clock,lastCheckinDay:attendancePetDay(clock)}});
  class Clock extends Date{constructor(...args){super(...(args.length?args:[clock]));}static now(){return clock;}}
- const context={Date:Clock,Math,Map,Set,Number,Object,Array,JSON,Promise,Infinity,crypto:globalThis.crypto,TextEncoder,PET_BATTLE_STEP_MS:1800,
+ const context={PET_CLOUD_ENABLED:false,Date:Clock,Math,Map,Set,Number,Object,Array,JSON,Promise,Infinity,crypto:globalThis.crypto,TextEncoder,PET_BATTLE_STEP_MS:1800,
   db:{},currentUser:{uid:'a'},attendancePetRef:{collection:'users',id:'a'},authenticatedProfileSnapshot:null,attendancePetData:profiles.get('a').attendancePet,
   document:{getElementById:id=>{if(!nodes.has(id))nodes.set(id,{open:false,hidden:true,textContent:'',dataset:{},close(){this.open=false;}});return nodes.get(id);}},
   usersDirectorySnapshot:{docs:['a','b'].map(id=>({id,data:()=>structuredClone(profiles.get(id))}))},
   doc:(_,collection,id)=>({collection,id}),onSnapshot:()=>()=>{},serverTimestamp:()=>clock,assertPetQuotaAvailable(){},petQuotaErrorText:()=>'',renderAttendancePet(){},setInterval:()=>1,clearInterval(){},
-  attendancePetRecords,attendancePetSelected,attendancePetView,petWeightLabel:g=>g/1000+' kg',petBattleBudget,petBattleStats,petBattleRps,petBattleSimulation,petBattlePlayback,petBattleTime:v=>Number(v)||0,petBattleChangeWeight,petBattleFighter,petBattleClaimAmount,petBattleSettleXp,petBattleCommitment,
+  attendancePetRecords,attendancePetSelected,attendancePetView,petWeightLabel:g=>g/1000+' kg',petBattleBudget,petBattleStats,petBattleRps,petBattleSimulation,petBattlePlayback,petBattleTime:v=>Number(v)||0,petBattleChangeWeight,petBattleFighter,petBattleClaimAmount,petBattleSettleXp,petBattleCompletePet,makePetBattleBot,petBattleCommitment,
   runTransaction:async(_,callback)=>{const pending=[];const tx={get:async ref=>{reads++;const data=(ref.collection==='users'?profiles:battles).get(ref.id);return {exists:()=>!!data,data:()=>structuredClone(data)};},set:(ref,data)=>pending.push({ref,data,merge:false}),update:(ref,data)=>pending.push({ref,data,merge:true})};const result=await callback(tx);for(const p of pending){const store=p.ref.collection==='users'?profiles:battles;store.set(p.ref.id,p.merge?{...store.get(p.ref.id),...structuredClone(p.data)}:structuredClone(p.data));writes++;}return result;}
  };
  const source=fs.readFileSync('app.js','utf8');let code=source.slice(source.indexOf('const PetBattleGame='),source.indexOf('let sharedNotesUnsubscribe ='));
- code=code.replace('return {init,start,stop,sync,profile,open};','return {init,start,stop,sync,profile,open,mutate,inspect:()=>state};');
+ code=code.replace('return {init,start,stop,sync,profile,open};','return {init,start,stop,sync,profile,open,mutate,mutateBot,inspect:()=>state};');
  vm.createContext(context);vm.runInContext(code+';globalThis.game=PetBattleGame;',context);const game=context.game;
  const use=(uid,id='')=>{context.currentUser={uid};context.attendancePetRef={collection:'users',id:uid};context.attendancePetData=profiles.get(uid).attendancePet;const st=game.inspect();st.uid=uid;st.own=structuredClone(profiles.get(uid));st.active=id;st.cooldown=0;};
  const statsA={attack:60,defense:20,health:20},statsB={attack:20,defense:20,health:60};
@@ -996,7 +1027,7 @@ test('two-client battle escrow, hidden RPS, automatic fight, payout and refunds 
  const writesDuringFight=writes;clock+=5000+m.turns.length*1800+1;assert.equal(writes,writesDuringFight,'no writes occur per automatic turn');
  use('a',id);await game.mutate('claim');assert.equal(attendancePetView(profiles.get('a').attendancePet,clock).weightGrams,1200);
  const auraUntil=profiles.get('a').attendancePet.victoryAuraUntil;
- assert.equal(auraUntil,m.startedAt+5000+m.turns.length*1800+3600000,'aura expires one hour from combat end, not claim or refresh');
+ assert.equal(auraUntil,m.startedAt+5000+m.turns.length*1800+10800000,'aura expires three hours from combat end, not claim or refresh');
  const claimed=writes;await game.mutate('claim');assert.equal(writes,claimed,'refresh/double claim cannot pay twice');
  assert.equal(profiles.get('a').attendancePet.victoryAuraUntil,auraUntil,'repeat claim never extends aura');
  use('b',id);await game.mutate('claim');assert.equal(attendancePetView(profiles.get('b').attendancePet,clock).weightGrams,800);
@@ -1019,7 +1050,7 @@ test('two-client battle escrow, hidden RPS, automatic fight, payout and refunds 
  assert.equal(attendancePetView(demoted,clock).xp,9);
  assert.equal(attendancePetView(demoted,clock).level,1);
  assert.equal(profiles.get('b').attendancePet.victoryAuraUntil,undefined,'loser does not receive victory aura');
- assert.equal(profiles.get('b').attendancePet.defeatAuraUntil,auraUntil,'defeat aura expires one hour after combat ends');
+ assert.equal(profiles.get('b').attendancePet.defeatAuraUntil,auraUntil,'defeat aura expires three hours after combat ends');
  assert.equal(profiles.get('b').attendancePet.defeatOpponentName,'a');
  assert.equal(attendancePetView(profiles.get('a').attendancePet,clock).weightGrams+attendancePetView(profiles.get('b').attendancePet,clock).weightGrams,2000,'kg is conserved');
  for(const uid of ['a','b'])assert.equal(Object.keys(profiles.get(uid).petBattleLocks).length,0);
@@ -1063,6 +1094,101 @@ test('two-client battle escrow, hidden RPS, automatic fight, payout and refunds 
  await game.mutate('claim');use('b',waiting);await game.mutate('claim');
  assert.equal(battles.get(waiting).status,'expired');
  assert.deepEqual(['a','b'].map(uid=>attendancePetView(profiles.get(uid).attendancePet,clock).weightGrams),priorWeights);
+ use('a');game.inspect().bot=makePetBattleBot(1);
+ const bot=game.inspect().bot,weightBeforeBot=profiles.get('a').attendancePet.weightGrams;
+ const historyBeforeBot=profiles.get('a').attendancePet.battleHistory?.length||0;
+ const xpBeforeBot=attendancePetView(profiles.get('a').attendancePet,clock).xp;
+ await game.mutateBot('start',{...payload('a',statsA),element:'fire'});
+ const botMatch=profiles.get('a').petBotBattle;assert.deepEqual(botMatch.players[1],bot);
+ assert.equal(profiles.get('a').attendancePet.weightGrams,weightBeforeBot-200);
+ const claimBeforeBotEnd=writes;await game.mutateBot('claim');assert.equal(writes,claimBeforeBotEnd);
+ clock+=2000+botMatch.turns.length*1800+1;
+ await game.mutateBot('claim');
+ const afterBot=profiles.get('a').attendancePet;
+ const expectedWeight=botMatch.winnerUid?(botMatch.winnerUid==='a'?200:-200):0;
+ assert.equal(afterBot.weightGrams,weightBeforeBot+expectedWeight);
+ assert.equal(afterBot.battleHistory?.length||0,historyBeforeBot,'Bot does not add a challenge history entry');
+ const xpAfterBot=attendancePetView(afterBot,clock).xp;
+ assert.equal(xpAfterBot,Math.max(0,xpBeforeBot+Math.sign(expectedWeight)));
+ const settledBotWrites=writes;await game.mutateBot('claim');assert.equal(writes,settledBotWrites);
+});
+
+test('cloud pets migrate once and the server settles both profiles once without connected players', async () => {
+ const source=fs.readFileSync('pet-cloud.mjs','utf8');
+ const documents=new Map(),removed=Symbol('delete'),commits=[];
+ let clock=Date.UTC(2026,10,22),queue=Promise.resolve();
+ class Clock extends Date { static now(){return clock;} }
+ class HttpsError extends Error { constructor(code,message){super(message);this.code=code;} }
+ const ref=path=>({id:path.split('/').at(-1),path,get:async()=>snapshot(ref(path)),collection:name=>collection(path+'/'+name)});
+ const snapshot=reference=>({id:reference.id,ref:reference,exists:documents.has(reference.path),data:()=>structuredClone(documents.get(reference.path))});
+ const collection=prefix=>({doc:id=>ref(prefix+'/'+id),where:(key,op,value)=>{
+  const target={select:()=>target,get:async()=>({docs:[...documents.keys()].filter(path=>path.startsWith(prefix+'/')&&path.split('/').length===2)
+   .map(path=>snapshot(ref(path))).filter(doc=>op==='=='?doc.data()[key]===value:doc.data()[key]>value)})};
+  return target;
+ }});
+ const db={runTransaction:callback=>{
+  const transaction=queue.then(async()=>{
+   const pending=[];
+   const result=await callback({
+    get:async target=>{assert.equal(pending.length,0,'Firestore transactions read before writing');return target.path?snapshot(target):target.get();},
+    create:(target,patch)=>pending.push({target,patch,create:true}),
+    update:(target,patch)=>pending.push({target,patch,update:true}),
+    set:(target,patch)=>pending.push({target,patch})
+   });
+   for(const {target,patch,create,update} of pending){
+    if(create)assert.equal(documents.has(target.path),false);
+    if(update)assert.equal(documents.has(target.path),true);
+    const next=update?{...documents.get(target.path)}:{};
+    for(const [key,value] of Object.entries(patch)){if(value===removed)delete next[key];else next[key]=structuredClone(value);}
+    documents.set(target.path,next);
+   }
+   if(pending.length)commits.push(pending.map(item=>item.target.path));
+   return result;
+  });
+  queue=transaction.catch(()=>{});
+  return transaction;
+ }};
+ const context={db,profiles:collection('petProfiles'),battles:collection('petCloudBattles'),legacy:collection('users'),
+  Date:Clock,HttpsError,FieldValue:{delete:()=>removed},randomUUID:()=>String(commits.length),randomInt:()=>0,
+  ATTENDANCE_PET_BRANCHES,attendancePetActivityTime,attendancePetRecords,attendancePetView,buildPetComparison,
+  transitionPetHousehold,petBattleFighter,petBattleChangeWeight,petBattleSimulation,petBattleSettleXp,
+  petBattleTime:value=>Number(value)||0,PET_BATTLE_STEP_MS:1800,week:7*86400000,pageSize:20,rankingCache:undefined};
+ vm.createContext(context);
+ vm.runInContext(source.slice(source.indexOf('function requireId'),source.indexOf('export const workpicPets'))+
+  '\nglobalThis.cloud={openProfile,care,battle,settle,deadline,ranking};',context);
+ const {openProfile,battle,settle,deadline,ranking}=context.cloud;
+ for(const uid of ['a','b'])documents.set('users/legacy-'+uid,{uid,displayName:uid.toUpperCase(),avatar:'keep',attendancePet:{
+  ...newAttendancePet(clock-7200000),lastCheckinAt:clock,weightGrams:1000,feedingXp:uid==='b'?1:0}});
+ const [a,b]=await Promise.all([openProfile('a'),openProfile('b')]);
+ assert.equal(documents.get('users/legacy-a').attendancePet,undefined);
+ assert.equal(documents.get('users/legacy-a').avatar,'keep');
+ const beforeReopen=commits.length;await openProfile('a');assert.equal(commits.length,beforeReopen);
+ const player=(profile,stats)=>({petId:attendancePetRecords(profile.attendancePet,clock)[0].id,element:'water',stats});
+ const created=await battle('a',{action:'create',opponentUid:'b',stakeGrams:200,...player(a,{attack:60,defense:20,health:20})});
+ const id=created.match.id;
+ await battle('b',{action:'accept',id,...player(b,{attack:20,defense:20,health:60})});
+ await battle('a',{action:'ready',id});
+ const {match}=await battle('b',{action:'ready',id});
+ assert.equal(match.status,'fighting');
+ assert.equal(match.winnerUid,'a');
+ const end=deadline(match);
+ await assert.rejects(settle(id,end),/before the match deadline/);
+ clock=end;
+ const beforeSettle=commits.length;
+ await Promise.all([settle(id,end),settle(id,end)]);
+ assert.equal(commits.length,beforeSettle+1);
+ assert.deepEqual(commits.at(-1),['petProfiles/a','petProfiles/b','petCloudBattles/'+id]);
+ const winner=documents.get('petProfiles/a'),loser=documents.get('petProfiles/b');
+ assert.equal(winner.attendancePet.weightGrams,1200);
+ assert.equal(loser.attendancePet.weightGrams,800);
+ assert.equal(winner.attendancePet.battleHistory[0].xpDelta,1);
+ assert.equal(loser.attendancePet.battleHistory[0].xpDelta,-1);
+ assert.equal(loser.attendancePet.battleHistory[0].weightDelta,-200);
+ assert.deepEqual(winner.petBattleLocks,{});
+ assert.deepEqual(loser.petBattleLocks,{});
+ const page=await ranking({});
+ assert.equal(page.rows[0].uid,'a');
+ assert.ok(!Object.hasOwn(page.rows[0],'battleHistory'));
 });
 
 test('admin actions affect only their own fields and unchanged choices do not produce a write', () => {
@@ -1098,40 +1224,43 @@ test('admin pet adjustments preserve revival progress and apply requested evolut
  assert.throws(()=>adjustAdminPet(original,'level',-1,now));
 });
 
-test('pet weight uses grams, feed-only gains and cumulative offline attendance penalties without restoration', () => {
+test('absence leaves weight intact through the 72-hour death deadline', () => {
  const born=Date.UTC(2026,10,20),day=86400000;
  const base={...newAttendancePet(born),weightGrams:5000,lastCheckinAt:born,lastCheckinDay:attendancePetDay(born)};
  assert.equal(attendancePetView(base,born+day-1).weightGrams,5000);
- assert.equal(attendancePetView(base,born+day).weightGrams,4500);
- assert.equal(attendancePetView(base,born+2*day).weightGrams,3000,'day two is 2 kg total, not another 2 kg');
+ assert.equal(attendancePetView(base,born+day).weightGrams,5000);
+ assert.equal(attendancePetView(base,born+2*day).weightGrams,5000);
  const original=JSON.stringify(base);for(let i=0;i<10;i++)attendancePetView(base,born+2*day);assert.equal(JSON.stringify(base),original,'reading weight never mutates or writes');
  let pet=transitionAttendancePet(base,'feed',born+day).pet;
- assert.equal(pet.weightGrams,4700);assert.equal(pet.weightPenaltyGrams,500);assert.equal(pet.lastCheckinAt,born);
+ assert.equal(pet.weightGrams,5200);assert.equal(pet.lastCheckinAt,born);
  assert.equal(transitionAttendancePet(pet,'feed',born+day+1).changed,false);
  pet=transitionAttendancePet(pet,'rename:Heavy fish',born+day+1).pet;
- assert.equal(attendancePetView(pet,born+day+2).weightGrams,4700,'rename cannot apply a penalty twice');
- assert.equal(attendancePetView(pet,born+2*day).weightGrams,3200);
- pet=transitionAttendancePet(pet,'feed',born+2*day).pet;assert.equal(pet.weightGrams,3400);
+ assert.equal(attendancePetView(pet,born+day+2).weightGrams,5200);
+ assert.equal(attendancePetView(pet,born+2*day).weightGrams,5200);
+ pet=transitionAttendancePet(pet,'feed',born+2*day).pet;assert.equal(pet.weightGrams,5400);
  const checked=transitionAttendancePet(pet,'checkin',born+2*day+1).pet;
- assert.equal(checked.weightGrams,3400,'attendance never adds or restores weight');assert.equal(checked.weightPenaltyGrams,0);
- assert.equal(attendancePetView(checked,born+2*day+2).weightGrams,3400);
+ assert.equal(checked.weightGrams,5400,'attendance never adds or restores weight');
+ assert.equal(attendancePetView(checked,born+2*day+2).weightGrams,5400);
+ assert.equal(attendancePetView(pet,born+3*day-1).dead,false);
  assert.equal(attendancePetView(pet,born+3*day).dead,true,'food does not prevent death');
- const low={...base,weightGrams:100};assert.equal(attendancePetView(low,born+day).weightGrams,0);
- assert.equal(transitionAttendancePet(low,'feed',born+day).pet.weightGrams,200,'loss at zero does not erase a later food gain');
- const legacy={...base,feeds:7};delete legacy.weightGrams;delete legacy.weightPenaltyGrams;
- assert.equal(attendancePetView(legacy,born+day).weightGrams,900,'legacy food is worth 200 grams per feed');
- assert.equal(transitionAttendancePet(legacy,'checkin',born+day).pet.weightGrams,900);
+ assert.equal(attendancePetView(pet,born+3*day).weightGrams,5400);
+ const saved={...base,id:'saved',weightGrams:4500,weightPenaltyGrams:500};
+ assert.equal(attendancePetView(saved,born+2*day).weightGrams,4500,'previously stored loss is not refunded or charged again');
+ assert.equal(petBattleChangeWeight(saved,'saved',-200,born+2*day).weightGrams,4300);
+ const legacy={...base,feeds:7};delete legacy.weightGrams;
+ assert.equal(attendancePetView(legacy,born+day).weightGrams,1400,'legacy food is worth 200 grams per feed');
+ assert.equal(transitionAttendancePet(legacy,'checkin',born+day).pet.weightGrams,1400);
  assert.equal(attendancePetView({...base,weightGrams:Infinity,feeds:Infinity},born+day).weightGrams,0);
  const root={...base,companions:[{...base,id:'other',weightGrams:7000}]};
  const household=transitionPetHousehold(root,'checkin',born+day).pet;
- assert.deepEqual(attendancePetRecords(household).map(p=>p.weightGrams),[4500,6500]);
+ assert.deepEqual(attendancePetRecords(household).map(p=>p.weightGrams),[5000,7000]);
 });
 
-test('pet comparison includes only actual feeding/attendance in seven days and ranks living pets by projected weight', () => {
+test('pet comparison limits activity to seven days and ranks living pets by level, then weight', () => {
  const now=Date.UTC(2026,10,20),day=86400000;
  const pet=(weight,activity,extra={})=>({...newAttendancePet(now-10*day),weightGrams:weight,lastCheckinAt:activity,lastCheckinDay:attendancePetDay(activity),...extra});
  const profiles=[
-  {id:'a',uid:'a',displayName:'A',attendancePet:pet(3000,now-3600000)},
+  {id:'a',uid:'a',displayName:'A',attendancePet:pet(7000,now-3600000)},
   {id:'b',uid:'b',displayName:'B',attendancePet:pet(5000,now-day,{branch:'bird',checkins:90,battleXp:7})},
   {id:'z',uid:'a',displayName:'Duplicate',attendancePet:pet(99000,now-1)},
   {id:'c',uid:'c',displayName:'Expired',attendancePet:pet(9000,now-7*day)},
@@ -1141,7 +1270,7 @@ test('pet comparison includes only actual feeding/attendance in seven days and r
  ];
  const rows=buildPetComparison(profiles,now);
  assert.equal(rows.length,4);assert.deepEqual(rows.map(row=>row.uid),['b','a','e','d']);
- assert.equal(rows[0].weightGrams,4500);assert.equal(rows[0].rank,1);assert.equal(rows.at(-1).rank,null);
+ assert.equal(rows[0].weightGrams,5000);assert.equal(rows[0].rank,1);assert.equal(rows.at(-1).rank,null);
  assert.equal(rows[0].xpToNextLevel,3,'comparison includes battle EXP in the next-level progress');
  assert.equal(buildPetComparison(profiles,now,'bird').length,1);
  assert.equal(buildPetComparison(profiles,now,'dino').length,0);
@@ -1172,7 +1301,7 @@ test('feeding grants XP every two hours but never postpones the attendance death
 
 test('household maximum level grants exactly one new egg and attendance cares for all living pets once a day', () => {
  const now=Date.UTC(2026,10,20,6),lastDay=now-86400000;
- let root={...newAttendancePet(now-7200000),checkins:278,feedingXp:1,branch:'fish',nickname:'Ocean',lastCheckinAt:lastDay,lastCheckinDay:attendancePetDay(lastDay)};
+ let root={...newAttendancePet(now-7200000),checkins:288,feedingXp:1,branch:'fish',nickname:'Ocean',lastCheckinAt:lastDay,lastCheckinDay:attendancePetDay(lastDay)};
  let change=transitionPetHousehold(root,'feed',now);root=change.pet;
  assert.equal(change.spawned,1);assert.equal(attendancePetRecords(root,now).length,2);assert.equal(attendancePetView(root,now).egg,true);
  let veteran=attendancePetRecords(root,now)[1];assert.equal(attendancePetView(veteran,now).maxed,true);assert.equal(veteran.nickname,'Ocean');
@@ -1183,16 +1312,16 @@ test('household maximum level grants exactly one new egg and attendance cares fo
  assert.equal(change.spawned,0);assert.equal(attendancePetRecords(root).length,2);
  change=transitionPetHousehold(root,'checkin',now+7200000,newborn);root=change.pet;
  assert.equal(change.result,'checked');for(const p of attendancePetRecords(root))assert.equal(p.lastCheckinAt,now+7200000);
- assert.equal(attendancePetSelected(root,newborn).checkins,1);assert.equal(attendancePetSelected(root,originalVeteran).checkins,279);
+ assert.equal(attendancePetSelected(root,newborn).checkins,1);assert.equal(attendancePetSelected(root,originalVeteran).checkins,289);
  assert.equal(transitionPetHousehold(root,'checkin',now+7200001,originalVeteran).changed,false);
  const before=attendancePetSelected(root,originalVeteran).feedingXp;
  root=transitionPetHousehold(root,'feed',now+14400000,newborn).pet;
  assert.equal(attendancePetSelected(root,originalVeteran).feedingXp,before,'food affects only the selected pet');
  assert.equal(transitionPetHousehold(root,'feed',now+14400001,'missing-id').result,'missing-pet');
- const capped={...newAttendancePet(now-7200000),branch:'bird',checkins:280,lastCheckinAt:now};
+ const capped={...newAttendancePet(now-7200000),branch:'bird',checkins:290,lastCheckinAt:now};
  const migrated=transitionPetHousehold(capped,'init',now);
  assert.equal(migrated.spawned,1);assert.equal(transitionPetHousehold(migrated.pet,'init',now).spawned,0,'legacy max pets receive one egg across reloads');
- const admin=transitionPetHousehold({...capped,checkins:0},'level',now,null,29);
+ const admin=transitionPetHousehold({...capped,checkins:0},'level',now,null,30);
  assert.equal(admin.spawned,1,'admin level-up follows the same one-egg rule');
  const expired={...root,companions:root.companions.map(p=>({...p,lastCheckinAt:now-73*3600000,bornAt:now-100*3600000}))};
  const survivorId=attendancePetRecords(expired)[0].id;
@@ -1679,8 +1808,11 @@ ${extract('let sharedNotesUnsubscribe =', 'function initQuickChatUi(')}
 let usersDirectorySnapshot=null,authenticatedProfileSnapshot=null;
 const auth={currentUser:{uid:'me',email:'chauchikil01@gmail.com'}};
 ${extract('const canControlPets =', 'let attendancePetData =')}
-const createAttendancePet3D=()=>({start(){},stop(){},update(){},feed(){},duelPose(){},thumbnail:async view=>'data:image/svg+xml;charset=utf-8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 144 104"><ellipse cx="72" cy="52" rx="40" ry="25" fill="'+view.form.color+'"/></svg>')});
+const modelViews=new Map();
+const createAttendancePet3D=(id,_art,_preview,mode)=>({start(){},stop(){modelViews.delete(id);},update(view){modelViews.set(id,{view,mode});},feed(){},duelPose(){},thumbnail:async view=>'data:image/svg+xml;charset=utf-8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 144 104"><ellipse cx="72" cy="52" rx="40" ry="25" fill="'+view.form.color+'"/></svg>')});
 const AttendancePet3D={start(){},stop(){},update(){},preview(open){document.getElementById("attendancePetPreview").innerHTML=open?'<svg viewBox="0 0 140 100"><ellipse cx="70" cy="50" rx="30" ry="40"/></svg>':'';},feed(){petFeedAnimations++;}};
+let PET_CLOUD_ENABLED=false;
+let petCloudRequest=()=>{throw new Error('Unexpected cloud request in the legacy fixture');};
 ${extract('let attendancePetData =', 'let sharedNotesUnsubscribe =').replace('return {init,start,stop,sync,profile,open};','return {init,start,stop,sync,profile,open,inspect:()=>state};')}
 let noteSnapshot, noteWrites = [], noteUpdates = [], noteDeletes = [], noteUnsubscribed = 0, rejectNoteWrite = false;
 const collection = (_, name) => name;
@@ -1694,7 +1826,7 @@ let quickChatPanelOpen = false, quickChatUnreadCount = 0;
 const updateQuickChatBadge = () => {};
 ${extract('function openQuickChatPanel(', 'function createAttendancePet3D(')}
 try {
-    const kept = ['dayOffModal','viewJobModal','changeHistoryModal','sharedNotesPanel','sharedNotesToggle','quickChatToggleBtn','quickChatPanel','sharedNoteImageDialog','attendancePetDialog','attendancePetBranchDialog','petCompareDialog','petBattleHistoryDialog','petAdminDialog','petAdminOpen','petBattleDialog','petBattleLobby','petBattleInvitePicker','petBattleExitDialog','petBattleInvite','attendancePetToggle','attendancePetSwimmer'].map(id=>document.getElementById(id));
+    const kept = ['dayOffModal','viewJobModal','changeHistoryModal','sharedNotesPanel','sharedNotesToggle','quickChatToggleBtn','quickChatPanel','sharedNoteImageDialog','attendancePetDialog','attendancePetBranchDialog','petGuideDialog','petCompareDialog','petBattleHistoryDialog','petRankingPreviewDialog','petAdminDialog','petAdminOpen','petBattleDialog','petBattleLobby','petBattleInvitePicker','petBattleExitDialog','petBattleInvite','attendancePetToggle','attendancePetSwimmer'].map(id=>document.getElementById(id));
     check(document.getElementById('scheduleActions').closest('#mainContent'),'job actions are inside schedule area');
     check(!document.getElementById('sidebar').contains(document.getElementById('addJobBtn')),'job actions leave sidebar');
     check(document.getElementById('jobColor')&&document.getElementById('settingsHideOutOfSchedule'),'color and hide-outside controls exist');
@@ -1751,7 +1883,12 @@ try {
     check(!document.getElementById('attendancePetBranchDialog').open&&document.getElementById('attendancePetDialog').open,'successful choice closes only branch form');
 
     petRecord.attendancePet={...petRecord.attendancePet,checkins:90};attendancePetData=petRecord.attendancePet;renderAttendancePet();
-    check(document.querySelectorAll('#attendancePetRoad li').length===30,'journey lists shared path and twenty branch stages');
+    check(document.querySelectorAll('.pet-road-shared li').length===10&&document.querySelectorAll('.pet-road-branch').length===4,'journey shows the shared path and all four branches');
+    check([...document.querySelectorAll('.pet-road-branch')].every(branch=>branch.querySelectorAll('li').length===11&&branch.textContent.includes('Cấp 30')),'every branch shows ten species and a final evolution');
+    const guide=document.getElementById('petGuideDialog');
+    document.querySelector('[data-pet-guide="care"]').click();
+    check(guide.open&&!document.getElementById('petGuideCare').hidden&&document.getElementById('attendancePetRoad').closest('dialog')===guide,'care guide opens separately with the evolution journey');
+    document.getElementById('petGuideClose').click();
     document.querySelector('[data-pet-branch="bird"]').click();await new Promise(resolve=>setTimeout(resolve,0));
     check(petRecord.attendancePet.branch==='bird'&&attendancePetView(petRecord.attendancePet).level===10,'switching branch keeps earned level');
     const nickname=document.getElementById('attendancePetNickname'),nameForm=document.getElementById('attendancePetNicknameForm'),beforeNameWrites=petWrites;
@@ -1765,14 +1902,14 @@ try {
     check(nameForm.hidden,'saving closes the nickname editor');
     nameForm.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));await new Promise(resolve=>setTimeout(resolve,0));
     check(petWrites===beforeNameWrites+1,'saving same nickname does not write again');
-    petRecord.attendancePet={...newAttendancePet(Date.now()-7200000),branch:'bird',checkins:279,lastCheckinAt:Date.now(),lastCheckinDay:attendancePetDay(Date.now())};attendancePetData=petRecord.attendancePet;selectedAttendancePetId=null;renderAttendancePet();
+    petRecord.attendancePet={...newAttendancePet(Date.now()-7200000),branch:'bird',checkins:289,lastCheckinAt:Date.now(),lastCheckinDay:attendancePetDay(Date.now())};attendancePetData=petRecord.attendancePet;selectedAttendancePetId=null;renderAttendancePet();
     await actOnAttendancePet('feed');
-    check(attendancePetRecords(petRecord.attendancePet).length===2&&document.querySelectorAll('#attendancePetRoster button').length===2,'reaching max creates one egg and keeps veteran in roster');
+    check(attendancePetRecords(petRecord.attendancePet).length===2&&document.querySelectorAll('#attendancePetRoster [data-pet-id]').length===2,'reaching max creates one egg and keeps veteran in roster');
     check(selectedAttendancePetView().egg&&document.getElementById('attendancePetCheckin').disabled,'new egg inherits account attendance status');
     check(document.querySelectorAll('.attendance-pet-swimmer').length===2,'veteran and egg have independent floating renderers');
     const veteran=attendancePetRecords(petRecord.attendancePet)[1];
     document.querySelector('#attendancePetRoster [data-pet-id="'+veteran.id+'"]').click();
-    check(selectedAttendancePetView().maxed&&document.getElementById('petGameXp').textContent==='280 XP','roster selects veteran independently');
+    check(selectedAttendancePetView().maxed&&document.getElementById('petGameXp').textContent==='290 XP','roster selects veteran independently');
     petRecord.attendancePet.companions[0].lastFedAt=Date.now()-7200000;attendancePetData=petRecord.attendancePet;renderAttendancePet();
     await actOnAttendancePet('feed');
     check(attendancePetRecords(petRecord.attendancePet).length===2,'feeding a max veteran does not create another reward egg');
@@ -1793,12 +1930,41 @@ try {
     check([...document.querySelectorAll('#petCompareRows img')].every(img=>!img.hidden&&img.src.startsWith('data:image/')&&img.alt.length>0),'each comparison row shows a cached image with pet identity');
 
     check(document.getElementById('petCompareRows').textContent.includes('Active trainer')&&!document.getElementById('petCompareRows').textContent.includes('Inactive trainer'),'only recently active users are compared');
-    check(document.querySelector('#petCompareRows .pet-compare-weight').textContent==='9,0 kg','comparison sorts by weight');
-    document.querySelector('#petCompareRows .pet-compare-history-button').click();
+    check(document.querySelector('#petCompareRows tr').classList.contains('is-me'),'ranking puts the higher level first even with less weight');
+    const rivalRanking=[...document.querySelectorAll('#petCompareRows tr')].find(row=>row.textContent.includes('Active trainer'));
+    check(rivalRanking.querySelector('.pet-compare-weight').textContent==='9,0 kg','ranking still displays pet weight');
+    document.querySelector('#petCompareRows .pet-compare-picture').click();
+    check(document.getElementById('petRankingPreviewDialog').open&&modelViews.get('petRankingPreviewModel')?.mode==='showcase','the ranked pet opens a rotating model');
+    document.getElementById('petRankingPreviewClose').click();
+    check(!modelViews.has('petRankingPreviewModel'),'closing the ranking preview releases the renderer');
+    rivalRanking.querySelector('.pet-compare-history-button').click();
     const historyText=document.getElementById('petBattleHistoryList').textContent;
     check(document.getElementById('petBattleHistoryDialog').open&&historyText.includes('Thắng · Rival')&&historyText.includes('+1 EXP · +0,2 kg'),'ranking opens the selected pet history with signed totals');
     document.getElementById('petBattleHistoryClose').click();
-    check(document.querySelector('#petCompareRows .pet-compare-xp').textContent==='0/10 EXP · Còn 10 EXP','comparison shows EXP within the current level and remaining EXP');
+    const cloudRows=buildPetComparison(usersDirectorySnapshot.docs.map(doc=>({id:doc.id,...doc.data()})),comparisonNow);
+    const cloudHistory=cloudRows[0].battleHistory,cloudCalls=[];
+    petCloudRequest=async(kind,data)=>{
+        cloudCalls.push([kind,data]);
+        if(kind==='history')return {entries:cloudHistory};
+        const {battleHistory,...row}=cloudRows[0];
+        return data.offset?{rows:[{...row,petId:'second-pet',rank:2}],nextOffset:null}:{rows:[row],nextOffset:20};
+    };
+    document.getElementById('petCompareClose').click();
+    PET_CLOUD_ENABLED=true;
+    renderAttendancePet();
+    check(cloudCalls.length===0,'background pet render does not load ranking or history');
+    document.getElementById('petCompareOpen').click();await Promise.resolve();
+    check(cloudCalls.length===1&&cloudCalls[0][0]==='ranking'&&document.querySelectorAll('#petCompareRows tr').length===1,'cloud ranking opens with the first page only');
+    document.getElementById('petCompareMore').click();await Promise.resolve();
+    check(cloudCalls[1][1].offset===20&&document.querySelectorAll('#petCompareRows tr').length===2,'ranking fetches the next page on demand');
+    document.querySelector('#petCompareRows .pet-compare-history-button').click();await Promise.resolve();
+    check(cloudCalls[2][0]==='history'&&document.getElementById('petBattleHistoryList').textContent.includes('Rival'),'cloud history fetches only after the row action');
+    document.getElementById('petBattleHistoryClose').click();
+    document.querySelector('#petCompareRows .pet-compare-history-button').click();await Promise.resolve();
+    check(cloudCalls.length===3,'reopening recent history uses the cache');
+    document.getElementById('petBattleHistoryClose').click();
+    PET_CLOUD_ENABLED=false;renderPetComparison(true);
+    check(rivalRanking.querySelector('.pet-compare-xp').textContent==='0/10 EXP · Còn 10 EXP','comparison shows EXP within the current level and remaining EXP');
     check(document.querySelector('#petCompareRows .is-me'),'own pets are highlighted');
     document.getElementById('petCompareBranch').value='fish';document.getElementById('petCompareBranch').dispatchEvent(new Event('change'));
     check(document.querySelectorAll('#petCompareRows tr').length===1,'comparison filters pet branch');
@@ -1830,18 +1996,38 @@ try {
     petReject=true;document.getElementById('petAdminLevel').value='13';levelButton.click();await new Promise(resolve=>setTimeout(resolve,0));petReject=false;
     check(petWrites===adminWrites+2&&!petAdminBusy&&!levelButton.disabled,'failed admin action writes nothing and releases the lock');
     document.getElementById('petAdminClose').click();
+    usersDirectorySnapshot.docs.push({id:'trainer',data:()=>({uid:'trainer',displayName:'Rival trainer'})});
     document.getElementById('petBattleOpen').click();
     check(document.getElementById('petBattleLobby').open&&!document.getElementById('petBattleDialog').open,'lobby opens from care screen');
+    const botPicker=document.getElementById('petBattleMatches');
+    botPicker.value='bot:new';botPicker.dispatchEvent(new Event('change'));
+    check(!document.getElementById('petBattleBotSlot').hidden&&!document.getElementById('petBattleStatComparison').hidden,'bot stats and model are visible in the draft');
+    check(document.getElementById('petBattleBotStart').hidden,'bot cannot start without an element');
+    document.querySelector('[data-battle-element="metal"]').click();
+    check(!document.getElementById('petBattleBotStart').hidden,'bot is ready to fight once the setup is complete');
+    document.getElementById('petBattleClose').click();
     document.getElementById('petBattleNew').click();
     check(document.getElementById('petBattleDialog').open&&!document.getElementById('petBattleDraftSlots').hidden,'create opens a dedicated room with an opponent slot');
+    const hostModel=document.getElementById('petBattleDraftModel'),elementPicker=document.getElementById('petBattleElement');
+    check(!hostModel.hidden&&modelViews.get(hostModel.id)?.mode==='draft','host slot shows the selected pet model');
+    document.querySelector('[data-battle-element="water"]').click();
+    check(elementPicker.value==='water'&&document.querySelectorAll('[data-battle-element][aria-pressed="true"]').length===1,'element buttons select exactly one element');
+    check(hostModel.classList.contains('has-element-aura')&&hostModel.style.getPropertyValue('--pet-battle-element-color')==='#38bdf8','draft model shows the selected element aura immediately');
+    elementPicker.value='';elementPicker.dispatchEvent(new Event('change'));
+    check(!hostModel.classList.contains('has-element-aura'),'clearing the draft element removes its aura');
+    document.querySelector('#petBattleDialog [data-pet-guide="battle"]').click();
+    const battleGuide=document.getElementById('petGuideBattle'),balance=document.getElementById('petBattleBalance');
+    check(guide.open&&!battleGuide.hidden&&!balance.hidden&&balance.textContent.includes('để cược')&&battleGuide.textContent.includes('Kim → Thủy → Mộc → Hỏa → Thổ'),'battle guide shows the current pet balance and element rules');
+    document.getElementById('petGuideClose').click();
     document.getElementById('petBattleAddOpponent').click();
     check(document.getElementById('petBattleInvitePicker').open,'plus opens the opponent picker');
+    check(document.querySelector('#petBattleOpponentList [data-invite-uid="trainer"]').textContent==='+'&&document.getElementById('petBattleOpponentList').textContent.includes('Rival trainer'),'each invite card shows its own plus action');
     document.getElementById('petBattleInvitePickerClose').click();
     const battlePet=attendancePetSelected(attendancePetData,document.getElementById('petBattlePet').value),battleView=attendancePetView(battlePet);
     const statsSum=()=>['petBattleAttack','petBattleMagic','petBattleDefense','petBattleMagicReduction','petBattlePhysicalReduction','petBattleDodge','petBattleLuck','petBattleHealth'].reduce((sum,id)=>sum+Number(document.getElementById(id).value),0);
     check(statsSum()===petBattleBudget(battleView.level),'battle allocation uses one bonus point per level');
     document.getElementById('petBattleAttack').value=Number(document.getElementById('petBattleAttack').value)+1;document.getElementById('petBattleAttack').dispatchEvent(new Event('input'));
-    check(document.getElementById('petBattleRemaining').classList.contains('invalid'),'invalid stat total is visibly rejected');
+    check(document.getElementById('petBattleRemaining').textContent==='Dư 1 điểm','over-allocation shows the exact excess');
     const savedAttack=document.getElementById('petBattleAttack').value;
     document.getElementById('petBattleClose').click();document.getElementById('petBattleNew').click();
     check(document.getElementById('petBattleAttack').value===savedAttack&&document.getElementById('petBattleRemaining').classList.contains('invalid'),'Chrome draft restores all edited points when room reopens without silently rebalancing');
@@ -1898,7 +2084,7 @@ try {
     check(petBattlePlayback(revealFixture).count===0&&document.getElementById('petBattleRpsCountdown').textContent.includes('5'),'five second reveal precedes combat');
     const readyFixture={...battleFixture,id:'ui-ready',roomFlow:true,status:'ready',startedAt:null,turns:[],maxHp:[],winnerUid:null,ready:{me:true},readyDeadline:Date.now()+120000};
     battleState.matches.set(readyFixture.id,readyFixture);PetBattleGame.open(readyFixture.id);
-    check(!document.getElementById('petBattleReadyPanel').hidden&&document.getElementById('petBattleReady').disabled&&document.getElementById('petBattleReadyStatuses').textContent.includes('Đã sẵn sàng'),'shared waiting room marks own readiness and waits for the other player');
+    check(!document.getElementById('petBattleReadyPanel').hidden&&document.getElementById('petBattleReady').hidden&&document.getElementById('petBattleReady0').textContent==='Đã sẵn sàng','the ready badge appears next to the pet while waiting');
     const done={...battleFixture,id:'ui-done',status:'finished',startedAt:Date.now()-999999};battleState.matches.set(done.id,done);PetBattleGame.open(done.id);
     const exitDialog=document.getElementById('petBattleExitDialog');
     check(exitDialog.open&&document.getElementById('petBattleExitWinner').textContent.length>0,'finished room automatically opens a result form');
@@ -2097,7 +2283,7 @@ try {
         document.querySelectorAll('dialog[open]').forEach(dialog=>dialog.close());
         document.body.className='theme-dark';document.documentElement.dataset.theme='dark';
         currentUser={uid:'me',displayName:'Trainer'};attendancePetReady=true;attendancePetBusy=false;attendancePetVisible=true;
-        attendancePetData=transitionPetHousehold({...newAttendancePet(Date.now()-7200000),checkins:280,branch:'dino',nickname:'Adventure companion',lastCheckinAt:Date.now()},'init').pet;
+        attendancePetData=transitionPetHousehold({...newAttendancePet(Date.now()-7200000),checkins:290,branch:'dino',nickname:'Adventure companion',lastCheckinAt:Date.now()},'init').pet;
         selectedAttendancePetId=attendancePetRecords(attendancePetData)[1].id;renderAttendancePet();
         const care=document.getElementById('attendancePetDialog');care.showModal();AttendancePet3D.preview(true);
         if(${process.argv.includes('--compare-layout')}){document.getElementById('petCompareOpen').click();const comparison=document.getElementById('petCompareDialog');check(comparison.scrollWidth<=comparison.clientWidth+1,'comparison fits viewport without horizontal clipping');}
@@ -2145,6 +2331,7 @@ try {
  AttendancePet3D.start();
  let now=Date.now(),pet={...newAttendancePet(now-7200000),lastCheckinAt:now};
  AttendancePet3D.update(attendancePetView(pet,now));
+ check(!document.querySelector('#attendancePetArt svg'),'loading WebGL does not flash a 2D model');
  for(let i=0;i<50&&!AttendancePet3D.inspect()?.renderer;i++)await new Promise(resolve=>setTimeout(resolve,100));
  const s=AttendancePet3D.inspect();check(s?.renderer,'real WebGL pet renderer starts');
  const cards=[];
@@ -2160,6 +2347,9 @@ try {
  for(const [key,branch] of Object.entries(ATTENDANCE_PET_BRANCHES))for(let index=0;index<branch.forms.length;index++){
   pet={...pet,branch:key,checkins:(index+9)*10};capture(attendancePetView(pet,now),branch.name+' '+(index+1)+' - '+branch.forms[index].name);
  }
+ }else{
+  for(const branch of Object.keys(ATTENDANCE_PET_BRANCHES))capture(attendancePetView({...pet,branch,checkins:290},now),ATTENDANCE_PET_BRANCHES[branch].forms.at(-1).name);
+  capture(attendancePetView({...pet,branch:'fish',checkins:200},now),'Nàng tiên cá');
  }
  const petDialog=document.createElement('dialog');petDialog.id='attendancePetDialog';petDialog.innerHTML='<div id="attendancePetPreview"></div>';document.body.appendChild(petDialog);petDialog.showModal();
  AttendancePet3D.preview(true);
@@ -2182,11 +2372,22 @@ try {
  check(creatureImage.startsWith('data:image/png')&&eggImage.startsWith('data:image/png')&&creatureImage!==eggImage,'hidden renderer captures distinct real creature and egg images');
  const decoded=new Image();decoded.src=creatureImage;await decoded.decode();check(decoded.naturalWidth>0&&decoded.naturalHeight>0,'thumbnail is a decodable image');
  const arenaButton=document.createElement('div');arenaButton.id='arena-test';arenaButton.innerHTML='<span id="arena-test-art"></span>';document.body.appendChild(arenaButton);
- const arenaRenderer=createAttendancePet3D('arena-test','arena-test-art',null,'arena');arenaRenderer.start();arenaRenderer.update(attendancePetView(pet,now));arenaRenderer.duelPose({facing:Math.PI,attackAt:Date.now()});
+ const arenaRenderer=createAttendancePet3D('arena-test','arena-test-art',null,'arena');arenaRenderer.start();arenaRenderer.update(attendancePetView(pet,now));arenaRenderer.duelPose({facing:Math.PI,attackAt:Date.now(),skill:{motion:'claw',variant:4},skillColor:'#f97316'});
  await new Promise(resolve=>setTimeout(resolve,150));
  const arena=arenaRenderer.inspect();check(arena?.renderer&&arena.renderer!==peer.renderer,'arena has an independent real WebGL model');
  arena.renderer.render(arena.scene,arena.camera);const arenaGL=arena.renderer.getContext(),arenaPixels=new Uint8Array(arena.renderer.domElement.width*arena.renderer.domElement.height*4);arenaGL.readPixels(0,0,arena.renderer.domElement.width,arena.renderer.domElement.height,arenaGL.RGBA,arenaGL.UNSIGNED_BYTE,arenaPixels);check(arenaPixels.some((value,index)=>index%4===3&&value>0),'arena fighter paints visible pixels');
  arenaRenderer.stop();arenaButton.remove();
+ const draft=document.createElement('div');draft.id='draft-test';draft.className='pet-battle-model pet-battle-draft-model';draft.innerHTML='<span id="draft-test-art"></span>';document.body.appendChild(draft);
+ const draftRenderer=createAttendancePet3D(draft.id,'draft-test-art',null,'draft');
+ const clownIndex=ATTENDANCE_PET_FORMS.findIndex(form=>form.shape==='clown');
+ draftRenderer.start();draftRenderer.update(attendancePetView({...newAttendancePet(now-7200000),checkins:clownIndex*10},now));
+ await new Promise(resolve=>setTimeout(resolve,150));
+ const draftState=draftRenderer.inspect();
+ check(draftState.renderer?.domElement.style.height==='108px','draft WebGL adopts the compact slot height');
+ const paintedBody=draftState.model.children.find(mesh=>mesh.material?.map);
+ const colors=paintedBody.material.map.image.getContext('2d').getImageData(64,0,1,256).data;
+ check([255,33,249].every(red=>colors.some((value,index)=>index%4===0&&value===red)),'clownfish skin includes warm white, dark borders and its orange base');
+ draftRenderer.stop();draft.remove();
  peerRenderer.stop();peerButton.remove();check(s.renderer.domElement.parentElement.id==='attendancePetArt','disposing companion preserves selected pet');
  AttendancePet3D.feed();AttendancePet3D.stop();check(!document.querySelector('#attendancePetArt canvas'),'renderer disposes on stop');
  document.body.innerHTML='<main class="pet-gallery">'+cards.join('')+'</main><pre id="pet-result">PASS: all real 3D pet forms render visible pixels; renderer cleanup works</pre>';
@@ -2194,7 +2395,7 @@ try {
 `;
   fs.writeFileSync(path.join(temp,'pet.html'),'<!doctype html><meta charset="utf-8"><style>'+fs.readFileSync('styles.css','utf8')+'body{background:#0c1524!important;color:white;padding:20px;height:auto;overflow:auto}.pet-gallery{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}.pet-gallery article{display:grid;justify-items:center;gap:8px;padding:15px;background:#172337;border:1px solid #29405c;border-radius:14px}.pet-gallery img{width:190px;height:137px;object-fit:contain}.pet-gallery strong{font:13px sans-serif}#pet-result{color:#7dd3fc}</style><body><button id="attendancePetSwimmer" class="attendance-pet-swimmer"><span id="attendancePetArt"></span></button><script type="module">'+script+'</script>');
   fs.mkdirSync('.artifacts',{recursive:true});
-  const result=spawnSync(chrome,['--headless','--no-first-run','--disable-extensions','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--allow-file-access-from-files','--user-data-dir='+path.join(temp,'profile'),'--window-size=1500,3900','--screenshot='+path.resolve(process.argv.includes('--pet-fleet-only')?'.artifacts/attendance-pet-fleet.png':'.artifacts/attendance-pet-stages.png'),'--dump-dom','--virtual-time-budget=12000',pathToFileURL(path.join(temp,'pet.html')).href],{encoding:'utf8',timeout:180000,windowsHide:true,maxBuffer:12*1024*1024});
+  const result=spawnSync(chrome,['--headless','--no-first-run','--disable-extensions','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--allow-file-access-from-files','--user-data-dir='+path.join(temp,'profile'),'--window-size=1500,3900','--screenshot='+path.resolve(process.argv.includes('--pet-fleet-only')?'.artifacts/attendance-pet-fleet.png':'.artifacts/attendance-pet-stages.png'),'--dump-dom','--virtual-time-budget=30000',pathToFileURL(path.join(temp,'pet.html')).href],{encoding:'utf8',timeout:180000,windowsHide:true,maxBuffer:12*1024*1024});
   const output=result.stdout?.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'').match(/<pre id="pet-result">([\s\S]*?)<\/pre>/)?.[1];assert.ok(output?.startsWith('PASS:'),output||result.error?.message||result.stderr?.slice(-1500)||'No pet result');console.log(output);
  }finally{const resolved=path.resolve(temp);if(resolved.startsWith(path.resolve(os.tmpdir())+path.sep)&&path.basename(resolved).startsWith('workpic-pet-'))fs.rmSync(resolved,{recursive:true,force:true,maxRetries:5,retryDelay:200});}
 })();

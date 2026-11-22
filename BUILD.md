@@ -88,10 +88,10 @@ Eggs and dead pets rest; reduced-motion mode stops roaming and articulation.
 
 Levels 1–9 are shared, ending with the ray. At 80 XP (level 9), users
 unlock four branches: fish, dinosaurs, birds, and cats/tigers/lions. Each branch
-has twenty forms, covering overall levels 10–29 (90–280 XP). Each
+has twenty paired forms at levels 10–29 and a final form at level 30 (290 XP). Each regular
 species has a juvenile and mature stage with increasing display size. Users may
 switch branches without losing check-ins; transactions persist the selected
-`branch` in the same profile. The last form is capped at level 29, but daily
+`branch` in the same profile. The last form is capped at level 30, but daily
 check-ins continue to keep it alive. Legacy profiles without a branch retain all
 check-ins and display the ray until a branch is chosen. Resurrection resets the
 branch along with evolution; admin revival that keeps progress retains it.
@@ -122,7 +122,7 @@ The profile's `attendancePet` retains its version-1 shape for the newest pet and
 stores other pets as flat records in `companions`, with stable IDs. The same root
 stores account-wide `attendanceDay`/`attendanceAt`. Household transitions run in a
 single Firestore transaction: daily check-in updates all living pets once, while
-feeding/renaming/branch/revival target a stable pet ID. A pet that reaches level 29
+feeding/renaming/branch/revival target a stable pet ID. A pet that reaches level 30
 is marked with `eggGrantedAt` and grants exactly one new egg per life. The mature
 pet is retained and the egg becomes the newest root pet. Startup initializes this
 reward for legacy max-level pets exactly once. Completed pets continue to require
@@ -137,14 +137,11 @@ by that on-screen renderer budget. The admin picker selects a pet within a user.
 
 Weight is stored as integer `weightGrams`. New eggs start at zero; every valid
 two-hour feed adds 200 grams in addition to its existing one XP. Attendance adds
-XP but no weight. After 24 hours since the last check-in/birth, the total absence
-penalty is 500 grams; after 48 hours it is 2000 grams total (not another 2000).
-The existing death threshold remains 72 hours. Weight never falls below zero.
-Views project offline penalties without writing. Successful mutations settle
-them with `weightPenaltyGrams`, and attendance resets the penalty stage only
-after settling, so checking in cannot restore previously lost weight or apply
-a penalty twice. Legacy records without weight derive their initial mass from
-their existing feed count at 200 grams per feed. Revival/egg resets weight to zero.
+XP but no weight. Absence leaves weight intact and the pet dies after 72 hours
+without checking in. Weight never falls below zero. Previously stored weight
+is used as-is, including old deductions. Legacy records without weight derive
+it from their feed count at 200 grams per feed. Revival and egg resets set weight
+to zero. The Firebase Functions build shares the same weight calculation.
 
 The separate weight comparison dialog reuses the existing users-directory
 snapshot, with no new polling/query or write per render. It includes users whose
@@ -153,7 +150,7 @@ at exactly seven days they are omitted. Born-at, rename and generic updated-at
 timestamps do not qualify a user. Modern household records use `attendanceAt`
 for actual attendance so an admin level edit cannot qualify an offline user.
 Legacy profiles fall back to pet attendance/feed timestamps. Each owned pet is a
-row, ordered by living status then projected weight and level. Dead pets remain
+row, ordered by living status, then level, then weight. Dead pets remain
 visible last without ranks. A branch filter and own-user highlighting are included.
 Comparison refreshes on directory snapshots, local pet changes and minute ticks
 while open, using the same weight projection as care and roster cards.
@@ -259,6 +256,68 @@ allow update: if request.auth != null
   && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['attendancePet']);
 ```
 
+### Cloud pet deployment
+
+This is optional. The browser defaults to direct Firestore access. Set
+`globalThis.WORKPIC_PET_BACKEND = 'cloud'` before loading `app.js` only when
+this backend is deployed and the data cutover is ready.
+`workpicPets` is an HTTPS callable in `us-central1`. Its CORS handling includes
+localhost. If a browser reports missing CORS headers, check the status of the
+OPTIONS request in Network. A 404 at the callable URL means the function is
+unavailable at that project, region and name. Verify the deployment before
+changing Firestore Rules.
+`petProfiles/{authUid}` owns pet data, stake locks and history. Personal and admin
+care go through the callable. The admin role comes from the deployed
+`PET_ADMIN_UID` parameter. `petCloudBattles/{id}` stores the server-generated
+timeline. The invite listener is scoped to the recipient and reads up to 12
+pending invites. Both accepted participants can read their room. A Cloud Tasks
+worker handles deadlines, including when both clients are offline, and settles
+the match and both profiles in one transaction. History and ranking use separate
+callable requests. Ranking returns 20 rows per page without embedded history.
+On a cache miss, each function instance reads active profiles once to produce the
+ranking, then reuses the result inputs for one minute.
+
+1. Drain or cancel old `petBattles` before switching. The migration refuses
+   profiles that still hold legacy stakes. Take a backup and stop serving the old
+   pet client during the cutover.
+2. Install with Node.js 22 and `npm ci`. Deploy the backend to the existing project
+   with `firebase deploy --project workpic-eb555 --only functions:workpic-pets`.
+   Set `PET_ADMIN_UID` to the actual Firebase Authentication UID. The functions use
+   the `us-central1` region. Enable the required Functions and Cloud Tasks APIs.
+   Grant the enqueueing runtime service account task creation and the required
+   service-account permissions. Follow the official Cloud Tasks IAM instructions
+   for the account used to dispatch the task handler.
+3. Merge the new collection rules below into the existing Firestore rules. Also
+   block client changes to `attendancePet` and `petBattleLocks` in existing
+   `users` write grants, including the old admin grant. For existing update
+   grants use `!request.resource.data.diff(resource.data).affectedKeys().hasAny(['attendancePet', 'petBattleLocks'])`.
+   Preserve reads and unrelated fields. The new collections use Admin SDK writes
+   and the deploy configuration leaves the existing Firestore Rules in place.
+   Review any broad wildcard grants, since matching grants are combined with OR.
+4. Existing pets migrate atomically when a user or admin opens the profile.
+   To populate the ranking for members who have not reopened the app, run
+   `node pet-cloud.mjs --migrate-existing-pets` once with authorized Application
+   Default Credentials and `GOOGLE_CLOUD_PROJECT=workpic-eb555`. This reads
+   legacy profiles in pages. The canonical copy migrates to `petProfiles` and
+   duplicate legacy pet fields are archived privately before removal.
+5. Publish the browser build after the backend and rules are ready. Validate an
+   invitation, a known finished match, both offline payouts, and the Usage chart
+   in the target project.
+
+```firestore
+match /petProfiles/{uid} {
+  allow get: if request.auth != null && request.auth.uid == uid;
+}
+match /petCloudBattles/{id} {
+  allow get: if request.auth != null
+    && request.auth.uid in resource.data.participantUids;
+  allow list: if request.auth != null
+    && request.query.limit <= 12
+    && resource.data.opponentUid == request.auth.uid
+    && resource.data.status == "invited";
+}
+```
+
 New battles include a five-second RPS result intro (`introMs: 5000`) anchored
 to `startedAt`; older battles retain their two-second intro. The finish button
 is enabled only after the current player's claim has settled. It dismisses the
@@ -268,10 +327,206 @@ bounded to 4–16 per turn; species control the effect and model lunge, while le
 increase particle density and glow. Reduced-motion preferences suppress particles.
 
 New allocations use eight fields (attack, magic, defense, physicalReduction,
-magicReduction, dodge, luck, health) within the original total budget. Existing
+magicReduction, dodge, luck, health). Level 1 starts at 100 points, levels 2–9
+add one point each, and levels 10–30 add two each. Existing
 three-field battles remain supported. New combat sums separately mitigated physical
 and magic damage; deterministic seeded rolls apply capped dodge (40%) and critical
 chance (35%, 1.5x damage), each at 0.5 percentage points per allocated point.
 Winner claims set the participating pet's `victoryAuraUntil` in the same profile
 transaction as payment. Expiry is combat end plus one hour, independent of claim
 time; timers merely render it and never extend it or write to Firestore.
+
+
+### Full Rules for direct Firestore mode
+
+Paste the complete block into Firestore Database > Rules. This mode stores pet
+data in users and uses petBattles. Players can settle their results on returning
+to the app. Existing petProfiles documents are owner-readable so the browser can
+detect migrated accounts without creating a replacement pet.
+
+```firestore
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function owns(data, field) {
+      return signedIn()
+        && data.get(field, '') == request.auth.uid;
+    }
+
+    function battleParticipant(data) {
+      return signedIn()
+        && data.participantUids is list
+        && request.auth.uid in data.participantUids;
+    }
+
+    match /users/{id} {
+      allow read: if signedIn();
+
+      allow create: if owns(request.resource.data, 'uid');
+
+      allow update: if owns(resource.data, 'uid')
+        && request.resource.data.uid == resource.data.uid;
+
+      allow delete: if false;
+
+      allow update: if request.auth != null
+        && request.auth.uid == "M5ZnmEC8JdYbSFHN6K5rjK5YMQw1"
+        && request.resource.data.attendancePet is map
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['attendancePet']);
+    }
+
+    match /petProfiles/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow list, write: if false;
+    }
+
+    match /jobs/{id} {
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && request.resource.data.ownerId is string
+        && request.resource.data.ownerId.size() > 0;
+
+      allow update, delete: if signedIn()
+        && (
+          !('ownerId' in resource.data)
+          || owns(resource.data, 'ownerId')
+        );
+    }
+
+    match /sharedNotes/{noteId} {
+      allow read, write: if signedIn();
+    }
+
+    match /petBattles/{battleId} {
+      // Transaction tạo trận đọc ID chưa tồn tại trước khi ghi.
+      // Trận đã tồn tại chỉ hai người tham gia được đọc.
+      allow get: if signedIn()
+        && (
+          !exists(
+            /databases/$(database)/documents/petBattles/$(battleId)
+          )
+          || battleParticipant(resource.data)
+        );
+
+      allow list: if battleParticipant(resource.data);
+
+      allow create: if signedIn()
+        && request.resource.data.version == 1
+        && request.resource.data.challengerUid == request.auth.uid
+        && request.resource.data.opponentUid is string
+        && request.resource.data.opponentUid.size() > 0
+        && request.resource.data.opponentUid != request.auth.uid
+        && request.resource.data.participantUids == [
+          request.auth.uid,
+          request.resource.data.opponentUid
+        ]
+        && request.resource.data.status == 'invited'
+        && request.resource.data.stakeGrams is int
+        && request.resource.data.stakeGrams >= 100
+        && request.resource.data.stakeGrams % 100 == 0
+        && request.resource.data.players is list
+        && request.resource.data.players.size() == 1
+        && request.resource.data.players[0].uid == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.rpsRound == 0
+        && request.resource.data.commits == {}
+        && request.resource.data.reveals == {}
+        && request.resource.data.claims == {}
+        && request.resource.data.turns == []
+        && request.resource.data.maxHp == []
+        && request.resource.data.winnerUid == null
+        && request.resource.data.startedAt == null;
+
+      // Giữ nguyên danh tính hai bên, mức cược và dữ liệu tạo trận.
+      allow update: if battleParticipant(resource.data)
+        && request.resource.data.version == resource.data.version
+        && request.resource.data.challengerUid
+          == resource.data.challengerUid
+        && request.resource.data.opponentUid
+          == resource.data.opponentUid
+        && request.resource.data.participantUids
+          == resource.data.participantUids
+        && request.resource.data.stakeGrams
+          == resource.data.stakeGrams
+        && request.resource.data.createdAt
+          == resource.data.createdAt
+        && request.resource.data.createdMs
+          == resource.data.createdMs
+        && request.resource.data.expiresAt
+          == resource.data.expiresAt
+        && request.resource.data.status in [
+          'invited',
+          'ready',
+          'rps',
+          'fighting',
+          'finished',
+          'rejected',
+          'cancelled',
+          'expired'
+        ];
+
+      allow delete: if false;
+    }
+
+    match /notifications/{id} {
+      allow read, delete: if owns(resource.data, 'userId');
+
+      allow create: if signedIn();
+
+      allow update: if owns(resource.data, 'userId')
+        && request.resource.data.userId == resource.data.userId;
+    }
+
+    match /dayOffs/{id} {
+      allow read: if signedIn();
+
+      allow create: if owns(request.resource.data, 'userId');
+
+      allow update: if owns(resource.data, 'userId')
+        && request.resource.data.userId == resource.data.userId;
+
+      allow delete: if owns(resource.data, 'userId');
+    }
+
+    match /jobDayOverrides/{id} {
+      allow read, delete: if owns(resource.data, 'userId');
+
+      allow create: if owns(request.resource.data, 'userId');
+
+      allow update: if owns(resource.data, 'userId')
+        && request.resource.data.userId == resource.data.userId;
+    }
+
+    match /quickJobs/{id} {
+      allow read, write: if signedIn();
+    }
+
+    match /transferRequests/{id} {
+      allow read, write: if signedIn();
+    }
+
+    match /quickJobTransferRequests/{id} {
+      allow read, write: if signedIn();
+    }
+
+    match /workHours/{id} {
+      allow read, write: if signedIn();
+    }
+
+    match /departments/{id} {
+      allow read, write: if signedIn();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+```
