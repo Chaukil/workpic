@@ -345,8 +345,8 @@ const ATTENDANCE_PET_BRANCHES={
 };
 const PET_BRANCH_FINALS={
     fish:petForm('Huyền Vũ','dino','tortoise','#57a59a',1.85),
-    dino:petForm('Chu Tước','bird','phoenix','#f27639',1.78,{crest:true}),
-    bird:petForm('Khổng Tước','bird','peacock','#4298b3',1.68,{crest:true}),
+    dino:petForm('Thanh Long','dino','dragon','#3aa99f',1.78,{crest:true}),
+    bird:petForm('Chu Tước','bird','phoenix','#f27639',1.68,{crest:true}),
     beast:petForm('Bạch Hổ','beast','tiger','#ece5df',1.65,{stripes:true,crest:true})
 };
 // Every regular branch species has a juvenile and mature form.
@@ -724,8 +724,8 @@ function petBattleCompletePet(root,petId,match,uid,xpDelta,weightDelta,now){
 const PET_BATTLE_SKILL_NAMES={
     base:['Bọt Ngân','Vẫy Kim Lân','Vũ Điệu San Hô','Cánh Nước','Đuôi Chớp','Gai Xoáy','Cầu Gai','Mũi Kiếm','Lướt Đáy Biển'],
     fish:['Búa Xé Sóng','Hàm Trắng','Vây Sát Thủ','Đuôi Lưng Gù','Âm Vang Đại Dương','Khúc Ca Biển','Sóng Lam','Nanh Cổ Đại','Đại Triều Xanh','Vực Leviathan','Mai Huyền Vũ'],
-    dino:['Cú Đạp Non','Tam Giác Xung Kích','Phiến Giáp','Chùy Giáp','Móng Liềm','Hàm Bạo Chúa','Sống Gai','Quật Cổ Dài','Hơi Thở Rồng','Long Viêm Cổ','Chu Tước Hỏa Vũ'],
-    bird:['Mũi Mổ Lam','Lông Vũ Ngũ Sắc','Đêm Tuyết','Ưng Lao','Hạc Xuyên Mây','Quạt Công','Sải Cánh Andes','Gió Hải Âu','Phượng Hỏa','Thiên Hỏa','Khổng Tước Khai Bình'],
+    dino:['Cú Đạp Non','Tam Giác Xung Kích','Phiến Giáp','Chùy Giáp','Móng Liềm','Hàm Bạo Chúa','Sống Gai','Quật Cổ Dài','Hơi Thở Rồng','Long Viêm Cổ','Thanh Long Giáng Thế'],
+    bird:['Mũi Mổ Lam','Lông Vũ Ngũ Sắc','Đêm Tuyết','Ưng Lao','Hạc Xuyên Mây','Quạt Công','Sải Cánh Andes','Gió Hải Âu','Phượng Hỏa','Thiên Hỏa','Chu Tước Hỏa Vũ'],
     beast:['Vồ Cỏ','Chớp Tai Nhọn','Vuốt Hoa Mai','Bóng Đen','Vồ Vách Đá','Hổ Vồ Xé Gió','Vuốt Băng','Sư Tử Gầm','Bờm Ánh Trăng','Nanh Kiếm','Bạch Hổ Phá Sơn']
 };
 function petBattleSkill({form,level,branch}){
@@ -10491,7 +10491,7 @@ const PetBattleGame=(()=>{
         const hidden=dismissed();const matches=[...state.matches.values()].filter(m=>!hidden.includes(m.id)).sort((a,b)=>b.createdMs-a.createdMs),listKey=JSON.stringify(matches.map(m=>[m.id,m.status]));
         if(state.listKey!==listKey){
             state.listKey=listKey;
-            const options=[new Option('Chọn phòng đấu','')];
+            const options=[new Option('Đấu người','')];
             if(!PET_CLOUD_ENABLED)options.push(new Option('Đánh Bot','bot:new'));
             options.push(...matches.map(m=>new Option(`${m.players[0].name} ↔ ${m.players[1]?.name||m.opponentUid} · ${{invited:'Lời mời',ready:'Chờ sẵn sàng',rps:'Oẳn tù tì',fighting:'Đang đấu',finished:'Kết thúc',cancelled:'Đã hủy',rejected:'Từ chối',expired:'Hết hạn'}[m.status]}`,m.id)));
             el('petBattleMatches').replaceChildren(...options);
