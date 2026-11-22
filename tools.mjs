@@ -115,6 +115,8 @@ test('Firebase listeners are scoped, bounded, and opened on demand', () => {
     const notifications = source.slice(source.indexOf('function listenUserNotifications()'), source.indexOf('// QUICK CHAT'));
     assert.match(notifications, /orderBy\('timestamp', 'desc'\)/);
     assert.match(notifications, /limit\(50\)/);
+    assert.match(notifications, /error\?\.code === 'failed-precondition'/);
+    assert.match(notifications, /fallbackQuery[\s\S]*where\('userId', '==', uid\)[\s\S]*limit\(50\)/);
     const notes = source.slice(source.indexOf('function listenSharedNotes()'), source.indexOf('function stopSharedNotes()'));
     assert.match(notes, /limit\(50\)/);
     const workHours = source.slice(source.indexOf('function listenWorkHours()'), source.indexOf('function resolveWorkHoursDept('));
@@ -571,29 +573,6 @@ override = null; selected = new Set(['2026-11-09', '2026-11-10']);
 preview = vm.runInContext('getDayOffJobPreview()', ctx);
 assert.equal(preview.length, 2);
 assert.ok(preview.every(e => e.date === '2026-11-07'), 'consecutive off days shift together');
-
-const current = { uid: 'me', displayName: 'My name' };
-const storage = new Map([['workpic_history_me', JSON.stringify([
-    { id: 'expired', at: '2000-01-01T00:00:00Z' },
-    ...Array.from({ length: 50 }, (_, i) => ({ id: 'old-' + i, at: new Date().toISOString() }))
-])]]);
-let storageBlocked = false;
-const history = vm.createContext({
-    Date, currentUser: current, crypto: { randomUUID: () => 'new' },
-    localStorage: { getItem: key => storage.get(key) || null, setItem: (key, value) => { if (storageBlocked) throw new Error('Storage blocked'); storage.set(key, value); } },
-    getDocs: () => assert.fail('History must not read Firebase'), runTransaction: () => assert.fail('History must not write Firebase')
-});
-vm.runInContext(extract('function readLocalChangeHistory(', 'function renderChangeHistory('), history);
-await vm.runInContext("recordChange('job', 'Edit', 'Example', '09:00 → 10:00')", history);
-const storedHistory = JSON.parse(storage.get('workpic_history_me'));
-assert.equal(storedHistory.length, 50);
-assert.equal(storedHistory[0].id, 'old-1');
-assert.equal(storedHistory.at(-1).actorId, 'me');
-assert.equal(storedHistory.at(-1).detail, '09:00 → 10:00');
-assert.equal(vm.runInContext("readLocalChangeHistory('other').length", history), 0, 'account histories are isolated');
-storageBlocked = true;
-await vm.runInContext("recordChange('job', 'Edit', 'Example')", history);
-assert.equal(current.changeHistory.length, 50, 'blocked browser storage does not interrupt the main action');
 
 const noticeStorage = new Map();
 let rendered = 0;
@@ -2461,6 +2440,9 @@ try {
  await new Promise(resolve=>setTimeout(resolve,150));
  const arena=arenaRenderer.inspect();check(arena?.renderer&&arena.renderer!==peer.renderer,'arena has an independent real WebGL model');
  arena.renderer.render(arena.scene,arena.camera);const arenaGL=arena.renderer.getContext(),arenaPixels=new Uint8Array(arena.renderer.domElement.width*arena.renderer.domElement.height*4);arenaGL.readPixels(0,0,arena.renderer.domElement.width,arena.renderer.domElement.height,arenaGL.RGBA,arenaGL.UNSIGNED_BYTE,arenaPixels);check(arenaPixels.some((value,index)=>index%4===3&&value>0),'arena fighter paints visible pixels');
+ arenaRenderer.duelPose({criticalAt:Date.now()});check(arena.criticalGroup&&arena.criticalGhost&&!arena.model.visible,'critical hit animates a floating pet spirit above its grave');
+ arenaRenderer.duelPose({result:'defeat'});check(arena.resultGroup&&arena.resultGhost&&!arena.model.visible,'defeated fighter keeps the redesigned grave and ghost');
+ arenaRenderer.duelPose({result:null});check(arena.model.visible&&!arena.resultGroup,'leaving the result pose restores the original pet model');
  arenaRenderer.stop();arenaButton.remove();
  const draft=document.createElement('div');draft.id='draft-test';draft.className='pet-battle-model pet-battle-draft-model';draft.innerHTML='<span id="draft-test-art"></span>';document.body.appendChild(draft);
  const draftRenderer=createAttendancePet3D(draft.id,'draft-test-art',null,'draft');

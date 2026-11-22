@@ -4,6 +4,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+        // Firebase treats 127.0.0.1 and localhost as different OAuth domains.
+        // Keep local previews on the single development domain configured in Authentication.
+        if (location.hostname === '127.0.0.1') {
+            const localUrl = new URL(location.href);
+            localUrl.hostname = 'localhost';
+            location.replace(localUrl.href);
+        }
+    </script>
     <title>Job Schedule Manager</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -205,7 +214,7 @@
 
         <div class="container-fluid p-2">
             <div class="row">
-                <div class="col-lg-3 col-md-4" id="sidebar">
+                <div class="col-lg-3 col-md-4 hidden" id="sidebar" aria-hidden="true">
                     <div class="card shadow-sm job-list-card">
                         <div class="card-header modern-card-header modern-card-header-primary">
                             <div class="modern-card-header-inner">
@@ -230,13 +239,13 @@
                     </div>
                 </div>
 
-                <div class="col-lg-9 col-md-8" id="mainContent">
+                <div class="col-lg-9 col-md-8 expanded" id="mainContent">
                     <div class="card shadow-sm">
                         <div
                             class="card-header modern-card-header modern-card-header-success d-flex justify-content-between align-items-center flex-wrap gap-2">
                             <div class="modern-card-header-inner">
-                                <button class="btn btn-toggle-sidebar" id="toggleSidebarBtn" title="Ẩn/Hiện Sidebar">
-                                    <i class="bi bi-layout-sidebar-inset"></i>
+                                <button class="btn btn-toggle-sidebar sidebar-hidden" id="toggleSidebarBtn" title="Hiện Sidebar" aria-expanded="false" aria-controls="sidebar">
+                                    <i class="bi bi-layout-sidebar-inset-reverse"></i>
                                 </button>
                                 <div class="modern-card-header-icon">
                                     <i class="bi bi-calendar3" id="scheduleHeaderIcon"></i>
@@ -247,7 +256,6 @@
                                 </div>
                             </div>
                             <div class="d-flex align-items-center gap-2 flex-wrap">
-                                <button class="btn btn-sm btn-outline-light" id="changeHistoryBtn" type="button"><i class="bi bi-clock-history"></i> Lịch sử</button>
                                 <div class="schedule-view-tabs" role="group" aria-label="Chế độ xem lịch">
                                     <button class="schedule-view-tab active" type="button" data-view="calendar" aria-pressed="true"><i class="bi bi-calendar3"></i> Lịch cố định</button>
                                     <button class="schedule-view-tab" type="button" data-view="timeline" aria-pressed="false"><i class="bi bi-bar-chart-steps"></i> Timeline</button>
@@ -1091,16 +1099,6 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
     </div>
 
     <!-- Day Off Modal -->
-    <div class="modal fade workpic-dialog" id="changeHistoryModal" tabindex="-1" aria-labelledby="changeHistoryTitle">
-        <div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">
-            <div class="modal-header modern-header"><div class="modern-header-inner"><div class="modern-header-icon"><i class="bi bi-clock-history"></i></div><div><h5 class="modal-title" id="changeHistoryTitle">Lịch sử thay đổi của tôi</h5><p class="modern-header-subtitle mb-0">Theo dõi những cập nhật trong công việc của bạn</p></div></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div>
-            <div class="modal-body">
-                <p class="small text-muted">Tối đa 50 thay đổi trong 7 ngày, chỉ lưu trên trình duyệt này để tiết kiệm Firebase. Không đồng bộ giữa các máy.</p>
-                <div class="d-flex gap-2 mb-3 history-toolbar"><input id="changeHistorySearch" class="form-control" placeholder="Tìm tên, nội dung thay đổi…" aria-label="Tìm lịch sử"><select id="changeHistoryFilter" class="form-select w-auto" aria-label="Loại thay đổi"><option value="all">Tất cả</option><option value="job">Job</option><option value="off">Lịch off</option><option value="holiday">Lịch lễ</option><option value="event">Sự kiện</option></select></div>
-                <div id="changeHistoryList" aria-live="polite"></div>
-            </div>
-        </div></div>
-    </div>
     <div class="modal fade workpic-dialog" id="dayOffModal" tabindex="-1">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
@@ -1971,7 +1969,6 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
                                     <div class="ia-item">Hiện / ẩn Chủ Nhật<span>Toggle ở tiêu đề Lịch làm việc</span>
                                     </div>
                                     <div class="ia-item">Xem job hôm nay<span>Bấm Xem dữ liệu để xem Timeline và danh sách job theo ca ngày 07:00–20:00 hoặc ca đêm 20:00–07:00. Vạch đỏ chỉ giờ hiện tại, viền cầu vồng chỉ job đang chạy; bấm job để mở chi tiết.</span></div>
-                                    <div class="ia-item">Lịch sử thay đổi<span>Bấm Lịch sử để xem tối đa 50 thay đổi trong 7 ngày trên trình duyệt đang dùng. Có tìm kiếm và lọc; lịch sử không ghi Firebase và không đồng bộ giữa các máy.</span></div>
                                     <div class="ia-item">Tạo job bằng AI<span>Mở công cụ AI, cấu hình khóa API theo hộp thoại rồi dán tin nhắn/email/ghi chú. Kiểm tra và sửa tên, lịch, giờ, thời lượng trước khi tạo các job đã chọn.</span></div>
                                     <div class="ia-item">Hồ sơ cá nhân<span>Đổi avatar, tên hiển thị, bộ phận và ca làm việc. Khi đổi ca, có thể chuyển giờ các job hiện tại hoặc giữ nguyên.</span></div>
                                     <div class="ia-item">Mở folder nhanh<span>Bấm vào đường dẫn trong nội dung Job để

@@ -14476,8 +14476,6 @@ body.theme-dark .calendar-personal-event { color: #7dd3fc; }
 #personalEventForm .dayoff-toolbar label { flex: 1; min-width: 0; }
 #personalEventForm .form-control { font-size: .85rem; }
 #personalEventForm .btn { font-size: .8rem; padding: 6px 10px; }
-.change-history-entry { padding: 14px 0; border-bottom: 1px solid var(--border); }
-.change-history-detail { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .85rem; margin-top: 6px; }
 .job-checklist-panel { padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-muted); }
 .job-checklist-item { display: flex; align-items: start; gap: 10px; padding: 8px 0; cursor: pointer; overflow-wrap: anywhere; }
 .job-checklist-item input { margin-top: 4px; flex-shrink: 0; }
@@ -14551,17 +14549,9 @@ body.theme-light.fx-fullscreen-on[data-topbar-theme="rain"] {
 .calendar-holiday-label, .calendar-personal-event { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 100%; }
 
 /* Native controls and history follow the application's selected theme. */
-#changeHistoryModal, #dayOffModal, .job-checklist-panel { color-scheme: light; }
-body.theme-dark #changeHistoryModal, body.theme-dark #dayOffModal, body.theme-dark .job-checklist-panel { color-scheme: dark; }
+#dayOffModal, .job-checklist-panel { color-scheme: light; }
+body.theme-dark #dayOffModal, body.theme-dark .job-checklist-panel { color-scheme: dark; }
 .job-checklist-item input[type="checkbox"] { accent-color: var(--primary); width: 16px; height: 16px; cursor: pointer; }
-#changeHistoryModal .modal-content { background: var(--surface); color: var(--text); border-color: var(--border); }
-#changeHistoryModal .modal-header { border-color: var(--border); }
-#changeHistoryModal .form-control, #changeHistoryModal .form-select { background-color: var(--surface-muted); border-color: var(--border); color: var(--text); }
-#changeHistoryModal .form-control::placeholder { color: var(--muted); }
-#changeHistoryModal .text-muted { color: var(--muted) !important; }
-#changeHistoryModal .btn-close { filter: none; }
-body.theme-dark #changeHistoryModal .btn-close { filter: invert(1) grayscale(100%) brightness(200%); }
-body.theme-dark #changeHistoryModal .form-select,
 body.theme-dark #dayOffModal .form-select { --bs-form-select-bg-img: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23edf2ff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e"); }
 @media (max-width: 767px) {
     .dayoff-period-picker { flex: 1; }
@@ -15981,3 +15971,164 @@ body.modal-open .attendance-pet-swimmer,body:has(dialog[open]) .attendance-pet-s
 @keyframes pet-skill-flight-left { 0% { opacity:0; transform:translate(0,var(--y)) scale(.3); } 20% { opacity:1; } 75% { opacity:1; } 100% { opacity:0; transform:translate(-300px,var(--y)) scale(var(--power)); } }
 @media(max-width:700px) { .pet-battle-rps [data-pet-rps] { min-width:0; padding:14px 10px; } #petBattleRpsHands { font-size:1.1rem; } }
 @media(prefers-reduced-motion:reduce) { .pet-battle-skill span,.pet-battle-skill strong,.pet-battle-rps-reveal { animation:none!important; }.pet-battle-skill span { opacity:0; } }
+
+/* Compact phone typography and prevent labels from being clipped by fixed layouts. */
+@media(max-width:760px) {
+    html { font-size:14px; }
+    body { overflow-wrap:anywhere; }
+    :is(dialog,.modal-content,.card,.account-section,.settings-section) { min-width:0; }
+    :is(dialog,.modal-content,.card) :is(h1,h2,h3,h4,h5,h6,p,small,strong,label,button,a,span,td,th) { max-width:100%; overflow-wrap:anywhere; }
+    :is(.btn,button,.form-control,.form-select) { font-size:.78rem; line-height:1.35; }
+    .modal-header,.modal-footer { gap:8px; padding:10px 12px; }
+    .modal-body { padding:12px; }
+    .modal-title,.modern-header-title { font-size:1rem; line-height:1.35; }
+    .modern-header-subtitle,.text-muted { font-size:.72rem; line-height:1.45; }
+    .table-responsive { max-width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    .table { font-size:.72rem; }
+    .table :is(th,td) { padding:.42rem .48rem; white-space:normal; }
+    .schedule-actions .btn { min-width:0; }
+    #attendancePetDialog.attendance-pet-dialog,.pet-battle-dialog,.pet-compare-dialog,.pet-admin-dialog,.pet-branch-dialog { width:calc(100vw - 12px); max-width:calc(100vw - 12px); padding:12px; }
+    #attendancePetDialog > header,.pet-battle-dialog > header { gap:8px; }
+    .pet-compare-launch-row { gap:6px; }
+    .pet-compare-launch-row .btn { flex:1 1 120px; padding:8px; font-size:.72rem; }
+    .pet-roster-card strong { font-size:.69rem; }
+    .pet-roster-card small { font-size:.58rem; }
+    .pet-game-hud small { font-size:.5rem; }
+    .pet-game-hud strong { font-size:.66rem; }
+    #attendancePetDialog .attendance-pet-summary p,.pet-weight-card p { font-size:.68rem; }
+    .pet-battle-dialog button { padding:7px 9px; font-size:.7rem; }
+    .pet-battle-stat-fields label { font-size:.63rem; }
+    .pet-battle-model-stats > div { grid-template-columns:minmax(36px,auto) minmax(14px,1fr) auto; font-size:.47rem; }
+    .pet-battle-model-stats strong { font-size:.49rem; }
+    .pet-battle-log { font-size:.65rem; }
+    .shared-notes-panel,.quick-chat-panel { font-size:.78rem; }
+}
+@media(max-width:520px) {
+    html { font-size:13.5px; }
+    .pet-battle-draft-slots { grid-template-columns:minmax(0,1fr); }
+    .pet-battle-arena { grid-template-columns:minmax(0,1fr) 20px minmax(0,1fr); }
+    .pet-battle-model { height:175px; }
+    .pet-battle-model canvas,.pet-battle-model svg { max-height:175px; }
+    .pet-battle-model-stats { width:49%; padding:4px; }
+    .pet-battle-versus { font-size:.82rem; }
+    .pet-weight-card { align-items:flex-start; }
+    #attendancePetDialog .pet-weight-card p { max-width:52%; }
+    .pet-admin-weight-actions { width:100%; }
+}
+
+/* Final phone pass for every Bootstrap form, including Account and Settings. */
+@media(max-width:760px) {
+    body.modal-open { padding-right:0 !important; }
+    .modal { padding:0 !important; }
+    .modal .modal-dialog[class] {
+        width:calc(100vw - 10px) !important;
+        max-width:calc(100vw - 10px) !important;
+        height:calc(100dvh - 10px) !important;
+        min-height:0 !important;
+        max-height:calc(100dvh - 10px) !important;
+        margin:5px auto !important;
+    }
+    .modal .modal-content[class] {
+        width:100%;
+        height:100% !important;
+        max-height:100% !important;
+        border-radius:12px !important;
+    }
+    .modal :is(.modal-header,.modal-footer) { padding:10px 12px !important; }
+    .modal .modal-body { padding:12px !important; overflow-x:hidden; }
+    .modal .modern-header-inner { min-width:0; gap:8px; }
+    .modal .modern-header-icon { width:30px; height:30px; flex:0 0 30px; font-size:.86rem; }
+    .modal .modern-header-text { min-width:0; }
+    .modal .modal-title { font-size:.92rem !important; line-height:1.3; }
+    .modal .modern-header-subtitle { font-size:.65rem !important; line-height:1.35; }
+    .modal .btn-close,.modal .account-icon-button { flex:0 0 auto; }
+    .modal :is(.form-label,.form-check-label) { font-size:.76rem; line-height:1.4; }
+    .modal :is(.form-text,small,.text-muted) { font-size:.66rem; line-height:1.45; }
+    .modal .modal-footer > .btn { flex:1 1 110px; min-width:0; }
+    .modal :is(.row,[class*="-grid"],[class*="-toolbar"]) > * { min-width:0; }
+    .modal .input-group { min-width:0; flex-wrap:nowrap; }
+    .modal .input-group > :is(.form-control,.form-select) { min-width:0; }
+    .modal :is(.nav,.nav-tabs,.nav-pills) { max-width:100%; overflow-x:auto; flex-wrap:nowrap; scrollbar-width:thin; }
+    .modal :is(.nav-link,[role="tab"]) { flex:0 0 auto; white-space:nowrap; font-size:.72rem; }
+
+    #userProfileModal.modal .account-modal-body { gap:10px; }
+    #userProfileModal.modal .account-identity { gap:10px; padding:2px 0; }
+    #userProfileModal .profile-avatar-container,#userProfileModal .profile-avatar-img { width:48px; height:48px; border-radius:13px; }
+    #userProfileModal .account-identity-text h4 { margin:4px 0 2px; font-size:.88rem; }
+    #userProfileModal #profileEmail { font-size:.67rem !important; }
+    #userProfileModal.modal .account-section { padding:12px; border-radius:12px; }
+    #userProfileModal .account-section-heading { gap:8px; }
+    #userProfileModal .account-section-icon { width:30px; height:30px; flex:0 0 30px; }
+    #userProfileModal .account-section-heading :is(h6,strong) { font-size:.8rem; }
+    #userProfileModal .account-section-heading :is(p,small) { font-size:.64rem; }
+    #userProfileModal .account-field-grid { gap:10px; }
+    #userProfileModal .account-name-field { margin-bottom:11px; }
+    #userProfileModal .account-security-fields { padding-top:12px; margin-top:10px; }
+    #userProfileModal .account-security-actions .btn { width:100%; margin:0; }
+    #userProfileModal .account-modal-footer { gap:8px; }
+    #userProfileModal .account-modal-footer > * { flex:1 1 0; justify-content:center; }
+
+    #settingsModal.modal .modal-body { padding:10px !important; gap:8px; }
+    #settingsModal.modal .settings-section { padding:11px; border-radius:11px; }
+    #settingsModal.modal .settings-section-head { gap:8px; margin-bottom:8px; }
+    #settingsModal.modal .settings-section-head > i { width:28px; height:28px; flex:0 0 28px; font-size:.82rem; }
+    #settingsModal.modal .settings-section-head h6 { font-size:.78rem; }
+    #settingsModal.modal .settings-section-head small { font-size:.62rem; line-height:1.4; }
+    #settingsModal .theme-grid.theme-grid-compact { grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+    #settingsModal .theme-grid-compact .theme-card { min-width:0; min-height:58px; padding:7px 3px; }
+    #settingsModal .theme-grid-compact .theme-card-emoji { font-size:1.1rem; }
+    #settingsModal .theme-grid-compact .theme-card-name { font-size:.58rem; overflow-wrap:anywhere; }
+    #settingsModal.modal .job-switch-card { min-width:0; padding:8px 10px; }
+    #settingsModal.modal .job-switch-card .form-check-label { min-width:0; font-size:.7rem; }
+}
+@media(max-width:380px) {
+    .modal .modal-dialog[class] { width:100vw !important; max-width:100vw !important; height:100dvh !important; max-height:100dvh !important; margin:0 !important; }
+    .modal .modal-content[class] { border-radius:0 !important; }
+    .modal :is(.modal-header,.modal-footer) { padding:8px 10px !important; }
+    .modal .modal-body { padding:10px !important; }
+    #userProfileModal .account-name-field,#userProfileModal #profileNewDeptRow { flex-wrap:wrap; }
+    #userProfileModal .account-name-field > .form-control,#userProfileModal #profileNewDeptRow > .form-control { flex:1 0 100%; border-radius:8px; }
+    #userProfileModal .account-name-field > button,#userProfileModal #profileNewDeptRow > button { width:100%; margin-top:6px; border-radius:8px; }
+    #settingsModal .theme-grid.theme-grid-compact { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+
+/* Keep control and table density in step with the smaller phone typography. */
+@media(max-width:760px) {
+    :is(.modal,dialog,.card) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),select,textarea,.form-control,.form-select,.input-group-text) {
+        min-width:0;
+        min-height:32px !important;
+        height:auto;
+        padding:6px 8px !important;
+        font-size:.75rem !important;
+        line-height:1.35 !important;
+    }
+    :is(.modal,dialog,.card) textarea { min-height:84px !important; }
+    :is(.modal,dialog,.card) select,
+    :is(.modal,dialog,.card) .form-select { padding-right:26px !important; background-size:12px 9px; }
+    :is(.modal,dialog,.card) :is(.btn,button:not(.btn-close)) {
+        min-height:30px;
+        padding:6px 9px !important;
+        font-size:.72rem !important;
+        line-height:1.3;
+    }
+    :is(.modal,dialog,.card) :is(.table-responsive,[class*="table-wrap"],[class*="table-container"]) {
+        width:100%; max-width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch;
+    }
+    :is(.modal,dialog,.card) table { width:100%; font-size:.67rem !important; line-height:1.3; }
+    :is(.modal,dialog,.card) table :is(th,td) {
+        min-width:0;
+        padding:5px 6px !important;
+        font-size:inherit !important;
+        vertical-align:middle;
+    }
+    :is(.modal,dialog,.card) table :is(button,.btn) { min-height:26px; padding:4px 6px !important; font-size:.63rem !important; }
+    :is(.modal,dialog,.card) :is(.form-check-input[type="checkbox"],.form-check-input[type="radio"]) {
+        width:1rem; height:1rem; min-height:1rem !important; padding:0 !important;
+    }
+    :is(.modal,dialog,.card) .form-range { min-height:18px !important; padding:0 !important; }
+}
+@media(max-width:380px) {
+    :is(.modal,dialog,.card) table { font-size:.62rem !important; }
+    :is(.modal,dialog,.card) table :is(th,td) { padding:4px !important; }
+    :is(.modal,dialog,.card) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),select,textarea,.form-control,.form-select,.input-group-text) { font-size:.7rem !important; }
+}

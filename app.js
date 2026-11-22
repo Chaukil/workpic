@@ -854,7 +854,7 @@ let filteredJobs = [];
 let notificationCheckInterval;
 let firestoreConnected = false;
 let showSunday = true;
-let sidebarVisible = true;
+let sidebarVisible = false;
 let pendingConfirmCallback = null;
 let currentTheme = 'light';
 let uiRefreshInterval = null;
@@ -3929,7 +3929,6 @@ async function handleAuthenticatedUser(user) {
     if (auth.currentUser?.uid !== user.uid) return;
     currentUser.personalCalendarEvents = Array.isArray(userData?.personalCalendarEvents) ? userData.personalCalendarEvents : [];
     currentUser.holidayPolicy = userData?.holidayPolicy || {};
-    currentUser.changeHistory = readLocalChangeHistory(currentUser.uid);
 
     if (userData && userData.displayName) {
         // Store displayName in currentUser for easy access
@@ -4265,8 +4264,6 @@ function handleSignedOut() {
         unsubscribeTransferRequests = null;
     }
     currentUser = null;
-    bootstrap.Modal.getInstance(document.getElementById('changeHistoryModal'))?.hide();
-    document.getElementById('changeHistoryList').replaceChildren();
     try {
         [userProfileModal, jobModal, viewJobModal, dayOffModal,
             workHoursModal, salaryCalcModal, statisticsModal,
@@ -7565,11 +7562,13 @@ function listenUserNotifications() {
         limit(50)
     );
 
-    if (unsubscribeNotifications) unsubscribeNotifications();
-    unsubscribeNotifications = onSnapshot(q, (snapshot) => {
+    const handleSnapshot = (snapshot) => {
         if (currentUser?.uid !== uid) return;
         const readIds = localNotificationReads(uid);
-        notificationsList = snapshot.docs.map(d => ({ id: d.id, ...d.data(), read: d.data().read === true || readIds.has(d.id) }));
+        notificationsList = snapshot.docs
+            .map(d => ({ id: d.id, ...d.data(), read: d.data().read === true || readIds.has(d.id) }))
+            .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
+            .slice(0, 50);
 
         if (notifInitialLoadDone) {
             snapshot.docChanges().forEach(change => {
@@ -7598,9 +7597,27 @@ function listenUserNotifications() {
 
         if (notifDropdownOpen) markAllNotificationsRead();
         renderNotifDropdown();
-    }, (error) => {
+    };
+    const handleError = (error) => {
+        if (error?.code === 'failed-precondition' && currentUser?.uid === uid) {
+            // Keep notifications usable on projects that have not created the
+            // optional userId + timestamp composite index yet.
+            console.warn('Thiếu index thông báo; đang dùng truy vấn tương thích giới hạn 50 bản ghi.');
+            const fallbackQuery = query(
+                collection(db, 'notifications'),
+                where('userId', '==', uid),
+                limit(50)
+            );
+            unsubscribeNotifications = onSnapshot(fallbackQuery, handleSnapshot, fallbackError => {
+                console.error('Lỗi lắng nghe thông báo:', fallbackError);
+            });
+            return;
+        }
         console.error('Lỗi lắng nghe thông báo:', error);
-    });
+    };
+
+    if (unsubscribeNotifications) unsubscribeNotifications();
+    unsubscribeNotifications = onSnapshot(q, handleSnapshot, handleError);
 }
 
 
@@ -7625,7 +7642,19 @@ function listenQuickJobs() {
     quickChatInitialLoadDone = false;
 
     const recentSince=new Date(Date.now()-30*86400000).toISOString();
-    const q=query(collection(db,'quickJobs'),or(where('status','in',['open','invited']),where('createdAt','>=',recentSince)));
+    const activeQuery=query(
+        collection(db,'quickJobs'),
+        where('status','in',['open','invited']),
+        limit(100)
+    );
+    const recentQuery=query(
+        collection(db,'quickJobs'),
+        where('createdAt','>=',recentSince),
+        orderBy('createdAt','desc'),
+        limit(100)
+    );
+    const sourceDocs={active:new Map(),recent:new Map()};
+    const readySources=new Set();
 
     if (unsubscribeQuickJobs) unsubscribeQuickJobs();
     const onJobs=snapshot=>{
@@ -7671,7 +7700,20 @@ function listenQuickJobs() {
     const reportError=error=>{
         console.error('Lỗi lắng nghe job trong ngày:', error);
     };
-    unsubscribeQuickJobs=onSnapshot(q,onJobs,reportError);
+    const receiveSource=(source,snapshot)=>{
+        const docs=sourceDocs[source];
+        docs.clear();
+        snapshot.docs.forEach(item=>docs.set(item.id,item));
+        readySources.add(source);
+        if(readySources.size<2)return;
+        const merged=new Map([...sourceDocs.active,...sourceDocs.recent]);
+        onJobs({docs:[...merged.values()],docChanges:()=>snapshot.docChanges()});
+    };
+    const unsubscribers=[
+        onSnapshot(activeQuery,snapshot=>receiveSource('active',snapshot),reportError),
+        onSnapshot(recentQuery,snapshot=>receiveSource('recent',snapshot),reportError)
+    ];
+    unsubscribeQuickJobs=()=>unsubscribers.forEach(unsubscribe=>unsubscribe());
 }
 
 // Job trong ngày: chỉ hiện cho người cùng bộ phận với người báo job (job do mình tạo / nhận / được chỉ định luôn hiện).
@@ -8718,14 +8760,111 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
         if(state?.previewMode)document.getElementById(previewId).innerHTML=art.innerHTML.replaceAll(artId+'-egg-light',previewId+'-egg-light').replaceAll(artId+'-fish-light',previewId+'-fish-light');
     };
     function disposeModel(s) {
+        disposeBattleCritical(s);
+        disposeBattleResult(s);
         if (!s.model) return;
         const geometries=new Set(),materials=new Set(),textures=new Set();
         s.model.traverse(object=>{if(object.geometry)geometries.add(object.geometry);const mats=object.material?Array.isArray(object.material)?object.material:[object.material]:[];mats.forEach(mat=>materials.add(mat));});
         s.scene.remove(s.model);geometries.forEach(value=>value.dispose());materials.forEach(value=>{for(const key of ['map','bumpMap','roughnessMap'])if(value[key])textures.add(value[key]);value.dispose();});textures.forEach(value=>value.dispose());
     }
+    function disposeBattleCritical(s){
+        if(!s.criticalGroup)return;
+        s.scene.remove(s.criticalGroup);
+        const materials=new Set();
+        s.criticalGroup.traverse(object=>{if(object.material)(Array.isArray(object.material)?object.material:[object.material]).forEach(material=>materials.add(material));});
+        materials.forEach(material=>material.dispose());
+        s.criticalGeometries?.forEach(geometry=>geometry.dispose());
+        s.criticalGroup=null;s.criticalGhost=null;s.criticalSpirit=null;s.criticalMotes=null;s.criticalAt=0;
+        if(s.model)s.model.visible=true;
+    }
+    function disposeBattleResult(s){
+        if(!s.resultGroup)return;
+        s.scene.remove(s.resultGroup);
+        const materials=new Set();
+        s.resultGroup.traverse(object=>{if(object.material)(Array.isArray(object.material)?object.material:[object.material]).forEach(material=>materials.add(material));});
+        materials.forEach(material=>material.dispose());
+        s.resultGeometries?.forEach(geometry=>geometry.dispose());
+        s.resultGroup=null;s.resultGhost=null;s.resultSpirit=null;s.resultMotes=null;s.resultGeometries=[];
+    }
+    function createGraveSpirit(s,geometries){
+        const T=s.THREE,group=new T.Group();
+        const makeMaterial=(color,options={})=>{
+            const material=new T.MeshStandardMaterial({color,roughness:.82,...options});
+            material.userData.baseOpacity=material.opacity;
+            return material;
+        };
+        const add=(geometry,mat,x,y,z,target=group)=>{const mesh=new T.Mesh(geometry,mat);mesh.position.set(x,y,z);target.add(mesh);geometries.push(geometry);return mesh;};
+        const stone=makeMaterial('#7d8992'),stoneLight=makeMaterial('#c8d1d2'),engraving=makeMaterial('#394956');
+        add(new T.BoxGeometry(1.05,.13,.48),stone,-.03,-.83,0);
+        const arch=new T.Shape();
+        arch.moveTo(-.43,-.73);arch.lineTo(-.43,.04);arch.quadraticCurveTo(-.43,.40,0,.42);arch.quadraticCurveTo(.43,.40,.43,.04);arch.lineTo(.43,-.73);arch.closePath();
+        const monument=new T.ExtrudeGeometry(arch,{depth:.15,bevelEnabled:true,bevelSegments:3,steps:1,bevelSize:.035,bevelThickness:.035,curveSegments:12});
+        add(monument,stone,0,-.34,0);
+        add(new T.BoxGeometry(.075,.35,.035),stoneLight,0,-.23,.105);
+        add(new T.BoxGeometry(.24,.075,.035),stoneLight,0,-.2,.105);
+        add(new T.TorusGeometry(.24,.025,7,24),engraving,0,-.58,.12).scale.set(.8,.3,1);
+        add(new T.SphereGeometry(.055,12,8),stoneLight,0,-.58,.15);
+
+        const spirit=new T.Group();spirit.position.set(0,.22,.02);group.add(spirit);
+        const ghost=s.model.clone(true);ghost.scale.setScalar(.38);
+        ghost.traverse(object=>{
+            if(!object.isMesh||!object.material)return;
+            object.material=(Array.isArray(object.material)?object.material:[object.material]).map(source=>{
+                const clone=source.clone();
+                if(clone.color)clone.color.lerp(new T.Color('#c7f5ff'),.62);
+                if(clone.emissive)clone.emissive.set('#4ccfe5');
+                clone.emissiveIntensity=.52;clone.transparent=true;clone.opacity=.78;clone.userData.baseOpacity=.78;clone.depthWrite=false;
+                return clone;
+            });
+        });
+        spirit.add(ghost);
+        const glow=makeMaterial('#b9f5ff',{transparent:true,opacity:.35,emissive:'#39bad4',emissiveIntensity:.7,depthWrite:false});
+        add(new T.SphereGeometry(.58,16,12),glow,0,0,-.18,spirit);
+        const wisp=makeMaterial('#d8fbff',{transparent:true,opacity:.78,emissive:'#5ed6e8',emissiveIntensity:.38,depthWrite:false});
+        const motes=[];
+        for(let i=0;i<5;i++){
+            const mote=add(new T.SphereGeometry(.035+(i%2)*.018,8,6),wisp,0,0,.18);
+            mote.userData.orbit=i*Math.PI*2/5;
+            motes.push(mote);
+        }
+        return {group,ghost,spirit,motes,geometries};
+    }
+    function fadeGraveSpirit(group,opacity){
+        group.traverse(object=>{
+            if(!object.material)return;
+            for(const material of Array.isArray(object.material)?object.material:[object.material]){
+                material.transparent=true;
+                material.opacity=(material.userData.baseOpacity??1)*opacity;
+            }
+        });
+    }
+    function startBattleCritical(s,at){
+        if(!at||s.criticalStartedAt===at||s.result||!s.model||!s.THREE)return;
+        disposeBattleCritical(s);
+        s.criticalStartedAt=at;
+        const spirit=createGraveSpirit(s,[]);
+        s.criticalGroup=spirit.group;s.criticalGhost=spirit.ghost;s.criticalSpirit=spirit.spirit;
+        s.criticalMotes=spirit.motes;s.criticalGeometries=spirit.geometries;s.criticalAt=at;
+        s.criticalGroup.scale.setScalar(.08);s.criticalGroup.position.y=-.15;
+        s.model.visible=false;s.scene.add(s.criticalGroup);
+    }
+    function setBattleResult(s,result){
+        if(s.result===result)return;
+        disposeBattleCritical(s);disposeBattleResult(s);
+        if(s.model)s.model.visible=true;
+        s.result=result;
+        if(result!=='defeat'||!s.model||!s.THREE)return;
+        const spirit=createGraveSpirit(s,[]);
+        s.resultGroup=spirit.group;s.resultGhost=spirit.ghost;s.resultSpirit=spirit.spirit;
+        s.resultMotes=spirit.motes;s.resultGeometries=spirit.geometries;
+        s.resultGroup.scale.setScalar(.92);s.resultGhost.position.set(0,.03,0);
+        s.model.visible=false;s.scene.add(s.resultGroup);
+    }
     function build(s,view) {
         disposeModel(s);
+        s.result=null;
         const T=s.THREE,group=new T.Group();s.model=group;s.rig=[];s.mouth=null;s.scene.add(group);
+        const applyBattleResult=()=>{if(s.duel?.result)setBattleResult(s,s.duel.result);};
         const variant=!!view.form.crest;
         const mainColor=new T.Color(view.form.color);
         if(view.form.juvenile)mainColor.lerp(new T.Color('#e5e3d3'),.1);
@@ -8824,7 +8963,7 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
         if(view.egg){
             sphere(group,0,0,0,.62,.84,.62,material('#ece9da'));
             for(let i=0;i<10;i++){const angle=i*2.399;const y=-.5+i*.105;const r=.61*Math.sqrt(Math.max(.1,1-y*y));sphere(group,Math.sin(angle)*r,y,Math.cos(angle)*r,.05,.07,.025,material(i%2?'#bfaa77':'#adc4c7'));}
-            group.rotation.z=.07;return;
+            group.rotation.z=.07;applyBattleResult();return;
         }
         const shape=view.form.shape,kind=view.form.kind;
         if(shape==='tortoise'){
@@ -8842,7 +8981,7 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
                 s.rig.push({mesh:foot,axis:'z',amount:.22,phase:x+side});
             }
             tube(group,[[-.85,.04,0],[-1.12,.16,.22],[-1.26,.43,.3],[-1.1,.62,.18]],[.13,.095,.066,.024],finMat);
-            return;
+            applyBattleResult();return;
         }
         if(shape==='mermaid'){
             const skinTone=material(view.dead?'#8b929b':'#e8b99d'),hair=material('#6b404b'),tailMat=material(mainColor);
@@ -8855,7 +8994,7 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
             tube(tail,[[.31,.12,0],[-.11,-.11,0],[-.62,-.28,.04],[-1.07,-.13,0]],[.21,.17,.12,.065],tailMat);
             fin(tail,[[-.97,-.15],[-1.44,.20],[-1.7,.27],[-1.41,-.11],[-1.68,-.43],[-1.31,-.36]],material('#9ce4d8'));
             s.rig.push({mesh:tail,axis:'y',amount:.26,phase:0});
-            return;
+            applyBattleResult();return;
         }
         if(kind==='beast'){
             organicBody([[-.2,.02,0,.8,.34,.27],[.42,.12,0,.36,.38,.29],[.64,.29,0,.26,.34,.25],[.93,.38,0,.32,.28,.26]],bodyMat);
@@ -8877,14 +9016,14 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
             }
             if(shape==='lynx')for(const side of [-1,1])cone(group,.84,.85,side*.18,.025,.18,black);
             if(shape==='sabertooth')for(const side of [-1,1])tube(group,[[1.16,.2,side*.16],[1.21,.03,side*.16],[1.15,-.12,side*.16]],[.035,.025,.001],cream);
-            return;
+            applyBattleResult();return;
         }
         if(shape==='sea'){
             sphere(group,-.15,0,0,1.05,.34,.34,bodyMat);sphere(group,.85,.06,0,.62,.22,.25,bodyMat);sphere(group,1.18,-.08,0,.48,.08,.24,cream);eyes(group,1.02,.13,.24);
             const tail=cone(group,-1.55,.03,0,.25,1.3,finMat,Math.PI/2);s.rig.push({mesh:tail,axis:'y',amount:.25,phase:0});
             for(const side of [-1,1])for(const x of [-.5,.5]){const flipper=fin(group,[[x,.03],[x-.4,-.7],[x+.2,-.1]],finMat,side*.25);flipper.rotation.x=side*.8;s.rig.push({mesh:flipper,axis:'x',base:side*.8,amount:.25,phase:side+x});}
             for(let i=0;i<6;i++)cone(group,.75+i*.13,-.04,.24,.025,.1,cream,Math.PI);
-            return;
+            applyBattleResult();return;
         }
         if(['trex','raptor','spino'].includes(shape)){
             // Horizontal torso, muscular hips, S-shaped neck and long counterbalancing tail.
@@ -8925,7 +9064,7 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
             if(shape==='raptor'){for(let i=0;i<7;i++)cone(group,-.4+i*.13,.48,0,.04,.15,finMat);}
             group.scale.setScalar(.87);
             if(shape==='raptor')group.scale.y*=.88;
-            return;
+            applyBattleResult();return;
         }
         if(kind==='bird'){
             sphere(group,-.05,0,0,.63,.32,.29,bodyMat);
@@ -8951,7 +9090,7 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
             if(['crane','albatross','condor'].includes(shape))group.scale.z=1.4;
             if(shape==='parrot')cone(group,.79,.09,0,.11,.21,material('#d9ad57'),-.5);
             if(shape==='peacock')for(let i=0;i<11;i++){const feather=sphere(group,-.95,.08,(i-5)*.09,.6,.025,.09,material(i%2?'#3b8971':'#466da5'));feather.rotation.y=(i-5)*.09;}
-            return;
+            applyBattleResult();return;
         }
         if(kind==='dino'){
             const bodyParts=[[-.1,0,0,.92+(variant?(view.level%4)*.06:0),.5,.43],[.52,.25,0,.32,.42,.3]];
@@ -8983,7 +9122,7 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
                 for(let i=0;i<count;i++)cone(group,-1.15+i*.25,.5+Math.sin(i/count*Math.PI)*.2,0,.13,.35+(i%2)*.15,material(shape==='stego'?'#fbbf24':'#e9d5ff'));
             }
             if(shape==='dragon')[-1,1].forEach(side=>{const wing=fin(group,[[-.4,.2],[-.8,1.3],[.15,.95],[.45,.25]],material('#c4b5fd'),side*.35);wing.rotation.x=side*.8;s.rig.push({mesh:wing,axis:'x',base:side*.8,amount:.2,phase:side});});
-            return;
+            applyBattleResult();return;
         }
         if(clown){
             const profile=new T.SplineCurve([[-1.03,.025],[-.88,.115],[-.60,.32],[-.18,.48],[.28,.46],[.59,.36],[.82,.23],[.96,.025]].map(([x,r])=>new T.Vector2(r,x)));
@@ -9012,7 +9151,7 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
                 sphere(group,.718,.082,side*.273,.023,.021,.010,cream);
             }
             tube(group,[[.84,-.096,-.101],[.918,-.105,0],[.84,-.096,.101]],[.014,.023,.014],lip);
-            return;
+            applyBattleResult();return;
         }
         if(shape==='angel'){
             const royal=material(view.dead?'#71809a':'#1746b5'),deep=material(view.dead?'#5f6b7c':'#102f88'),gold=material(view.dead?'#8f8b78':'#e8b62d');
@@ -9031,7 +9170,7 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
             tube(group,[[-.25,-.64,.02],[-.70,-.98,.01],[-1.12,-1.18,0]],[.014,.009,.002],deep);
             eyes(group,.69,.12,.245);
             const mouth=new T.Mesh(new T.TorusGeometry(.065,.014,8,18),deep);mouth.position.set(1.02,-.10,0);mouth.rotation.y=Math.PI/2;group.add(mouth);s.mouth=mouth;
-            return;
+            applyBattleResult();return;
         }
         const round=shape==='puffer',disc=['angel','tang'].includes(shape),whale=kind==='whale',ray=shape==='ray';
         const size=shape==='small'?.78:whale?1.2:1;
@@ -9065,6 +9204,7 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
         if(whale)sphere(group,.3,.52,0,.08,.025,.065,black);
         if(kind==='shark')for(let i=0;i<5;i++)for(const side of [-1,1])cone(group,.53+i*.12,-.28,side*.24,.024,.09,cream,Math.PI);
         const mouth=new T.Mesh(new T.TorusGeometry(.07,.018,8,18),finMat);mouth.position.set(size*.98,-.08,0);mouth.rotation.y=Math.PI/2;group.add(mouth);s.mouth=mouth;
+        if(s.duel?.result)setBattleResult(s,s.duel.result);
     }
     function stop(){
         generation++;const s=state;state=null;if(!s)return;
@@ -9161,6 +9301,18 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
                     const pose=s.previewAttack||s.duel||{},attackAge=(Date.now()-(pose.attackAt||0))/1000,hitAge=(Date.now()-(pose.hitAt||0))/1000;
                     const lunge=attackAge>=0&&attackAge<.9?Math.sin(attackAge/.9*Math.PI):0,hurt=hitAge>=0&&hitAge<.5?(1-hitAge/.5):0;
                     const direction=pose.facing? -1:1;s.model.rotation.y=pose.facing||0;
+                    if(pose.result==='defeat'&&s.resultGhost){
+                        s.resultSpirit.position.y=.22+Math.sin(s.t*2.3)*.045;
+                        s.resultGhost.rotation.z=Math.sin(s.t*1.4)*.055;
+                        s.resultMotes?.forEach((mote,i)=>{
+                            const angle=s.t*1.8+mote.userData.orbit;
+                            mote.position.set(Math.cos(angle)*(.46+i%2*.08),.18+Math.sin(angle)*.18,.18+Math.sin(angle*2)*.04);
+                        });
+                    }else if(pose.result==='victory'){
+                        const jump=Math.max(0,Math.sin((s.t*1.7%1)*Math.PI));
+                        s.model.position.set(0,reduced?0:jump*.62,0);
+                        s.model.rotation.z=reduced?0:jump*.12;
+                    }else{
                     const motion=pose.skill?.motion,variant=pose.skill?.variant||0;
                     const aerial=motion==='dive',claw=motion==='claw',heavy=motion==='slam'||pose.kind==='whale';
                     const power=1+Math.min(3,Math.floor((pose.level||1)/8))*.15;
@@ -9170,10 +9322,27 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
                     s.model.position.set(reduced?0:direction*lunge*reach*power+(Math.sin(s.t*65)*hurt*.035),reduced?0:dive*peak+Math.sin(s.t*2)*.025,0);
                     s.model.rotation.z=pose.defeated?Math.PI*.65:reduced?0:Math.sin(s.t*50)*hurt*.04+(aerial?-direction*lunge*.60:claw?direction*lunge*.32:-direction*lunge*.12);
                     updateBattleBurst(s,pose,attackAge,direction,reduced);
+                    }
                     if(s.previewAttack&&attackAge>=1.15){s.previewAttack=null;disposeBattleBurst(s);}
                 }else if(staged){
                     s.model.rotation.y=reduced?-.28:presentation==='showcase'?s.t*.62-.28:Math.sin(s.t*1.3)*.24-.2;
                     s.model.position.y=reduced?0:Math.sin(s.t*2)*.055;
+                }
+                if(s.criticalGroup){
+                    const age=(Date.now()-s.criticalAt)/1000;
+                    if(age>=1.72)disposeBattleCritical(s);
+                    else{
+                        const rise=Math.min(1,age/.32),fade=age<1.22?1:Math.max(0,(1.72-age)/.5);
+                        s.criticalGroup.scale.setScalar(.08+rise*.84);
+                        s.criticalGroup.position.y=-.15+rise*.12;
+                        s.criticalSpirit.position.y=.22+rise*.5+Math.sin(s.t*4)*.045;
+                        s.criticalGhost.rotation.z=Math.sin(s.t*2.4)*.08;
+                        s.criticalMotes?.forEach((mote,i)=>{
+                            const angle=s.t*3+mote.userData.orbit;
+                            mote.position.set(Math.cos(angle)*(.46+i%2*.08),.18+Math.sin(angle)*.18,.18+Math.sin(angle*2)*.04);
+                        });
+                        fadeGraveSpirit(s.criticalGroup,fade);
+                    }
                 }
                 s.renderer.render(s.scene,s.camera);
             }
@@ -9206,7 +9375,7 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
             if(s.view)fallback(s.view);
         });
     }
-    function update(view){const s=state;if(!s)return;s.view=view;resizePet(s);const key=`${view.egg?'egg':view.level}:${view.branch}:${view.form.name}:${view.dead}`;if(s.signature===key)return;s.signature=key;if(s.renderer)build(s,view);else if(s.loadFailed)fallback(view);}
+    function update(view){const s=state;if(!s)return;s.view=view;if(!staged)s.button.style.cursor=view.hungry&&!view.dead&&!view.egg?attendancePetFoodCursor(view):'pointer';resizePet(s);const key=`${view.egg?'egg':view.level}:${view.branch}:${view.form.name}:${view.dead}`;if(s.signature===key)return;s.signature=key;if(s.renderer)build(s,view);else if(s.loadFailed)fallback(view);}
     function preview(open){
         const s=state;if(!s)return;s.previewMode=open;
         const container=document.getElementById(open?previewId:artId);
@@ -9232,9 +9401,21 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
         fallback(view);const art=document.getElementById(artId);
         return art?.querySelector('svg')?'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(art.innerHTML):null;
     }
-    return {start,stop,update,preview,thumbnail,duelPose:pose=>{if(state)state.duel=pose;},castSkill:skill=>{if(state?.view&&!state.view.dead&&!state.view.egg)state.previewAttack={attackAt:Date.now(),facing:0,kind:state.view.form.kind,level:state.view.level,skill,skillColor:state.view.form.color};},feed:()=>{if(state)state.fedAt=state.t;}};
+    return {start,stop,update,preview,thumbnail,duelPose:pose=>{if(state){state.duel=pose;const result=pose.result||null;setBattleResult(state,result);if(!result)startBattleCritical(state,pose.criticalAt);}},castSkill:skill=>{if(state?.view&&!state.view.dead&&!state.view.egg)state.previewAttack={attackAt:Date.now(),facing:0,kind:state.view.form.kind,level:state.view.level,skill,skillColor:state.view.form.color};},feed:()=>{if(state)state.fedAt=state.t;}};
 }
 const AttendancePet3D=createAttendancePet3D();
+
+const ATTENDANCE_PET_FOOD_CURSORS={
+    fish:'<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path d="M5 16c5-7 14-8 20-2l5-4v12l-5-4c-6 6-15 5-20-2z" fill="#67c9e8" stroke="#164e63" stroke-width="1.5"/><circle cx="10" cy="14" r="1.3" fill="#0f172a"/></svg>',
+    dino:'<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path d="M10 5 7 9l2 3-3 4 3 3-1 5 5 3 4-2 5 2 4-4-2-5 2-5-4-3-1-5-5 2z" fill="#c96f58" stroke="#713f32" stroke-width="1.5"/><path d="m12 11 2 2m4-4 1 3m3 3-2 2m-7 4 2-1" stroke="#f6c6a9" stroke-width="1.5" stroke-linecap="round"/></svg>',
+    bird:'<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path d="M7 25c-4-4 1-8 5-5s7 2 7-2 5-5 7-1-1 7-5 6-6 0-7 4-5 3-7-2z" fill="none" stroke="#80b95a" stroke-width="5" stroke-linecap="round"/><circle cx="24" cy="16" r="2" fill="#d87944"/></svg>',
+    beast:'<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path d="M10 12 6 8 4 10l5 8-4 6 2 2 7-5h5l7 5 2-2-4-6 5-8-2-2-4 4z" fill="#f3e5c4" stroke="#7c6f5a" stroke-width="1.5" stroke-linejoin="round"/><path d="M13 15h6v5h-6z" fill="#7c6f5a"/></svg>',
+    plant:'<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path d="M16 27V12m0 7c-8 0-10-5-10-10 6 0 10 3 10 10zm0-4c0-7 4-10 10-10 0 6-2 10-10 10z" fill="#77b95c" stroke="#285b39" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+};
+function attendancePetFoodCursor(view){
+    const kind=view.form.kind,food=kind==='bird'?'bird':kind==='beast'?'beast':view.form.shape==='tortoise'?'plant':view.form.shape==='sea'||['fish','shark','whale'].includes(kind)?'fish':'dino';
+    return `url("data:image/svg+xml,${encodeURIComponent(ATTENDANCE_PET_FOOD_CURSORS[food])}") 8 8, pointer`;
+}
 
 const canControlPets = () => auth.currentUser?.email?.toLowerCase() === 'chauchikil01@gmail.com';
 let petAdminProfiles = [], petAdminBusy = false, petAdminLoad = 0;
@@ -9718,12 +9899,57 @@ function attendancePetMessage(message) {
     attendancePetBubbleTimer = setTimeout(()=>bubble.classList.remove('show'),3500);
 }
 
+let petSkillAudioContext=null;
+function unlockPetSkillAudio(){
+    const Audio=window.AudioContext||window.webkitAudioContext;
+    if(!Audio)return null;
+    if(!petSkillAudioContext||petSkillAudioContext.state==='closed'){
+        try{petSkillAudioContext=new Audio();}
+        catch(error){console.warn('Không thể tạo âm thanh thú cưng:',error);return null;}
+    }
+    if(petSkillAudioContext.state==='suspended')petSkillAudioContext.resume().catch(error=>console.warn('Không thể bật âm thanh thú cưng:',error));
+    return petSkillAudioContext;
+}
+
+function playPetSkillSound(view,skill){
+    const audio=unlockPetSkillAudio();
+    if(!audio)return;
+    const sounds={
+        dive:{wave:'triangle',start:880,end:320,duration:.2,notes:[1,.75]},
+        claw:{wave:'sawtooth',start:620,end:180,duration:.16,notes:[1,.68]},
+        shield:{wave:'sine',start:260,end:420,duration:.3,notes:[1,1.5]},
+        song:{wave:'sine',start:520,end:780,duration:.32,notes:[1,1.25,1.5]},
+        slam:{wave:'square',start:150,end:55,duration:.24,notes:[1,.5]},
+        bite:{wave:'sawtooth',start:440,end:110,duration:.15,notes:[1,.6]},
+        swim:{wave:'triangle',start:500,end:250,duration:.24,notes:[1,1.2]}
+    };
+    const sound=sounds[skill.motion];
+    if(!sound)return;
+    const shape=String(view.form.shape||view.form.kind);
+    const shapeOffset=[...shape].reduce((sum,char)=>sum+char.charCodeAt(0),0)%9;
+    const pitch=(1+shapeOffset*.025)*(1+Math.max(0,skill.variant%8)*.012);
+    const at=audio.currentTime;
+    sound.notes.forEach((ratio,index)=>{
+        const oscillator=audio.createOscillator(),gain=audio.createGain(),start=at+index*.045;
+        oscillator.type=sound.wave;
+        oscillator.frequency.setValueAtTime(sound.start*pitch*ratio,start);
+        oscillator.frequency.exponentialRampToValueAtTime(Math.max(35,sound.end*pitch*ratio),start+sound.duration);
+        gain.gain.setValueAtTime(.0001,start);
+        gain.gain.exponentialRampToValueAtTime(index===0?.12:.07,start+.012);
+        gain.gain.exponentialRampToValueAtTime(.001,start+sound.duration);
+        oscillator.connect(gain);gain.connect(audio.destination);
+        oscillator.onended=()=>{oscillator.disconnect();gain.disconnect();};
+        oscillator.start(start);oscillator.stop(start+sound.duration+.01);
+    });
+}
+
 function previewAttendancePetSkill(){
     if(!attendancePetReady)return;
     const view=selectedAttendancePetView();
     if(view.dead||view.egg){attendancePetMessage(view.egg?'Thú cưng cần nở trước khi dùng chiêu.':'Hãy hồi sinh thú cưng trước khi dùng chiêu.');return;}
     const preview=document.getElementById('attendancePetPreview'),skill=petBattleSkill(view);
     preview.querySelector('.pet-preview-skill')?.remove();
+    playPetSkillSound(view,skill);
     AttendancePet3D.castSkill(skill);
     const fx=document.createElement('div');fx.className=`pet-preview-skill skill-${skill.effect}`;fx.style.setProperty('--skill-color',view.form.color);fx.style.setProperty('--power','1.35');
     const glyph={water:'○',fang:'⟫',wave:'≋',fire:'✦',wind:'❯',claw:'╱'}[skill.effect]||'✦';
@@ -9839,6 +10065,10 @@ async function actOnAttendancePet(action) {
     if (!currentUser || !attendancePetRef || attendancePetBusy || !attendancePetReady) return;
     const generation = attendancePetGeneration, uid = currentUser.uid, ref = attendancePetRef, targetId=attendancePetSelected(attendancePetData,selectedAttendancePetId).id;
     const previousLevel = selectedAttendancePetView().level;
+    if(action==='feed'){
+        AttendancePet3D.feed();
+        attendancePetMessage('Đang đưa thức ăn…');
+    }
     attendancePetBusy = true; renderAttendancePet();
     try {
         assertPetQuotaAvailable();
@@ -9863,7 +10093,6 @@ async function actOnAttendancePet(action) {
         Object.assign(messages,{branched:`Đã chọn nhánh ${after.branch?ATTENDANCE_PET_BRANCHES[after.branch].name:''}. Tiến độ điểm danh được giữ nguyên.`,'branch-locked':'Đạt cá đuối cấp 9 để mở nhánh.','already-branch':'Bạn đang ở nhánh này.'});
         attendancePetMessage(result.result==='checked' && after.level>previousLevel && !after.egg ? `Tiến hóa! Cấp ${after.level} · ${after.name}.` : messages[result.result] || 'Đã đồng bộ thú cưng.');
         if(result.spawned)attendancePetMessage(`Chúc mừng đạt cấp tối đa! Đã nhận ${result.spawned} trứng mới. Thú cưng trưởng thành vẫn ở trong đàn.`);
-        if (result.result==='fed') AttendancePet3D.feed();
     } catch (error) {
         if (generation===attendancePetGeneration) attendancePetMessage(petQuotaErrorText(error)||'Chưa lưu được. Kiểm tra kết nối và quyền cập nhật hồ sơ rồi thử lại.');
     } finally {
@@ -10568,7 +10797,8 @@ const PetBattleGame=(()=>{
         if(!play.last||Date.now()-petBattleTime(m.startedAt)-(m.introMs===5000?5000:2000)-(play.count-1)*PET_BATTLE_STEP_MS>1200)return;
         const attacker=m.players.find(p=>p.uid===play.last.attacker);if(!attacker)return;
         const level=attacker.appearance.level,tier=Math.min(3,Math.floor((level-1)/8));
-        const {effect,label,variant}=petBattleSkill(attacker.appearance);
+        const skill=petBattleSkill(attacker.appearance),{effect,label,variant}=skill;
+        playPetSkillSound(attacker.appearance,skill);
         const glyph={water:'○',fang:'⟫',wave:'≋',fire:'✦',wind:'❯',claw:'╱'}[effect];
         const fx=document.createElement('div');fx.className=`pet-battle-skill skill-${effect} tier-${tier}`;fx.dataset.direction=play.last.attacker===m.players[0].uid?'right':'left';fx.setAttribute('aria-hidden','true');
         fx.style.setProperty('--power',String(1+tier*.35));
@@ -10668,7 +10898,7 @@ const PetBattleGame=(()=>{
         renderStatComparison(m.players,effectiveStats);
         const guestPetId=incoming&&el('petBattlePet').value;
         const guestView=guestPetId?attendancePetView(attendancePetSelected(attendancePetData,guestPetId)):null;
-        ensureModels(m,guestView);const play=petBattlePlayback(m),full=m.maxHp?.length?m.maxHp:effectiveStats.map(petBattleMaxHp),hp=play.hp.length?play.hp:full;
+        ensureModels(m,guestView);const play=petBattlePlayback(m),battleEnded=m.status==='finished'||play.finished,full=m.maxHp?.length?m.maxHp:effectiveStats.map(petBattleMaxHp),hp=play.hp.length?play.hp:full;
         const ready=m.status==='ready';
         el('petBattleReadyPanel').hidden=!ready;
         if(ready){
@@ -10701,7 +10931,9 @@ const PetBattleGame=(()=>{
             el(`petBattleHp${i}`).max=full[i]||100;el(`petBattleHp${i}`).value=hp[i]??full[i]??100;el(`petBattleHpText${i}`).textContent=p?`${hp[i]??full[i]} / ${full[i]} HP`:'';
             el(`petBattleHp${i}`).hidden=!p;
             const at=petBattleTime(m.startedAt)+(m.introMs===5000?5000:2000)+(play.count-1)*PET_BATTLE_STEP_MS,attacking=!!p&&!!play.last&&play.last.attacker===p.uid,hit=!!p&&!!play.last&&play.last.defender===p.uid;
-            state.models[i]?.duelPose({facing:i?Math.PI:0,attackAt:attacking?at:0,hitAt:hit?at+300:0,defeated:(hp[i]??1)<=0,
+            const result=battleEnded&&m.winnerUid&&p?(m.winnerUid===p.uid?'victory':'defeat'):null;
+            state.models[i]?.duelPose({facing:i?Math.PI:0,attackAt:attacking?at:0,hitAt:hit?at+300:0,
+                criticalAt:hit&&play.last?.critical?at+300:0,defeated:result==='defeat',result,
                 kind:p?.appearance.form.kind,level:p?.appearance.level,skill:attacking?petBattleSkill(p.appearance):null,
                 skillColor:element?.color||p?.appearance.form.color});
             el(`petBattleSide${i}`).classList.toggle('is-attacking',!!attacking&&Date.now()-at<1000);el(`petBattleSide${i}`).classList.toggle('is-hit',!!hit&&Date.now()-at<1000);
@@ -10739,7 +10971,7 @@ const PetBattleGame=(()=>{
     }
     function init(){
         const dialog=el('petBattleDialog');if(!dialog||dialog.dataset.ready)return;dialog.dataset.ready='true';
-        el('petBattleOpen').addEventListener('click',openLobby);
+        el('petBattleOpen').addEventListener('click',()=>{unlockPetSkillAudio();openLobby();});
         el('petBattleLobbyClose').addEventListener('click',()=>el('petBattleLobby').close());
         el('petBattleClose').addEventListener('click',()=>{disposeModels();stopDraftModel();dialog.close();openLobby();});
         dialog.addEventListener('close',()=>{if(!dialog.open){disposeModels();stopDraftModel();}});
@@ -11423,6 +11655,22 @@ function toggleSidebar() {
 
     sidebarVisible = !sidebarVisible;
 
+    applySidebarVisibility(sidebar,mainContent,toggleBtn);
+
+    // Add animation effect
+    toggleBtn.style.animation = 'none';
+    setTimeout(() => {
+        toggleBtn.style.animation = '';
+    }, 10);
+    saveSidebarState();
+}
+
+function applySidebarVisibility(sidebar=document.getElementById('sidebar'),mainContent=document.getElementById('mainContent'),toggleBtn=document.getElementById('toggleSidebarBtn')) {
+    if(!sidebar||!mainContent||!toggleBtn)return;
+
+    sidebar.setAttribute('aria-hidden', String(!sidebarVisible));
+    toggleBtn.setAttribute('aria-expanded', String(sidebarVisible));
+
     if (sidebarVisible) {
         // Show sidebar
         sidebar.classList.remove('hidden');
@@ -11438,13 +11686,6 @@ function toggleSidebar() {
         toggleBtn.innerHTML = '<i class="bi bi-layout-sidebar-inset-reverse"></i>';
         toggleBtn.title = 'Hiện Sidebar';
     }
-
-    // Add animation effect
-    toggleBtn.style.animation = 'none';
-    setTimeout(() => {
-        toggleBtn.style.animation = '';
-    }, 10);
-    saveSidebarState();
 }
 
 // Save sidebar state to localStorage (optional)
@@ -11455,12 +11696,8 @@ function saveSidebarState() {
 // Load sidebar state from localStorage (optional)
 function loadSidebarState() {
     const savedState = localStorage.getItem('sidebarVisible');
-    if (savedState !== null) {
-        sidebarVisible = savedState === 'true';
-        if (!sidebarVisible) {
-            toggleSidebar();
-        }
-    }
+    sidebarVisible = savedState === null ? false : savedState === 'true';
+    applySidebarVisibility();
 }
 
 function showConfirmDialog({
@@ -17849,51 +18086,10 @@ function describeJobChanges(before = {}, after = {}) {
     return changes.join('\n') || 'Lưu thông tin job';
 }
 
-function readLocalChangeHistory(uid) {
-    try {
-        const entries = JSON.parse(localStorage.getItem('workpic_history_' + uid) || '[]');
-        const cutoff = Date.now() - 7 * 86400000;
-        return Array.isArray(entries) ? entries.filter(e => e && Date.parse(e.at) >= cutoff).slice(-50) : [];
-    } catch { return []; }
-}
-
-async function recordChange(kind, action, title, detail = '', user = currentUser) {
-    if (!user) return;
-    const entry = {
-        id: crypto.randomUUID(), kind, action, title: String(title).slice(0, 200),
-        detail: String(detail).slice(0, 1200), actor: user.displayName || user.email || user.uid,
-        actorId: user.uid, at: new Date().toISOString()
-    };
-    const latest = [...readLocalChangeHistory(user.uid), entry].slice(-50);
-    if (currentUser?.uid === user.uid) user.changeHistory = latest;
-    try { localStorage.setItem('workpic_history_' + user.uid, JSON.stringify(latest)); }
-    catch { /* Optional local history must never interrupt a saved job. */ }
-}
-
-function renderChangeHistory() {
-    if (!accessControl.requireAccess('history', 'view')) return;
-    const search = document.getElementById('changeHistorySearch').value.trim().toLocaleLowerCase('vi');
-    const filter = document.getElementById('changeHistoryFilter').value;
-    const entries = [...(currentUser?.changeHistory || [])].reverse().filter(e =>
-        e.kind !== 'checklist' && !['Hoàn thành job', 'Bỏ hoàn thành job'].includes(e.action) &&
-        (filter === 'all' || e.kind === filter) && `${e.title} ${e.action} ${e.detail} ${e.actor}`.toLocaleLowerCase('vi').includes(search));
-    document.getElementById('changeHistoryList').innerHTML = entries.map(entry =>
-        `<article class="change-history-entry"><div class="d-flex justify-content-between gap-2 flex-wrap"><strong>${escapeHtml(entry.action)} · ${escapeHtml(entry.title)}</strong><time class="small text-muted">${escapeHtml(new Date(entry.at).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }))}</time></div><div class="small text-muted">${escapeHtml(entry.actor)}</div><div class="change-history-detail">${escapeHtml(entry.detail)}</div></article>`
-    ).join('') || '<p class="text-muted">Chưa có thay đổi phù hợp.</p>';
-}
+// Kept temporarily as a no-op for existing save paths; change history is disabled.
+async function recordChange() {}
 
 function setupProductivityFeatures() {
-    document.getElementById('changeHistorySearch').addEventListener('input', renderChangeHistory);
-    document.getElementById('changeHistoryFilter').addEventListener('change', renderChangeHistory);
-    document.getElementById('changeHistoryBtn').addEventListener('click', async () => {
-        if (!accessControl.requireAccess('history')) return;
-        const user = currentUser;
-        if (!user) return;
-        const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('changeHistoryModal'));
-        modal.show();
-        user.changeHistory = readLocalChangeHistory(user.uid);
-        renderChangeHistory();
-    });
     document.getElementById('personalEventRepeat').addEventListener('change', e => {
         const until = document.getElementById('personalEventUntil');
         until.disabled = e.target.value === 'none';
