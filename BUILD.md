@@ -236,9 +236,10 @@ coordinated data and rules migration.
 Battle tests use two simulated clients and real browser/WebGL rendering. Live
 Firebase access has not been tested. Existing rules must permit participant access
 to `petBattles` and owned profile updates; no deployed rules were overwritten.
-This client implementation prevents accidental duplicate settlements, but is not
-server-authoritative anti-cheat. Adversarial play requires server-side validation
-and restrictive rules; virtual pet weight has no monetary value.
+Firestore-only Bot matches are simulated locally and settle in one transaction
+when the match ends. A bounded `petBotClaims` marker prevents ordinary retries
+from paying twice, but clients control the simulation and can alter their data.
+This is not server-authoritative anti-cheat.
 
 ### Pet Control Center permissions
 
@@ -256,67 +257,26 @@ allow update: if request.auth != null
   && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['attendancePet']);
 ```
 
-### Cloud pet deployment
+### Firestore-only pet mode
 
-This is optional. The browser defaults to direct Firestore access. Set
-`globalThis.WORKPIC_PET_BACKEND = 'cloud'` before loading `app.js` only when
-this backend is deployed and the data cutover is ready.
-`workpicPets` is an HTTPS callable in `us-central1`. Its CORS handling includes
-localhost. If a browser reports missing CORS headers, check the status of the
-OPTIONS request in Network. A 404 at the callable URL means the function is
-unavailable at that project, region and name. Verify the deployment before
-changing Firestore Rules.
-`petProfiles/{authUid}` owns pet data, stake locks and history. Personal and admin
-care go through the callable. The admin role comes from the deployed
-`PET_ADMIN_UID` parameter. `petCloudBattles/{id}` stores the server-generated
-timeline. The invite listener is scoped to the recipient and reads up to 12
-pending invites. Both accepted participants can read their room. A Cloud Tasks
-worker handles deadlines, including when both clients are offline, and settles
-the match and both profiles in one transaction. History and ranking use separate
-callable requests. Ranking returns 20 rows per page without embedded history.
-On a cache miss, each function instance reads active profiles once to produce the
-ranking, then reuses the result inputs for one minute.
+The browser uses Firestore directly; Cloud Functions deployment and callable CORS
+are not required. Pet data and human battles stay in `users` and `petBattles`.
+The member list is fetched once per sign-in rather than kept in a real-time
+collection listener. Opening rankings reads `users` once and builds the ordered
+result locally; the UI displays 20 rows at a time and caches the result for one
+minute. While ranking is open, document listeners track the first 20 ranked
+profiles only; they are removed when the dialog closes. This keeps changes to
+those profiles live without listening to the whole collection. A newly active
+member or profile not in those first 20 requires reopening/refreshing the ranking
+to enter the in-memory result.
 
-1. Drain or cancel old `petBattles` before switching. The migration refuses
-   profiles that still hold legacy stakes. Take a backup and stop serving the old
-   pet client during the cutover.
-2. Install with Node.js 22 and `npm ci`. Deploy the backend to the existing project
-   with `firebase deploy --project workpic-eb555 --only functions:workpic-pets`.
-   Set `PET_ADMIN_UID` to the actual Firebase Authentication UID. The functions use
-   the `us-central1` region. Enable the required Functions and Cloud Tasks APIs.
-   Grant the enqueueing runtime service account task creation and the required
-   service-account permissions. Follow the official Cloud Tasks IAM instructions
-   for the account used to dispatch the task handler.
-3. Merge the new collection rules below into the existing Firestore rules. Also
-   block client changes to `attendancePet` and `petBattleLocks` in existing
-   `users` write grants, including the old admin grant. For existing update
-   grants use `!request.resource.data.diff(resource.data).affectedKeys().hasAny(['attendancePet', 'petBattleLocks'])`.
-   Preserve reads and unrelated fields. The new collections use Admin SDK writes
-   and the deploy configuration leaves the existing Firestore Rules in place.
-   Review any broad wildcard grants, since matching grants are combined with OR.
-4. Existing pets migrate atomically when a user or admin opens the profile.
-   To populate the ranking for members who have not reopened the app, run
-   `node pet-cloud.mjs --migrate-existing-pets` once with authorized Application
-   Default Credentials and `GOOGLE_CLOUD_PROJECT=workpic-eb555`. This reads
-   legacy profiles in pages. The canonical copy migrates to `petProfiles` and
-   duplicate legacy pet fields are archived privately before removal.
-5. Publish the browser build after the backend and rules are ready. Validate an
-   invitation, a known finished match, both offline payouts, and the Usage chart
-   in the target project.
-
-```firestore
-match /petProfiles/{uid} {
-  allow get: if request.auth != null && request.auth.uid == uid;
-}
-match /petCloudBattles/{id} {
-  allow get: if request.auth != null
-    && request.auth.uid in resource.data.participantUids;
-  allow list: if request.auth != null
-    && request.query.limit <= 12
-    && resource.data.opponentUid == request.auth.uid
-    && resource.data.status == "invited";
-}
-```
+Bot matches are local simulations. At completion, one Firestore transaction
+updates the player's pet and an idempotency marker in their `users` document.
+Because the browser controls the result, users can manipulate Bot rewards.
+Server-side verification requires Cloud Functions and is intentionally not used
+in this mode. Continue using the existing Firestore Rules for signed-in reads,
+owned profile updates, and participant access to `petBattles`; no new collection
+or Firebase deployment setup is needed.
 
 New battles include a five-second RPS result intro (`introMs: 5000`) anchored
 to `startedAt`; older battles retain their two-second intro. The finish button

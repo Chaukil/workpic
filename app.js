@@ -820,7 +820,7 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const PET_CLOUD_ENABLED = globalThis.WORKPIC_PET_BACKEND === 'cloud';
+const PET_CLOUD_ENABLED = false;
 let workpicPets;
 async function petCloudRequest(kind, data = {}){
     assertPetQuotaAvailable();
@@ -867,7 +867,7 @@ let presenterSpinModal;
 let dayOffModal;
 let salaryCalcModal;
 let dayOffModalOpen = false;
-let dayOffsList = [];            // toàn bộ lịch off (mọi user) từ tháng trước trở đi
+let dayOffsList = [];            // lịch off của tháng hiện tại và tháng kế tiếp
 let unsubscribeDayOffs = null;
 let dayOffSelected = new Set();  // các ngày (YYYY-MM-DD) MÌNH đang chọn off
 // Giờ làm việc (Motion / Station) theo ngày — dùng chung mọi user
@@ -879,7 +879,7 @@ let unsubscribeWorkHours = null;
 let workHoursParsed = [];        // kết quả phân tích ô dán
 
 const WORKHOURS_COLLECTION = 'workHours';
-let workHoursAll = [];           // toàn bộ document giờ làm việc (mọi bộ phận)
+let workHoursAll = [];           // giờ làm việc của tháng hiện tại và tháng kế tiếp
 
 // Bộ phận làm việc
 const DEPT_COLLECTION = 'departments';
@@ -920,7 +920,7 @@ let currentOverrideJob = null;    // { job, occurrenceDate }
 
 // Avatar realtime: cache avatar mọi user từ Firestore
 let usersAvatarCache = null;      // { uid: dataUrl }
-let unsubscribeUsersAvatar = null; // listener realtime để thấy avatar mới của người khác
+let unsubscribeUsersAvatar = null;
 
 let userProfileModal;
 let changePasswordConfirmModal;
@@ -984,6 +984,7 @@ let statisticsModal = null;
 let statsMode = 'today';          // 'today' | 'week'
 let statsAllJobs = [];            // cache toàn bộ job active (không pause, không out-of-schedule)
 let usersInfoCache = {};          // { uid: { displayName, email, avatar } }
+let usersFullInfoLoaded = false;
 const STATS_HIDDEN_USERS_KEY = 'workpic_stats_hidden_users';
 let statsHiddenUsers = new Set();
 const DEFAULT_JOB_DURATION = 30;  // phút
@@ -4327,6 +4328,7 @@ function handleSignedOut() {
     }
     usersAvatarCache = null;
     authenticatedProfileSnapshot=null;usersDirectorySnapshot=null;
+    usersInfoCache={};usersFullInfoLoaded=false;usersDeptLatest={};departmentCalendarUsers={};
 
     jobs = [];
     filteredJobs = [];
@@ -4362,13 +4364,8 @@ function initializeAuthenticatedApp() {
     loadJobs();
     startNotificationCheck();
     listenTransferRequests();
-    listenUserNotifications();
-    listenQuickJobs();
-    listenSharedNotes();
-    listenQuickJobTransferRequests();
-    listenDayOffs();
+    document.getElementById('sharedNotesToggle').hidden = false;
     listenDepartments();
-    listenWorkHours();
     listenJobDayOverrides();
     listenUsersAvatars();
     startAttendancePet();
@@ -4410,7 +4407,13 @@ document.addEventListener('DOMContentLoaded', function () {
     dayOffModal = new bootstrap.Modal(document.getElementById('dayOffModal'));
     salaryCalcModal = new bootstrap.Modal(document.getElementById('salaryCalcModal'));
 
-    document.getElementById('dayOffModal').addEventListener('hidden.bs.modal', () => { dayOffModalOpen = false; });
+    document.getElementById('dayOffModal').addEventListener('hidden.bs.modal', () => {
+        dayOffModalOpen = false;
+        if (unsubscribeDayOffs) {
+            unsubscribeDayOffs();
+            unsubscribeDayOffs = null;
+        }
+    });
     transferConfirmModal = new bootstrap.Modal(document.getElementById('transferConfirmModal'));
     quickJobInviteModal = new bootstrap.Modal(document.getElementById('quickJobInviteModal'), {
         backdrop: 'static',
@@ -7520,7 +7523,11 @@ function toggleNotifDropdown() {
     notifDropdownOpen = !notifDropdownOpen;
     dropdown.classList.toggle('show', notifDropdownOpen);
     if (notifDropdownOpen) {
+        listenUserNotifications();
         markAllNotificationsRead();
+    } else if (unsubscribeNotifications) {
+        unsubscribeNotifications();
+        unsubscribeNotifications = null;
     }
 }
 
@@ -7543,16 +7550,20 @@ async function markAllNotificationsRead() {
 function listenUserNotifications() {
     if (!(accessControl.can('notifications'))) return;
     if (!currentUser) return;
+    const uid = currentUser.uid;
     notifInitialLoadDone = false;
 
     const q = query(
         collection(db, 'notifications'),
-        where('userId', '==', currentUser.uid)
+        where('userId', '==', uid),
+        orderBy('timestamp', 'desc'),
+        limit(50)
     );
 
     if (unsubscribeNotifications) unsubscribeNotifications();
     unsubscribeNotifications = onSnapshot(q, (snapshot) => {
-        const readIds = localNotificationReads(currentUser.uid);
+        if (currentUser?.uid !== uid) return;
+        const readIds = localNotificationReads(uid);
         notificationsList = snapshot.docs.map(d => ({ id: d.id, ...d.data(), read: d.data().read === true || readIds.has(d.id) }));
 
         if (notifInitialLoadDone) {
@@ -7580,6 +7591,7 @@ function listenUserNotifications() {
         }
         notifInitialLoadDone = true;
 
+        if (notifDropdownOpen) markAllNotificationsRead();
         renderNotifDropdown();
     }, (error) => {
         console.error('Lỗi lắng nghe thông báo:', error);
@@ -7607,9 +7619,8 @@ function listenQuickJobs() {
     const uid=currentUser.uid;
     quickChatInitialLoadDone = false;
 
-    const jobsRef=collection(db,'quickJobs');
     const recentSince=new Date(Date.now()-30*86400000).toISOString();
-    const q=query(jobsRef,or(where('status','in',['open','invited']),where('createdAt','>=',recentSince)));
+    const q=query(collection(db,'quickJobs'),or(where('status','in',['open','invited']),where('createdAt','>=',recentSince)));
 
     if (unsubscribeQuickJobs) unsubscribeQuickJobs();
     const onJobs=snapshot=>{
@@ -7655,11 +7666,7 @@ function listenQuickJobs() {
     const reportError=error=>{
         console.error('Lỗi lắng nghe job trong ngày:', error);
     };
-    unsubscribeQuickJobs=onSnapshot(q,onJobs,error=>{
-        if(error.code==='failed-precondition'&&currentUser?.uid===uid){
-            unsubscribeQuickJobs=onSnapshot(jobsRef,onJobs,reportError);
-        }else reportError(error);
-    });
+    unsubscribeQuickJobs=onSnapshot(q,onJobs,reportError);
 }
 
 // Job trong ngày: chỉ hiện cho người cùng bộ phận với người báo job (job do mình tạo / nhận / được chỉ định luôn hiện).
@@ -8270,14 +8277,21 @@ function noSameDeptLabel() {
 }
 
 async function fetchUsersExceptMe(forceRefresh = false) {
-    if (usersDirectorySnapshot || !cachedUsersForAssign || forceRefresh) {
-        const snapshot = usersDirectorySnapshot || await getDocs(collection(db, 'users'));
+    if (!cachedUsersForAssign || forceRefresh) {
+        const snapshot = await getDocs(collection(db, 'users'));
         // Một uid có thể có nhiều doc → chỉ giữ doc cập nhật sau cùng
         const byUid = new Map();
         snapshot.forEach(d => {
             const u = d.data();
 
             if (!u.uid || u.uid === currentUser.uid) return;
+            collectUserDepts(u);
+            usersInfoCache[u.uid] = {
+                displayName: u.displayName || '',
+                email: u.email || '',
+                avatar: u.avatar || null,
+                department: u.department || ''
+            };
             const old = byUid.get(u.uid);
             if (!old || String(u.updatedAt || '') >= String(old.updatedAt || '')) byUid.set(u.uid, u);
         });
@@ -8366,71 +8380,46 @@ async function quickChatConfirmAssign(jobId) {
 let departmentCalendarUsers = {};
 let usersDirectorySnapshot=null;
 
-function listenUsersAvatars() {
-    if (unsubscribeUsersAvatar) unsubscribeUsersAvatar();
-    unsubscribeUsersAvatar = onSnapshot(collection(db, 'users'), (snapshot) => {
+async function listenUsersAvatars() {
+    const uid=currentUser?.uid;
+    if(!uid)return;
+    try{
+        const snapshot=await getDocs(collection(db,'users'));
+        if(currentUser?.uid!==uid)return;
         usersDirectorySnapshot=snapshot;
-        const ownPetProfile=!PET_CLOUD_ENABLED&&snapshot.docChanges().find(change=>change.type!=='removed'&&change.doc.id===attendancePetRef?.id)?.doc;
-        if(ownPetProfile){
-            attendancePetUnsubscribe?.();attendancePetUnsubscribe=null;
-            applyAttendancePetProfile(ownPetProfile);
-            PetBattleGame.profile(ownPetProfile,false);
-        }
         PetBattleGame.sync();
-        if(!PET_CLOUD_ENABLED&&document.getElementById('petCompareDialog')?.open)renderPetComparison(true);
         usersAvatarCache = {};
         usersInfoCache = {};
+        usersFullInfoLoaded = false;
         usersDeptLatest = {};
         departmentCalendarUsers = {};
         snapshot.forEach(d => {
             const u = d.data();
 
             if (u.uid) {
-                departmentCalendarUsers[u.uid] = u;
-                collectUserDepts(u);
+                departmentCalendarUsers[u.uid] = { uid: u.uid, displayName: u.displayName || '', avatar: u.avatar || null, status: u.status || 'active' };
                 if (u.avatar) usersAvatarCache[u.uid] = u.avatar;
                 usersInfoCache[u.uid] = {
                     displayName: u.displayName || '',
-                    email: u.email || '',
                     avatar: u.avatar || null,
-                    department: u.department || ''
+                    status: u.status || 'active'
                 };
             }
         });
-
-        if (currentUser && usersInfoCache[currentUser.uid]
-            && (usersInfoCache[currentUser.uid].department || '') !== (currentUser.department || '')) {
-            currentUser.department = usersInfoCache[currentUser.uid].department || '';   // đổi từ thiết bị khác
-            rebuildScheduleWorkHoursMap();   // ← THÊM
-            renderSchedule();
-        }
-        rebuildDepartmentsList();
-        if (currentUser && departmentCalendarUsers[currentUser.uid]) {
-            currentUser.personalCalendarEvents = departmentCalendarUsers[currentUser.uid].personalCalendarEvents || [];
-        }
-        if (currentUser) renderSchedule();
-        if (document.getElementById('presenterSpinModal')?.classList.contains('show') && spinAllUsers.length) applySpinDeptFilter(false);
 
         if (currentUser && usersAvatarCache[currentUser.uid] && usersAvatarCache[currentUser.uid] !== currentUser.avatar) {
             currentUser.avatar = usersAvatarCache[currentUser.uid];
             updateUserProfileUI();
         }
 
-        if (dayOffModalOpen) renderDayOffModal();
         if (typeof renderQuickChat === 'function' && quickChatPanelOpen) renderQuickChat();
-        if (typeof renderSpinUsersList === 'function' && spinCandidates && spinCandidates.length
-            && document.getElementById('presenterSpinModal')?.classList.contains('show')) {
-            renderSpinUsersList();
-        }
-        // Statistics modal đang mở → refresh để cập nhật tên/avatar
-        if (statisticsModal && document.getElementById('statisticsModal')?.classList.contains('show')) {
-            renderStatistics();
-        }
-    }, (error) => {
-        console.error('Lỗi lắng nghe avatar users:', error);
+    }catch(error){
+        console.error('Không tải được danh bạ thành viên:', error);
         usersDirectorySnapshot=null;
-        if(!petQuotaErrorText(error))watchAttendancePetProfile();
-    });
+        unsubscribeUsersAvatar=null;
+        if(error.code==='permission-denied')showNotification('Thiếu quyền danh bạ',
+            'Firestore Rules chưa cho phép đọc danh sách users.',false,'warning');
+    }
 }
 
 function getUserAvatarUrl(uid) {
@@ -8662,6 +8651,8 @@ function openQuickChatPanel() {
     const toggle = document.getElementById('quickChatToggleBtn');
     if (!panel) return;
     quickChatPanelOpen = true;
+    listenQuickJobs();
+    listenQuickJobTransferRequests();
     panel.classList.add('show');
     document.getElementById('sharedNotesToggle')?.classList.add('d-none');
     if (toggle) {
@@ -8681,6 +8672,14 @@ function closeQuickChatPanel() {
     const toggle = document.getElementById('quickChatToggleBtn');
     if (!panel) return;
     quickChatPanelOpen = false;
+    if (unsubscribeQuickJobs) {
+        unsubscribeQuickJobs();
+        unsubscribeQuickJobs = null;
+    }
+    if (unsubscribeQuickJobTransferRequests) {
+        unsubscribeQuickJobTransferRequests();
+        unsubscribeQuickJobTransferRequests = null;
+    }
     panel.classList.remove('show');
     document.getElementById('sharedNotesToggle')?.classList.toggle('d-none', sharedNotesOpen);
     if (toggle) {
@@ -9236,8 +9235,8 @@ async function loadPetAdminProfiles() {
     const token=++petAdminLoad,uid=auth.currentUser.uid;
     const status=document.getElementById('petAdminStatus');status.textContent='Đang tải danh sách…';
     try {
-        if(!usersDirectorySnapshot)assertPetQuotaAvailable();
-        const result=usersDirectorySnapshot||await getDocs(collection(db,'users'));
+        assertPetQuotaAvailable();
+        const result=await getDocs(collection(db,'users'));
         if(token!==petAdminLoad || !canControlPets() || auth.currentUser.uid!==uid)return;
         const previous=document.getElementById('petAdminUser').value, seen=new Set();
         petAdminProfiles=[...result.docs].sort((a,b)=>a.id.localeCompare(b.id)).filter(snapshot=>{
@@ -9340,20 +9339,76 @@ function selectedAttendancePetView(){return attendancePetView(attendancePetSelec
 const petWeightLabel=grams=>new Intl.NumberFormat('vi-VN',{minimumFractionDigits:1,maximumFractionDigits:1}).format(grams/1000)+' kg';
 let petComparisonCache=null;
 const petRankingByBranch=new Map(),petHistoryById=new Map();
+let petRankingSourceCache=null;
+const petRankingUnsubscribes=new Map();
 let petHistoryRequest=0;
+function stopPetRankingListeners(){
+    for(const unsubscribe of petRankingUnsubscribes.values())unsubscribe();
+    petRankingUnsubscribes.clear();
+}
+function syncPetRankingListeners(branch,page){
+    if(PET_CLOUD_ENABLED||!document.getElementById('petCompareDialog')?.open||!petRankingSourceCache)return;
+    const profiles=petRankingSourceCache.profiles;
+    const visible=page.rows.slice(0,20);
+    const desired=new Map(visible.map(row=>{
+        const profile=profiles.find(item=>item.uid===row.uid);
+        return profile?[profile.id,profile]:null;
+    }).filter(Boolean));
+    for(const [id,unsubscribe] of petRankingUnsubscribes){
+        if(!desired.has(id)){unsubscribe();petRankingUnsubscribes.delete(id);}
+    }
+    for(const [id,profile] of desired){
+        if(petRankingUnsubscribes.has(id))continue;
+        let unsubscribe;
+        unsubscribe=onSnapshot(profile.ref,snapshot=>{
+            if(petRankingUnsubscribes.get(id)!==unsubscribe||!petRankingSourceCache)return;
+            const index=petRankingSourceCache.profiles.findIndex(item=>item.id===id);
+            if(index<0)return;
+            if(snapshot.exists())petRankingSourceCache.profiles[index]={id,ref:snapshot.ref,...snapshot.data()};
+            else petRankingSourceCache.profiles.splice(index,1);
+            const updated=buildPetComparison(petRankingSourceCache.profiles)
+                .filter(row=>branch==='all'||row.branchKey===branch);
+            const current=petRankingByBranch.get(branch);
+            if(!current)return;
+            current.rows=updated.slice(0,current.rows.length);
+            current.nextOffset=current.rows.length<updated.length?current.rows.length:null;
+            current.expiresAt=Infinity;
+            renderPetComparison(true);
+            syncPetRankingListeners(branch,current);
+        },error=>{
+            if(petRankingUnsubscribes.get(id)!==unsubscribe)return;
+            petRankingUnsubscribes.delete(id);
+            console.error('Không cập nhật được hồ sơ đang theo dõi trong xếp hạng:',error);
+        });
+        petRankingUnsubscribes.set(id,unsubscribe);
+    }
+}
 async function loadPetRanking(more=false){
     const dialog=document.getElementById('petCompareDialog');
     if(!currentUser||!dialog.open)return;
     const branch=document.getElementById('petCompareBranch').value;
     let page=petRankingByBranch.get(branch);
     if(page?.loading||more&&page?.nextOffset==null||!more&&page?.expiresAt>Date.now()){
-        renderPetComparison(true);return;
+        renderPetComparison(true);
+        if(page&&!page.loading)syncPetRankingListeners(branch,page);
+        return;
     }
     page={rows:page?.rows||[],nextOffset:page?.nextOffset??null,loading:true};
     petRankingByBranch.set(branch,page);
     renderPetComparison(true);
     try{
-        const result=await petCloudRequest('ranking',{branch,offset:more?page.nextOffset:0});
+        let result;
+        if(PET_CLOUD_ENABLED)result=await petCloudRequest('ranking',{branch,offset:more?page.nextOffset:0});
+        else{
+            if(!petRankingSourceCache||petRankingSourceCache.expiresAt<=Date.now()){
+                const snapshot=await getDocs(collection(db,'users'));
+                const profiles=snapshot.docs.map(doc=>({id:doc.id,ref:doc.ref,...doc.data()}));
+                petRankingSourceCache={profiles,rows:buildPetComparison(profiles),expiresAt:Date.now()+60000};
+            }
+            const rows=petRankingSourceCache.rows.filter(row=>branch==='all'||row.branchKey===branch);
+            const offset=more?page.nextOffset:0;
+            result={rows:rows.slice(offset,offset+20),nextOffset:offset+20<rows.length?offset+20:null};
+        }
         if(petRankingByBranch.get(branch)!==page)return;
         const rows=more?[...page.rows,...result.rows]:result.rows;
         page.rows=[...new Map(rows.map(row=>[JSON.stringify([row.uid,row.petId]),row])).values()];
@@ -9362,7 +9417,10 @@ async function loadPetRanking(more=false){
         if(petRankingByBranch.get(branch)===page)page.error=petQuotaErrorText(error)||error.message;
     }finally{
         page.loading=false;
-        if(petRankingByBranch.get(branch)===page&&document.getElementById('petCompareBranch').value===branch)renderPetComparison(true);
+        if(petRankingByBranch.get(branch)===page&&document.getElementById('petCompareBranch').value===branch){
+            renderPetComparison(true);
+            syncPetRankingListeners(branch,page);
+        }
     }
 }
 const petComparisonImageCache=new Map(),petComparisonImagePending=new Map();
@@ -9410,15 +9468,9 @@ function renderPetComparison(force=false){
     const filter=document.getElementById('petCompareBranch').value,minute=Math.floor(Date.now()/60000);
     const cached=petComparisonCache;
     const page=petRankingByBranch.get(filter);
-    if(!force&&cached&&cached.filter===filter&&(PET_CLOUD_ENABLED
-        ?cached.page===page:cached.directory===usersDirectorySnapshot&&cached.pet===attendancePetData&&cached.minute===minute))return;
+    if(!force&&cached&&cached.filter===filter&&cached.page===page)return;
     petComparisonCache={directory:usersDirectorySnapshot,pet:attendancePetData,filter,minute,page};
     let rows=page?.rows||[];
-    if(!PET_CLOUD_ENABLED){
-        const profiles=(usersDirectorySnapshot?.docs||[]).map(snapshot=>({id:snapshot.id,...snapshot.data()})).filter(profile=>profile.uid!==currentUser.uid);
-        if(attendancePetData)profiles.push({id:'local-current',uid:currentUser.uid,displayName:currentUser.displayName||currentUser.email?.split('@')[0]||'Bạn',attendancePet:attendancePetData});
-        rows=buildPetComparison(profiles,Date.now(),filter);
-    }
     const body=document.getElementById('petCompareRows');
     body.replaceChildren(...rows.map(row=>{
         const tr=document.createElement('tr');if(row.uid===currentUser.uid)tr.classList.add('is-me');if(row.dead)tr.classList.add('is-dead');
@@ -9453,11 +9505,9 @@ function renderPetComparison(force=false){
     }));
     document.getElementById('petCompareEmpty').hidden=rows.length>0||!!page?.loading||!!page?.error;
     const summary=`${new Set(rows.map(row=>row.uid)).size} thành viên · ${rows.length} thú cưng`;
-    document.getElementById('petCompareSummary').textContent=PET_CLOUD_ENABLED
-        ?page?.loading?'Đang tải xếp hạng…':page?.error||summary
-        :usersDirectorySnapshot?summary:'Đang chờ dữ liệu thành viên khác · '+summary;
+    document.getElementById('petCompareSummary').textContent=page?.loading?'Đang tải xếp hạng…':page?.error||summary;
     const more=document.getElementById('petCompareMore');
-    more.hidden=!PET_CLOUD_ENABLED||page?.nextOffset==null;
+    more.hidden=page?.nextOffset==null;
     more.disabled=!!page?.loading;
     document.getElementById('petCompareRetry').hidden=!page?.error;
 }
@@ -9470,22 +9520,22 @@ async function openPetBattleHistory(row){
     status.hidden=false;
     status.textContent='Đang tải lịch sử…';
     if(!dialog.open)dialog.showModal();
-    let entries=row.battleHistory||[];
-    if(PET_CLOUD_ENABLED){
-        const key=JSON.stringify([row.uid,row.petId]);
-        let cached=petHistoryById.get(key);
-        if(!cached||Date.now()>=cached.until){
-            const pending=petCloudRequest('history',{uid:row.uid,petId:row.petId});
-            cached={pending,until:Date.now()+60000};
-            petHistoryById.set(key,cached);
-            while(petHistoryById.size>60)petHistoryById.delete(petHistoryById.keys().next().value);
-        }
-        try{entries=(await cached.pending).entries;}
-        catch(error){
-            if(petHistoryById.get(key)===cached)petHistoryById.delete(key);
-            if(token===petHistoryRequest&&dialog.open)status.textContent=petQuotaErrorText(error)||error.message;
-            return;
-        }
+    const key=JSON.stringify([row.uid,row.petId]);
+    let cached=petHistoryById.get(key);
+    if(!cached||Date.now()>=cached.until){
+        const pending=PET_CLOUD_ENABLED
+            ?petCloudRequest('history',{uid:row.uid,petId:row.petId})
+            :Promise.resolve({entries:Array.isArray(row.battleHistory)?row.battleHistory:[]});
+        cached={pending,until:Date.now()+60000};
+        petHistoryById.set(key,cached);
+        while(petHistoryById.size>60)petHistoryById.delete(petHistoryById.keys().next().value);
+    }
+    let entries=[];
+    try{entries=(await cached.pending).entries;}
+    catch(error){
+        if(petHistoryById.get(key)===cached)petHistoryById.delete(key);
+        if(token===petHistoryRequest&&dialog.open)status.textContent=petQuotaErrorText(error)||error.message;
+        return;
     }
     if(token!==petHistoryRequest||!dialog.open)return;
     const results={win:'Thắng',loss:'Thua',draw:'Hòa'};
@@ -9868,8 +9918,7 @@ async function startAttendancePet() {
             pet=profile.attendancePet;
         }else{
             const loginProfile=authenticatedProfileSnapshot?.data()?.uid===uid?authenticatedProfileSnapshot:null;
-            const cached=usersDirectorySnapshot?.docs.find(snapshot=>snapshot.id===loginProfile?.id)||loginProfile;
-            const profiles=cached?{docs:[cached]}:await getDocs(query(collection(db,'users'),where('uid','==',uid)));
+            const profiles=loginProfile?{docs:[loginProfile]}:await getDocs(query(collection(db,'users'),where('uid','==',uid)));
             if(generation!==attendancePetGeneration||currentUser?.uid!==uid)return;
             const profile=[...profiles.docs].sort((a,b)=>a.id.localeCompare(b.id))[0];
             if(!profile)throw new Error('Missing profile');
@@ -9898,7 +9947,7 @@ async function startAttendancePet() {
         PetBattleGame.start();
         checkPetHungerNotifications();
         attendancePetInterval=setInterval(()=>{renderAttendancePet();checkPetHungerNotifications();},1000);
-        if(!PET_CLOUD_ENABLED&&!usersDirectorySnapshot?.docs.some(snapshot=>snapshot.id===attendancePetRef.id))watchAttendancePetProfile();
+        if(!PET_CLOUD_ENABLED)watchAttendancePetProfile();
     } catch (error) {
         if (generation!==attendancePetGeneration) return;
         document.getElementById('attendancePetStatus').textContent=petQuotaErrorText(error)||(error.code?.split('/').pop()==='permission-denied'?'Firebase chưa cho phép đọc/cập nhật hồ sơ thú cưng.':error.message||'Chưa tải được thú cưng. Kiểm tra kết nối rồi thử lại.');
@@ -9921,6 +9970,7 @@ function stopAttendancePet() {
     selectedAttendancePetId=null;
     petComparisonCache=null;
     petRankingByBranch.clear();petHistoryById.clear();petHistoryRequest++;
+    stopPetRankingListeners();
     stopPetComparisonThumbnails();
     const comparison=document.getElementById('petCompareDialog');if(comparison?.open)comparison.close();
     closePetRankingPreview();
@@ -9971,7 +10021,7 @@ function initAttendancePetUi() {
     });
     const comparison=document.getElementById('petCompareDialog');
     document.getElementById('petCompareBranch').append(...Object.entries(ATTENDANCE_PET_BRANCHES).map(([key,branch])=>new Option(branch.name,key)));
-    document.getElementById('petCompareOpen').addEventListener('click',()=>{if(!currentUser)return;if(!comparison.open)comparison.showModal();if(PET_CLOUD_ENABLED)loadPetRanking();else renderPetComparison(true);});
+    document.getElementById('petCompareOpen').addEventListener('click',()=>{if(!currentUser)return;if(!comparison.open)comparison.showModal();loadPetRanking();});
     document.getElementById('petCompareClose').addEventListener('click',()=>comparison.close());
     const history=document.getElementById('petBattleHistoryDialog');
     const preview=document.getElementById('petRankingPreviewDialog');
@@ -9979,9 +10029,13 @@ function initAttendancePetUi() {
     preview.addEventListener('close',()=>{if(!preview.open)closePetRankingPreview();});
     document.getElementById('petBattleHistoryClose').addEventListener('click',()=>history.close());
     history.addEventListener('click',event=>{if(event.target===history)history.close();});
-    comparison.addEventListener('close',()=>{if(!comparison.open){history.close();closePetRankingPreview();stopPetComparisonThumbnails();}});
+    comparison.addEventListener('close',()=>{if(!comparison.open){
+        stopPetRankingListeners();
+        for(const page of petRankingByBranch.values())page.expiresAt=0;
+        history.close();closePetRankingPreview();stopPetComparisonThumbnails();
+    }});
     comparison.addEventListener('click',event=>{if(event.target===comparison)comparison.close();});
-    document.getElementById('petCompareBranch').addEventListener('change',()=>PET_CLOUD_ENABLED?loadPetRanking():renderPetComparison(true));
+    document.getElementById('petCompareBranch').addEventListener('change',()=>loadPetRanking());
     document.getElementById('petCompareMore').addEventListener('click',()=>loadPetRanking(true));
     document.getElementById('petCompareRetry').addEventListener('click',()=>loadPetRanking());
     const branchDialog=document.getElementById('attendancePetBranchDialog');
@@ -10025,7 +10079,7 @@ const PetBattleGame=(()=>{
     const state={uid:null,own:null,matches:new Map(),subs:new Map(),failedSubs:new Set(),active:'',busy:false,message:'',cooldown:0,autoOpened:new Set(),models:[],lastTurn:'',setupKey:'',listKey:'',lastSync:0,timer:null};
     const el=id=>document.getElementById(id),mine=()=>currentUser&&state.uid===currentUser.uid;
     const ownRef=()=>attendancePetRef||authenticatedProfileSnapshot?.ref;
-    const profileRows=()=>[...(usersDirectorySnapshot?.docs||[])].map(d=>({id:d.id,...d.data()}));
+    const profileRows=()=>state.opponentProfiles||[...(usersDirectorySnapshot?.docs||[])].map(d=>({id:d.id,...d.data()}));
     const match=()=>state.matches.get(state.active);
     function setElementAura(model,key){
         const element=PET_BATTLE_ELEMENTS.get(key);
@@ -10067,6 +10121,7 @@ const PetBattleGame=(()=>{
     function finishRoom(){
         const m=match();if(!m||state.busy||(!m.claims?.[state.uid]&&state.own?.petBattleLocks?.[m.id])||!(['finished','cancelled','rejected','expired'].includes(m.status)||petBattlePlayback(m).finished))return;
         try{localStorage.setItem('workpic-battle-dismissed:'+state.uid,JSON.stringify([...new Set([...dismissed(),m.id])].slice(-200)));}catch{state.message='Không lưu được danh sách trận đã kết thúc trên máy này.';render();return;}
+        if(m.bot){try{localStorage.removeItem(`workpic-bot-pending:${state.uid}`);}catch{}}
         state.subs.get(m.id)?.();state.subs.delete(m.id);state.matches.delete(m.id);state.active='';state.listKey='';disposeModels();el('petBattleExitDialog').close();el('petBattleDialog').close();openLobby();
     }
     const secretKey=(id,round)=>`workpic-battle-rps:${state.uid}:${id}:${round}`;
@@ -10080,6 +10135,7 @@ const PetBattleGame=(()=>{
         if(el('petBattleInvite'))el('petBattleInvite').hidden=true;
     }
     function start(){stop();if(!currentUser||!attendancePetRef)return;state.uid=currentUser.uid;state.own=(PET_CLOUD_ENABLED?attendanceCloudProfile:authenticatedProfileSnapshot?.data())||{uid:state.uid,attendancePet:attendancePetData};
+        try{const pending=JSON.parse(localStorage.getItem(`workpic-bot-pending:${state.uid}`)||'null');if(pending?.bot&&pending.participantUids?.includes(state.uid))state.matches.set(pending.id,pending);}catch{}
         state.timer=setInterval(()=>{if(!mine())return;if(Date.now()-state.lastSync>15000)sync();process();if(el('petBattleDialog').open&&!document.hidden)render();},200);sync();}
     function profile(snapshot,refresh=true){if(mine()&&snapshot?.exists()&&snapshot.data().uid===state.uid){state.own=snapshot.data();if(refresh)sync();}}
     function fail(error){const code=error.code?.split('/').pop();state.message=code==='permission-denied'?'Firebase chưa cho phép truy cập phòng đấu hoặc hồ sơ của bạn.':petQuotaErrorText(error)||error.message||'Chưa đồng bộ được trận đấu.';state.cooldown=code==='resource-exhausted'?(error.retryAt||Date.now()+300000):Infinity;el('petBattleRetry').hidden=false;render();}
@@ -10110,8 +10166,6 @@ const PetBattleGame=(()=>{
     }
     function sync(){
         if(!mine())return;state.lastSync=Date.now();const wanted=new Set(Object.keys(state.own?.petBattleLocks||{}).filter(id=>!id.startsWith('bot-'))),offers=[];
-        const botBattle=state.own?.petBotBattle;
-        if(botBattle&&!dismissed().includes(botBattle.id))state.matches.set(botBattle.id,botBattle);
         if(PET_CLOUD_ENABLED){
             listenCloudInvites();
             const current=match();
@@ -10231,8 +10285,8 @@ const PetBattleGame=(()=>{
         list.replaceChildren(...opponents.map(profile=>{
             const row=document.createElement('div'),info=document.createElement('span'),name=document.createElement('strong'),meta=document.createElement('small'),invite=document.createElement('button');
             const label=profile.displayName||profile.email||profile.uid;
-            const rival=attendancePetRecords(profile.attendancePet||{},Date.now()).map(p=>attendancePetView(p)).find(v=>!v.dead&&!v.egg);
-            name.textContent=label;meta.textContent=rival?`${rival.displayName} · Cấp ${rival.level} · ${petWeightLabel(rival.weightGrams)}`:'Chưa có thú cưng sẵn sàng';info.append(name,meta);invite.type='button';invite.textContent='+';
+            const rival=profile.attendancePet&&attendancePetRecords(profile.attendancePet,Date.now()).map(p=>attendancePetView(p)).find(v=>!v.dead&&!v.egg);
+            name.textContent=label;meta.textContent=rival?`${rival.displayName} · Cấp ${rival.level} · ${petWeightLabel(rival.weightGrams)}`:'Mời đấu để kiểm tra thú cưng';info.append(name,meta);invite.type='button';invite.textContent='+';
             invite.dataset.inviteUid=profile.uid;invite.setAttribute('aria-label',`Mời ${label}`);
             row.append(info,invite);return row;
         }));
@@ -10376,51 +10430,68 @@ const PetBattleGame=(()=>{
         return m.status==='rps'&&now>=m.rpsDeadline;
     }
     async function mutateBot(action,payload={},targetId=state.active){
-        if(PET_CLOUD_ENABLED||!mine()||state.busy)return;
-        const uid=state.uid,ref=ownRef(),bot=state.bot;
-        if(!ref||action==='start'&&!bot)return;
-        if(action==='start'&&typeof globalThis.crypto?.randomUUID!=='function'){fail(new Error('Đấu Bot cần HTTPS hoặc localhost.'));return;}
-        const id=action==='start'?'bot-'+globalThis.crypto.randomUUID():targetId;
+        if(!mine()||state.busy)return;
+        if(action==='start'&&!state.bot)return;
+        const uid=state.uid,id=action==='claim'?targetId:action==='start'?`bot-${crypto.randomUUID()}`:targetId;
         state.busy=true;state.message='Đang đồng bộ…';render();
         try{
             assertPetQuotaAvailable();
-            const result=await runTransaction(db,async tx=>{
-                const profile=(await tx.get(ref)).data(),now=Date.now();
-                if(!mine()||profile?.uid!==uid)throw new Error('Phiên đăng nhập đã thay đổi.');
-                const locks={...profile.petBattleLocks},pending=profile.petBotBattle;
-                let root=profile.attendancePet,room;
-                if(action==='start'){
-                    if(pending?.status==='fighting')throw new Error('Hãy nhận kết quả trận Bot đang diễn ra.');
-                    const stake=payload.stakeGrams;
-                    if(!Number.isSafeInteger(stake)||stake<100||stake%100!==0)throw new Error('Cược tối thiểu 0,1 kg, theo bước 0,1 kg.');
-                    const player=petBattleFighter(profile,ref.id,payload.petId,payload.stats,now,payload.element);
-                    if(player.appearance.level!==bot.appearance.level)throw new Error('Cấp thú cưng đã thay đổi. Hãy mở lại phòng Bot.');
-                    root=petBattleChangeWeight(root,player.petId,-stake,now);
-                    const players=[player,bot],firstUid=players[Math.random()<.5?0:1].uid;
-                    room={id,bot:true,botDifficulty:bot.difficulty,rewardMultiplier:bot.rewardMultiplier,roomFlow:true,createdMs:now,players,participantUids:players.map(p=>p.uid),
-                        status:'fighting',stakeGrams:stake,stakeXp:Math.floor(stake/200),firstUid,
-                        startedAt:now,claims:{},...petBattleSimulation(players,firstUid)};
-                    locks[id]={petId:player.petId,stakeGrams:stake,role:'bot'};
-                }else{
-                    if(pending?.id!==id)throw new Error('Không tìm thấy trận Bot.');
-                    if(pending.claims?.[uid])return {room:pending,patch:{}};
-                    const lock=locks[id],baseAmount=petBattleClaimAmount(pending,uid,now);
-                    if(!lock||baseAmount===null||lock.stakeGrams!==pending.stakeGrams||lock.petId!==pending.players[0].petId)throw new Error('Trận Bot chưa kết thúc hoặc cược không khớp.');
-                    const won=pending.winnerUid===uid,multiplier=won?Math.max(1,Math.min(2,Number(pending.rewardMultiplier)||1)):1;
-                    const amount=won?baseAmount+(multiplier-1)*pending.stakeGrams:baseAmount;
-                    if(amount)root=petBattleChangeWeight(root,lock.petId,amount,now);
-                    const delta=pending.winnerUid?(won?pending.stakeXp*multiplier:-pending.stakeXp):0;
-                    const xp=petBattleSettleXp(root,lock.petId,delta,now);
-                    room={...pending,status:'finished',claims:{[uid]:true},xpChanges:{[uid]:xp.change}};
-                    root=xp.pet;
-                    delete locks[id];
-                }
-                const patch={attendancePet:root,petBattleLocks:locks,petBotBattle:room};
-                tx.update(ref,patch);return {room,patch};
-            },{maxAttempts:2});
+            let result;
+            if(PET_CLOUD_ENABLED)result=await petCloudRequest('bot',{...payload,action,id});
+            else if(action==='start'){
+                const ref=ownRef(),stake=payload.stakeGrams;
+                if(!ref||!Number.isSafeInteger(stake)||stake<100||stake%100)throw new Error('Cược tối thiểu 0,1 kg, theo bước 0,1 kg.');
+                const player=petBattleFighter({...state.own,uid,attendancePet:attendancePetData},ref.id,payload.petId,payload.stats,Date.now(),payload.element);
+                petBattleChangeWeight(attendancePetData,player.petId,-stake,Date.now());
+                const bot={...state.bot,uid:'workpic-bot'};
+                const players=[player,bot],firstUid=Math.random()<.5?uid:bot.uid,now=Date.now();
+                const match={id,bot:true,botDifficulty:state.botDifficulty||'easy',rewardMultiplier:bot.rewardMultiplier,
+                    participantUids:[uid],players,stakeGrams:stake,stakeXp:Math.floor(stake/200),status:'fighting',
+                    createdMs:now,startedAt:now,firstUid,claims:{},...petBattleSimulation(players,firstUid)};
+                result={match,patch:{}};
+            }else if(action==='claim'){
+                const ref=ownRef();
+                if(!ref)throw new Error('Chưa tải được hồ sơ.');
+                const pending=state.matches.get(id);
+                if(!pending?.bot||!pending.participantUids?.includes(uid))throw new Error('Không tìm thấy trận Bot trên thiết bị này.');
+                result=await runTransaction(db,async transaction=>{
+                    const snapshot=await transaction.get(ref);
+                    if(!snapshot.exists()||snapshot.data().uid!==uid)throw new Error('Không đọc được hồ sơ thú cưng.');
+                    const profile=snapshot.data(),claims={...(profile.petBotClaims||{})},existing=claims[id];
+                    if(existing)return {match:{...pending,status:'finished',settledAt:existing.settledAt,
+                        claims:{...pending.claims,[uid]:true},xpChanges:{...pending.xpChanges,[uid]:existing.xpChange}},
+                        patch:{attendancePet:profile.attendancePet,petBotClaims:claims}};
+                    const at=petBattleTime(pending.startedAt)+2000+pending.turns.length*PET_BATTLE_STEP_MS;
+                    if(Date.now()<at)throw new Error('Trận Bot chưa kết thúc.');
+                    const player=pending.players.find(item=>item.uid===uid);
+                    const current=petBattleFighter({...profile,displayName:profile.displayName||profile.name},uid,
+                        player.petId,player.stats,Date.now(),player.element);
+                    if(current.appearance.level!==player.appearance.level)throw new Error('Cấp thú cưng đã thay đổi trong trận.');
+                    const won=pending.winnerUid===uid,multiplier=Math.max(1,Math.min(2,Number(pending.rewardMultiplier)||1));
+                    const weightDelta=pending.winnerUid?(won?pending.stakeGrams*multiplier:-pending.stakeGrams):0;
+                    let pet=weightDelta?petBattleChangeWeight(profile.attendancePet,player.petId,weightDelta,Date.now()):profile.attendancePet;
+                    const xpDelta=pending.winnerUid?(won?pending.stakeXp*multiplier:-pending.stakeXp):0;
+                    const xp=petBattleSettleXp(pet,player.petId,xpDelta,Date.now());
+                    pet=petBattleCompletePet(xp.pet,player.petId,pending,uid,xp.change,weightDelta,Date.now());
+                    const settledAt=Date.now();
+                    claims[id]={settledAt,xpChange:xp.change};
+                    const keys=Object.keys(claims).sort((a,b)=>claims[a].settledAt-claims[b].settledAt);
+                    while(keys.length>50)delete claims[keys.shift()];
+                    const patch={attendancePet:pet,petBotClaims:claims};
+                    transaction.update(ref,patch);
+                    return {match:{...pending,status:'finished',settledAt,claims:{...pending.claims,[uid]:true},
+                        xpChanges:{...pending.xpChanges,[uid]:xp.change}},patch};
+                },{maxAttempts:2});
+            }else throw new Error('Thao tác Bot không hợp lệ.');
             if(!mine()||state.uid!==uid)return;
-            state.matches.set(id,result.room);state.own={...state.own,...result.patch};
-            if(action==='start'){state.active=id;state.creating=false;state.botDraft=false;}
+            const room=action==='start'
+                ?{...result.match,...petBattleSimulation(result.match.players,result.match.firstUid)}
+                :result.match;
+            state.matches.set(room.id,room);state.own={...state.own,...result.patch};
+            if(action==='start'){
+                state.active=room.id;state.creating=false;state.botDraft=false;
+            }
+            try{localStorage.setItem(`workpic-bot-pending:${uid}`,JSON.stringify(room));}catch{}
             state.cooldown=0;state.message=action==='claim'?'Đã cập nhật kết quả.':'';
             if(result.patch.attendancePet){attendancePetData=result.patch.attendancePet;renderAttendancePet();}
         }catch(error){fail(error);}finally{state.busy=false;render();}
@@ -10432,9 +10503,13 @@ const PetBattleGame=(()=>{
         try{const hash=await petBattleCommitment(m.id,state.uid,m.rpsRound,saved.choice,saved.nonce);await mutate('commit',{hash,round:m.rpsRound});}catch(error){fail(error);}
     }
     async function process(){
-        if(PET_CLOUD_ENABLED)return;
         if(!mine()||state.busy||Date.now()<state.cooldown)return;
         for(const m of state.matches.values()){
+            if(m.bot&&!m.claims?.[state.uid]&&petBattleClaimAmount(m,state.uid)!==null){
+                await mutateBot('claim',{},m.id);
+                return;
+            }
+            if(PET_CLOUD_ENABLED)continue;
             if(m.status==='rps'&&m.participantUids.every(uid=>m.commits?.[uid])&&!m.reveals?.[state.uid]){
                 const saved=secret(m.id,m.rpsRound);if(saved){const hash=await petBattleCommitment(m.id,state.uid,m.rpsRound,saved.choice,saved.nonce);if(state.busy)return;await mutate('reveal',{...saved,hash,round:m.rpsRound},m.id);return;}
             }
@@ -10528,7 +10603,7 @@ const PetBattleGame=(()=>{
         if(state.listKey!==listKey){
             state.listKey=listKey;
             const options=[new Option('Đấu người','')];
-            if(!PET_CLOUD_ENABLED)options.push(new Option('Đánh Bot','bot:new'));
+            options.push(new Option('Đánh Bot','bot:new'));
             options.push(...matches.map(m=>new Option(`${m.players[0].name} ↔ ${m.players[1]?.name||m.opponentUid} · ${{invited:'Lời mời',ready:'Chờ sẵn sàng',rps:'Oẳn tù tì',fighting:'Đang đấu',finished:'Kết thúc',cancelled:'Đã hủy',rejected:'Từ chối',expired:'Hết hạn'}[m.status]}`,m.id)));
             el('petBattleMatches').replaceChildren(...options);
         }
@@ -10546,9 +10621,11 @@ const PetBattleGame=(()=>{
         el('petBattleCycleGuest').hidden=!incoming;
         el('petBattleCancel').hidden=!(m?.status==='invited'&&m.challengerUid===state.uid);
         const terminal=!!m&&(['finished','cancelled','rejected','expired'].includes(m.status)||petBattlePlayback(m).finished);
-        const awaitingClaim=!!m&&!m.claims?.[state.uid]&&(PET_CLOUD_ENABLED
-            ?m.players.some(p=>p.uid===state.uid)&&!m.settledAt
-            :!!state.own?.petBattleLocks?.[m.id]);
+        const awaitingClaim=!!m&&!m.claims?.[state.uid]&&(m.bot
+            ?petBattleClaimAmount(m,state.uid)!==null
+            :PET_CLOUD_ENABLED
+                ?m.players.some(p=>p.uid===state.uid)&&!m.settledAt
+                :!!state.own?.petBattleLocks?.[m.id]);
         el('petBattleFinish').hidden=!terminal;el('petBattleFinish').disabled=state.busy||awaitingClaim;
         const endDelay=PET_CLOUD_ENABLED&&m?.status==='fighting'
             ?Date.now()-petBattleTime(m.startedAt)-2000-m.turns.length*PET_BATTLE_STEP_MS:Infinity;
@@ -10647,7 +10724,7 @@ const PetBattleGame=(()=>{
         el('petBattleNew').addEventListener('click',()=>open());
         el('petBattleMatches').addEventListener('change',event=>{
             const id=event.target.value;
-            if(id==='bot:new'&&!PET_CLOUD_ENABLED)open('',true);
+            if(id==='bot:new')open('',true);
             else if(id)open(id);
         });
         el('petBattleAddOpponent').addEventListener('click',()=>el('petBattleInvitePicker').showModal());
@@ -10683,7 +10760,7 @@ const PetBattleGame=(()=>{
                 if(state.active!==previous&&el('petBattleInvitePicker').open)el('petBattleInvitePicker').close();
             });
         });
-        el('petBattleBotStart').addEventListener('click',()=>mutateBot('start',payload()));
+        el('petBattleBotStart').addEventListener('click',()=>mutateBot('start',{...payload(),difficulty:state.botDifficulty||'easy'}));
         el('petBattleBotSlot').querySelectorAll('[data-bot-difficulty]').forEach(button=>button.addEventListener('click',event=>{
             event.preventDefault();event.stopPropagation();if(state.busy)return;
             state.botDifficulty=button.dataset.botDifficulty;state.botKey='';
@@ -10809,9 +10886,14 @@ function setSharedNotesOpen(open) {
     document.getElementById('sharedNotesToggle').classList.toggle('d-none', sharedNotesOpen || quickChatPanelOpen);
     if (sharedNotesOpen) {
         closeQuickChatPanel();
+        listenSharedNotes();
         document.getElementById('quickChatToggleBtn')?.classList.add('d-none');
         document.getElementById('sharedNotesEditor').focus();
     } else if (!quickChatPanelOpen) {
+        if (sharedNotesUnsubscribe) {
+            sharedNotesUnsubscribe();
+            sharedNotesUnsubscribe = null;
+        }
         document.getElementById('quickChatToggleBtn')?.classList.remove('d-none');
     }
     renderSharedNotes();
@@ -10852,8 +10934,8 @@ function listenSharedNotes() {
     const generation = sharedNotesGeneration;
     document.getElementById('sharedNotesToggle').hidden = false;
     document.getElementById('sharedNotesStatus').textContent = '';
-    sharedNotesUnsubscribe = onSnapshot(query(collection(db, 'sharedNotes'), orderBy('createdAt', 'desc'), limit(100)), snapshot => {
-        if (currentUser?.uid !== uid || generation !== sharedNotesGeneration) return;
+    sharedNotesUnsubscribe = onSnapshot(query(collection(db, 'sharedNotes'), orderBy('createdAt', 'desc'), limit(50)), snapshot => {
+        if (currentUser?.uid !== uid || generation !== sharedNotesGeneration || !sharedNotesOpen) return;
         sharedNotesItems = snapshot.docs.map(item => ({ ...item.data(), id: item.id }));
         renderSharedNotes();
     }, error => {
@@ -12123,7 +12205,7 @@ async function openPresenterSpinModal() {
     listEl.innerHTML = '<div class="empty-state"><i class="bi bi-hourglass-split"></i><br>Đang tải danh sách user...</div>';
 
     try {
-        const snapshot = usersDirectorySnapshot || await getDocs(collection(db, 'users'));
+        const snapshot = await getDocs(collection(db, 'users'));
         spinAllUsers = [];
         usersDeptLatest = {};
         snapshot.forEach(userDoc => {
@@ -14094,8 +14176,12 @@ function listenWorkHours() {
     if (!(accessControl.can('workHours') || accessControl.can('jobs'))) return;
     if (unsubscribeWorkHours) unsubscribeWorkHours();
     const lower = new Date();
-    lower.setMonth(lower.getMonth() - 2);
-    const q = query(collection(db, WORKHOURS_COLLECTION), where('date', '>=', localDateKey(lower)));
+    lower.setDate(1);
+    lower.setHours(0, 0, 0, 0);
+    const upper = new Date(lower);
+    upper.setMonth(upper.getMonth() + 2);
+    const q = query(collection(db, WORKHOURS_COLLECTION),
+        where('date', '>=', localDateKey(lower)), where('date', '<', localDateKey(upper)));
     unsubscribeWorkHours = onSnapshot(q, (snapshot) => {
         const all = [];
         snapshot.forEach(d => {
@@ -14290,6 +14376,7 @@ async function saveWorkHours() {
 function openWorkHoursModal() {
     if (!accessControl.requireAccess('workHours', 'view')) return;
     workHoursModalOpen = true;
+    listenWorkHours();
     rebuildWorkHoursMap();
     fillDeptSelect(document.getElementById('whDeptSelect'), workHoursViewDept, { none: true, noneLabel: 'Chưa phân bộ phận' });
     renderWorkHoursSaved();
@@ -14299,7 +14386,13 @@ function openWorkHoursModal() {
 
 function initWorkHoursUi() {
     workHoursModal = new bootstrap.Modal(document.getElementById('workHoursModal'));
-    document.getElementById('workHoursModal').addEventListener('hidden.bs.modal', () => { workHoursModalOpen = false; });
+    document.getElementById('workHoursModal').addEventListener('hidden.bs.modal', () => {
+        workHoursModalOpen = false;
+        if (unsubscribeWorkHours) {
+            unsubscribeWorkHours();
+            unsubscribeWorkHours = null;
+        }
+    });
     document.getElementById('workHoursBtn').addEventListener('click', openWorkHoursModal);
     document.getElementById('whSaveBtn').addEventListener('click', saveWorkHours);
 }
@@ -14343,8 +14436,13 @@ function dayOffAllIds(o) {
 function listenDayOffs() {
     if (!(accessControl.can('dayOffs') || accessControl.can('jobs'))) return;
     if (unsubscribeDayOffs) unsubscribeDayOffs();
-    // Year/month navigation also needs previously registered dates in past years.
-    const q = collection(db, DAYOFF_COLLECTION);
+    const lower = new Date();
+    lower.setDate(1);
+    lower.setHours(0, 0, 0, 0);
+    const upper = new Date(lower);
+    upper.setMonth(upper.getMonth() + DAYOFF_MONTHS_SHOWN);
+    const q = query(collection(db, DAYOFF_COLLECTION),
+        where('date', '>=', localDateKey(lower)), where('date', '<', localDateKey(upper)));
     unsubscribeDayOffs = onSnapshot(q, (snapshot) => {
         dayOffsList = normalizeDayOffs(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
         renderSchedule();
@@ -14466,6 +14564,7 @@ async function openDayOffModal() {
     if (!accessControl.requireAccess('dayOffs', 'view')) return;
     if (!currentUser) return;
     dayOffModalOpen = true;
+    listenDayOffs();
     dayOffFocusUid = null;
     dayOffSelected = new Set(Object.keys(getMyOffMap()));
     syncDayOffFilters();
@@ -14477,7 +14576,7 @@ async function openDayOffModal() {
     renderDayOffModal();
 
     try {
-        const snapshot = usersDirectorySnapshot || await getDocs(collection(db, 'users'));
+        const snapshot = await getDocs(collection(db, 'users'));
         const users = [];
         // Đồng thời nạp cache avatar từ kết quả fetch này (đề phòng listener
         // listenUsersAvatars chưa fire xong hoặc chưa có user nào có avatar)
@@ -16482,9 +16581,9 @@ function getStatsUserColor(uid) {
 }
 
 async function ensureUsersInfoCache() {
-    if (Object.keys(usersInfoCache).length > 0) return;
+    if (usersFullInfoLoaded) return;
     try {
-        const snap = usersDirectorySnapshot || await getDocs(collection(db, 'users'));
+        const snap = await getDocs(collection(db, 'users'));
         usersDeptLatest = {};
         snap.forEach(d => {
             const u = d.data();
@@ -16503,6 +16602,7 @@ async function ensureUsersInfoCache() {
                 }
             }
         });
+        usersFullInfoLoaded = true;
         rebuildDepartmentsList();
     } catch (e) { console.error('Không tải được users info:', e); }
 }

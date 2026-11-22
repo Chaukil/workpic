@@ -14,12 +14,12 @@ const helpers = await import('data:text/javascript;base64,' + Buffer.from(shared
     export { ATTENDANCE_PET_BRANCHES, attendancePetActivityTime, attendancePetRecords,
         attendancePetView, buildPetComparison, transitionPetHousehold, petBattleFighter,
         petBattleChangeWeight, petBattleSimulation, petBattleTime,
-        petBattleSettleXp, PET_BATTLE_STEP_MS };
+        petBattleSettleXp, petBattleCompletePet, makePetBattleBot, PET_BATTLE_STEP_MS };
 `).toString('base64'));
 const { ATTENDANCE_PET_BRANCHES, attendancePetActivityTime, attendancePetRecords,
     attendancePetView, buildPetComparison, transitionPetHousehold, petBattleFighter,
     petBattleChangeWeight, petBattleSimulation, petBattleTime,
-    petBattleSettleXp, PET_BATTLE_STEP_MS } = helpers;
+    petBattleSettleXp, petBattleCompletePet, makePetBattleBot, PET_BATTLE_STEP_MS } = helpers;
 
 initializeApp();
 const db = getFirestore();
@@ -28,6 +28,7 @@ const adminUid = defineString('PET_ADMIN_UID');
 const profiles = db.collection('petProfiles');
 const battles = db.collection('petCloudBattles');
 const legacy = db.collection('users');
+const directory = db.collection('userDirectory');
 const week = 7 * 86400000;
 const pageSize = 20;
 let rankingCache;
@@ -45,6 +46,15 @@ function activityPatch(pet, now) {
 
 function safeName(value) {
     return typeof value === 'string' && value.trim() ? value.trim().slice(0, 100) : 'Thành viên';
+}
+
+function userDirectoryEntry(profile) {
+    return {
+        uid: profile.uid,
+        displayName: safeName(profile.displayName || profile.email?.split('@')[0]),
+        avatar: typeof profile.avatar === 'string' ? profile.avatar : null,
+        status: typeof profile.status === 'string' ? profile.status : profile.disabled === true ? 'inactive' : 'active'
+    };
 }
 
 async function openProfile(uid) {
@@ -249,6 +259,73 @@ async function battle(uid, data) {
     }, { maxAttempts: 3 });
 }
 
+async function botBattle(uid, data) {
+    if (data.action === 'start') {
+        const difficulty = ['easy', 'medium', 'hard'].includes(data.difficulty) ? data.difficulty : 'easy';
+        const stake = data.stakeGrams;
+        if (!Number.isSafeInteger(stake) || stake < 100 || stake % 100) {
+            throw new HttpsError('invalid-argument', 'Cược tối thiểu 0,1 kg, theo bước 0,1 kg.');
+        }
+        validateElement(data.element);
+        const id = `bot-${randomUUID()}`, ref = profiles.doc(uid), matchRef = battles.doc(id);
+        const snapshot = await ref.get(), profile = snapshot.data(), now = Date.now();
+        if (!profile) throw new HttpsError('failed-precondition', 'Chưa mở hồ sơ thú cưng.');
+        if (Object.keys(profile.petBattleLocks || {}).length >= 6) {
+            throw new HttpsError('failed-precondition', 'Hãy hoàn tất các trận đang giữ cược.');
+        }
+        const player = petBattleFighter({ ...profile, displayName: profile.name }, uid,
+            requireId(data.petId), data.stats, now, data.element);
+        petBattleChangeWeight(profile.attendancePet, player.petId, -stake, now);
+        const bot = makePetBattleBot(player.appearance.level, difficulty);
+        const players = [player, { ...bot, uid: 'workpic-bot' }];
+        const firstUid = players[randomInt(2)].uid;
+        const match = { id, bot: true, botDifficulty: difficulty, rewardMultiplier: bot.rewardMultiplier,
+            participantUids: [uid], players, stakeGrams: stake, stakeXp: Math.floor(stake / 200),
+            status: 'fighting', createdMs: now, startedAt: now, firstUid, claims: {},
+            ...petBattleSimulation(players, firstUid) };
+        await matchRef.create(match);
+        const { turns, maxHp, winnerUid, ...publicMatch } = match;
+        return { match: publicMatch, patch: {} };
+    }
+
+    if (data.action !== 'claim') throw new HttpsError('invalid-argument', 'Thao tác trận Bot không hợp lệ.');
+    const id = requireId(data.id), matchRef = battles.doc(id), profileRef = profiles.doc(uid);
+    return db.runTransaction(async tx => {
+        const [matchSnapshot, profileSnapshot] = await Promise.all([tx.get(matchRef), tx.get(profileRef)]);
+        const match = matchSnapshot.data(), profile = profileSnapshot.data(), now = Date.now();
+        if (!match?.bot || !match.participantUids?.includes(uid) || !profile) {
+            throw new HttpsError('not-found', 'Không tìm thấy trận Bot.');
+        }
+        if (match.claims?.[uid]) return { match, patch: {} };
+        const at = deadline(match);
+        if (match.status !== 'fighting' || !at || now < at) {
+            throw new HttpsError('failed-precondition', 'Trận Bot chưa kết thúc.');
+        }
+        const player = match.players.find(item => item.uid === uid);
+        if (!player) throw new HttpsError('failed-precondition', 'Không tìm thấy thú cưng trong trận.');
+        const currentPlayer = petBattleFighter({ ...profile, displayName: profile.name }, uid,
+            player.petId, player.stats, now, player.element);
+        if (currentPlayer.appearance.level !== player.appearance.level) {
+            throw new HttpsError('failed-precondition', 'Cấp thú cưng đã thay đổi trong trận.');
+        }
+        const won = match.winnerUid === uid;
+        const multiplier = Math.max(1, Math.min(2, Number(match.rewardMultiplier) || 1));
+        const weightDelta = match.winnerUid ? won ? match.stakeGrams * multiplier : -match.stakeGrams : 0;
+        let pet = weightDelta ? petBattleChangeWeight(profile.attendancePet, player.petId, weightDelta, now) : profile.attendancePet;
+        const xpDelta = match.winnerUid ? won ? match.stakeXp * multiplier : -match.stakeXp : 0;
+        const xp = petBattleSettleXp(pet, player.petId, xpDelta, now);
+        pet = petBattleCompletePet(xp.pet, player.petId, match, uid, xp.change, weightDelta, now);
+        const locks = { ...profile.petBattleLocks };
+        delete locks[id];
+        const result = { ...match, status: 'finished', settledAt: now,
+            claims: { ...match.claims, [uid]: true }, xpChanges: { [uid]: xp.change } };
+        const patch = { ...activityPatch(pet, now), petBattleLocks: locks };
+        tx.update(profileRef, patch);
+        tx.update(matchRef, { status: result.status, settledAt: now, claims: result.claims, xpChanges: result.xpChanges });
+        return { match: result, patch };
+    }, { maxAttempts: 3 });
+}
+
 async function ranking(data) {
     const branch = data.branch || 'all', offset = Number(data.offset || 0);
     if (!Number.isSafeInteger(offset) || offset < 0 ||
@@ -284,6 +361,7 @@ export const workpicPets = onCall({ region, maxInstances: 3 }, async request => 
             const pet = owner.exists && attendancePetRecords(owner.data().attendancePet).find(item => item.id === petId);
             return { entries: Array.isArray(pet?.battleHistory) ? pet.battleHistory.slice(0, 30) : [] };
         }
+        if (data.kind === 'bot') return await botBattle(uid, data);
         if (data.kind === 'battle') return await battle(uid, data);
         if (data.kind === 'care') return await care(uid, data, false);
         if (data.kind === 'admin-open' || data.kind === 'admin-care') {
@@ -300,9 +378,23 @@ export const workpicPets = onCall({ region, maxInstances: 3 }, async request => 
     }
 });
 
+export const syncWorkpicUserDirectory = onDocumentWritten({ region, document: 'users/{profileId}' }, async event => {
+    const uid = event.data?.after.data()?.uid || event.data?.before.data()?.uid;
+    if (typeof uid !== 'string' || !uid) return;
+    const snapshot = await legacy.where('uid', '==', uid).get();
+    if (snapshot.empty) {
+        await directory.doc(uid).delete();
+        return;
+    }
+    const latest = [...snapshot.docs].sort((a, b) =>
+        String(b.data().updatedAt || b.data().createdAt || '').localeCompare(String(a.data().updatedAt || a.data().createdAt || ''))
+    )[0].data();
+    await directory.doc(uid).set(userDirectoryEntry(latest));
+});
+
 export const queueWorkpicPetDeadline = onDocumentWritten({ region, document: 'petCloudBattles/{id}', retry: true }, async event => {
     const after = event.data?.after.data();
-    if (!after) return;
+    if (!after || after.bot) return;
     const at = deadline(after), before = event.data.before.data();
     if (!at || (before && deadline(before) === at)) return;
     const id = event.params.id;
@@ -322,6 +414,35 @@ export const settleWorkpicPetDeadline = onTaskDispatched({ region,
 }, async request => {
     await settle(request.data.id, request.data.at);
 });
+
+if (process.argv.includes('--sync-user-directory')) {
+    if (!process.env.GOOGLE_CLOUD_PROJECT) throw new Error('Set GOOGLE_CLOUD_PROJECT before syncing the user directory.');
+    const byUid = new Map();
+    let cursor;
+    for (;;) {
+        let query = legacy.orderBy(FieldPath.documentId()).limit(400);
+        if (cursor) query = query.startAfter(cursor);
+        const page = await query.get();
+        for (const doc of page.docs) {
+            const profile = doc.data();
+            if (!profile.uid) continue;
+            const previous = byUid.get(profile.uid);
+            const stamp = String(profile.updatedAt || profile.createdAt || '');
+            if (!previous || stamp >= previous.stamp) byUid.set(profile.uid, { profile, stamp });
+        }
+        cursor = page.docs.at(-1);
+        if (page.size < 400) break;
+    }
+    const rows = [...byUid.values()];
+    for (let index = 0; index < rows.length; index += 400) {
+        const batch = db.batch();
+        rows.slice(index, index + 400).forEach(({ profile }) => {
+            batch.set(directory.doc(profile.uid), userDirectoryEntry(profile));
+        });
+        await batch.commit();
+    }
+    console.log(`User directory synced: ${rows.length} members.`);
+}
 
 if (process.argv.includes('--migrate-existing-pets')) {
     if (!process.env.GOOGLE_CLOUD_PROJECT) throw new Error('Set GOOGLE_CLOUD_PROJECT before migrating.');

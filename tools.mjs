@@ -97,6 +97,49 @@ test('optional libraries load once concurrently and can retry after a network fa
     assert.equal(scripts.length, 2);
 });
 
+test('Firebase listeners are scoped, bounded, and opened on demand', () => {
+    const source = fs.readFileSync('app.js', 'utf8');
+    const init = source.slice(source.indexOf('function initializeAuthenticatedApp()'), source.indexOf('// Trong DOMContentLoaded event listener'));
+    for (const listener of ['listenUserNotifications()', 'listenQuickJobs()', 'listenSharedNotes()', 'listenDayOffs()', 'listenWorkHours()']) {
+        assert.equal(init.includes(listener), false, `${listener} must not start at login`);
+    }
+    const directory = source.slice(source.indexOf('async function listenUsersAvatars()'), source.indexOf('function getUserAvatarUrl('));
+    assert.match(directory, /getDocs\(collection\(db,'users'\)\)/);
+    assert.doesNotMatch(directory, /onSnapshot/);
+    assert.match(source, /const PET_CLOUD_ENABLED = false/);
+    const ranking = source.slice(source.indexOf('function stopPetRankingListeners()'), source.indexOf('const petComparisonImageCache'));
+    assert.match(ranking, /getDocs\(collection\(db,'users'\)\)/);
+    assert.match(ranking, /slice\(offset,offset\+20\)/);
+    assert.match(ranking, /onSnapshot\(profile\.ref/);
+    assert.match(ranking, /const visible=page\.rows\.slice\(0,20\)/);
+    const notifications = source.slice(source.indexOf('function listenUserNotifications()'), source.indexOf('// QUICK CHAT'));
+    assert.match(notifications, /orderBy\('timestamp', 'desc'\)/);
+    assert.match(notifications, /limit\(50\)/);
+    const notes = source.slice(source.indexOf('function listenSharedNotes()'), source.indexOf('function stopSharedNotes()'));
+    assert.match(notes, /limit\(50\)/);
+    const workHours = source.slice(source.indexOf('function listenWorkHours()'), source.indexOf('function resolveWorkHoursDept('));
+    assert.match(workHours, /where\('date', '>=', localDateKey\(lower\)\)/);
+    assert.match(workHours, /where\('date', '<', localDateKey\(upper\)\)/);
+    const dayOffs = source.slice(source.indexOf('function listenDayOffs()'), source.indexOf('function getMyOffMap('));
+    assert.match(dayOffs, /DAYOFF_MONTHS_SHOWN/);
+    assert.match(dayOffs, /where\('date', '>=', localDateKey\(lower\)\)/);
+    assert.match(dayOffs, /where\('date', '<', localDateKey\(upper\)\)/);
+});
+
+test('Firestore-only Bot settlement uses one idempotent client transaction', () => {
+    const client = fs.readFileSync('app.js', 'utf8');
+    const backend = fs.readFileSync('pet-cloud.mjs', 'utf8');
+    const mutateBot = client.slice(client.indexOf('async function mutateBot('), client.indexOf('async function process()', client.indexOf('async function mutateBot(')));
+    assert.match(mutateBot, /runTransaction\(db/);
+    assert.match(mutateBot, /profile\.petBotClaims/);
+    assert.match(mutateBot, /transaction\.update\(ref,patch\)/);
+    const botBattle = backend.slice(backend.indexOf('async function botBattle('), backend.indexOf('async function ranking('));
+    assert.match(botBattle, /petBattleSimulation\(players, firstUid\)/);
+    assert.match(botBattle, /db\.runTransaction/);
+    assert.match(botBattle, /tx\.update\(profileRef, patch\)/);
+    assert.match(botBattle, /tx\.update\(matchRef/);
+});
+
 test('UI refresh timers stay bounded across sessions and pause rendering in background tabs', () => {
     const source = fs.readFileSync('app.js', 'utf8');
     const timers = new Map(), events = new Map();
@@ -834,7 +877,7 @@ test('pet startup reuses login profile, creates only missing pets and never writ
  state={uid:'me'};await context.startAttendancePet();assert.equal(transactions,1);assert.equal(writes,1);
  context.usersDirectorySnapshot={docs:[context.authenticatedProfileSnapshot]};
  const before=extraListeners;
- await context.startAttendancePet();assert.equal(transactions,1);assert.equal(writes,1);assert.equal(extraListeners,before);
+ await context.startAttendancePet();assert.equal(transactions,1);assert.equal(writes,1);assert.equal(extraListeners,before+1);
 });
 
 test('cloud startup reuses the profile listener and migrates only after a server-confirmed miss', async()=>{
@@ -1102,23 +1145,21 @@ test('two-client battle escrow, hidden RPS, automatic fight, payout and refunds 
  await game.mutate('claim');use('b',waiting);await game.mutate('claim');
  assert.equal(battles.get(waiting).status,'expired');
  assert.deepEqual(['a','b'].map(uid=>attendancePetView(profiles.get(uid).attendancePet,clock).weightGrams),priorWeights);
- use('a');game.inspect().bot=makePetBattleBot(1);
- const bot=game.inspect().bot,weightBeforeBot=profiles.get('a').attendancePet.weightGrams;
- const historyBeforeBot=profiles.get('a').attendancePet.battleHistory?.length||0;
- const xpBeforeBot=attendancePetView(profiles.get('a').attendancePet,clock).xp;
+ use('a');const weightBeforeBot=profiles.get('a').attendancePet.weightGrams,beforeLegacyBot=writes;
+ const botState=game.inspect(),botPet=attendancePetRecords(profiles.get('a').attendancePet,clock)[0];
+ botState.bot=makePetBattleBot(attendancePetView(botPet,clock).level,'easy');botState.botDifficulty='easy';
  await game.mutateBot('start',{...payload('a',statsA),element:'fire'});
- const botMatch=profiles.get('a').petBotBattle;assert.deepEqual(botMatch.players[1],bot);
- assert.equal(profiles.get('a').attendancePet.weightGrams,weightBeforeBot-200);
- const claimBeforeBotEnd=writes;await game.mutateBot('claim');assert.equal(writes,claimBeforeBotEnd);
+ const botId=game.inspect().active,botMatch=game.inspect().matches.get(botId);
+ assert.equal(writes,beforeLegacyBot,'Bot simulation stays local until the match ends');
+ assert.equal(profiles.get('a').attendancePet.weightGrams,weightBeforeBot);
  clock+=2000+botMatch.turns.length*1800+1;
- await game.mutateBot('claim');
- const afterBot=profiles.get('a').attendancePet;
- const expectedWeight=botMatch.winnerUid?(botMatch.winnerUid==='a'?200:-200):0;
- assert.equal(afterBot.weightGrams,weightBeforeBot+expectedWeight);
- assert.equal(afterBot.battleHistory?.length||0,historyBeforeBot,'Bot does not add a challenge history entry');
- const xpAfterBot=attendancePetView(afterBot,clock).xp;
- assert.equal(xpAfterBot,Math.max(0,xpBeforeBot+Math.sign(expectedWeight)));
- const settledBotWrites=writes;await game.mutateBot('claim');assert.equal(writes,settledBotWrites);
+ use('a',botId);await game.mutateBot('claim',{},botId);
+ const settledWeight=attendancePetView(profiles.get('a').attendancePet,clock).weightGrams;
+ const expectedDelta=botMatch.winnerUid==='a'?botMatch.stakeGrams*botMatch.rewardMultiplier:botMatch.winnerUid?-botMatch.stakeGrams:0;
+ assert.equal(settledWeight,weightBeforeBot+expectedDelta,'one Firestore transaction settles the local simulation');
+ assert.equal(writes,beforeLegacyBot+1);
+ const afterBotClaim=writes;await game.mutateBot('claim',{},botId);
+ assert.equal(writes,afterBotClaim,'the profile marker prevents an ordinary duplicate claim');
 });
 
 test('cloud pets migrate once and the server settles both profiles once without connected players', async () => {
@@ -1127,7 +1168,9 @@ test('cloud pets migrate once and the server settles both profiles once without 
  let clock=Date.UTC(2026,10,22),queue=Promise.resolve();
  class Clock extends Date { static now(){return clock;} }
  class HttpsError extends Error { constructor(code,message){super(message);this.code=code;} }
- const ref=path=>({id:path.split('/').at(-1),path,get:async()=>snapshot(ref(path)),collection:name=>collection(path+'/'+name)});
+ const ref=path=>({id:path.split('/').at(-1),path,get:async()=>snapshot(ref(path)),create:async value=>{
+  assert.equal(documents.has(path),false);documents.set(path,structuredClone(value));
+ },collection:name=>collection(path+'/'+name)});
  const snapshot=reference=>({id:reference.id,ref:reference,exists:documents.has(reference.path),data:()=>structuredClone(documents.get(reference.path))});
  const collection=prefix=>({doc:id=>ref(prefix+'/'+id),where:(key,op,value)=>{
   const target={select:()=>target,get:async()=>({docs:[...documents.keys()].filter(path=>path.startsWith(prefix+'/')&&path.split('/').length===2)
@@ -1160,11 +1203,12 @@ test('cloud pets migrate once and the server settles both profiles once without 
   Date:Clock,HttpsError,FieldValue:{delete:()=>removed},randomUUID:()=>String(commits.length),randomInt:()=>0,
   ATTENDANCE_PET_BRANCHES,attendancePetActivityTime,attendancePetRecords,attendancePetView,buildPetComparison,
   transitionPetHousehold,petBattleFighter,petBattleChangeWeight,petBattleSimulation,petBattleSettleXp,
-  petBattleTime:value=>Number(value)||0,PET_BATTLE_STEP_MS:1800,week:7*86400000,pageSize:20,rankingCache:undefined};
+  petBattleCompletePet,makePetBattleBot,petBattleTime:value=>Number(value)||0,PET_BATTLE_STEP_MS:1800,
+  week:7*86400000,pageSize:20,rankingCache:undefined};
  vm.createContext(context);
  vm.runInContext(source.slice(source.indexOf('function requireId'),source.indexOf('export const workpicPets'))+
-  '\nglobalThis.cloud={openProfile,care,battle,settle,deadline,ranking};',context);
- const {openProfile,battle,settle,deadline,ranking}=context.cloud;
+  '\nglobalThis.cloud={openProfile,care,battle,settle,deadline,ranking,botBattle};',context);
+ const {openProfile,battle,settle,deadline,ranking,botBattle}=context.cloud;
  for(const uid of ['a','b'])documents.set('users/legacy-'+uid,{uid,displayName:uid.toUpperCase(),avatar:'keep',attendancePet:{
   ...newAttendancePet(clock-7200000),lastCheckinAt:clock,weightGrams:1000,feedingXp:uid==='b'?1:0}});
  const [a,b]=await Promise.all([openProfile('a'),openProfile('b')]);
@@ -1197,6 +1241,23 @@ test('cloud pets migrate once and the server settles both profiles once without 
  const page=await ranking({});
  assert.equal(page.rows[0].uid,'a');
  assert.ok(!Object.hasOwn(page.rows[0],'battleHistory'));
+ const botPet=attendancePetRecords(winner.attendancePet,clock)[0];
+ const startWeight=attendancePetView(winner.attendancePet,clock).weightGrams;
+ const started=await botBattle('a',{action:'start',petId:botPet.id,stats:{attack:30,magic:20,defense:10,magicReduction:10,physicalReduction:10,dodge:5,luck:5,health:10},element:'fire',stakeGrams:200,difficulty:'hard'});
+ const botId=started.match.id,botRecord=documents.get(`petCloudBattles/${botId}`);
+ assert.equal(started.match.turns,undefined,'the local client receives setup, not the authoritative timeline');
+ assert.equal(started.match.winnerUid,undefined);
+ assert.equal(attendancePetView(documents.get('petProfiles/a').attendancePet,clock).weightGrams,startWeight,'starting a Bot match does not mutate pet rewards');
+ const botEnd=deadline(botRecord);clock=botEnd;
+ const beforeBotClaim=commits.length;
+ await botBattle('a',{action:'claim',id:botId});
+ assert.equal(commits.length,beforeBotClaim+1,'Bot reward and match claim settle in one transaction');
+ assert.deepEqual(commits.at(-1),['petProfiles/a',`petCloudBattles/${botId}`]);
+ const expectedDelta=botRecord.winnerUid==='a'?botRecord.stakeGrams*botRecord.rewardMultiplier:botRecord.winnerUid?-botRecord.stakeGrams:0;
+ assert.equal(attendancePetView(documents.get('petProfiles/a').attendancePet,clock).weightGrams,startWeight+expectedDelta);
+ const afterBotClaim=commits.length;
+ await botBattle('a',{action:'claim',id:botId});
+ assert.equal(commits.length,afterBotClaim,'a duplicate Bot claim cannot settle twice');
 });
 
 test('admin actions affect only their own fields and unchanged choices do not produce a write', () => {
@@ -1814,6 +1875,7 @@ ${extract('function renderChangeHistory(', 'function getDayOffJobPreview(')}
 ${extract('function renderJobChecklist(', "window.addEventListener('beforeunload'")}
 ${extract('let sharedNotesUnsubscribe =', 'function initQuickChatUi(')}
 let usersDirectorySnapshot=null,authenticatedProfileSnapshot=null;
+const collection=(_,name)=>name,getDocs=async()=>usersDirectorySnapshot;
 const auth={currentUser:{uid:'me',email:'chauchikil01@gmail.com'}};
 ${extract('const canControlPets =', 'let attendancePetData =')}
 const modelViews=new Map();
