@@ -2441,7 +2441,9 @@ try {
  const arena=arenaRenderer.inspect();check(arena?.renderer&&arena.renderer!==peer.renderer,'arena has an independent real WebGL model');
  arena.renderer.render(arena.scene,arena.camera);const arenaGL=arena.renderer.getContext(),arenaPixels=new Uint8Array(arena.renderer.domElement.width*arena.renderer.domElement.height*4);arenaGL.readPixels(0,0,arena.renderer.domElement.width,arena.renderer.domElement.height,arenaGL.RGBA,arenaGL.UNSIGNED_BYTE,arenaPixels);check(arenaPixels.some((value,index)=>index%4===3&&value>0),'arena fighter paints visible pixels');
  arenaRenderer.duelPose({criticalAt:Date.now()});check(arena.criticalGroup&&arena.criticalGhost&&!arena.model.visible,'critical hit animates a floating pet spirit above its grave');
- arenaRenderer.duelPose({result:'defeat'});check(arena.resultGroup&&arena.resultGhost&&!arena.model.visible,'defeated fighter keeps the redesigned grave and ghost');
+ arenaRenderer.duelPose({result:'defeat'});const gravePlaque=arena.resultGroup?.children.find(child=>child.material?.map);
+ check(arena.resultGroup&&arena.resultGhost&&!arena.model.visible&&gravePlaque?.material.map.image.width===512,'defeated pet shows a grave with a high-resolution name plaque and clear ghost');
+ check(arena.resultSpirit.children.some(child=>child.material?.color?.getHexString()==='163448'),'ghost has a visible face');
  arenaRenderer.duelPose({result:null});check(arena.model.visible&&!arena.resultGroup,'leaving the result pose restores the original pet model');
  arenaRenderer.stop();arenaButton.remove();
  const draft=document.createElement('div');draft.id='draft-test';draft.className='pet-battle-model pet-battle-draft-model';draft.innerHTML='<span id="draft-test-art"></span>';document.body.appendChild(draft);

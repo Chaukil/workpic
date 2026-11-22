@@ -8770,9 +8770,10 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
     function disposeBattleCritical(s){
         if(!s.criticalGroup)return;
         s.scene.remove(s.criticalGroup);
-        const materials=new Set();
-        s.criticalGroup.traverse(object=>{if(object.material)(Array.isArray(object.material)?object.material:[object.material]).forEach(material=>materials.add(material));});
+        const materials=new Set(),textures=new Set();
+        s.criticalGroup.traverse(object=>{if(object.material)(Array.isArray(object.material)?object.material:[object.material]).forEach(material=>{materials.add(material);for(const key of ['map','alphaMap','emissiveMap'])if(material[key])textures.add(material[key]);});});
         materials.forEach(material=>material.dispose());
+        textures.forEach(texture=>texture.dispose());
         s.criticalGeometries?.forEach(geometry=>geometry.dispose());
         s.criticalGroup=null;s.criticalGhost=null;s.criticalSpirit=null;s.criticalMotes=null;s.criticalAt=0;
         if(s.model)s.model.visible=true;
@@ -8780,9 +8781,10 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
     function disposeBattleResult(s){
         if(!s.resultGroup)return;
         s.scene.remove(s.resultGroup);
-        const materials=new Set();
-        s.resultGroup.traverse(object=>{if(object.material)(Array.isArray(object.material)?object.material:[object.material]).forEach(material=>materials.add(material));});
+        const materials=new Set(),textures=new Set();
+        s.resultGroup.traverse(object=>{if(object.material)(Array.isArray(object.material)?object.material:[object.material]).forEach(material=>{materials.add(material);for(const key of ['map','alphaMap','emissiveMap'])if(material[key])textures.add(material[key]);});});
         materials.forEach(material=>material.dispose());
+        textures.forEach(texture=>texture.dispose());
         s.resultGeometries?.forEach(geometry=>geometry.dispose());
         s.resultGroup=null;s.resultGhost=null;s.resultSpirit=null;s.resultMotes=null;s.resultGeometries=[];
     }
@@ -8800,27 +8802,45 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
         arch.moveTo(-.43,-.73);arch.lineTo(-.43,.04);arch.quadraticCurveTo(-.43,.40,0,.42);arch.quadraticCurveTo(.43,.40,.43,.04);arch.lineTo(.43,-.73);arch.closePath();
         const monument=new T.ExtrudeGeometry(arch,{depth:.15,bevelEnabled:true,bevelSegments:3,steps:1,bevelSize:.035,bevelThickness:.035,curveSegments:12});
         add(monument,stone,0,-.34,0);
-        add(new T.BoxGeometry(.075,.35,.035),stoneLight,0,-.23,.105);
-        add(new T.BoxGeometry(.24,.075,.035),stoneLight,0,-.2,.105);
-        add(new T.TorusGeometry(.24,.025,7,24),engraving,0,-.58,.12).scale.set(.8,.3,1);
-        add(new T.SphereGeometry(.055,12,8),stoneLight,0,-.58,.15);
+        const plaqueCanvas=document.createElement('canvas');plaqueCanvas.width=512;plaqueCanvas.height=128;
+        const plaqueContext=plaqueCanvas.getContext('2d');
+        plaqueContext.fillStyle='#263640';plaqueContext.beginPath();plaqueContext.roundRect(18,18,476,92,18);plaqueContext.fill();
+        plaqueContext.strokeStyle='#d5bc83';plaqueContext.lineWidth=7;plaqueContext.stroke();
+        const petName=String(s.view?.displayName||s.view?.name||'Thú cưng').trim();
+        plaqueContext.font='700 52px Inter, Arial, sans-serif';plaqueContext.textAlign='center';plaqueContext.textBaseline='middle';
+        let label=petName;
+        while(label.length>3&&plaqueContext.measureText(label).width>426)label=label.slice(0,-2)+'…';
+        plaqueContext.fillStyle='#fff5d8';plaqueContext.shadowColor='#080f14';plaqueContext.shadowBlur=5;
+        plaqueContext.fillText(label,256,64,426);
+        const plaqueTexture=new T.CanvasTexture(plaqueCanvas);plaqueTexture.colorSpace=T.SRGBColorSpace;
+        const plaqueMaterial=makeMaterial('#ffffff',{map:plaqueTexture,roughness:.72});
+        add(new T.PlaneGeometry(.72,.18),plaqueMaterial,0,-.48,.205);
+        add(new T.TorusGeometry(.13,.018,6,20),engraving,0,-.7,.16).scale.set(1,.38,1);
 
         const spirit=new T.Group();spirit.position.set(0,.22,.02);group.add(spirit);
-        const ghost=s.model.clone(true);ghost.scale.setScalar(.38);
-        ghost.traverse(object=>{
-            if(!object.isMesh||!object.material)return;
-            object.material=(Array.isArray(object.material)?object.material:[object.material]).map(source=>{
-                const clone=source.clone();
-                if(clone.color)clone.color.lerp(new T.Color('#c7f5ff'),.62);
-                if(clone.emissive)clone.emissive.set('#4ccfe5');
-                clone.emissiveIntensity=.52;clone.transparent=true;clone.opacity=.78;clone.userData.baseOpacity=.78;clone.depthWrite=false;
-                return clone;
-            });
-        });
-        spirit.add(ghost);
-        const glow=makeMaterial('#b9f5ff',{transparent:true,opacity:.35,emissive:'#39bad4',emissiveIntensity:.7,depthWrite:false});
-        add(new T.SphereGeometry(.58,16,12),glow,0,0,-.18,spirit);
-        const wisp=makeMaterial('#d8fbff',{transparent:true,opacity:.78,emissive:'#5ed6e8',emissiveIntensity:.38,depthWrite:false});
+        const ghostShape=new T.Shape();
+        ghostShape.moveTo(-.43,-.18);ghostShape.lineTo(-.43,.34);
+        ghostShape.quadraticCurveTo(-.43,.78,0,.81);ghostShape.quadraticCurveTo(.43,.78,.43,.34);
+        ghostShape.lineTo(.43,-.18);ghostShape.quadraticCurveTo(.31,-.34,.19,-.17);
+        ghostShape.quadraticCurveTo(.07,-.35,-.05,-.17);ghostShape.quadraticCurveTo(-.19,-.34,-.3,-.17);
+        ghostShape.quadraticCurveTo(-.38,-.29,-.43,-.18);ghostShape.closePath();
+        const ghostMaterial=makeMaterial('#d9fbff',{transparent:true,opacity:.96,emissive:'#75ddeb',emissiveIntensity:.5,depthWrite:false,side:T.DoubleSide});
+        const ghost=add(new T.ExtrudeGeometry(ghostShape,{depth:.16,bevelEnabled:true,bevelSegments:4,steps:1,bevelSize:.045,bevelThickness:.045,curveSegments:16}),ghostMaterial,0,0,0,spirit);
+        ghost.position.set(0,-.09,.05);
+        const rimMaterial=makeMaterial('#8deaf5',{transparent:true,opacity:.8,emissive:'#36bacc',emissiveIntensity:.65,depthWrite:false});
+        for(const side of [-1,1]){
+            const ear=add(new T.ConeGeometry(.12,.28,10),rimMaterial,side*.29,.61,.12,spirit);ear.rotation.z=side*-.22;
+        }
+        const eyeMaterial=makeMaterial('#163448',{roughness:.38});
+        for(const x of [-.16,.16]){
+            add(new T.SphereGeometry(.052,14,10),eyeMaterial,x,.36,.25,spirit);
+            add(new T.SphereGeometry(.016,8,6),makeMaterial('#ffffff',{emissive:'#d9ffff',emissiveIntensity:.25}),x-.014,.38,.291,spirit);
+        }
+        const mouthMaterial=makeMaterial('#275369',{roughness:.5});
+        add(new T.SphereGeometry(.045,12,8),mouthMaterial,0,.19,.25,spirit).scale.set(.72,1.05,.48);
+        const cheekMaterial=makeMaterial('#f5a9bd',{transparent:true,opacity:.75});
+        for(const x of [-.27,.27])add(new T.SphereGeometry(.045,10,8),cheekMaterial,x,.2,.23,spirit).scale.set(1,.52,.45);
+        const wisp=makeMaterial('#d8fbff',{transparent:true,opacity:.88,emissive:'#5ed6e8',emissiveIntensity:.5,depthWrite:false});
         const motes=[];
         for(let i=0;i<5;i++){
             const mote=add(new T.SphereGeometry(.035+(i%2)*.018,8,6),wisp,0,0,.18);
@@ -8864,7 +8884,10 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
         disposeModel(s);
         s.result=null;
         const T=s.THREE,group=new T.Group();s.model=group;s.rig=[];s.mouth=null;s.scene.add(group);
-        const applyBattleResult=()=>{if(s.duel?.result)setBattleResult(s,s.duel.result);};
+        const applyBattleResult=()=>{
+            if(s.duel?.result)setBattleResult(s,s.duel.result);
+            else startBattleCritical(s,s.duel?.criticalAt);
+        };
         const variant=!!view.form.crest;
         const mainColor=new T.Color(view.form.color);
         if(view.form.juvenile)mainColor.lerp(new T.Color('#e5e3d3'),.1);
@@ -9331,7 +9354,9 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
                 if(s.criticalGroup){
                     const age=(Date.now()-s.criticalAt)/1000;
                     if(age>=1.72)disposeBattleCritical(s);
+                    else if(age<0){s.criticalGroup.visible=false;s.model.visible=true;}
                     else{
+                        s.criticalGroup.visible=true;s.model.visible=false;
                         const rise=Math.min(1,age/.32),fade=age<1.22?1:Math.max(0,(1.72-age)/.5);
                         s.criticalGroup.scale.setScalar(.08+rise*.84);
                         s.criticalGroup.position.y=-.15+rise*.12;
@@ -10781,10 +10806,10 @@ const PetBattleGame=(()=>{
         }
     }
     function ensureModels(m,guestView){
-        const key=JSON.stringify([m.id,m.players.map(p=>[p.uid,p.petId,p.appearance.level]),guestView&&[guestView.pet.id,guestView.level,guestView.branch]]);
+        const key=JSON.stringify([m.id,m.players.map(p=>[p.uid,p.petId,p.petName,p.appearance.level]),guestView&&[guestView.pet.id,guestView.level,guestView.branch]]);
         if(state.modelKey===key)return;
         disposeModels();state.modelKey=key;
-        const views=m.players.map(player=>player.appearance);
+        const views=m.players.map(player=>({...player.appearance,displayName:player.petName}));
         if(guestView)views.push(guestView);
         views.forEach((view,index)=>{
             const renderer=createAttendancePet3D(`petBattleModel${index}`,`petBattleArt${index}`,null,'arena');
