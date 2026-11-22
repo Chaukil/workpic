@@ -1041,6 +1041,8 @@ test('Bot difficulty uses fixed stat budgets and hard mode doubles win rewards',
  const easy=makePetBattleBot(18,'easy'),medium=makePetBattleBot(18,'medium'),hard=makePetBattleBot(18,'hard');
  const total=bot=>Object.values(bot.stats).reduce((sum,value)=>sum+value,0);
  assert.equal(total(easy),100);assert.equal(total(medium),108);assert.equal(total(hard),120);
+ assert.deepEqual([easy.appearance.level,medium.appearance.level,hard.appearance.level],[1,9,15]);
+ assert.equal(easy.petName,attendancePetCatalog(null)[0].name);assert.equal(medium.petName,attendancePetCatalog(null)[8].name);
  assert.equal(easy.rewardMultiplier,1);assert.equal(medium.rewardMultiplier,1);assert.equal(hard.rewardMultiplier,2);
  assert.doesNotThrow(()=>petBattleSimulation([{...easy,uid:'player-a'},hard],'player-a'));
 });
@@ -1291,6 +1293,13 @@ test('admin pet adjustments preserve revival progress and apply requested evolut
  assert.equal(attendancePetView(adjustAdminPet(egg,'hatch',0,now),now).egg,false);
  assert.equal(adjustAdminPet(original,'feed',0,now).fedOn,null,'feeding cannot revive an absent pet');
  assert.throws(()=>adjustAdminPet(original,'level',-1,now));
+});
+
+test('admin can increase and decrease pet weight without changing progression',()=>{
+ const now=Date.UTC(2026,10,22),pet={...newAttendancePet(now-7200000),weightGrams:1000,checkins:12,feedingXp:3};
+ const increased=adjustAdminPet(pet,'weight:200',1,now),decreased=adjustAdminPet(increased,'weight:-500',1,now+1),floored=adjustAdminPet(decreased,'weight:-5000',1,now+2);
+ assert.equal(increased.weightGrams,1200);assert.equal(decreased.weightGrams,700);assert.equal(floored.weightGrams,0);
+ assert.equal(increased.checkins,pet.checkins);assert.equal(increased.feedingXp,pet.feedingXp);
 });
 
 test('absence leaves weight intact through the 72-hour death deadline', () => {

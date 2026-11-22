@@ -262,10 +262,7 @@ async function battle(uid, data) {
 async function botBattle(uid, data) {
     if (data.action === 'start') {
         const difficulty = ['easy', 'medium', 'hard'].includes(data.difficulty) ? data.difficulty : 'easy';
-        const stake = data.stakeGrams;
-        if (!Number.isSafeInteger(stake) || stake < 100 || stake % 100) {
-            throw new HttpsError('invalid-argument', 'Cược tối thiểu 0,1 kg, theo bước 0,1 kg.');
-        }
+        const stake = 200;
         validateElement(data.element);
         const id = `bot-${randomUUID()}`, ref = profiles.doc(uid), matchRef = battles.doc(id);
         const snapshot = await ref.get(), profile = snapshot.data(), now = Date.now();
@@ -314,7 +311,7 @@ async function botBattle(uid, data) {
         let pet = weightDelta ? petBattleChangeWeight(profile.attendancePet, player.petId, weightDelta, now) : profile.attendancePet;
         const xpDelta = match.winnerUid ? won ? match.stakeXp * multiplier : -match.stakeXp : 0;
         const xp = petBattleSettleXp(pet, player.petId, xpDelta, now);
-        pet = petBattleCompletePet(xp.pet, player.petId, match, uid, xp.change, weightDelta, now);
+        pet = xp.pet;
         const locks = { ...profile.petBattleLocks };
         delete locks[id];
         const result = { ...match, status: 'finished', settledAt: now,

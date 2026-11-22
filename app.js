@@ -288,7 +288,7 @@ const ATTENDANCE_PET_FORMS = [
     {name:'Cá bột',kind:'fish',color:'#7dd3fc',shape:'small'},
     {name:'Cá vàng',kind:'fish',color:'#f59e0b',shape:'gold'},
     {name:'Cá hề',kind:'fish',color:'#f97316',shape:'clown'},
-    {name:'Cá thiên thần',kind:'fish',color:'#c4b5fd',shape:'angel'},
+    {name:'Cá thiên thần',kind:'fish',color:'#1746b5',shape:'angel'},
     {name:'Cá đuôi gai',kind:'fish',color:'#2563eb',shape:'tang'},
     {name:'Cá sư tử',kind:'fish',color:'#dc6846',shape:'lion'},
     {name:'Cá nóc ngọc',kind:'fish',color:'#6ee7b7',shape:'puffer'},
@@ -477,6 +477,10 @@ function adjustAdminPet(raw, action, level, now = Date.now()) {
     else if(action.startsWith('branch:')){
         const branch=action.slice(7);if(!Object.hasOwn(ATTENDANCE_PET_BRANCHES,branch))throw new Error('Invalid branch');
         pet.branch=branch;
+    } else if(action.startsWith('weight:')){
+        const delta=Number(action.slice(7));
+        if(!Number.isSafeInteger(delta)||Math.abs(delta)>100000)throw new Error('Invalid pet weight');
+        pet.weightGrams=Math.max(0,pet.weightGrams+delta);
     } else if (action === 'evolve' || action === 'level') {
         const next = action === 'evolve' ? Math.max(1,view.level+1) : Number(level);
         if (!Number.isInteger(next) || next<1 || next>ATTENDANCE_PET_MAX_LEVEL) throw new Error('Invalid pet level');
@@ -696,14 +700,15 @@ function petBattleSettleXp(root,petId,delta,now){
 function makePetBattleBot(level,difficulty='easy'){
     const levels={easy:{label:'Dễ',budget:100,rewardMultiplier:1},medium:{label:'Trung bình',budget:108,rewardMultiplier:1},hard:{label:'Khó',budget:120,rewardMultiplier:2}};
     const config=levels[difficulty]||levels.easy;
+    const botLevel=config.budget===100?1:config.budget===108?9:15;
     const branch=Object.keys(ATTENDANCE_PET_BRANCHES)[Math.floor(Math.random()*4)];
     const stats={attack:1,magic:1,defense:1,magicReduction:1,physicalReduction:1,dodge:1,luck:1,health:1};
     const keys=Object.keys(stats);
     for(let i=keys.length;i<config.budget;i++)stats[keys[Math.floor(Math.random()*keys.length)]]++;
-    const form=attendancePetCatalog(branch)[level-1],elements=[...PET_BATTLE_ELEMENTS.keys()];
+    const form=attendancePetCatalog(branch)[botLevel-1],elements=[...PET_BATTLE_ELEMENTS.keys()];
     return {uid:'workpic-bot',name:`Bot ${config.label}`,petName:form.name,budgetVersion:2,statBudget:config.budget,difficulty,rewardMultiplier:config.rewardMultiplier,stats,
         element:elements[Math.floor(Math.random()*elements.length)],
-        appearance:{form,level,branch,dead:false,egg:false}};
+        appearance:{form,level:botLevel,branch:botLevel>9?branch:null,dead:false,egg:false}};
 }
 function petBattleCompletePet(root,petId,match,uid,xpDelta,weightDelta,now){
     const endedAt=petBattleTime(match.startedAt)+(match.introMs===5000?5000:2000)+match.turns.length*PET_BATTLE_STEP_MS;
@@ -9009,6 +9014,25 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
             tube(group,[[.84,-.096,-.101],[.918,-.105,0],[.84,-.096,.101]],[.014,.023,.014],lip);
             return;
         }
+        if(shape==='angel'){
+            const royal=material(view.dead?'#71809a':'#1746b5'),deep=material(view.dead?'#5f6b7c':'#102f88'),gold=material(view.dead?'#8f8b78':'#e8b62d');
+            sphere(group,.05,0,0,1,.72,.27,royal);
+            sphere(group,.62,-.03,0,.52,.50,.255,royal);
+            const tail=new T.Group();tail.position.set(-.86,-.02,0);group.add(tail);
+            fin(tail,[[0,0],[-.58,.42],[-.48,0],[-.58,-.42]],deep);s.rig.push({mesh:tail,axis:'y',amount:.24,phase:0});
+            fin(group,[[-.66,.34],[-.38,1.18],[.12,.78],[.48,.38]],deep);
+            fin(group,[[-.58,-.34],[-.30,-1.04],[.18,-.72],[.48,-.34]],deep);
+            for(const side of [-1,1]){
+                const patch=sphere(group,.02,.02,side*.273,.40,.29,.018,gold);patch.rotation.z=-.28;
+                const pectoral=fin(group,[[.38,.02],[-.08,-.52],[-.42,-.12]],deep,side*.29);pectoral.rotation.x=side*.42;
+                s.rig.push({mesh:pectoral,axis:'x',base:side*.42,amount:.12,phase:side});
+            }
+            tube(group,[[-.34,.67,.02],[-.82,1.05,.01],[-1.28,1.28,0]],[.014,.009,.002],deep);
+            tube(group,[[-.25,-.64,.02],[-.70,-.98,.01],[-1.12,-1.18,0]],[.014,.009,.002],deep);
+            eyes(group,.69,.12,.245);
+            const mouth=new T.Mesh(new T.TorusGeometry(.065,.014,8,18),deep);mouth.position.set(1.02,-.10,0);mouth.rotation.y=Math.PI/2;group.add(mouth);s.mouth=mouth;
+            return;
+        }
         const round=shape==='puffer',disc=['angel','tang'].includes(shape),whale=kind==='whale',ray=shape==='ray';
         const size=shape==='small'?.78:whale?1.2:1;
         if(round||disc||ray)sphere(group,.05,0,0,size,ray?.2:round?.72:.76,ray?.86:round?.63:.3,bodyMat);
@@ -9267,7 +9291,7 @@ async function loadSelectedCloudPetAdminProfile(){
 }
 async function applyPetAdminAction(action,trigger=null) {
     if(!canControlPets()||petAdminBusy)return;
-    if(!['checkin','feed','hatch','evolve','revive','egg','level'].includes(action)&&!(action.startsWith('branch:')&&Object.hasOwn(ATTENDANCE_PET_BRANCHES,action.slice(7))))return;
+    if(!['checkin','feed','hatch','evolve','revive','egg','level'].includes(action)&&!(action.startsWith('branch:')&&Object.hasOwn(ATTENDANCE_PET_BRANCHES,action.slice(7)))&&!/^weight:-?\d+$/.test(action))return;
     const item=petAdminProfiles.find(item=>item.id===document.getElementById('petAdminUser').value);
     if(!item||PET_CLOUD_ENABLED&&!item.pet)return;
     const targetId=document.getElementById('petAdminPet').value;
@@ -9330,6 +9354,11 @@ function initPetAdminPanel() {
         document.getElementById('petAdminPet').addEventListener('change',renderPetAdminSummary);
         document.getElementById('petAdminRefresh').addEventListener('click',loadPetAdminProfiles);
         panel.querySelectorAll('[data-pet-admin]').forEach(button=>button.addEventListener('click',event=>applyPetAdminAction(button.dataset.petAdmin,event.currentTarget)));
+        panel.querySelectorAll('[data-pet-admin-weight]').forEach(button=>button.addEventListener('click',event=>{
+            const kg=Number(document.getElementById('petAdminWeightAmount').value),grams=Math.round(kg*1000)*Number(button.dataset.petAdminWeight);
+            if(!Number.isFinite(kg)||kg<.1||kg>100){document.getElementById('petAdminStatus').textContent='Nhập mức điều chỉnh từ 0,1 đến 100 kg.';return;}
+            applyPetAdminAction(`weight:${grams}`,event.currentTarget);
+        }));
     }
 }
 
@@ -10294,7 +10323,7 @@ const PetBattleGame=(()=>{
         const records=attendancePetRecords(attendancePetData).filter(p=>{const v=attendancePetView(p);return !v.egg&&!v.dead&&!Object.values(state.own?.petBattleLocks||{}).some(lock=>lock.petId===p.id);});
         el('petBattlePet').replaceChildren(...records.map(p=>{const v=attendancePetView(p);return new Option(`${v.displayName} · Cấp ${v.level} · ${petWeightLabel(v.weightGrams)}`,p.id);}));
         if(records.some(p=>p.id===selectedAttendancePetId))el('petBattlePet').value=selectedAttendancePetId;
-        el('petBattleStake').disabled=!!m;
+        el('petBattleStake').disabled=!!m||state.botDraft;
         el('petBattleStake').value=m?m.stakeGrams/1000:0.2;
         el('petBattleElement').value='';
         loadStatsDraft();
@@ -10437,7 +10466,7 @@ const PetBattleGame=(()=>{
         try{
             assertPetQuotaAvailable();
             let result;
-            if(PET_CLOUD_ENABLED)result=await petCloudRequest('bot',{...payload,action,id});
+            if(PET_CLOUD_ENABLED)result=await petCloudRequest('bot',{...payload,action,id,difficulty:state.botDifficulty||'easy',stakeGrams:200});
             else if(action==='start'){
                 const ref=ownRef(),stake=payload.stakeGrams;
                 if(!ref||!Number.isSafeInteger(stake)||stake<100||stake%100)throw new Error('Cược tối thiểu 0,1 kg, theo bước 0,1 kg.');
@@ -10472,7 +10501,7 @@ const PetBattleGame=(()=>{
                     let pet=weightDelta?petBattleChangeWeight(profile.attendancePet,player.petId,weightDelta,Date.now()):profile.attendancePet;
                     const xpDelta=pending.winnerUid?(won?pending.stakeXp*multiplier:-pending.stakeXp):0;
                     const xp=petBattleSettleXp(pet,player.petId,xpDelta,Date.now());
-                    pet=petBattleCompletePet(xp.pet,player.petId,pending,uid,xp.change,weightDelta,Date.now());
+                    pet=xp.pet;
                     const settledAt=Date.now();
                     claims[id]={settledAt,xpChange:xp.change};
                     const keys=Object.keys(claims).sort((a,b)=>claims[a].settledAt-claims[b].settledAt);
@@ -10617,7 +10646,7 @@ const PetBattleGame=(()=>{
         el('petBattleDraftSlots').hidden=!draft;
         el('petBattleAddOpponent').hidden=!!state.botDraft;
         el('petBattleBotSlot').hidden=!draft||!state.botDraft;
-        el('petBattleStake').closest('label').hidden=!m&&!state.creating;
+        el('petBattleStake').closest('label').hidden=(!m&&!state.creating)||state.botDraft;
         el('petBattleCycleGuest').hidden=!incoming;
         el('petBattleCancel').hidden=!(m?.status==='invited'&&m.challengerUid===state.uid);
         const terminal=!!m&&(['finished','cancelled','rejected','expired'].includes(m.status)||petBattlePlayback(m).finished);
@@ -10748,7 +10777,7 @@ const PetBattleGame=(()=>{
             else renderDraft();
         });
         Object.values(statInputs).forEach(id=>el(id).addEventListener('input',()=>{renderDraft();saveStatsDraft();}));
-        const payload=()=>({petId:el('petBattlePet').value,stats:draftStats(),element:el('petBattleElement').value,stakeGrams:Math.round(Number(el('petBattleStake').value)*1000)});
+        const payload=()=>({petId:el('petBattlePet').value,stats:draftStats(),element:el('petBattleElement').value,stakeGrams:state.botDraft?200:Math.round(Number(el('petBattleStake').value)*1000)});
         el('petBattleOpponentList').addEventListener('click',event=>{
             const button=event.target.closest('[data-invite-uid]');
             if(!button||button.disabled)return;

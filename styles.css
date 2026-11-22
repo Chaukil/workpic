@@ -15630,7 +15630,7 @@ body.modal-open .attendance-pet-swimmer,body:has(dialog[open]) .attendance-pet-s
 #attendancePetDialog .attendance-pet-summary { padding:14px 16px; border-color:color-mix(in srgb,#d8b672 35%,var(--border)); }
 #attendancePetDialog .attendance-pet-summary p { line-height:1.65; font-size:.78rem; }
 #attendancePetDialog .attendance-pet-preview { position:relative; height:185px; margin-bottom:12px; border-color:color-mix(in srgb,#d8b672 35%,var(--border)); background:radial-gradient(ellipse at 50% 25%,#2c769a30,transparent 65%),linear-gradient(160deg,var(--surface-muted),var(--surface)); }
-#attendancePetDialog .attendance-pet-preview::after { content:''; position:absolute; bottom:12px; width:65%; height:22px; border:1px solid #c8a65d50; border-radius:50%; background:radial-gradient(ellipse,#73c3da25,transparent 70%); pointer-events:none; }
+#attendancePetDialog .attendance-pet-preview::after { content:''; position:absolute; left:50%; bottom:30px; width:55%; height:18px; transform:translateX(-50%); border:1px solid #c8a65d50; border-radius:50%; background:radial-gradient(ellipse,#73c3da25,transparent 70%); pointer-events:none; }
 #attendancePetDialog .attendance-pet-preview canvas,#attendancePetDialog .attendance-pet-preview svg { z-index:1; max-height:185px; }
 .pet-stable { margin-bottom:18px; }
 .pet-stable-heading { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
@@ -15717,6 +15717,8 @@ body.modal-open .attendance-pet-swimmer,body:has(dialog[open]) .attendance-pet-s
 #petAdminPanel button[aria-disabled='true'] { opacity:1; }
 #petAdminPanel[aria-busy='true'] button[aria-disabled='true'] { pointer-events:none; transform:none; transition:none; animation:none; }
 #petAdminPanel button.pet-admin-pending { position:relative; opacity:1; cursor:wait; transform:none; }
+.pet-admin-weight-actions { display:flex; align-items:end; gap:8px; }
+.pet-admin-weight-actions .btn { flex:1; white-space:nowrap; }
 #petAdminPanel button.pet-admin-pending::before { content:''; position:absolute; top:4px; right:4px; width:8px; height:8px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:pet-admin-spin .7s linear infinite; }
 @keyframes pet-admin-spin { to { transform:rotate(360deg); } }
 @media(prefers-reduced-motion:reduce) { #petAdminPanel button.pet-admin-pending::before { animation:none; } }
