@@ -2184,7 +2184,7 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
         </section>
         <div class="pet-compare-launch-row"><button type="button" id="petCompareOpen" class="btn btn-outline-primary"><i class="bi bi-trophy" aria-hidden="true"></i> Xếp hạng</button><button type="button" id="petBattleOpen" class="btn btn-outline-primary"><i class="bi bi-lightning-charge" aria-hidden="true"></i> Thách đấu <span id="petBattleBadge"></span></button><button type="button" class="btn btn-outline-primary" data-pet-guide="care" aria-haspopup="dialog" aria-controls="petGuideDialog"><i class="bi bi-question-circle" aria-hidden="true"></i> Hướng dẫn cách chơi</button></div>
         <div class="attendance-pet-layout"><div class="attendance-pet-care">
-        <div id="attendancePetPreview" class="attendance-pet-preview" role="img" aria-label="Thú cưng hiện tại"></div>
+        <div id="attendancePetPreview" class="attendance-pet-preview" role="button" tabindex="0" aria-label="Thú cưng hiện tại. Nhấn để xem thử chiêu thức"></div>
         <div class="pet-preview-name">
             <h4 id="attendancePetName">Đang tải…</h4>
             <button type="button" class="btn btn-outline-primary" id="attendancePetNicknameEdit" aria-controls="attendancePetNicknameForm" aria-expanded="false" aria-label="Edit tên thú cưng"><i class="bi bi-pencil" aria-hidden="true"></i> Sửa tên</button>
@@ -2279,13 +2279,13 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
             <div class="pet-battle-draft-host">
                 <button type="button" id="petBattleCycleHost" class="pet-battle-cycle" aria-label="Đổi thú cưng ra trận" title="Đổi thú cưng ra trận"><i class="bi bi-arrow-repeat" aria-hidden="true"></i></button>
                 <small>Chủ phòng</small>
-                <div id="petBattleDraftModel" class="pet-battle-model pet-battle-draft-model" aria-hidden="true" hidden><span id="petBattleDraftArt"></span></div>
+                <div id="petBattleDraftModel" class="pet-battle-model pet-battle-draft-model" aria-hidden="true" hidden><span id="petBattleDraftArt"></span><div id="petBattleDraftStats0" class="pet-battle-model-stats side-0"></div></div>
                 <strong id="petBattleDraftPet"></strong>
             </div>
             <button type="button" id="petBattleAddOpponent" class="pet-battle-add-opponent"><span aria-hidden="true">+</span> Mời đối thủ</button>
             <div id="petBattleBotSlot" class="pet-battle-draft-host" hidden>
                 <small>Đối thủ máy</small>
-                <div id="petBattleBotModel" class="pet-battle-model pet-battle-draft-model" aria-hidden="true"><span id="petBattleBotArt"></span></div>
+                <div id="petBattleBotModel" class="pet-battle-model pet-battle-draft-model" aria-hidden="true"><span id="petBattleBotArt"></span><div id="petBattleDraftStats1" class="pet-battle-model-stats side-1"></div></div>
                 <strong id="petBattleBotName"></strong><span class="pet-battle-ready-tag is-ready">Đã sẵn sàng</span>
                 <div class="pet-battle-bot-levels" aria-label="Độ khó Bot">
                     <button type="button" data-bot-difficulty="easy" aria-pressed="true">Dễ <small>100 điểm</small></button>
@@ -2326,9 +2326,9 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
         <section id="petBattleRoom" class="pet-battle-room" hidden>
             <div id="petBattleRpsReveal" class="pet-battle-rps-reveal" hidden><div id="petBattleRpsHands"></div><strong id="petBattleRpsWinner"></strong><small id="petBattleRpsCountdown"></small></div><div class="pet-battle-room-head"><strong id="petBattlePhase"></strong><span id="petBattlePot"></span></div>
             <div class="pet-battle-arena">
-                <div class="pet-battle-side" id="petBattleSide0"><h6 id="petBattleName0"></h6><small id="petBattleStats0"></small><span id="petBattleReady0" class="pet-battle-ready-tag" role="status" hidden></span><div id="petBattleModel0" class="pet-battle-model"><span id="petBattleArt0"></span></div><progress id="petBattleHp0" max="100" value="100"></progress><strong id="petBattleHpText0"></strong><span id="petBattleDamage0" class="pet-battle-damage"></span></div>
+                <div class="pet-battle-side" id="petBattleSide0"><h6 id="petBattleName0"></h6><small id="petBattleStats0"></small><span id="petBattleReady0" class="pet-battle-ready-tag" role="status" hidden></span><div id="petBattleModel0" class="pet-battle-model"><span id="petBattleArt0"></span><div id="petBattleRoomStats0" class="pet-battle-model-stats side-0"></div></div><progress id="petBattleHp0" max="100" value="100"></progress><strong id="petBattleHpText0"></strong><span id="petBattleDamage0" class="pet-battle-damage"></span></div>
                 <div class="pet-battle-versus">VS<span class="pet-battle-energy"></span></div>
-                <div class="pet-battle-side" id="petBattleSide1"><button type="button" id="petBattleCycleGuest" class="pet-battle-cycle" aria-label="Đổi thú cưng ra trận" title="Đổi thú cưng ra trận" hidden><i class="bi bi-arrow-repeat" aria-hidden="true"></i></button><h6 id="petBattleName1"></h6><small id="petBattleStats1"></small><span id="petBattleReady1" class="pet-battle-ready-tag" role="status" hidden></span><div id="petBattleModel1" class="pet-battle-model"><span id="petBattleArt1"></span></div><progress id="petBattleHp1" max="100" value="100"></progress><strong id="petBattleHpText1"></strong><span id="petBattleDamage1" class="pet-battle-damage"></span></div>
+                <div class="pet-battle-side" id="petBattleSide1"><button type="button" id="petBattleCycleGuest" class="pet-battle-cycle" aria-label="Đổi thú cưng ra trận" title="Đổi thú cưng ra trận" hidden><i class="bi bi-arrow-repeat" aria-hidden="true"></i></button><h6 id="petBattleName1"></h6><small id="petBattleStats1"></small><span id="petBattleReady1" class="pet-battle-ready-tag" role="status" hidden></span><div id="petBattleModel1" class="pet-battle-model"><span id="petBattleArt1"></span><div id="petBattleRoomStats1" class="pet-battle-model-stats side-1"></div></div><progress id="petBattleHp1" max="100" value="100"></progress><strong id="petBattleHpText1"></strong><span id="petBattleDamage1" class="pet-battle-damage"></span></div>
             </div>
             <div id="petBattleReadyPanel" class="pet-battle-ready-panel" hidden>
                 <button type="button" id="petBattleReady">Sẵn sàng</button>

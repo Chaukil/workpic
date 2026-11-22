@@ -1818,7 +1818,7 @@ const auth={currentUser:{uid:'me',email:'chauchikil01@gmail.com'}};
 ${extract('const canControlPets =', 'let attendancePetData =')}
 const modelViews=new Map();
 const createAttendancePet3D=(id,_art,_preview,mode)=>({start(){},stop(){modelViews.delete(id);},update(view){modelViews.set(id,{view,mode});},feed(){},duelPose(){},thumbnail:async view=>'data:image/svg+xml;charset=utf-8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 144 104"><ellipse cx="72" cy="52" rx="40" ry="25" fill="'+view.form.color+'"/></svg>')});
-const AttendancePet3D={start(){},stop(){},update(){},preview(open){document.getElementById("attendancePetPreview").innerHTML=open?'<svg viewBox="0 0 140 100"><ellipse cx="70" cy="50" rx="30" ry="40"/></svg>':'';},feed(){petFeedAnimations++;}};
+let petSkillPreviews=0;const AttendancePet3D={start(){},stop(){},update(){},preview(open){document.getElementById("attendancePetPreview").innerHTML=open?'<svg viewBox="0 0 140 100"><ellipse cx="70" cy="50" rx="30" ry="40"/></svg>':'';},castSkill(){petSkillPreviews++;},feed(){petFeedAnimations++;}};
 let PET_CLOUD_ENABLED=false;
 let petCloudRequest=()=>{throw new Error('Unexpected cloud request in the legacy fixture');};
 ${extract('let attendancePetData =', 'let sharedNotesUnsubscribe =').replace('return {init,start,stop,sync,profile,open};','return {init,start,stop,sync,profile,open,inspect:()=>state};')}
@@ -1851,6 +1851,7 @@ try {
     const petDialogRect=document.getElementById('attendancePetDialog').getBoundingClientRect();
     check(Math.abs(petDialogRect.left+petDialogRect.width/2-document.documentElement.clientWidth/2)<2&&Math.abs(petDialogRect.top+petDialogRect.height/2-innerHeight/2)<2,'pet care form is centered horizontally and vertically '+JSON.stringify({rect:petDialogRect.toJSON(),width:innerWidth,height:innerHeight,css:Array.from(['width','height','max-height','margin','position','transform','zoom']).map(k=>[k,getComputedStyle(document.getElementById('attendancePetDialog')).getPropertyValue(k)]),body:getComputedStyle(document.body).transform,sheets:Array.from(document.styleSheets).map(s=>s.cssRules.length),rules:(()=>{const out=[];function visit(rules,path){for(const r of rules){if(r.selectorText?.includes('attendance-pet-dialog'))out.push(path+' / '+r.selectorText);if(r.cssRules)visit(r.cssRules,path+' / '+(r.selectorText||r.conditionText||''));}}for(const s of document.styleSheets)visit(s.cssRules,'');return out;})()}));
     check(document.querySelector('#attendancePetPreview svg'),'pet care form displays current pet artwork');
+    document.getElementById('attendancePetPreview').click();check(petSkillPreviews===1&&document.querySelector('#attendancePetPreview .pet-preview-skill strong'),'clicking the 3D pet previews its current unique skill');
     check(document.getElementById('attendancePetDialog').scrollWidth<=document.getElementById('attendancePetDialog').clientWidth+1,'game form has no horizontal clipping');
 
     check(!document.getElementById('attendancePetBranchDialog').open&&document.getElementById('attendancePetBranchOpen').hidden,'branch form and button stay hidden below level nine');
@@ -2010,6 +2011,11 @@ try {
     const botPicker=document.getElementById('petBattleMatches');
     botPicker.value='bot:new';botPicker.dispatchEvent(new Event('change'));
     check(!document.getElementById('petBattleBotSlot').hidden&&!document.getElementById('petBattleStatComparison').hidden,'bot stats and model are visible in the draft');
+    document.querySelector('[data-bot-difficulty="medium"]').click();
+    check(document.querySelector('[data-bot-difficulty="medium"]').getAttribute('aria-pressed')==='true'&&document.getElementById('petBattleBotName').textContent.includes('108 điểm'),'medium Bot button changes the live opponent to 108 points');
+    document.querySelector('[data-bot-difficulty="hard"]').click();
+    check(document.querySelector('[data-bot-difficulty="hard"]').getAttribute('aria-pressed')==='true'&&document.getElementById('petBattleBotName').textContent.includes('120 điểm'),'hard Bot button changes the live opponent to 120 points');
+    check(document.querySelectorAll('#petBattleDraftStats0 > div').length===8&&document.querySelectorAll('#petBattleDraftStats1 > div').length===8,'both 3D pet cards contain eight comparison stat bars');
     check(document.getElementById('petBattleBotStart').hidden,'bot cannot start without an element');
     document.querySelector('[data-battle-element="metal"]').click();
     check(!document.getElementById('petBattleBotStart').hidden,'bot is ready to fight once the setup is complete');

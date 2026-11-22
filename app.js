@@ -9134,19 +9134,20 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
                 s.model.rotation.z=alive?(reduced?0:Math.sin(s.t*1.3)*(mode==='walk'?.012:.035)):Math.PI*.75;
                 if(alive&&!reduced)s.rig.forEach(part=>{const pace=mode==='fly'?7:mode==='walk'?5:3.5;const intensity=mode==='walk'&&!walking&&!petDialogOpen?.08:1;part.mesh.rotation[part.axis]=(part.base||0)+Math.sin(s.t*pace+part.phase)*part.amount*intensity;});
                 const feeding=Math.max(0,1-(s.t-s.fedAt)/1.4);s.model.scale.setScalar(1+feeding*.07);if(s.mouth)s.mouth.scale.y=1+feeding*Math.abs(Math.sin(s.t*14));
-                if(presentation==='arena'){
-                    const pose=s.duel||{},attackAge=(Date.now()-(pose.attackAt||0))/1000,hitAge=(Date.now()-(pose.hitAt||0))/1000;
+                if(presentation==='arena'||s.previewAttack){
+                    const pose=s.previewAttack||s.duel||{},attackAge=(Date.now()-(pose.attackAt||0))/1000,hitAge=(Date.now()-(pose.hitAt||0))/1000;
                     const lunge=attackAge>=0&&attackAge<.9?Math.sin(attackAge/.9*Math.PI):0,hurt=hitAge>=0&&hitAge<.5?(1-hitAge/.5):0;
                     const direction=pose.facing? -1:1;s.model.rotation.y=pose.facing||0;
                     const motion=pose.skill?.motion,variant=pose.skill?.variant||0;
                     const aerial=motion==='dive',claw=motion==='claw',heavy=motion==='slam'||pose.kind==='whale';
                     const power=1+Math.min(3,Math.floor((pose.level||1)/8))*.15;
                     const peak=aerial?.74:claw?.61:heavy?.18:.10;
-                    const reach=motion==='shield'?.22:heavy?.72:.48+(variant%11)*.017;
+                    const reach=(motion==='shield'?.22:heavy?.72:.48+(variant%11)*.017)*(s.previewAttack?1.75:1);
                     const dive=aerial&&attackAge>=0&&attackAge<.9?Math.sin(Math.PI*Math.min(1,attackAge/.61)):lunge;
                     s.model.position.set(reduced?0:direction*lunge*reach*power+(Math.sin(s.t*65)*hurt*.035),reduced?0:dive*peak+Math.sin(s.t*2)*.025,0);
                     s.model.rotation.z=pose.defeated?Math.PI*.65:reduced?0:Math.sin(s.t*50)*hurt*.04+(aerial?-direction*lunge*.60:claw?direction*lunge*.32:-direction*lunge*.12);
                     updateBattleBurst(s,pose,attackAge,direction,reduced);
+                    if(s.previewAttack&&attackAge>=1.15){s.previewAttack=null;disposeBattleBurst(s);}
                 }else if(staged){
                     s.model.rotation.y=reduced?-.28:presentation==='showcase'?s.t*.62-.28:Math.sin(s.t*1.3)*.24-.2;
                     s.model.position.y=reduced?0:Math.sin(s.t*2)*.055;
@@ -9208,7 +9209,7 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
         fallback(view);const art=document.getElementById(artId);
         return art?.querySelector('svg')?'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(art.innerHTML):null;
     }
-    return {start,stop,update,preview,thumbnail,duelPose:pose=>{if(state)state.duel=pose;},feed:()=>{if(state)state.fedAt=state.t;}};
+    return {start,stop,update,preview,thumbnail,duelPose:pose=>{if(state)state.duel=pose;},castSkill:skill=>{if(state?.view&&!state.view.dead&&!state.view.egg)state.previewAttack={attackAt:Date.now(),facing:0,kind:state.view.form.kind,level:state.view.level,skill,skillColor:state.view.form.color};},feed:()=>{if(state)state.fedAt=state.t;}};
 }
 const AttendancePet3D=createAttendancePet3D();
 
@@ -9638,6 +9639,20 @@ function attendancePetMessage(message) {
     attendancePetBubbleTimer = setTimeout(()=>bubble.classList.remove('show'),3500);
 }
 
+function previewAttendancePetSkill(){
+    if(!attendancePetReady)return;
+    const view=selectedAttendancePetView();
+    if(view.dead||view.egg){attendancePetMessage(view.egg?'Thú cưng cần nở trước khi dùng chiêu.':'Hãy hồi sinh thú cưng trước khi dùng chiêu.');return;}
+    const preview=document.getElementById('attendancePetPreview'),skill=petBattleSkill(view);
+    preview.querySelector('.pet-preview-skill')?.remove();
+    AttendancePet3D.castSkill(skill);
+    const fx=document.createElement('div');fx.className=`pet-preview-skill skill-${skill.effect}`;fx.style.setProperty('--skill-color',view.form.color);fx.style.setProperty('--power','1.35');
+    const glyph={water:'○',fang:'⟫',wave:'≋',fire:'✦',wind:'❯',claw:'╱'}[skill.effect]||'✦';
+    for(let i=0;i<10;i++){const spark=document.createElement('span');spark.textContent=glyph;spark.style.setProperty('--i',String(i));spark.style.setProperty('--y',`${Math.sin(i*2.399+skill.variant)*(30+skill.variant%18)}px`);fx.appendChild(spark);}
+    const caption=document.createElement('strong');caption.textContent=skill.label;fx.appendChild(caption);preview.appendChild(fx);
+    setTimeout(()=>fx.remove(),1500);
+}
+
 function renderAttendancePet() {
     if (!currentUser) return;
     const view = selectedAttendancePetView();
@@ -9647,7 +9662,7 @@ function renderAttendancePet() {
         return `${Math.floor(seconds/3600)}h ${Math.floor(seconds%3600/60)}m ${seconds%60}s`;
     };
     document.getElementById('attendancePetName').textContent = view.dead ? `${view.displayName} · Đã chết` : view.displayName;
-    document.getElementById('attendancePetPreview').setAttribute('aria-label',`${view.displayName} · ${view.name} · Cấp ${view.level}${view.dead?' · Đã chết':''}`);
+    document.getElementById('attendancePetPreview').setAttribute('aria-label',`${view.displayName} · ${view.name} · Cấp ${view.level}${view.dead?' · Đã chết':''}. Nhấn để xem thử chiêu thức`);
     document.getElementById('attendancePetLevel').textContent = `${view.egg?'Trứng · Cấp 0':`Cấp ${view.level}`}${view.nickname?` · ${view.name}`:''}`;
     const nicknameInput=document.getElementById('attendancePetNickname');
     nicknameInput.disabled=!attendancePetReady||attendancePetBusy;
@@ -9942,6 +9957,9 @@ function initAttendancePetUi() {
     }));
     document.getElementById('petGuideClose').addEventListener('click',()=>guide.close());
     toggle.addEventListener('click',()=>{renderAttendancePet();if(!dialog.open)dialog.showModal();AttendancePet3D.preview(true);openAttendancePetBranch(true);});
+    const petPreview=document.getElementById('attendancePetPreview');
+    petPreview.addEventListener('click',previewAttendancePetSkill);
+    petPreview.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();previewAttendancePetSkill();}});
     dialog.addEventListener('close',()=>{if(dialog.open)return;closePetNicknameEditor();document.getElementById('attendancePetBranchDialog').close();document.getElementById('petCompareDialog').close();AttendancePet3D.preview(false);});
     document.getElementById('attendancePetClose').addEventListener('click',()=>dialog.close());
     dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close();});
@@ -10133,6 +10151,7 @@ const PetBattleGame=(()=>{
         if(!canOpen())return;
         el('petBattleLobby').close();el('petBattleInvitePicker').close();el('petBattleExitDialog').close();
         state.active=id;state.creating=!id;state.botDraft=bot;state.botKey='';state.bot=null;state.setupKey='';state.lastTurn='';state.message='';
+        if(bot)try{state.botDifficulty=localStorage.getItem(`workpic-bot-difficulty:${state.uid}`)||'easy';}catch{state.botDifficulty='easy';}
         if(!el('petBattleDialog').open)el('petBattleDialog').showModal();
         render();
     }
@@ -10457,9 +10476,11 @@ const PetBattleGame=(()=>{
     function renderStatComparison(players,stats){
         const comparison=el('petBattleStatComparison');
         comparison.hidden=players.length!==2;
-        if(comparison.hidden)return;
+        const draft=state.botDraft&&!match(),targets=draft?[el('petBattleDraftStats0'),el('petBattleDraftStats1')]:[el('petBattleRoomStats0'),el('petBattleRoomStats1')];
+        for(const id of ['petBattleDraftStats0','petBattleDraftStats1','petBattleRoomStats0','petBattleRoomStats1'])el(id).hidden=players.length!==2||!targets.includes(el(id));
+        if(comparison.hidden){targets.forEach(target=>target.replaceChildren());return;}
         const signature=JSON.stringify([players.map(p=>p.petName),stats]);
-        if(comparison.dataset.signature===signature)return;
+        if(comparison.dataset.signature===signature&&targets.every(target=>target.dataset.signature===signature))return;
         comparison.dataset.signature=signature;
         const max=Math.max(1,...stats.flatMap(Object.values));
         const heading=document.createElement('div');
@@ -10491,6 +10512,15 @@ const PetBattleGame=(()=>{
             return row;
         });
         comparison.replaceChildren(heading,...rows);
+        const shortLabels={attack:'Vật lý',magic:'Phép',defense:'Thủ',magicReduction:'Kháng phép',physicalReduction:'Kháng lý',dodge:'Né',luck:'Chí mạng',health:'Máu'};
+        targets.forEach((target,index)=>{
+            target.dataset.signature=signature;
+            target.replaceChildren(...Object.keys(statInputs).map(key=>{
+                const row=document.createElement('div'),label=document.createElement('span'),bar=document.createElement('progress'),value=document.createElement('strong');
+                const number=petBattleNumber(stats[index][key]||0);label.textContent=shortLabels[key];bar.max=max;bar.value=number;value.textContent=number.toLocaleString('vi-VN');
+                row.append(label,bar,value);return row;
+            }));
+        });
     }
     function render(){
         if(!mine()||(!el('petBattleDialog').open&&!el('petBattleLobby').open))return;
@@ -10654,10 +10684,12 @@ const PetBattleGame=(()=>{
             });
         });
         el('petBattleBotStart').addEventListener('click',()=>mutateBot('start',payload()));
-        el('petBattleBotSlot').addEventListener('click',event=>{
-            const button=event.target.closest('[data-bot-difficulty]');if(!button||state.busy)return;
-            state.botDifficulty=button.dataset.botDifficulty;state.botKey='';renderDraft();
-        });
+        el('petBattleBotSlot').querySelectorAll('[data-bot-difficulty]').forEach(button=>button.addEventListener('click',event=>{
+            event.preventDefault();event.stopPropagation();if(state.busy)return;
+            state.botDifficulty=button.dataset.botDifficulty;state.botKey='';
+            try{localStorage.setItem(`workpic-bot-difficulty:${state.uid}`,state.botDifficulty);}catch{}
+            renderDraft();
+        }));
         el('petBattleAccept').addEventListener('click',()=>mutate('accept',payload()));el('petBattleReject').addEventListener('click',()=>mutate('reject'));el('petBattleCancel').addEventListener('click',()=>mutate('cancel'));
         el('petBattleClaim').addEventListener('click',()=>match()?.bot?mutateBot('claim'):mutate('claim'));
         dialog.querySelectorAll('[data-pet-rps]').forEach(button=>button.addEventListener('click',()=>choose(button.dataset.petRps)));el('petBattleRetry').addEventListener('click',()=>{
