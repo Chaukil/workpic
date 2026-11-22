@@ -617,10 +617,11 @@ function petBattleBudget(level,legacy=false){
     const validLevel=Math.max(1,Math.min(ATTENDANCE_PET_MAX_LEVEL,Math.floor(Number(level)||1)));
     return 100+validLevel-1+(legacy?0:Math.max(0,validLevel-9));
 }
-function petBattleStats(stats,level,legacy=false){
+function petBattleStats(stats,level,legacy=false,budgetOverride=0){
     const keys=Object.hasOwn(stats||{},'magic')?['attack','magic','defense','magicReduction','physicalReduction','dodge','luck','health']:['attack','defense','health'];
     const values=keys.map(key=>Number(stats?.[key]));
-    if(values.some(value=>!Number.isInteger(value)||value<1)||values.reduce((a,b)=>a+b,0)!==petBattleBudget(level,legacy))throw new Error('Tổng chỉ số phải bằng điểm được cấp; mỗi chỉ số tối thiểu 1.');
+    const budget=Number.isSafeInteger(budgetOverride)&&budgetOverride>=keys.length?budgetOverride:petBattleBudget(level,legacy);
+    if(values.some(value=>!Number.isInteger(value)||value<1)||values.reduce((a,b)=>a+b,0)!==budget)throw new Error('Tổng chỉ số phải bằng điểm được cấp; mỗi chỉ số tối thiểu 1.');
     return Object.fromEntries(keys.map((key,i)=>[key,values[i]]));
 }
 function petBattleRps(first,second){
@@ -630,7 +631,7 @@ function petBattleRps(first,second){
 function petBattleSimulation(players,firstUid){
     if(players.length!==2||players[0].uid===players[1].uid||!players.some(p=>p.uid===firstUid))throw new Error('Trận đấu cần hai người khác nhau.');
     players.forEach(p=>petBattleStats(p.stats,p.appearance.level,
-        !p.budgetVersion&&Object.values(p.stats||{}).reduce((sum,value)=>sum+Number(value),0)===petBattleBudget(p.appearance.level,true)));
+        !p.budgetVersion&&Object.values(p.stats||{}).reduce((sum,value)=>sum+Number(value),0)===petBattleBudget(p.appearance.level,true),p.statBudget));
     const stats=players.map((player,index)=>petBattleEffectiveStats(player,players[1-index]));
     const hp=stats.map(petBattleMaxHp),maxHp=[...hp],turns=[];
     let attacker=players.findIndex(p=>p.uid===firstUid);
@@ -692,13 +693,15 @@ function petBattleSettleXp(root,petId,delta,now){
     const updated={...root,...records[0],companions:records.slice(1)};
     return {pet:transitionPetHousehold(updated,'init',now).pet,change};
 }
-function makePetBattleBot(level){
+function makePetBattleBot(level,difficulty='easy'){
+    const levels={easy:{label:'Dễ',budget:100,rewardMultiplier:1},medium:{label:'Trung bình',budget:108,rewardMultiplier:1},hard:{label:'Khó',budget:120,rewardMultiplier:2}};
+    const config=levels[difficulty]||levels.easy;
     const branch=Object.keys(ATTENDANCE_PET_BRANCHES)[Math.floor(Math.random()*4)];
     const stats={attack:1,magic:1,defense:1,magicReduction:1,physicalReduction:1,dodge:1,luck:1,health:1};
     const keys=Object.keys(stats);
-    for(let i=keys.length;i<petBattleBudget(level);i++)stats[keys[Math.floor(Math.random()*keys.length)]]++;
+    for(let i=keys.length;i<config.budget;i++)stats[keys[Math.floor(Math.random()*keys.length)]]++;
     const form=attendancePetCatalog(branch)[level-1],elements=[...PET_BATTLE_ELEMENTS.keys()];
-    return {uid:'workpic-bot',name:'Bot',petName:form.name,budgetVersion:2,stats,
+    return {uid:'workpic-bot',name:`Bot ${config.label}`,petName:form.name,budgetVersion:2,statBudget:config.budget,difficulty,rewardMultiplier:config.rewardMultiplier,stats,
         element:elements[Math.floor(Math.random()*elements.length)],
         appearance:{form,level,branch,dead:false,egg:false}};
 }
@@ -10028,15 +10031,16 @@ const PetBattleGame=(()=>{
         state.draftModel.update(view);
         setElementAura(model,el('petBattleElement').value);
         if(state.botDraft){
-            const key=`${view.pet.id}:${view.level}`;
-            if(state.botKey!==key){state.botKey=key;state.bot=makePetBattleBot(view.level);}
+            const difficulty=state.botDifficulty||'easy',key=`${view.pet.id}:${view.level}:${difficulty}`;
+            if(state.botKey!==key){state.botKey=key;state.bot=makePetBattleBot(view.level,difficulty);}
             if(!state.botModel){
                 state.botModel=createAttendancePet3D('petBattleBotModel','petBattleBotArt',null,'draft');
                 state.botModel.start();
             }
             state.botModel.update(state.bot.appearance);
             setElementAura(el('petBattleBotModel'),state.bot.element);
-            el('petBattleBotName').textContent=`${state.bot.petName} · Cấp ${state.bot.appearance.level}`;
+            el('petBattleBotName').textContent=`${state.bot.name} · ${state.bot.petName} · Cấp ${state.bot.appearance.level} · ${state.bot.statBudget} điểm`;
+            el('petBattleBotSlot').querySelectorAll('[data-bot-difficulty]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.botDifficulty===difficulty)));
             const host={petName:view.displayName,stats:draftStats(),element:el('petBattleElement').value};
             renderStatComparison([host,state.bot],[petBattleEffectiveStats(host,state.bot),petBattleEffectiveStats(state.bot,host)]);
         }
@@ -10374,17 +10378,19 @@ const PetBattleGame=(()=>{
                     if(player.appearance.level!==bot.appearance.level)throw new Error('Cấp thú cưng đã thay đổi. Hãy mở lại phòng Bot.');
                     root=petBattleChangeWeight(root,player.petId,-stake,now);
                     const players=[player,bot],firstUid=players[Math.random()<.5?0:1].uid;
-                    room={id,bot:true,roomFlow:true,createdMs:now,players,participantUids:players.map(p=>p.uid),
+                    room={id,bot:true,botDifficulty:bot.difficulty,rewardMultiplier:bot.rewardMultiplier,roomFlow:true,createdMs:now,players,participantUids:players.map(p=>p.uid),
                         status:'fighting',stakeGrams:stake,stakeXp:Math.floor(stake/200),firstUid,
                         startedAt:now,claims:{},...petBattleSimulation(players,firstUid)};
                     locks[id]={petId:player.petId,stakeGrams:stake,role:'bot'};
                 }else{
                     if(pending?.id!==id)throw new Error('Không tìm thấy trận Bot.');
                     if(pending.claims?.[uid])return {room:pending,patch:{}};
-                    const lock=locks[id],amount=petBattleClaimAmount(pending,uid,now);
-                    if(!lock||amount===null||lock.stakeGrams!==pending.stakeGrams||lock.petId!==pending.players[0].petId)throw new Error('Trận Bot chưa kết thúc hoặc cược không khớp.');
+                    const lock=locks[id],baseAmount=petBattleClaimAmount(pending,uid,now);
+                    if(!lock||baseAmount===null||lock.stakeGrams!==pending.stakeGrams||lock.petId!==pending.players[0].petId)throw new Error('Trận Bot chưa kết thúc hoặc cược không khớp.');
+                    const won=pending.winnerUid===uid,multiplier=won?Math.max(1,Math.min(2,Number(pending.rewardMultiplier)||1)):1;
+                    const amount=won?baseAmount+(multiplier-1)*pending.stakeGrams:baseAmount;
                     if(amount)root=petBattleChangeWeight(root,lock.petId,amount,now);
-                    const delta=pending.winnerUid?(pending.winnerUid===uid?pending.stakeXp:-pending.stakeXp):0;
+                    const delta=pending.winnerUid?(won?pending.stakeXp*multiplier:-pending.stakeXp):0;
                     const xp=petBattleSettleXp(root,lock.petId,delta,now);
                     room={...pending,status:'finished',claims:{[uid]:true},xpChanges:{[uid]:xp.change}};
                     root=xp.pet;
@@ -10539,7 +10545,9 @@ const PetBattleGame=(()=>{
         }else{
             el('petBattlePhase').textContent={invited:'Đang chờ đối thủ chấp nhận',rps:`Oẳn tù tì · Vòng ${m.rpsRound+1}`,fighting:play.finished?'Trận đấu đã kết thúc':play.count?`Lượt ${play.count}/${m.turns.length}`:'Chuẩn bị giao đấu…',finished:'Trận đấu đã kết thúc',cancelled:'Lời mời đã hủy',rejected:'Đối thủ đã từ chối',expired:'Hết thời gian'}[m.status];
         }
-        el('petBattlePot').textContent=`Mỗi bên ${petWeightLabel(m.stakeGrams)} · Quỹ ${petWeightLabel(m.stakeGrams*2)}`;
+        el('petBattlePot').textContent=m.bot&&m.rewardMultiplier===2
+            ?`Cược ${petWeightLabel(m.stakeGrams)} · Thắng nhận thêm ${petWeightLabel(m.stakeGrams*2)} và EXP ×2`
+            :`Mỗi bên ${petWeightLabel(m.stakeGrams)} · Quỹ ${petWeightLabel(m.stakeGrams*2)}`;
         for(let i=0;i<2;i++){
             const p=m.players[i],guest=i===1?guestView:null;
             const elementKey=p?.element||(guest?el('petBattleElement').value:'');
@@ -10579,7 +10587,8 @@ const PetBattleGame=(()=>{
         const ended=m.status==='finished'||play.finished,closed=['cancelled','rejected','expired'].includes(m.status);
         const xpChange=m.xpChanges?.[state.uid];
         const xpResult=Number.isSafeInteger(xpChange)?` · ${xpChange>0?'+':xpChange<0?'−':''}${Math.abs(xpChange)} EXP`:'';
-        el('petBattleResult').textContent=ended?(m.winnerUid?(m.winnerUid===state.uid?'Bạn thắng! +':'Bạn thua! −')+petWeightLabel(m.stakeGrams)+xpResult:'Hòa trận: hoàn lại kg cược.')+(m.claims?.[state.uid]?' Đã cập nhật kết quả.':' Đang chờ cập nhật kết quả.'):(closed?'Hoàn lại kg đã giữ cho bên đặt cược.':'');
+        const resultWeight=m.bot&&m.rewardMultiplier===2&&m.winnerUid===state.uid?m.stakeGrams*2:m.stakeGrams;
+        el('petBattleResult').textContent=ended?(m.winnerUid?(m.winnerUid===state.uid?'Bạn thắng! +':'Bạn thua! −')+petWeightLabel(resultWeight)+xpResult:'Hòa trận: hoàn lại kg cược.')+(m.claims?.[state.uid]?' Đã cập nhật kết quả.':' Đang chờ cập nhật kết quả.'):(closed?'Hoàn lại kg đã giữ cho bên đặt cược.':'');
         if(ended){
             const winner=m.players.find(p=>p.uid===m.winnerUid);
             el('petBattleExitWinner').textContent=winner?`${winner.name} thắng trận!`:'Hòa trận';
@@ -10645,6 +10654,10 @@ const PetBattleGame=(()=>{
             });
         });
         el('petBattleBotStart').addEventListener('click',()=>mutateBot('start',payload()));
+        el('petBattleBotSlot').addEventListener('click',event=>{
+            const button=event.target.closest('[data-bot-difficulty]');if(!button||state.busy)return;
+            state.botDifficulty=button.dataset.botDifficulty;state.botKey='';renderDraft();
+        });
         el('petBattleAccept').addEventListener('click',()=>mutate('accept',payload()));el('petBattleReject').addEventListener('click',()=>mutate('reject'));el('petBattleCancel').addEventListener('click',()=>mutate('cancel'));
         el('petBattleClaim').addEventListener('click',()=>match()?.bot?mutateBot('claim'):mutate('claim'));
         dialog.querySelectorAll('[data-pet-rps]').forEach(button=>button.addEventListener('click',()=>choose(button.dataset.petRps)));el('petBattleRetry').addEventListener('click',()=>{

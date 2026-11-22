@@ -49,7 +49,7 @@ console.log(`Deploy dist/: index.html (${((await stat('dist/index.html')).size /
     },
 
     "test": async () => {
-const helperSource = fs.readFileSync('app.js', 'utf8').split('// BEGIN SHARED HELPERS\n')[1].split('// END SHARED HELPERS')[0];
+const helperSource = fs.readFileSync('app.js', 'utf8').replace(/\r\n/g,'\n').split('// BEGIN SHARED HELPERS\n')[1].split('// END SHARED HELPERS')[0];
 const helperModule = helperSource + '\nexport { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater, attendancePetDay, newAttendancePet, attendancePetView, transitionAttendancePet, adjustAdminPet, attendancePetMotion, attendancePetTravelBounds, attendancePetCatalog, attendancePetScale, ATTENDANCE_PET_BRANCHES, normalizePetNickname, attendancePetRecords, attendancePetSelected, attendancePetHouseholdDay, transitionPetHousehold, attendancePetWeight, attendancePetActivityTime, buildPetComparison, unchangedPetAdminAction, petBattleBudget, petBattleStats, petBattleRps, petBattleSimulation, petBattlePlayback, petBattleChangeWeight, petBattleFighter, petBattleClaimAmount, petBattleSettleXp, petBattleCompletePet, makePetBattleBot, petBattleSkill, petBattleCommitment };';
 const { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater, attendancePetDay, newAttendancePet, attendancePetView, transitionAttendancePet, adjustAdminPet, attendancePetMotion, attendancePetTravelBounds, attendancePetCatalog, attendancePetScale, ATTENDANCE_PET_BRANCHES, normalizePetNickname, attendancePetRecords, attendancePetSelected, attendancePetHouseholdDay, transitionPetHousehold, attendancePetWeight, attendancePetActivityTime, buildPetComparison, unchangedPetAdminAction, petBattleBudget, petBattleStats, petBattleRps, petBattleSimulation, petBattlePlayback, petBattleChangeWeight, petBattleFighter, petBattleClaimAmount, petBattleSettleXp, petBattleCompletePet, makePetBattleBot, petBattleSkill, petBattleCommitment } = await import('data:text/javascript;base64,' + Buffer.from(helperModule).toString('base64'));
 
@@ -992,6 +992,14 @@ test('eight battle stats split damage and produce reproducible dodge and critica
  const baseHit=battle.turns.find(t=>t.attacker==='a'&&!t.dodged);
  assert.ok(resistant.physical/(resistant.critical?1.5:1)<baseHit.physical/(baseHit.critical?1.5:1),'physical resistance specifically reduces physical damage');
  assert.ok(resistant.magic/(resistant.critical?1.5:1)>baseHit.magic/(baseHit.critical?1.5:1),'lower magic resistance allows more magic damage');
+});
+
+test('Bot difficulty uses fixed stat budgets and hard mode doubles win rewards',()=>{
+ const easy=makePetBattleBot(18,'easy'),medium=makePetBattleBot(18,'medium'),hard=makePetBattleBot(18,'hard');
+ const total=bot=>Object.values(bot.stats).reduce((sum,value)=>sum+value,0);
+ assert.equal(total(easy),100);assert.equal(total(medium),108);assert.equal(total(hard),120);
+ assert.equal(easy.rewardMultiplier,1);assert.equal(medium.rewardMultiplier,1);assert.equal(hard.rewardMultiplier,2);
+ assert.doesNotThrow(()=>petBattleSimulation([{...easy,uid:'player-a'},hard],'player-a'));
 });
 
 test('two-client battle escrow, hidden RPS, automatic fight, payout and refunds commit atomically once', async () => {
