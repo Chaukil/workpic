@@ -9454,6 +9454,12 @@ function renderPetAdminSummary(changedAction=null) {
     if(petSelect.dataset.optionsKey!==petsKey){petSelect.dataset.optionsKey=petsKey;petSelect.replaceChildren(...records.map(p=>{const v=attendancePetView(p);return new Option(`${v.displayName} · Cấp ${v.level}${v.dead?' · Đã chết':''}`,p.id);}));}
     petSelect.value=records.some(p=>p.id===previous)?previous:records[0].id;
     const view=attendancePetView(attendancePetSelected(item.pet,petSelect.value));
+    document.getElementById('petAdminCurrentLevel').textContent=`Cấp ${view.level}`;
+    document.querySelectorAll('[data-pet-admin-level]').forEach(button=>{
+        const direction=Number(button.dataset.petAdminLevel);
+        button.disabled=direction<0?view.level<=1:view.level>=ATTENDANCE_PET_MAX_LEVEL;
+        button.title=button.disabled?(direction<0?'Thú cưng đã ở cấp thấp nhất':'Thú cưng đã ở cấp cao nhất'):'';
+    });
     if(!preserveDrafts||changedAction.startsWith('branch:'))document.getElementById('petAdminBranch').value=view.branch||'fish';
     const levelSelect=document.getElementById('petAdminLevel'),levelKey=view.branch||'base',catalogChanged=levelSelect.dataset.optionsKey!==levelKey;
     if(catalogChanged){levelSelect.dataset.optionsKey=levelKey;levelSelect.replaceChildren(...attendancePetCatalog(view.branch).map((form,index)=>new Option(`Cấp ${index+1} · ${form.name}`,index+1)));}
@@ -9560,6 +9566,18 @@ function initPetAdminPanel() {
         document.getElementById('petAdminPet').addEventListener('change',renderPetAdminSummary);
         document.getElementById('petAdminRefresh').addEventListener('click',loadPetAdminProfiles);
         panel.querySelectorAll('[data-pet-admin]').forEach(button=>button.addEventListener('click',event=>applyPetAdminAction(button.dataset.petAdmin,event.currentTarget)));
+        panel.querySelectorAll('[data-pet-admin-level]').forEach(button=>button.addEventListener('click',async event=>{
+            if(petAdminBusy)return;
+            const item=petAdminProfiles.find(item=>item.id===document.getElementById('petAdminUser').value);
+            const petId=document.getElementById('petAdminPet').value;
+            if(!item||!petId)return;
+            const current=attendancePetView(attendancePetSelected(item.pet,petId)).level;
+            const target=Math.max(1,Math.min(ATTENDANCE_PET_MAX_LEVEL,current+Number(button.dataset.petAdminLevel)));
+            if(target===current){renderPetAdminSummary();return;}
+            document.getElementById('petAdminLevel').value=String(target);
+            await applyPetAdminAction('level',event.currentTarget);
+            renderPetAdminSummary();
+        }));
         panel.querySelectorAll('[data-pet-admin-weight]').forEach(button=>button.addEventListener('click',event=>{
             const kg=Number(document.getElementById('petAdminWeightAmount').value),grams=Math.round(kg*1000)*Number(button.dataset.petAdminWeight);
             if(!Number.isFinite(kg)||kg<.1||kg>100){document.getElementById('petAdminStatus').textContent='Nhập mức điều chỉnh từ 0,1 đến 100 kg.';return;}

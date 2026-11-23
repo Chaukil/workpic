@@ -15493,8 +15493,11 @@ body.modal-open .attendance-pet-swimmer,body:has(dialog[open]) .attendance-pet-s
 .pet-admin-fields .btn { white-space:normal; flex-shrink:0; }
 .pet-admin-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
 .pet-admin-actions .btn { white-space:normal; font-size:.78rem; padding:10px; }
+.pet-admin-level-stepper { display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:center; gap:8px; margin:14px 0; }
+.pet-admin-level-stepper strong { min-width:64px; padding:9px 7px; border:1px solid var(--border); border-radius:9px; background:var(--surface-muted); text-align:center; font-size:.78rem; }
+.pet-admin-level-stepper .btn { min-width:0; white-space:normal; }
 .pet-admin-summary { padding:12px; border:1px solid var(--border); border-radius:12px; background:var(--surface-muted); font-size:.8rem; line-height:1.6; }
-@media(max-width:560px) { .pet-admin-actions { grid-template-columns:repeat(2,minmax(0,1fr)); } .pet-admin-fields { flex-wrap:wrap; } }
+@media(max-width:560px) { .pet-admin-actions { grid-template-columns:repeat(2,minmax(0,1fr)); } .pet-admin-fields { flex-wrap:wrap; } .pet-admin-level-stepper { grid-template-columns:1fr 1fr; }.pet-admin-level-stepper strong { grid-column:1/-1; grid-row:1; } }
 .attendance-pet-dialog::backdrop { background: #020617aa; }
 .attendance-pet-dialog > header { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 20px; }
 .attendance-pet-dialog header small { color: var(--muted); font-size: .64rem; letter-spacing: .12em; }
