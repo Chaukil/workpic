@@ -140,6 +140,8 @@ test('Firestore-only Bot settlement uses one idempotent client transaction', () 
     assert.match(mutateBot, /runTransaction\(db/);
     assert.match(mutateBot, /profile\.petBotClaims/);
     assert.match(mutateBot, /transaction\.update\(ref,patch\)/);
+    assert.match(mutateBot, /usage\[difficulty\]>=BOT_DAILY_LIMIT/);
+    assert.match(mutateBot, /transaction\.update\(ref,\{petBotDailyBattles:usage\}\)/);
     const botBattle = backend.slice(backend.indexOf('async function botBattle('), backend.indexOf('async function ranking('));
     assert.match(botBattle, /petBattleSimulation\(players, firstUid\)/);
     assert.match(botBattle, /db\.runTransaction/);
@@ -1039,7 +1041,7 @@ test('two-client battle escrow, hidden RPS, automatic fight, payout and refunds 
   db:{},currentUser:{uid:'a'},attendancePetRef:{collection:'users',id:'a'},authenticatedProfileSnapshot:null,attendancePetData:profiles.get('a').attendancePet,
   document:{getElementById:id=>{if(!nodes.has(id))nodes.set(id,{open:false,hidden:true,textContent:'',dataset:{},close(){this.open=false;}});return nodes.get(id);}},
   usersDirectorySnapshot:{docs:['a','b'].map(id=>({id,data:()=>structuredClone(profiles.get(id))}))},
-  doc:(_,collection,id)=>({collection,id}),onSnapshot:()=>()=>{},serverTimestamp:()=>clock,assertPetQuotaAvailable(){},petQuotaErrorText:()=>'',renderAttendancePet(){},setInterval:()=>1,clearInterval(){},
+  doc:(_,collection,id)=>({collection,id}),onSnapshot:()=>()=>{},serverTimestamp:()=>clock,todayKey:()=>new Date(clock).toISOString().slice(0,10),assertPetQuotaAvailable(){},petQuotaErrorText:()=>'',renderAttendancePet(){},setInterval:()=>1,clearInterval(){},
   attendancePetRecords,attendancePetSelected,attendancePetView,petWeightLabel:g=>g/1000+' kg',petBattleBudget,petBattleStats,petBattleRps,petBattleSimulation,petBattlePlayback,petBattleTime:v=>Number(v)||0,petBattleChangeWeight,petBattleFighter,petBattleClaimAmount,petBattleSettleXp,petBattleCompletePet,makePetBattleBot,petBattleCommitment,
   runTransaction:async(_,callback)=>{const pending=[];const tx={get:async ref=>{reads++;const data=(ref.collection==='users'?profiles:battles).get(ref.id);return {exists:()=>!!data,data:()=>structuredClone(data)};},set:(ref,data)=>pending.push({ref,data,merge:false}),update:(ref,data)=>pending.push({ref,data,merge:true})};const result=await callback(tx);for(const p of pending){const store=p.ref.collection==='users'?profiles:battles;store.set(p.ref.id,p.merge?{...store.get(p.ref.id),...structuredClone(p.data)}:structuredClone(p.data));writes++;}return result;}
  };
@@ -1136,14 +1138,14 @@ test('two-client battle escrow, hidden RPS, automatic fight, payout and refunds 
  botState.bot=makePetBattleBot(attendancePetView(botPet,clock).level,'easy');botState.botDifficulty='easy';
  await game.mutateBot('start',{...payload('a',statsA),element:'fire'});
  const botId=game.inspect().active,botMatch=game.inspect().matches.get(botId);
- assert.equal(writes,beforeLegacyBot,'Bot simulation stays local until the match ends');
+ assert.equal(writes,beforeLegacyBot+1,'Bot start writes only the daily difficulty counter');
  assert.equal(profiles.get('a').attendancePet.weightGrams,weightBeforeBot);
  clock+=2000+botMatch.turns.length*1800+1;
  use('a',botId);await game.mutateBot('claim',{},botId);
  const settledWeight=attendancePetView(profiles.get('a').attendancePet,clock).weightGrams;
  const expectedDelta=botMatch.winnerUid==='a'?botMatch.stakeGrams*botMatch.rewardMultiplier:botMatch.winnerUid?-botMatch.stakeGrams:0;
  assert.equal(settledWeight,weightBeforeBot+expectedDelta,'one Firestore transaction settles the local simulation');
- assert.equal(writes,beforeLegacyBot+1);
+ assert.equal(writes,beforeLegacyBot+2);
  const afterBotClaim=writes;await game.mutateBot('claim',{},botId);
  assert.equal(writes,afterBotClaim,'the profile marker prevents an ordinary duplicate claim');
 });

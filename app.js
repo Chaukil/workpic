@@ -10362,6 +10362,31 @@ const PetBattleGame=(()=>{
     const state={uid:null,own:null,matches:new Map(),subs:new Map(),failedSubs:new Set(),active:'',busy:false,message:'',cooldown:0,autoOpened:new Set(),inviteSnoozedUntil:new Map(),models:[],lastTurn:'',setupKey:'',listKey:'',lastSync:0,timer:null};
     const el=id=>document.getElementById(id),mine=()=>currentUser&&state.uid===currentUser.uid;
     const ownRef=()=>attendancePetRef||authenticatedProfileSnapshot?.ref;
+    const BOT_DAILY_LIMIT=10;
+    function botDailyUsage(profile=state.own,day=todayKey()){
+        const saved=profile?.petBotDailyBattles;
+        const current=saved?.day===day?saved:{};
+        return {day,easy:Math.max(0,Number(current.easy)||0),medium:Math.max(0,Number(current.medium)||0),hard:Math.max(0,Number(current.hard)||0)};
+    }
+    function botBattlesRemaining(difficulty,profile=state.own){return Math.max(0,BOT_DAILY_LIMIT-botDailyUsage(profile)[difficulty]);}
+    function normalizeBotDifficulty(){
+        const selected=state.botDifficulty||'easy';
+        if(botBattlesRemaining(selected)>0)return selected;
+        state.botDifficulty=['easy','medium','hard'].find(key=>botBattlesRemaining(key)>0)||selected;
+        return state.botDifficulty;
+    }
+    function renderBotBattleLimits(){
+        const selected=state.botDifficulty||'easy';
+        el('petBattleBotSlot').querySelectorAll('[data-bot-difficulty]').forEach(button=>{
+            const remaining=botBattlesRemaining(button.dataset.botDifficulty);
+            button.disabled=state.busy||remaining===0;
+            button.setAttribute('aria-disabled',String(button.disabled));
+            button.setAttribute('aria-pressed',String(button.dataset.botDifficulty===selected));
+            const small=button.querySelector('small');
+            small.textContent=`${small.dataset.botBase} · còn ${remaining}/${BOT_DAILY_LIMIT}`;
+            button.title=remaining?`Còn ${remaining} trận hôm nay`:'Đã dùng đủ 10 trận hôm nay';
+        });
+    }
     const profileRows=()=>state.opponentProfiles||[...(usersDirectorySnapshot?.docs||[])].map(d=>({id:d.id,...d.data()}));
     const match=()=>state.matches.get(state.active);
     function setElementAura(model,key){
@@ -10386,7 +10411,7 @@ const PetBattleGame=(()=>{
         state.draftModel.update(view);
         setElementAura(model,el('petBattleElement').value);
         if(state.botDraft){
-            const difficulty=state.botDifficulty||'easy',key=`${view.pet.id}:${view.level}:${difficulty}`;
+            const difficulty=normalizeBotDifficulty(),key=`${view.pet.id}:${view.level}:${difficulty}`;
             if(state.botKey!==key){state.botKey=key;state.bot=makePetBattleBot(view.level,difficulty);}
             if(!state.botModel){
                 state.botModel=createAttendancePet3D('petBattleBotModel','petBattleBotArt',null,'draft');
@@ -10395,7 +10420,7 @@ const PetBattleGame=(()=>{
             state.botModel.update(state.bot.appearance);
             setElementAura(el('petBattleBotModel'),state.bot.element);
             el('petBattleBotName').textContent=`${state.bot.name} · ${state.bot.petName} · Cấp ${state.bot.appearance.level} · ${state.bot.statBudget} điểm`;
-            el('petBattleBotSlot').querySelectorAll('[data-bot-difficulty]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.botDifficulty===difficulty)));
+            renderBotBattleLimits();
             const host={petName:view.displayName,stats:draftStats(),element:el('petBattleElement').value};
             renderStatComparison([host,state.bot],[petBattleEffectiveStats(host,state.bot),petBattleEffectiveStats(state.bot,host)]);
         }
@@ -10544,9 +10569,11 @@ const PetBattleGame=(()=>{
     function syncDraftControls(){
         const pet=el('petBattlePet'),element=el('petBattleElement').value;
         const canSubmit=!!pet.value&&state.draftPointsValid&&PET_BATTLE_ELEMENTS.has(element)&&!state.busy;
+        const botAvailable=!state.botDraft||botBattlesRemaining(state.botDifficulty||'easy')>0;
         el('petBattleAccept').disabled=!canSubmit;
         el('petBattleBotStart').hidden=!state.botDraft||!canSubmit;
-        el('petBattleBotStart').disabled=!canSubmit;
+        el('petBattleBotStart').disabled=!canSubmit||!botAvailable;
+        if(state.botDraft)renderBotBattleLimits();
         el('petBattleInviteHint').hidden=canSubmit;
         for(const button of el('petBattleOpponentList').querySelectorAll('button')){
             button.disabled=state.busy;
@@ -10726,16 +10753,30 @@ const PetBattleGame=(()=>{
             let result;
             if(PET_CLOUD_ENABLED)result=await petCloudRequest('bot',{...payload,action,id,difficulty:state.botDifficulty||'easy',stakeGrams:200});
             else if(action==='start'){
-                const ref=ownRef(),stake=payload.stakeGrams;
+                const ref=ownRef(),stake=payload.stakeGrams,difficulty=state.botDifficulty||'easy';
                 if(!ref||!Number.isSafeInteger(stake)||stake<100||stake%100)throw new Error('Cược tối thiểu 0,1 kg, theo bước 0,1 kg.');
-                const player=petBattleFighter({...state.own,uid,attendancePet:attendancePetData},ref.id,payload.petId,payload.stats,Date.now(),payload.element);
-                petBattleChangeWeight(attendancePetData,player.petId,-stake,Date.now());
+                if(!['easy','medium','hard'].includes(difficulty))throw new Error('Độ khó Bot không hợp lệ.');
+                const usageResult=await runTransaction(db,async transaction=>{
+                    const snapshot=await transaction.get(ref);
+                    if(!snapshot.exists()||snapshot.data().uid!==uid)throw new Error('Không đọc được hồ sơ thú cưng.');
+                    const profile=snapshot.data(),usage=botDailyUsage(profile);
+                    const player=petBattleFighter({...profile,uid},ref.id,payload.petId,payload.stats,Date.now(),payload.element);
+                    petBattleChangeWeight(profile.attendancePet,player.petId,-stake,Date.now());
+                    if(usage[difficulty]>=BOT_DAILY_LIMIT){
+                        const label={easy:'Dễ',medium:'Trung bình',hard:'Khó'}[difficulty];
+                        throw new Error(`Đã dùng đủ ${BOT_DAILY_LIMIT} trận Bot ${label} hôm nay.`);
+                    }
+                    usage[difficulty]++;
+                    transaction.update(ref,{petBotDailyBattles:usage});
+                    return {profile,usage,player};
+                },{maxAttempts:2});
+                const player=usageResult.player;
                 const bot={...state.bot,uid:'workpic-bot'};
                 const players=[player,bot],firstUid=Math.random()<.5?uid:bot.uid,now=Date.now();
-                const match={id,bot:true,botDifficulty:state.botDifficulty||'easy',rewardMultiplier:bot.rewardMultiplier,
+                const match={id,bot:true,botDifficulty:difficulty,rewardMultiplier:bot.rewardMultiplier,
                     participantUids:[uid],players,stakeGrams:stake,stakeXp:Math.floor(stake/200),status:'fighting',
                     createdMs:now,startedAt:now,firstUid,claims:{},...petBattleSimulation(players,firstUid)};
-                result={match,patch:{}};
+                result={match,patch:{petBotDailyBattles:usageResult.usage}};
             }else if(action==='claim'){
                 const ref=ownRef();
                 if(!ref)throw new Error('Chưa tải được hồ sơ.');
