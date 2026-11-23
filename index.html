@@ -2252,7 +2252,13 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
             </section>
         </div>
     </dialog>
-    <div id="petBattleInvite" class="pet-battle-invite" hidden><span id="petBattleInviteText"></span><button type="button" id="petBattleViewInvite">Xem lời thách đấu</button></div>
+    <dialog id="petBattleInvite" class="pet-battle-invite" aria-labelledby="petBattleInviteText">
+        <span id="petBattleInviteText"></span>
+        <div class="pet-battle-invite-actions">
+            <button type="button" id="petBattleViewInvite">Muốn đấu à</button>
+            <button type="button" id="petBattleSnoozeInvite" class="is-secondary">Đợi tí đã</button>
+        </div>
+    </dialog>
     <dialog id="petBattleLobby" class="pet-battle-dialog pet-battle-overlay" aria-labelledby="petBattleLobbyTitle">
         <header><h5 id="petBattleLobbyTitle">Đấu trường thú cưng</h5><button type="button" id="petBattleLobbyClose" aria-label="Đóng">✕</button></header>
         <div class="pet-battle-tabs"><button type="button" id="petBattleNew">Tạo phòng</button><select id="petBattleMatches" aria-label="Phòng đấu và lời mời"><option value="">Chọn phòng đấu</option></select></div>

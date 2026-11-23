@@ -117,6 +117,11 @@ test('Firebase listeners are scoped, bounded, and opened on demand', () => {
     assert.match(notifications, /limit\(50\)/);
     assert.match(notifications, /error\?\.code === 'failed-precondition'/);
     assert.match(notifications, /fallbackQuery[\s\S]*where\('userId', '==', uid\)[\s\S]*limit\(50\)/);
+    const quickJobsStart = source.indexOf('function listenQuickJobs()');
+    const quickJobs = source.slice(quickJobsStart, source.indexOf('// Job trong ng', quickJobsStart));
+    assert.doesNotMatch(quickJobs, /\bor\(/);
+    assert.match(quickJobs, /where\('status','in',\['open','invited'\]\)[\s\S]*limit\(100\)/);
+    assert.match(quickJobs, /where\('createdAt','>=',recentSince\)[\s\S]*orderBy\('createdAt','desc'\)[\s\S]*limit\(100\)/);
     const notes = source.slice(source.indexOf('function listenSharedNotes()'), source.indexOf('function stopSharedNotes()'));
     assert.match(notes, /limit\(50\)/);
     const workHours = source.slice(source.indexOf('function listenWorkHours()'), source.indexOf('function resolveWorkHoursDept('));

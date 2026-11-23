@@ -764,7 +764,7 @@ function jobColorStyle(job) {
 
 // Firebase Configuration - Chỉ sử dụng Firestore
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, where, or, writeBatch, runTransaction, orderBy, limit, serverTimestamp }
+import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, where, writeBatch, runTransaction, orderBy, limit, serverTimestamp }
     from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, EmailAuthProvider, reauthenticateWithCredential, updatePassword }
     from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -7706,7 +7706,7 @@ function listenQuickJobs() {
         snapshot.docs.forEach(item=>docs.set(item.id,item));
         readySources.add(source);
         if(readySources.size<2)return;
-        const merged=new Map([...sourceDocs.active,...sourceDocs.recent]);
+        const merged=new Map([...sourceDocs.active,...sourceDocs.recent,...docs]);
         onJobs({docs:[...merged.values()],docChanges:()=>snapshot.docChanges()});
     };
     const unsubscribers=[
@@ -10359,7 +10359,7 @@ function initAttendancePetUi() {
 }
 
 const PetBattleGame=(()=>{
-    const state={uid:null,own:null,matches:new Map(),subs:new Map(),failedSubs:new Set(),active:'',busy:false,message:'',cooldown:0,autoOpened:new Set(),models:[],lastTurn:'',setupKey:'',listKey:'',lastSync:0,timer:null};
+    const state={uid:null,own:null,matches:new Map(),subs:new Map(),failedSubs:new Set(),active:'',busy:false,message:'',cooldown:0,autoOpened:new Set(),inviteSnoozedUntil:new Map(),models:[],lastTurn:'',setupKey:'',listKey:'',lastSync:0,timer:null};
     const el=id=>document.getElementById(id),mine=()=>currentUser&&state.uid===currentUser.uid;
     const ownRef=()=>attendancePetRef||authenticatedProfileSnapshot?.ref;
     const profileRows=()=>state.opponentProfiles||[...(usersDirectorySnapshot?.docs||[])].map(d=>({id:d.id,...d.data()}));
@@ -10411,11 +10411,11 @@ const PetBattleGame=(()=>{
     const secret=(id,round)=>{try{return JSON.parse(localStorage.getItem(secretKey(id,round))||'null');}catch{return null;}};
     function disposeModels(){state.models.forEach(model=>model.stop());state.models=[];state.modelKey='';}
     function stop(){
-        clearInterval(state.timer);state.timer=null;state.subs.forEach(unsubscribe=>unsubscribe());state.subs.clear();state.failedSubs.clear();state.matches.clear();state.autoOpened.clear();disposeModels();stopDraftModel();
+        clearInterval(state.timer);state.timer=null;state.subs.forEach(unsubscribe=>unsubscribe());state.subs.clear();state.failedSubs.clear();state.matches.clear();state.autoOpened.clear();state.inviteSnoozedUntil.clear();disposeModels();stopDraftModel();
         state.inviteUnsubscribe?.();state.inviteUnsubscribe=null;state.inviteFailed=false;state.invites=new Set();
         state.uid=null;state.own=null;state.active='';state.creating=false;state.busy=false;state.message='';state.setupKey='';state.listKey='';state.resultPrompt='';state.cooldown=0;state.lastSync=0;
         for(const id of ['petBattleExitDialog','petBattleInvitePicker','petBattleDialog','petBattleLobby'])if(el(id)?.open)el(id).close();
-        if(el('petBattleInvite'))el('petBattleInvite').hidden=true;
+        if(el('petBattleInvite')?.open)el('petBattleInvite').close();
     }
     function start(){stop();if(!currentUser||!attendancePetRef)return;state.uid=currentUser.uid;state.own=(PET_CLOUD_ENABLED?attendanceCloudProfile:authenticatedProfileSnapshot?.data())||{uid:state.uid,attendancePet:attendancePetData};
         try{const pending=JSON.parse(localStorage.getItem(`workpic-bot-pending:${state.uid}`)||'null');if(pending?.bot&&pending.participantUids?.includes(state.uid))state.matches.set(pending.id,pending);}catch{}
@@ -10426,8 +10426,6 @@ const PetBattleGame=(()=>{
         const id=data.id,uid=state.uid;
         if(!data.participantUids?.includes(uid))return;
         state.matches.set(id,data);
-        const inviteKey=id+':invite';
-        if(data.status==='invited'&&data.opponentUid===uid&&data.expiresAt>Date.now()&&!state.autoOpened.has(inviteKey)){state.autoOpened.add(inviteKey);open(id);}
         if(['ready','rps','fighting'].includes(data.status)&&!state.autoOpened.has(id)){state.autoOpened.add(id);open(id);}
         updateInvites();render();process();
     }
@@ -10470,8 +10468,14 @@ const PetBattleGame=(()=>{
     }
     function updateInvites(){
         if(!mine())return;const incoming=[...state.matches.values()].filter(m=>m.opponentUid===state.uid&&m.status==='invited'&&m.expiresAt>Date.now());
-        el('petBattleBadge').textContent=incoming.length?String(incoming.length):'';el('petBattleInvite').hidden=!incoming.length;
-        if(incoming.length){el('petBattleInviteText').textContent=`${incoming[0].players[0].name} thách đấu ${petWeightLabel(incoming[0].stakeGrams)} mỗi bên.`;el('petBattleViewInvite').dataset.matchId=incoming[0].id;}
+        const notice=el('petBattleInvite');
+        el('petBattleBadge').textContent=incoming.length?String(incoming.length):'';
+        if(!incoming.length){if(notice.open)notice.close();return;}
+        const invitation=incoming[0];
+        el('petBattleInviteText').textContent=`${invitation.players[0].name} thách đấu ${petWeightLabel(invitation.stakeGrams)} mỗi bên.`;
+        el('petBattleViewInvite').dataset.matchId=invitation.id;
+        el('petBattleSnoozeInvite').dataset.matchId=invitation.id;
+        if(!notice.open&&Date.now()>=(state.inviteSnoozedUntil.get(invitation.id)||0))notice.showModal();
     }
     function canOpen(){
         if(!currentUser)return false;
@@ -11016,7 +11020,16 @@ const PetBattleGame=(()=>{
         el('petBattleAddOpponent').addEventListener('click',()=>el('petBattleInvitePicker').showModal());
         el('petBattleInvitePickerClose').addEventListener('click',()=>el('petBattleInvitePicker').close());
         el('petBattleReady').addEventListener('click',()=>mutate('ready'));
-        el('petBattleViewInvite').addEventListener('click',event=>open(event.currentTarget.dataset.matchId));
+        el('petBattleViewInvite').addEventListener('click',event=>{
+            const id=event.currentTarget.dataset.matchId;
+            if(el('petBattleInvite').open)el('petBattleInvite').close();
+            open(id);
+        });
+        el('petBattleSnoozeInvite').addEventListener('click',event=>{
+            const id=event.currentTarget.dataset.matchId;
+            if(id)state.inviteSnoozedUntil.set(id,Date.now()+60000);
+            if(el('petBattleInvite').open)el('petBattleInvite').close();
+        });
         el('petBattlePet').addEventListener('change',()=>{loadStatsDraft();render();});
         el('petBattleCycleHost').addEventListener('click',cyclePet);
         el('petBattleCycleGuest').addEventListener('click',cyclePet);
