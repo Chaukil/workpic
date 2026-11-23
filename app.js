@@ -10468,20 +10468,25 @@ const PetBattleGame=(()=>{
     function receiveMatch(data){
         const id=data.id,uid=state.uid;
         if(!data.participantUids?.includes(uid))return;
+        const previous=state.matches.get(id);
+        if(previous&&JSON.stringify(previous.players?.map(player=>[player.uid,player.petId,player.appearance?.level]))!==JSON.stringify(data.players?.map(player=>[player.uid,player.petId,player.appearance?.level]))){
+            disposeModels();state.modelKey='';
+        }
         state.matches.set(id,data);
         if(['ready','rps','fighting'].includes(data.status)&&!state.autoOpened.has(id)){state.autoOpened.add(id);open(id);}
         updateInvites();render();process();
     }
-    function listenCloudInvites(){
+    function listenBattleInvites(){
         if(state.inviteUnsubscribe||state.inviteFailed||Date.now()<state.cooldown)return;
         try{assertPetQuotaAvailable();}catch{return;}
         const uid=state.uid;
-        const invitations=query(collection(db,'petCloudBattles'),where('opponentUid','==',uid),where('status','==','invited'),limit(12));
+        const invitations=query(collection(db,PET_CLOUD_ENABLED?'petCloudBattles':'petBattles'),where('opponentUid','==',uid),limit(50));
         state.inviteUnsubscribe=onSnapshot(invitations,snapshot=>{
             if(!mine()||state.uid!==uid)return;
-            const next=new Set(snapshot.docs.map(doc=>doc.id));
+            const invited=snapshot.docs.filter(doc=>doc.data().status==='invited'&&doc.data().expiresAt>Date.now());
+            const next=new Set(invited.map(doc=>doc.id));
             for(const id of state.invites)if(!next.has(id)&&!state.subs.has(id)&&state.matches.get(id)?.status==='invited')state.matches.delete(id);
-            for(const doc of snapshot.docs){
+            for(const doc of invited){
                 const match=state.matches.get(doc.id);
                 if(!match||match.status==='invited')receiveMatch({id:doc.id,...doc.data()});
             }
@@ -10490,8 +10495,8 @@ const PetBattleGame=(()=>{
     }
     function sync(){
         if(!mine())return;state.lastSync=Date.now();const wanted=new Set(Object.keys(state.own?.petBattleLocks||{}).filter(id=>!id.startsWith('bot-'))),offers=[];
+        listenBattleInvites();
         if(PET_CLOUD_ENABLED){
-            listenCloudInvites();
             const current=match();
             if(current&&['invited','ready','fighting'].includes(current.status)&&state.active)wanted.add(state.active);
         }else for(const profile of profileRows())if(profile.uid!==state.uid)for(const [id,lock]of Object.entries(profile.petBattleLocks||{}))if(lock.role==='challenger'&&lock.peerUid===state.uid&&lock.expiresAt>Date.now())offers.push({id,at:lock.createdAt});
@@ -10692,8 +10697,7 @@ const PetBattleGame=(()=>{
                             if(next.status!=='ready'||now>=next.readyDeadline)throw new Error('Phòng đã hết thời gian sẵn sàng.');
                             next.ready={...next.ready,[uid]:true};
                             if(next.participantUids.every(player=>next.ready[player])){
-                                const firstUid=next.participantUids[parseInt(id.slice(-1),16)%2];
-                                next={...next,...petBattleSimulation(next.players,firstUid),status:'fighting',firstUid,startedAt:serverTimestamp()};
+                                next.status='rps';next.rpsDeadline=now+120000;next.rpsRound=0;next.commits={};next.reveals={};
                             }
                         }
                     }else if(action==='reject'||action==='cancel'){
@@ -10738,13 +10742,23 @@ const PetBattleGame=(()=>{
                         }
                     }else throw new Error('Thao tác trận đấu không hợp lệ.');
                 }
-                if(changed){if(action==='create')tx.set(battleRef,next);else tx.update(battleRef,next);if(Object.keys(patch).length)tx.update(ref,patch);}
+                if(changed){
+                    if(action==='create')tx.set(battleRef,next);
+                    else if(action==='claim'){
+                        const claimPatch={status:next.status,claims:next.claims};
+                        if(next.xpChanges)claimPatch.xpChanges=next.xpChanges;
+                        tx.update(battleRef,claimPatch);
+                    }
+                    else tx.update(battleRef,next);
+                    if(Object.keys(patch).length)tx.update(ref,patch);
+                }
                 return {match:next,patch,changed};
-            },{maxAttempts:['ready','claim'].includes(action)?2:1});
+            },{maxAttempts:action==='claim'?5:action==='ready'?3:1});
             if(!mine()||state.uid!==uid)return;
             if(PET_CLOUD_ENABLED)id=result.match.id;
             result.patch||={};
             const previous=state.matches.get(id);
+            if(previous&&JSON.stringify(previous.players?.map(player=>[player.uid,player.petId,player.appearance?.level]))!==JSON.stringify(result.match.players?.map(player=>[player.uid,player.petId,player.appearance?.level]))){disposeModels();state.modelKey='';}
             if(result.match.status==='ready'&&previous?.ready&&(
                 previous.status!=='ready'||Object.keys(previous.ready).length>Object.keys(result.match.ready).length
             ))result.match=previous;
@@ -10861,6 +10875,11 @@ const PetBattleGame=(()=>{
             }
             if(state.own?.petBattleLocks?.[m.id]&&!m.claims?.[state.uid]){
                 if(roomExpired(m)||petBattleClaimAmount(m,state.uid)!==null){
+                    if(m.status==='fighting'||m.status==='finished'){
+                        const endAt=petBattleTime(m.startedAt)+(m.introMs===5000?5000:2000)+(m.turns?.length||0)*PET_BATTLE_STEP_MS;
+                        const playerIndex=Math.max(0,m.participantUids.indexOf(state.uid));
+                        if(Date.now()<endAt+playerIndex*1200)continue;
+                    }
                     if(m.bot)await mutateBot('claim',{},m.id);
                     else await mutate('claim',{},m.id);
                     return;
@@ -10869,7 +10888,7 @@ const PetBattleGame=(()=>{
         }
     }
     function ensureModels(m,guestView){
-        const key=JSON.stringify([m.id,m.players.map(p=>[p.uid,p.petId,p.petName,p.appearance.level]),guestView&&[guestView.pet.id,guestView.level,guestView.branch]]);
+        const key=JSON.stringify([m.id,m.players.map(p=>[p.uid,p.petId,p.petName,p.appearance]),guestView&&[guestView.pet.id,guestView.displayName,guestView.level,guestView.branch,guestView.form]]);
         if(state.modelKey===key)return;
         disposeModels();state.modelKey=key;
         const views=m.players.map(player=>({...player.appearance,displayName:player.petName}));
@@ -11032,7 +11051,7 @@ const PetBattleGame=(()=>{
         el('petBattleRps').hidden=m.status!=='rps';el('petBattleRpsStatus').textContent=m.commits?.[state.uid]?'Đã khóa lựa chọn. Chờ cả hai bên để mở kết quả.':m.rpsRound?'Vừa hòa. Cả hai cùng chọn lại.':'Lựa chọn được giữ kín đến khi cả hai đã chọn.';
         el('petBattleRps').querySelectorAll('button').forEach(button=>button.disabled=state.busy||!!m.commits?.[state.uid]);
         const symbols={rock:'✊',paper:'🖐',scissors:'✌'},rpsResult=el('petBattleRpsReveal');
-        rpsResult.hidden=m.roomFlow||!m.firstUid;
+        rpsResult.hidden=!m.firstUid;
         if(!rpsResult.hidden){
             const winner=m.players.find(p=>p.uid===m.firstUid),introEnd=petBattleTime(m.startedAt)+(m.introMs===5000?5000:2000);
             el('petBattleRpsHands').textContent=m.players.map(p=>`${p.name} ${symbols[m.reveals?.[p.uid]?.choice]||'✊'}`).join('  VS  ');
