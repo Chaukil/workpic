@@ -567,7 +567,7 @@ function buildPetComparison(profiles,now=Date.now(),branch='all',mode='level'){
             rows.push({uid:profile.uid,ownerName:profile.displayName||String(profile.email||'').split('@')[0]||profile.uid,
                 petId:pet.id,petName:view.displayName,species:view.name,level:view.level,branchKey:key,branchName:view.branch?ATTENDANCE_PET_BRANCHES[view.branch].name:'Chưa chọn nhánh',
                 xpToNextLevel:view.maxed?0:Math.max(0,view.level*10-view.xp),maxed:view.maxed,
-                weightGrams:view.weightGrams,battlePower:petBattlePower(battleStats),lastActiveAt:activity,dead:view.dead,egg:view.egg,
+                weightGrams:view.weightGrams,battlePower:petBattlePower(battleStats,view),lastActiveAt:activity,dead:view.dead,egg:view.egg,
                 battleHistory:Array.isArray(pet.battleHistory)?pet.battleHistory:[],
                 appearance:{form:view.form,level:view.level,branch:view.branch,egg:view.egg,dead:view.dead}});
         }
@@ -625,11 +625,12 @@ function petBattleEffectiveStats(player,opponent){
     return Object.fromEntries(Object.entries(player.stats).map(([key,value])=>[key,value*1.01]));
 }
 function petBattleNumber(value){return Number(value.toFixed(2));}
-function petBattleMaxHp(stats){return petBattleNumber(100+stats.health*8);}
-function petBattlePower(stats){
-    return 2*((Number(stats.attack)||0)+(Number(stats.magic)||0)+(Number(stats.defense)||0)+
-        (Number(stats.magicReduction)||0)+(Number(stats.physicalReduction)||0))+
-        4*((Number(stats.dodge)||0)+(Number(stats.luck)||0))+8*(Number(stats.health)||0);
+function petBattleMaxHp(stats){return petBattleNumber(500+stats.health*9);}
+function petBattlePower(stats,appearance={}){
+    const base=6*((Number(stats.attack)||0)+(Number(stats.magic)||0))+
+        2*((Number(stats.defense)||0)+(Number(stats.magicReduction)||0)+(Number(stats.physicalReduction)||0))+
+        4*((Number(stats.dodge)||0)+(Number(stats.luck)||0))+2*(Number(stats.health)||0);
+    return base+(appearance.branch?1000:0)+(Number(appearance.level)===ATTENDANCE_PET_MAX_LEVEL?2000:0);
 }
 function petBattleBudget(level,legacy=false){
     const validLevel=Math.max(1,Math.min(ATTENDANCE_PET_MAX_LEVEL,Math.floor(Number(level)||1)));
@@ -651,19 +652,23 @@ function petBattleSimulation(players,firstUid){
     players.forEach(p=>petBattleStats(p.stats,p.appearance.level,
         !p.budgetVersion&&Object.values(p.stats||{}).reduce((sum,value)=>sum+Number(value),0)===petBattleBudget(p.appearance.level,true),p.statBudget));
     const stats=players.map((player,index)=>petBattleEffectiveStats(player,players[1-index]));
+    const power=players.map((player,index)=>petBattlePower(stats[index],player.appearance));
     const hp=stats.map(petBattleMaxHp),maxHp=[...hp],turns=[];
     let attacker=players.findIndex(p=>p.uid===firstUid);
     let seed=2166136261;for(const c of JSON.stringify([players,firstUid],(key,value)=>key==='element'?undefined:value))seed=Math.imul(seed^c.charCodeAt(0),16777619)>>>0;
     const roll=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
+    const damageScale=power.map((value,index)=>Math.max(.5,Math.min(2,(value/Math.max(1,power[1-index]))**.8*(.95+roll()*.1))));
     while(hp.every(value=>value>0)&&turns.length<PET_BATTLE_MAX_TURNS){
         const defender=1-attacker,a=stats[attacker],d=stats[defender],attack=a.attack,defense=d.defense;
         const modern=Object.hasOwn(a,'magic')||Object.hasOwn(d,'magic');
         const dodged=modern&&roll()<Math.min(.4,(d.dodge||0)/200),critical=modern&&roll()<Math.min(.35,(a.luck||0)/200);
         const physical=(5+attack*2)*100/(100+defense)*100/(100+(d.physicalReduction||0)*2);
         const magic=(a.magic||0)*2*100/(100+defense)*100/(100+(d.magicReduction||0)*2);
-        const damage=modern?(dodged?0:Math.max(1,Math.round((physical+magic)*(critical?1.5:1)))):Math.max(1,Math.round((10+attack*2)*100/(100+defense)));
+        const damage=modern?(dodged?0:Math.max(1,Math.round((physical+magic)*(critical?1.5:1)*damageScale[attacker]))):Math.max(1,Math.round((10+attack*2)*100/(100+defense)*damageScale[attacker]));
         hp[defender]=Math.max(0,petBattleNumber(hp[defender]-damage));
-        turns.push({index:turns.length+1,attacker:players[attacker].uid,defender:players[defender].uid,damage,dodged,critical,physical:modern&&!dodged?physical*(critical?1.5:1):0,magic:modern&&!dodged?magic*(critical?1.5:1):0,hp:[...hp]});attacker=defender;
+        turns.push({index:turns.length+1,attacker:players[attacker].uid,defender:players[defender].uid,damage,dodged,critical,
+            physical:modern&&!dodged?physical*(critical?1.5:1)*damageScale[attacker]:0,
+            magic:modern&&!dodged?magic*(critical?1.5:1)*damageScale[attacker]:0,hp:[...hp]});attacker=defender;
     }
     return {maxHp,turns,winnerUid:hp[0]===0?players[1].uid:hp[1]===0?players[0].uid:null};
 }
@@ -716,9 +721,12 @@ function makePetBattleBot(level,difficulty='easy'){
     const config=levels[difficulty]||levels.easy;
     const botLevel=config.budget===100?1:config.budget===108?9:15;
     const branch=Object.keys(ATTENDANCE_PET_BRANCHES)[Math.floor(Math.random()*4)];
-    const stats={attack:1,magic:1,defense:1,magicReduction:1,physicalReduction:1,dodge:1,luck:1,health:1};
-    const keys=Object.keys(stats);
-    for(let i=keys.length;i<config.budget;i++)stats[keys[Math.floor(Math.random()*keys.length)]]++;
+    const weights={attack:18,magic:18,defense:8,magicReduction:8,physicalReduction:8,dodge:10,luck:10,health:20};
+    const stats=Object.fromEntries(Object.entries(weights).map(([key,weight])=>[key,Math.floor(config.budget*weight/100)]));
+    let remaining=config.budget-Object.values(stats).reduce((sum,value)=>sum+value,0);
+    for(const key of ['health','attack','magic','defense','dodge','luck','magicReduction','physicalReduction']){
+        if(!remaining)break;stats[key]++;remaining--;
+    }
     const form=attendancePetCatalog(branch)[botLevel-1],elements=[...PET_BATTLE_ELEMENTS.keys()];
     return {uid:'workpic-bot',name:`Bot ${config.label}`,petName:form.name,budgetVersion:2,statBudget:config.budget,difficulty,stakeGrams:config.stakeGrams,stakeXp:1,rewardMultiplier:1,stats,
         element:elements[Math.floor(Math.random()*elements.length)],
@@ -9741,7 +9749,7 @@ function renderPetComparison(force=false){
     petComparisonCache={directory:usersDirectorySnapshot,pet:attendancePetData,filter,mode,minute,page};
     let rows=page?.rows||[];
     document.getElementById('petCompareDescription').textContent=mode==='power'
-        ?'Xếp theo lực chiến từ cao đến thấp. Công thức: 2×(công vật lý + phép + thủ + kháng vật lý + kháng phép) + 4×(né + chí mạng) + 8×máu. Dùng chỉ số đã chọn gần nhất; thú chưa từng đấu dùng chỉ số phân bổ đều. Chỉ hiện thành viên đã điểm danh hoặc cho ăn trong 7 ngày gần nhất. Thú đã chết hiện cuối và không có hạng.'
+        ?'Xếp theo lực chiến từ cao đến thấp. Công thức: 6×(công vật lý + phép) + 2×(thủ + kháng vật lý + kháng phép) + 4×(né + chí mạng) + 2×máu; tiến hóa nhánh +1.000, cấp 30 +2.000. Công thức ưu tiên sát thương để lực chiến phản ánh hiệu quả chiến đấu; kết quả vẫn có yếu tố chỉ số khắc chế và ngẫu nhiên. Dùng chỉ số đã chọn gần nhất; thú chưa từng đấu dùng chỉ số phân bổ đều. Chỉ hiện thành viên đã điểm danh hoặc cho ăn trong 7 ngày gần nhất. Thú đã chết hiện cuối và không có hạng.'
         :'Xếp theo cấp từ cao đến thấp. Cùng cấp thì thú cưng nặng hơn xếp trước. Chỉ hiện thành viên đã điểm danh hoặc cho ăn trong 7 ngày gần nhất. Thú đã chết hiện cuối và không có hạng.';
     const body=document.getElementById('petCompareRows');
     body.replaceChildren(...rows.map(row=>{
@@ -9766,7 +9774,8 @@ function renderPetComparison(force=false){
         xp.textContent=row.egg?'Đợi trứng nở':row.maxed?'Cấp tối đa'
             :`${10-row.xpToNextLevel}/10 EXP · ${row.xpToNextLevel?`Còn ${row.xpToNextLevel} EXP`:'Chọn nhánh để lên cấp'}`;
         level.appendChild(xp);
-        cell(petPowerLabel(row.battlePower)).className='pet-compare-power';
+        const power=cell('');power.className='pet-compare-power';
+        const powerBadge=document.createElement('span');powerBadge.className='pet-power-badge';powerBadge.textContent=petPowerLabel(row.battlePower);power.appendChild(powerBadge);
         cell(petWeightLabel(row.weightGrams)).className='pet-compare-weight';
         const history=document.createElement('button');
         history.type='button';history.className='btn btn-outline-primary pet-compare-history-button';history.textContent='Xem lịch sử';
@@ -10458,7 +10467,8 @@ const PetBattleGame=(()=>{
             }
             state.botModel.update(state.bot.appearance);
             setElementAura(el('petBattleBotModel'),state.bot.element);
-            el('petBattleBotName').textContent=`${state.bot.name} · ${state.bot.petName} · Cấp ${state.bot.appearance.level} · ${state.bot.statBudget} điểm · Lực chiến ${petPowerLabel(petBattlePower(state.bot.stats))}`;
+            el('petBattleBotName').textContent=`${state.bot.name} · ${state.bot.petName} · Cấp ${state.bot.appearance.level} · ${state.bot.statBudget} điểm`;
+            el('petBattleBotPower').textContent=petPowerLabel(petBattlePower(state.bot.stats,state.bot.appearance));
             renderBotBattleLimits();
             const host={petName:view.displayName,stats:draftStats(),element:el('petBattleElement').value};
             renderStatComparison([host,state.bot],[petBattleEffectiveStats(host,state.bot),petBattleEffectiveStats(state.bot,host)]);
@@ -10602,7 +10612,7 @@ const PetBattleGame=(()=>{
         el('petBattleAllocation').dataset.state=remaining===0?'complete':remaining>0?'short':'over';
         el('petBattleRemaining').classList.toggle('invalid',remaining!==0);
         const meter=el('petBattleAllocationMeter');meter.max=budget;meter.value=Math.min(used,budget);
-        el('petBattleDraftPower').textContent=`${remaining===0?'Lực chiến':'Lực chiến tạm tính'}: ${petPowerLabel(petBattlePower(stats))}`;
+        el('petBattleDraftPower').textContent=petPowerLabel(petBattlePower(stats,view));
         Object.entries(statInputs).forEach(([key,id])=>{
             el(id).previousElementSibling.textContent=stats[key];
         });
@@ -11056,6 +11066,9 @@ const PetBattleGame=(()=>{
             el(`petBattleName${i}`).textContent=p?`${p.petName} · ${p.name}`:guest?.displayName||'Chờ đối thủ vào phòng';
             const view=p?.appearance||guest;
             el(`petBattleStats${i}`).textContent=view?`Cấp ${view.level}${element?` · ${element.label}`:''}${bonus}`:'';
+            const powerBadge=el(`petBattlePower${i}`);
+            powerBadge.hidden=!p;
+            if(p)powerBadge.textContent=petPowerLabel(petBattlePower(p.stats,p.appearance));
             const badge=el(`petBattleReady${i}`),isReady=!!m.ready?.[p?.uid];
             badge.hidden=!ready||!p;
             badge.classList.toggle('is-ready',isReady);
