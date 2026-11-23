@@ -50,8 +50,8 @@ console.log(`Deploy dist/: index.html (${((await stat('dist/index.html')).size /
 
     "test": async () => {
 const helperSource = fs.readFileSync('app.js', 'utf8').replace(/\r\n/g,'\n').split('// BEGIN SHARED HELPERS\n')[1].split('// END SHARED HELPERS')[0];
-const helperModule = helperSource + '\nexport { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater, attendancePetDay, newAttendancePet, attendancePetView, transitionAttendancePet, adjustAdminPet, attendancePetMotion, attendancePetTravelBounds, attendancePetCatalog, attendancePetScale, ATTENDANCE_PET_BRANCHES, normalizePetNickname, attendancePetRecords, attendancePetSelected, attendancePetHouseholdDay, transitionPetHousehold, attendancePetWeight, attendancePetActivityTime, buildPetComparison, unchangedPetAdminAction, petBattleBudget, petBattleStats, petBattleRps, petBattleSimulation, petBattlePlayback, petBattleChangeWeight, petBattleFighter, petBattleClaimAmount, petBattleSettleXp, petBattleCompletePet, makePetBattleBot, petBattleSkill, petBattleCommitment };';
-const { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater, attendancePetDay, newAttendancePet, attendancePetView, transitionAttendancePet, adjustAdminPet, attendancePetMotion, attendancePetTravelBounds, attendancePetCatalog, attendancePetScale, ATTENDANCE_PET_BRANCHES, normalizePetNickname, attendancePetRecords, attendancePetSelected, attendancePetHouseholdDay, transitionPetHousehold, attendancePetWeight, attendancePetActivityTime, buildPetComparison, unchangedPetAdminAction, petBattleBudget, petBattleStats, petBattleRps, petBattleSimulation, petBattlePlayback, petBattleChangeWeight, petBattleFighter, petBattleClaimAmount, petBattleSettleXp, petBattleCompletePet, makePetBattleBot, petBattleSkill, petBattleCommitment } = await import('data:text/javascript;base64,' + Buffer.from(helperModule).toString('base64'));
+const helperModule = helperSource + '\nexport { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater, attendancePetDay, newAttendancePet, attendancePetView, transitionAttendancePet, adjustAdminPet, attendancePetMotion, attendancePetTravelBounds, attendancePetCatalog, attendancePetScale, ATTENDANCE_PET_BRANCHES, normalizePetNickname, attendancePetRecords, attendancePetSelected, attendancePetHouseholdDay, transitionPetHousehold, attendancePetWeight, attendancePetActivityTime, buildPetComparison, unchangedPetAdminAction, petBattleBudget, petBattleStats, petBattlePower, petBattleRps, petBattleSimulation, petBattlePlayback, petBattleChangeWeight, petBattleFighter, petBattleClaimAmount, petBattleSettleXp, petBattleCompletePet, makePetBattleBot, petBattleSkill, petBattleCommitment };';
+const { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater, attendancePetDay, newAttendancePet, attendancePetView, transitionAttendancePet, adjustAdminPet, attendancePetMotion, attendancePetTravelBounds, attendancePetCatalog, attendancePetScale, ATTENDANCE_PET_BRANCHES, normalizePetNickname, attendancePetRecords, attendancePetSelected, attendancePetHouseholdDay, transitionPetHousehold, attendancePetWeight, attendancePetActivityTime, buildPetComparison, unchangedPetAdminAction, petBattleBudget, petBattleStats, petBattlePower, petBattleRps, petBattleSimulation, petBattlePlayback, petBattleChangeWeight, petBattleFighter, petBattleClaimAmount, petBattleSettleXp, petBattleCompletePet, makePetBattleBot, petBattleSkill, petBattleCommitment } = await import('data:text/javascript;base64,' + Buffer.from(helperModule).toString('base64'));
 
 
 
@@ -141,11 +141,12 @@ test('Firestore-only Bot settlement uses one idempotent client transaction', () 
     assert.match(mutateBot, /profile\.petBotClaims/);
     assert.match(mutateBot, /transaction\.update\(ref,patch\)/);
     assert.match(mutateBot, /usage\[difficulty\]>=BOT_DAILY_LIMIT/);
-    assert.match(mutateBot, /transaction\.update\(ref,\{petBotDailyBattles:usage\}\)/);
+    assert.match(mutateBot, /transaction\.update\(ref,\{petBotDailyBattles:usage,petBattleStatsByPet\}\)/);
+    assert.match(client, /const BOT_DAILY_LIMIT=5/);
     const botBattle = backend.slice(backend.indexOf('async function botBattle('), backend.indexOf('async function ranking('));
     assert.match(botBattle, /petBattleSimulation\(players, firstUid\)/);
     assert.match(botBattle, /db\.runTransaction/);
-    assert.match(botBattle, /tx\.update\(profileRef, patch\)/);
+    assert.match(botBattle, /tx\.update\(ref,\{petBotDailyBattles:usage,petBattleStatsByPet:/);
     assert.match(botBattle, /tx\.update\(matchRef/);
 });
 
@@ -1023,13 +1024,15 @@ test('eight battle stats split damage and produce reproducible dodge and critica
  assert.ok(resistant.magic/(resistant.critical?1.5:1)>baseHit.magic/(baseHit.critical?1.5:1),'lower magic resistance allows more magic damage');
 });
 
-test('Bot difficulty uses fixed stat budgets and hard mode doubles win rewards',()=>{
+test('Bot difficulty keeps its stake and EXP reward consistent across modes',()=>{
  const easy=makePetBattleBot(18,'easy'),medium=makePetBattleBot(18,'medium'),hard=makePetBattleBot(18,'hard');
  const total=bot=>Object.values(bot.stats).reduce((sum,value)=>sum+value,0);
  assert.equal(total(easy),100);assert.equal(total(medium),108);assert.equal(total(hard),120);
  assert.deepEqual([easy.appearance.level,medium.appearance.level,hard.appearance.level],[1,9,15]);
  assert.equal(easy.petName,attendancePetCatalog(null)[0].name);assert.equal(medium.petName,attendancePetCatalog(null)[8].name);
- assert.equal(easy.rewardMultiplier,1);assert.equal(medium.rewardMultiplier,1);assert.equal(hard.rewardMultiplier,2);
+ assert.deepEqual([easy.stakeGrams,medium.stakeGrams,hard.stakeGrams],[200,300,400]);
+ assert.deepEqual([easy.stakeXp,medium.stakeXp,hard.stakeXp],[1,1,1]);
+ assert.deepEqual([easy.rewardMultiplier,medium.rewardMultiplier,hard.rewardMultiplier],[1,1,1]);
  assert.doesNotThrow(()=>petBattleSimulation([{...easy,uid:'player-a'},hard],'player-a'));
 });
 
@@ -1052,6 +1055,7 @@ test('two-client battle escrow, hidden RPS, automatic fight, payout and refunds 
  const statsA={attack:60,defense:20,health:20},statsB={attack:20,defense:20,health:60};
  const payload=(uid,stats)=>({opponentUid:uid==='a'?'b':'a',petId:attendancePetRecords(profiles.get(uid).attendancePet,clock)[0].id,stats,stakeGrams:200});
  use('a');await game.mutate('create',payload('a',statsA));const firstId=game.inspect().active;
+ assert.equal(profiles.get('a').petBattleStatsByPet[attendancePetRecords(profiles.get('a').attendancePet,clock)[0].id].attack,60,'the Firestore battle saves selected stats for ranking');
  use('a',firstId);await game.mutate('cancel',{},firstId);
  use('a');await game.mutate('create',payload('a',statsA));const id=game.inspect().active;
  assert.notEqual(id,firstId,'a new invite can be sent immediately after cancelling the previous one');
@@ -1196,10 +1200,10 @@ test('cloud pets migrate once and the server settles both profiles once without 
  }};
  const context={db,profiles:collection('petProfiles'),battles:collection('petCloudBattles'),legacy:collection('users'),
   Date:Clock,HttpsError,FieldValue:{delete:()=>removed},randomUUID:()=>String(commits.length),randomInt:()=>0,
-  ATTENDANCE_PET_BRANCHES,attendancePetActivityTime,attendancePetRecords,attendancePetView,buildPetComparison,
+  ATTENDANCE_PET_BRANCHES,attendancePetActivityTime,attendancePetRecords,attendancePetView,buildPetComparison,petBattleBudget,petBattlePower,
   transitionPetHousehold,petBattleFighter,petBattleChangeWeight,petBattleSimulation,petBattleSettleXp,
   petBattleCompletePet,makePetBattleBot,petBattleTime:value=>Number(value)||0,PET_BATTLE_STEP_MS:1800,
-  week:7*86400000,pageSize:20,rankingCache:undefined};
+  week:7*86400000,pageSize:20,botDailyLimit:5,rankingCache:undefined};
  vm.createContext(context);
  vm.runInContext(source.slice(source.indexOf('function requireId'),source.indexOf('export const workpicPets'))+
   '\nglobalThis.cloud={openProfile,care,battle,settle,deadline,ranking,botBattle};',context);
@@ -1213,7 +1217,9 @@ test('cloud pets migrate once and the server settles both profiles once without 
  const player=(profile,stats)=>({petId:attendancePetRecords(profile.attendancePet,clock)[0].id,element:'water',stats});
  const created=await battle('a',{action:'create',opponentUid:'b',stakeGrams:200,...player(a,{attack:60,defense:20,health:20})});
  const id=created.match.id;
- await battle('b',{action:'accept',id,...player(b,{attack:20,defense:20,health:60})});
+ const accepted=await battle('b',{action:'accept',id,...player(b,{attack:20,defense:20,health:60})});
+ assert.equal(documents.get('petProfiles/a').petBattleStatsByPet[created.match.players[0].petId].attack,60,'cloud battle stores selected stats for power ranking');
+ assert.equal(documents.get('petProfiles/b').petBattleStatsByPet[accepted.match.players[1].petId].health,60);
  await battle('a',{action:'ready',id});
  const {match}=await battle('b',{action:'ready',id});
  assert.equal(match.status,'fighting');
@@ -1240,6 +1246,8 @@ test('cloud pets migrate once and the server settles both profiles once without 
  const startWeight=attendancePetView(winner.attendancePet,clock).weightGrams;
  const started=await botBattle('a',{action:'start',petId:botPet.id,stats:{attack:30,magic:20,defense:10,magicReduction:10,physicalReduction:10,dodge:5,luck:5,health:10},element:'fire',stakeGrams:200,difficulty:'hard'});
  const botId=started.match.id,botRecord=documents.get(`petCloudBattles/${botId}`);
+ assert.deepEqual([botRecord.stakeGrams,botRecord.stakeXp,botRecord.rewardMultiplier],[400,1,1],'hard Bot uses 0.4 kg and one EXP without a bonus multiplier');
+ assert.equal(documents.get('petProfiles/a').petBotDailyBattles.hard,1,'Bot match increments the daily difficulty counter atomically');
  assert.equal(started.match.turns,undefined,'the local client receives setup, not the authoritative timeline');
  assert.equal(started.match.winnerUid,undefined);
  assert.equal(attendancePetView(documents.get('petProfiles/a').attendancePet,clock).weightGrams,startWeight,'starting a Bot match does not mutate pet rewards');
@@ -1250,6 +1258,8 @@ test('cloud pets migrate once and the server settles both profiles once without 
  assert.deepEqual(commits.at(-1),['petProfiles/a',`petCloudBattles/${botId}`]);
  const expectedDelta=botRecord.winnerUid==='a'?botRecord.stakeGrams*botRecord.rewardMultiplier:botRecord.winnerUid?-botRecord.stakeGrams:0;
  assert.equal(attendancePetView(documents.get('petProfiles/a').attendancePet,clock).weightGrams,startWeight+expectedDelta);
+ for(let attempt=0;attempt<4;attempt++)await botBattle('a',{action:'start',petId:botPet.id,stats:{attack:30,magic:20,defense:10,magicReduction:10,physicalReduction:10,dodge:5,luck:5,health:10},element:'fire',difficulty:'hard'});
+ await assert.rejects(botBattle('a',{action:'start',petId:botPet.id,stats:{attack:30,magic:20,defense:10,magicReduction:10,physicalReduction:10,dodge:5,luck:5,health:10},element:'fire',difficulty:'hard'}),/5 trận Bot hôm nay/,'the fifth daily match is allowed and the sixth is blocked');
  const afterBotClaim=commits.length;
  await botBattle('a',{action:'claim',id:botId});
  assert.equal(commits.length,afterBotClaim,'a duplicate Bot claim cannot settle twice');
@@ -1327,7 +1337,7 @@ test('absence leaves weight intact through the 72-hour death deadline', () => {
  assert.deepEqual(attendancePetRecords(household).map(p=>p.weightGrams),[5000,7000]);
 });
 
-test('pet comparison limits activity to seven days and ranks living pets by level, then weight', () => {
+test('pet comparison supports level and weighted battle-power ranking within seven days', () => {
  const now=Date.UTC(2026,10,20),day=86400000;
  const pet=(weight,activity,extra={})=>({...newAttendancePet(now-10*day),weightGrams:weight,lastCheckinAt:activity,lastCheckinDay:attendancePetDay(activity),...extra});
  const profiles=[
@@ -1345,6 +1355,15 @@ test('pet comparison limits activity to seven days and ranks living pets by leve
  assert.equal(rows[0].xpToNextLevel,3,'comparison includes battle EXP in the next-level progress');
  assert.equal(buildPetComparison(profiles,now,'bird').length,1);
  assert.equal(buildPetComparison(profiles,now,'dino').length,0);
+ const attackStats={attack:70,magic:4,defense:4,magicReduction:4,physicalReduction:4,dodge:4,luck:4,health:6};
+ const healthStats={attack:1,magic:1,defense:1,magicReduction:1,physicalReduction:1,dodge:1,luck:1,health:93};
+ const byPower=buildPetComparison([
+  {...profiles[0],uid:'attack-build',petBattleStatsByPet:{[attendancePetRecords(profiles[0].attendancePet,now)[0].id]:attackStats}},
+  {...profiles[0],id:'health-build',uid:'health-build',displayName:'Health build',petBattleStatsByPet:{[attendancePetRecords(profiles[0].attendancePet,now)[0].id]:healthStats}}
+ ],now,'all','power');
+ assert.equal(byPower[0].uid,'health-build','power ranking follows weighted selected stats rather than level alone');
+ assert.equal(byPower[0].battlePower,petBattlePower(healthStats));
+ assert.ok(byPower[1].battlePower<byPower[0].battlePower);
  const adminOnly=transitionPetHousehold(pet(1000,now-8*day),'level',now,null,8).pet;
  assert.equal(buildPetComparison([{id:'admin-only',uid:'admin-only',attendancePet:adminOnly}],now).length,0,'admin level edits do not count as real attendance');
 
@@ -2004,6 +2023,10 @@ try {
 
     check(document.getElementById('petCompareRows').textContent.includes('Active trainer')&&!document.getElementById('petCompareRows').textContent.includes('Inactive trainer'),'only recently active users are compared');
     check(document.querySelector('#petCompareRows tr').classList.contains('is-me'),'ranking puts the higher level first even with less weight');
+    const rankingMode=document.getElementById('petCompareMode');
+    rankingMode.value='power';rankingMode.dispatchEvent(new Event('change'));await new Promise(resolve=>setTimeout(resolve,0));
+    check(document.querySelector('#petCompareRows .pet-compare-power')?.textContent.length>0&&document.getElementById('petCompareDescription').textContent.includes('lực chiến'),'ranking can switch to weighted battle power');
+    rankingMode.value='level';rankingMode.dispatchEvent(new Event('change'));await new Promise(resolve=>setTimeout(resolve,0));
     const rivalRanking=[...document.querySelectorAll('#petCompareRows tr')].find(row=>row.textContent.includes('Active trainer'));
     check(rivalRanking.querySelector('.pet-compare-weight').textContent==='9,0 kg','ranking still displays pet weight');
     document.querySelector('#petCompareRows .pet-compare-picture').click();
@@ -2104,6 +2127,7 @@ try {
     const battlePet=attendancePetSelected(attendancePetData,document.getElementById('petBattlePet').value),battleView=attendancePetView(battlePet);
     const statsSum=()=>['petBattleAttack','petBattleMagic','petBattleDefense','petBattleMagicReduction','petBattlePhysicalReduction','petBattleDodge','petBattleLuck','petBattleHealth'].reduce((sum,id)=>sum+Number(document.getElementById(id).value),0);
     check(statsSum()===petBattleBudget(battleView.level),'battle allocation uses one bonus point per level');
+    check(document.getElementById('petBattleDraftPower').textContent.startsWith('Lực chiến:'),'battle power updates from the selected stat allocation');
     document.getElementById('petBattleAttack').value=Number(document.getElementById('petBattleAttack').value)+1;document.getElementById('petBattleAttack').dispatchEvent(new Event('input'));
     check(document.getElementById('petBattleRemaining').textContent==='Dư 1 điểm','over-allocation shows the exact excess');
     const savedAttack=document.getElementById('petBattleAttack').value;

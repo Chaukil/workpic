@@ -2293,9 +2293,9 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
                 <div id="petBattleBotModel" class="pet-battle-model pet-battle-draft-model" aria-hidden="true"><span id="petBattleBotArt"></span><div id="petBattleDraftStats1" class="pet-battle-model-stats side-1"></div></div>
                 <strong id="petBattleBotName"></strong><span class="pet-battle-ready-tag is-ready">Đã sẵn sàng</span>
                 <div class="pet-battle-bot-levels" aria-label="Độ khó Bot">
-                    <button type="button" data-bot-difficulty="easy" aria-pressed="true">Dễ <small data-bot-base="100 điểm">100 điểm · còn 10/10</small></button>
-                    <button type="button" data-bot-difficulty="medium" aria-pressed="false">Trung bình <small data-bot-base="108 điểm">108 điểm · còn 10/10</small></button>
-                    <button type="button" data-bot-difficulty="hard" aria-pressed="false">Khó <small data-bot-base="120 điểm · thưởng ×2">120 điểm · thưởng ×2 · còn 10/10</small></button>
+                    <button type="button" data-bot-difficulty="easy" aria-pressed="true">Dễ <small data-bot-base="100 điểm · 0,2 kg · +1 EXP">100 điểm · 0,2 kg · +1 EXP · còn 5/5</small></button>
+                    <button type="button" data-bot-difficulty="medium" aria-pressed="false">Trung bình <small data-bot-base="108 điểm · 0,3 kg · +1 EXP">108 điểm · 0,3 kg · +1 EXP · còn 5/5</small></button>
+                    <button type="button" data-bot-difficulty="hard" aria-pressed="false">Khó <small data-bot-base="120 điểm · 0,4 kg · +1 EXP">120 điểm · 0,4 kg · +1 EXP · còn 5/5</small></button>
                 </div>
             </div>
         </div>
@@ -2325,6 +2325,7 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
             <div id="petBattleAllocation" class="pet-battle-allocation">
                 <div><strong id="petBattleUsed"></strong><span id="petBattleRemaining" role="status"></span></div>
                 <progress id="petBattleAllocationMeter" aria-label="Điểm chỉ số đã phân bổ" max="100" value="100"></progress>
+                <strong id="petBattleDraftPower" aria-live="polite"></strong>
             </div>
             <div class="pet-battle-actions"><button type="button" id="petBattleBotStart" hidden>Sẵn sàng</button><button type="button" id="petBattleAccept" hidden>Chấp nhận &amp; giữ kg cược</button><button type="button" id="petBattleReject" hidden>Từ chối</button></div>
         </section>
@@ -2347,9 +2348,9 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
     </dialog>
     <dialog id="petCompareDialog" class="pet-compare-dialog" aria-labelledby="petCompareTitle">
         <header><div><small>ĐẤU TRƯỜNG THÚ CƯNG</small><h5 id="petCompareTitle">Xếp hạng</h5></div><button type="button" id="petCompareClose" aria-label="Đóng">✕</button></header>
-        <p class="pet-compare-description">Xếp theo cấp từ cao đến thấp. Cùng cấp thì thú cưng nặng hơn xếp trước. Chỉ hiện thành viên đã điểm danh hoặc cho ăn trong 7 ngày gần nhất. Thú đã chết hiện cuối và không có hạng.</p>
-        <div class="pet-compare-toolbar"><p id="petCompareSummary" role="status"></p><label for="petCompareBranch">Nhánh <select id="petCompareBranch"><option value="all">Tất cả</option><option value="base">Chưa chọn nhánh</option></select></label></div>
-        <div class="pet-compare-scroll"><table class="pet-compare-table"><thead><tr><th>Hạng</th><th>Thành viên</th><th>Thú cưng</th><th>Cấp / Nhánh / EXP</th><th>Cân nặng</th><th>Lịch sử thách đấu</th><th>Trạng thái</th></tr></thead><tbody id="petCompareRows"></tbody></table></div>
+        <p id="petCompareDescription" class="pet-compare-description">Chọn xếp hạng theo cấp hoặc lực chiến. Lực chiến tính theo chỉ số chiến đấu đã chọn gần nhất; thú chưa từng đấu dùng chỉ số phân bổ đều. Chỉ hiện thành viên đã điểm danh hoặc cho ăn trong 7 ngày gần nhất. Thú đã chết hiện cuối và không có hạng.</p>
+        <div class="pet-compare-toolbar"><p id="petCompareSummary" role="status"></p><label for="petCompareMode">Xếp hạng theo <select id="petCompareMode"><option value="level">Cấp</option><option value="power">Lực chiến</option></select></label><label for="petCompareBranch">Nhánh <select id="petCompareBranch"><option value="all">Tất cả</option><option value="base">Chưa chọn nhánh</option></select></label></div>
+        <div class="pet-compare-scroll"><table class="pet-compare-table"><thead><tr><th>Hạng</th><th>Thành viên</th><th>Thú cưng</th><th>Cấp / Nhánh / EXP</th><th>Lực chiến</th><th>Cân nặng</th><th>Lịch sử thách đấu</th><th>Trạng thái</th></tr></thead><tbody id="petCompareRows"></tbody></table></div>
         <p id="petCompareEmpty" class="pet-compare-empty" hidden>Chưa có thú cưng hoạt động trong khoảng thời gian này.</p>
         <div class="pet-battle-actions">
             <button type="button" id="petCompareMore" class="btn btn-outline-primary" hidden>Xem thêm</button>

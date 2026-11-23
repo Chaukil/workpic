@@ -545,7 +545,7 @@ function attendancePetActivityTime(raw,now=Date.now()){
     const times=attendance.concat(records.flatMap(p=>[Number(p.lastFedAt)||0,/^\d{4}-\d{2}-\d{2}$/.test(p.fedOn||'')?Date.parse(p.fedOn+'T00:00:00+07:00'):0]));
     return Math.max(0,...times.filter(time=>Number.isFinite(time)&&time>0&&time<=now));
 }
-function buildPetComparison(profiles,now=Date.now(),branch='all'){
+function buildPetComparison(profiles,now=Date.now(),branch='all',mode='level'){
     const canonical=new Map(),rows=[];
     for(const profile of [...profiles].sort((a,b)=>String(a.id||'').localeCompare(String(b.id||'')))){
         if(profile.uid&&!canonical.has(profile.uid))canonical.set(profile.uid,profile);
@@ -557,15 +557,24 @@ function buildPetComparison(profiles,now=Date.now(),branch='all'){
         for(const pet of attendancePetRecords(profile.attendancePet,now)){
             const view=attendancePetView(pet,now),key=view.branch||'base';
             if(branch!=='all'&&key!==branch)continue;
+            const budget=petBattleBudget(view.level),saved=profile.petBattleStatsByPet?.[pet.id];
+            const battleStats=Object.fromEntries(['attack','magic','defense','magicReduction','physicalReduction','dodge','luck','health']
+                .map(stat=>[stat,Number.isInteger(saved?.[stat])&&saved[stat]>=1?saved[stat]:1]));
+            if(Object.values(battleStats).reduce((sum,value)=>sum+value,0)!==budget){
+                const base=Math.floor(budget/8),remainder=budget%8;
+                Object.keys(battleStats).forEach((stat,index)=>battleStats[stat]=base+(index<remainder?1:0));
+            }
             rows.push({uid:profile.uid,ownerName:profile.displayName||String(profile.email||'').split('@')[0]||profile.uid,
                 petId:pet.id,petName:view.displayName,species:view.name,level:view.level,branchKey:key,branchName:view.branch?ATTENDANCE_PET_BRANCHES[view.branch].name:'Chưa chọn nhánh',
                 xpToNextLevel:view.maxed?0:Math.max(0,view.level*10-view.xp),maxed:view.maxed,
-                weightGrams:view.weightGrams,lastActiveAt:activity,dead:view.dead,egg:view.egg,
+                weightGrams:view.weightGrams,battlePower:petBattlePower(battleStats),lastActiveAt:activity,dead:view.dead,egg:view.egg,
                 battleHistory:Array.isArray(pet.battleHistory)?pet.battleHistory:[],
                 appearance:{form:view.form,level:view.level,branch:view.branch,egg:view.egg,dead:view.dead}});
         }
     }
-    rows.sort((a,b)=>Number(a.dead)-Number(b.dead)||b.level-a.level||b.weightGrams-a.weightGrams||a.ownerName.localeCompare(b.ownerName,'vi')||a.petId.localeCompare(b.petId));
+    rows.sort((a,b)=>Number(a.dead)-Number(b.dead)||(mode==='power'?b.battlePower-a.battlePower:b.level-a.level)||
+        (mode==='power'?b.level-a.level:b.weightGrams-a.weightGrams)||b.weightGrams-a.weightGrams||
+        a.ownerName.localeCompare(b.ownerName,'vi')||a.petId.localeCompare(b.petId));
     let rank=0;return rows.map(row=>({...row,rank:row.dead?null:++rank}));
 }
 
@@ -617,6 +626,11 @@ function petBattleEffectiveStats(player,opponent){
 }
 function petBattleNumber(value){return Number(value.toFixed(2));}
 function petBattleMaxHp(stats){return petBattleNumber(100+stats.health*8);}
+function petBattlePower(stats){
+    return 2*((Number(stats.attack)||0)+(Number(stats.magic)||0)+(Number(stats.defense)||0)+
+        (Number(stats.magicReduction)||0)+(Number(stats.physicalReduction)||0))+
+        4*((Number(stats.dodge)||0)+(Number(stats.luck)||0))+8*(Number(stats.health)||0);
+}
 function petBattleBudget(level,legacy=false){
     const validLevel=Math.max(1,Math.min(ATTENDANCE_PET_MAX_LEVEL,Math.floor(Number(level)||1)));
     return 100+validLevel-1+(legacy?0:Math.max(0,validLevel-9));
@@ -698,7 +712,7 @@ function petBattleSettleXp(root,petId,delta,now){
     return {pet:transitionPetHousehold(updated,'init',now).pet,change};
 }
 function makePetBattleBot(level,difficulty='easy'){
-    const levels={easy:{label:'Dễ',budget:100,rewardMultiplier:1},medium:{label:'Trung bình',budget:108,rewardMultiplier:1},hard:{label:'Khó',budget:120,rewardMultiplier:2}};
+    const levels={easy:{label:'Dễ',budget:100,stakeGrams:200},medium:{label:'Trung bình',budget:108,stakeGrams:300},hard:{label:'Khó',budget:120,stakeGrams:400}};
     const config=levels[difficulty]||levels.easy;
     const botLevel=config.budget===100?1:config.budget===108?9:15;
     const branch=Object.keys(ATTENDANCE_PET_BRANCHES)[Math.floor(Math.random()*4)];
@@ -706,7 +720,7 @@ function makePetBattleBot(level,difficulty='easy'){
     const keys=Object.keys(stats);
     for(let i=keys.length;i<config.budget;i++)stats[keys[Math.floor(Math.random()*keys.length)]]++;
     const form=attendancePetCatalog(branch)[botLevel-1],elements=[...PET_BATTLE_ELEMENTS.keys()];
-    return {uid:'workpic-bot',name:`Bot ${config.label}`,petName:form.name,budgetVersion:2,statBudget:config.budget,difficulty,rewardMultiplier:config.rewardMultiplier,stats,
+    return {uid:'workpic-bot',name:`Bot ${config.label}`,petName:form.name,budgetVersion:2,statBudget:config.budget,difficulty,stakeGrams:config.stakeGrams,stakeXp:1,rewardMultiplier:1,stats,
         element:elements[Math.floor(Math.random()*elements.length)],
         appearance:{form,level:botLevel,branch:botLevel>9?branch:null,dead:false,egg:false}};
 }
@@ -9590,6 +9604,7 @@ let attendancePetData = null;
 let selectedAttendancePetId=null;
 function selectedAttendancePetView(){return attendancePetView(attendancePetSelected(attendancePetData,selectedAttendancePetId));}
 const petWeightLabel=grams=>new Intl.NumberFormat('vi-VN',{minimumFractionDigits:1,maximumFractionDigits:1}).format(grams/1000)+' kg';
+const petPowerLabel=value=>new Intl.NumberFormat('vi-VN').format(value);
 let petComparisonCache=null;
 const petRankingByBranch=new Map(),petHistoryById=new Map();
 let petRankingSourceCache=null;
@@ -9599,7 +9614,8 @@ function stopPetRankingListeners(){
     for(const unsubscribe of petRankingUnsubscribes.values())unsubscribe();
     petRankingUnsubscribes.clear();
 }
-function syncPetRankingListeners(branch,page){
+function petRankingKey(branch,mode){return `${branch}:${mode}`;}
+function syncPetRankingListeners(branch,mode,page){
     if(PET_CLOUD_ENABLED||!document.getElementById('petCompareDialog')?.open||!petRankingSourceCache)return;
     const profiles=petRankingSourceCache.profiles;
     const visible=page.rows.slice(0,20);
@@ -9619,15 +9635,14 @@ function syncPetRankingListeners(branch,page){
             if(index<0)return;
             if(snapshot.exists())petRankingSourceCache.profiles[index]={id,ref:snapshot.ref,...snapshot.data()};
             else petRankingSourceCache.profiles.splice(index,1);
-            const updated=buildPetComparison(petRankingSourceCache.profiles)
-                .filter(row=>branch==='all'||row.branchKey===branch);
-            const current=petRankingByBranch.get(branch);
+            const updated=buildPetComparison(petRankingSourceCache.profiles,Date.now(),branch,mode);
+            const current=petRankingByBranch.get(petRankingKey(branch,mode));
             if(!current)return;
             current.rows=updated.slice(0,current.rows.length);
             current.nextOffset=current.rows.length<updated.length?current.rows.length:null;
             current.expiresAt=Infinity;
             renderPetComparison(true);
-            syncPetRankingListeners(branch,current);
+            syncPetRankingListeners(branch,mode,current);
         },error=>{
             if(petRankingUnsubscribes.get(id)!==unsubscribe)return;
             petRankingUnsubscribes.delete(id);
@@ -9640,39 +9655,40 @@ async function loadPetRanking(more=false){
     const dialog=document.getElementById('petCompareDialog');
     if(!currentUser||!dialog.open)return;
     const branch=document.getElementById('petCompareBranch').value;
-    let page=petRankingByBranch.get(branch);
+    const mode=document.getElementById('petCompareMode').value,key=petRankingKey(branch,mode);
+    let page=petRankingByBranch.get(key);
     if(page?.loading||more&&page?.nextOffset==null||!more&&page?.expiresAt>Date.now()){
         renderPetComparison(true);
-        if(page&&!page.loading)syncPetRankingListeners(branch,page);
+        if(page&&!page.loading)syncPetRankingListeners(branch,mode,page);
         return;
     }
     page={rows:page?.rows||[],nextOffset:page?.nextOffset??null,loading:true};
-    petRankingByBranch.set(branch,page);
+    petRankingByBranch.set(key,page);
     renderPetComparison(true);
     try{
         let result;
-        if(PET_CLOUD_ENABLED)result=await petCloudRequest('ranking',{branch,offset:more?page.nextOffset:0});
+        if(PET_CLOUD_ENABLED)result=await petCloudRequest('ranking',{branch,mode,offset:more?page.nextOffset:0});
         else{
             if(!petRankingSourceCache||petRankingSourceCache.expiresAt<=Date.now()){
                 const snapshot=await getDocs(collection(db,'users'));
                 const profiles=snapshot.docs.map(doc=>({id:doc.id,ref:doc.ref,...doc.data()}));
-                petRankingSourceCache={profiles,rows:buildPetComparison(profiles),expiresAt:Date.now()+60000};
+                petRankingSourceCache={profiles,expiresAt:Date.now()+60000};
             }
-            const rows=petRankingSourceCache.rows.filter(row=>branch==='all'||row.branchKey===branch);
+            const rows=buildPetComparison(petRankingSourceCache.profiles,Date.now(),branch,mode);
             const offset=more?page.nextOffset:0;
             result={rows:rows.slice(offset,offset+20),nextOffset:offset+20<rows.length?offset+20:null};
         }
-        if(petRankingByBranch.get(branch)!==page)return;
+        if(petRankingByBranch.get(key)!==page)return;
         const rows=more?[...page.rows,...result.rows]:result.rows;
         page.rows=[...new Map(rows.map(row=>[JSON.stringify([row.uid,row.petId]),row])).values()];
         page.nextOffset=result.nextOffset;page.expiresAt=Date.now()+60000;
     }catch(error){
-        if(petRankingByBranch.get(branch)===page)page.error=petQuotaErrorText(error)||error.message;
+        if(petRankingByBranch.get(key)===page)page.error=petQuotaErrorText(error)||error.message;
     }finally{
         page.loading=false;
-        if(petRankingByBranch.get(branch)===page&&document.getElementById('petCompareBranch').value===branch){
+        if(petRankingByBranch.get(key)===page&&document.getElementById('petCompareBranch').value===branch&&document.getElementById('petCompareMode').value===mode){
             renderPetComparison(true);
-            syncPetRankingListeners(branch,page);
+            syncPetRankingListeners(branch,mode,page);
         }
     }
 }
@@ -9718,12 +9734,15 @@ function petComparisonThumbnail(view){
 }
 function renderPetComparison(force=false){
     const dialog=document.getElementById('petCompareDialog');if(!dialog?.open||!currentUser)return;
-    const filter=document.getElementById('petCompareBranch').value,minute=Math.floor(Date.now()/60000);
+    const filter=document.getElementById('petCompareBranch').value,mode=document.getElementById('petCompareMode').value,minute=Math.floor(Date.now()/60000);
     const cached=petComparisonCache;
-    const page=petRankingByBranch.get(filter);
-    if(!force&&cached&&cached.filter===filter&&cached.page===page)return;
-    petComparisonCache={directory:usersDirectorySnapshot,pet:attendancePetData,filter,minute,page};
+    const page=petRankingByBranch.get(petRankingKey(filter,mode));
+    if(!force&&cached&&cached.filter===filter&&cached.mode===mode&&cached.page===page)return;
+    petComparisonCache={directory:usersDirectorySnapshot,pet:attendancePetData,filter,mode,minute,page};
     let rows=page?.rows||[];
+    document.getElementById('petCompareDescription').textContent=mode==='power'
+        ?'Xếp theo lực chiến từ cao đến thấp. Công thức: 2×(công vật lý + phép + thủ + kháng vật lý + kháng phép) + 4×(né + chí mạng) + 8×máu. Dùng chỉ số đã chọn gần nhất; thú chưa từng đấu dùng chỉ số phân bổ đều. Chỉ hiện thành viên đã điểm danh hoặc cho ăn trong 7 ngày gần nhất. Thú đã chết hiện cuối và không có hạng.'
+        :'Xếp theo cấp từ cao đến thấp. Cùng cấp thì thú cưng nặng hơn xếp trước. Chỉ hiện thành viên đã điểm danh hoặc cho ăn trong 7 ngày gần nhất. Thú đã chết hiện cuối và không có hạng.';
     const body=document.getElementById('petCompareRows');
     body.replaceChildren(...rows.map(row=>{
         const tr=document.createElement('tr');if(row.uid===currentUser.uid)tr.classList.add('is-me');if(row.dead)tr.classList.add('is-dead');
@@ -9747,6 +9766,7 @@ function renderPetComparison(force=false){
         xp.textContent=row.egg?'Đợi trứng nở':row.maxed?'Cấp tối đa'
             :`${10-row.xpToNextLevel}/10 EXP · ${row.xpToNextLevel?`Còn ${row.xpToNextLevel} EXP`:'Chọn nhánh để lên cấp'}`;
         level.appendChild(xp);
+        cell(petPowerLabel(row.battlePower)).className='pet-compare-power';
         cell(petWeightLabel(row.weightGrams)).className='pet-compare-weight';
         const history=document.createElement('button');
         history.type='button';history.className='btn btn-outline-primary pet-compare-history-button';history.textContent='Xem lịch sử';
@@ -10337,6 +10357,7 @@ function initAttendancePetUi() {
     }});
     comparison.addEventListener('click',event=>{if(event.target===comparison)comparison.close();});
     document.getElementById('petCompareBranch').addEventListener('change',()=>loadPetRanking());
+    document.getElementById('petCompareMode').addEventListener('change',()=>loadPetRanking());
     document.getElementById('petCompareMore').addEventListener('click',()=>loadPetRanking(true));
     document.getElementById('petCompareRetry').addEventListener('click',()=>loadPetRanking());
     const branchDialog=document.getElementById('attendancePetBranchDialog');
@@ -10380,7 +10401,7 @@ const PetBattleGame=(()=>{
     const state={uid:null,own:null,matches:new Map(),subs:new Map(),failedSubs:new Set(),active:'',busy:false,message:'',cooldown:0,autoOpened:new Set(),inviteSnoozedUntil:new Map(),models:[],lastTurn:'',setupKey:'',listKey:'',lastSync:0,timer:null};
     const el=id=>document.getElementById(id),mine=()=>currentUser&&state.uid===currentUser.uid;
     const ownRef=()=>attendancePetRef||authenticatedProfileSnapshot?.ref;
-    const BOT_DAILY_LIMIT=10;
+    const BOT_DAILY_LIMIT=5;
     function botDailyUsage(profile=state.own,day=todayKey()){
         const saved=profile?.petBotDailyBattles;
         const current=saved?.day===day?saved:{};
@@ -10402,7 +10423,7 @@ const PetBattleGame=(()=>{
             button.setAttribute('aria-pressed',String(button.dataset.botDifficulty===selected));
             const small=button.querySelector('small');
             small.textContent=`${small.dataset.botBase} · còn ${remaining}/${BOT_DAILY_LIMIT}`;
-            button.title=remaining?`Còn ${remaining} trận hôm nay`:'Đã dùng đủ 10 trận hôm nay';
+            button.title=remaining?`Còn ${remaining} trận hôm nay`:'Đã dùng đủ 5 trận hôm nay';
         });
     }
     const profileRows=()=>state.opponentProfiles||[...(usersDirectorySnapshot?.docs||[])].map(d=>({id:d.id,...d.data()}));
@@ -10437,7 +10458,7 @@ const PetBattleGame=(()=>{
             }
             state.botModel.update(state.bot.appearance);
             setElementAura(el('petBattleBotModel'),state.bot.element);
-            el('petBattleBotName').textContent=`${state.bot.name} · ${state.bot.petName} · Cấp ${state.bot.appearance.level} · ${state.bot.statBudget} điểm`;
+            el('petBattleBotName').textContent=`${state.bot.name} · ${state.bot.petName} · Cấp ${state.bot.appearance.level} · ${state.bot.statBudget} điểm · Lực chiến ${petPowerLabel(petBattlePower(state.bot.stats))}`;
             renderBotBattleLimits();
             const host={petName:view.displayName,stats:draftStats(),element:el('petBattleElement').value};
             renderStatComparison([host,state.bot],[petBattleEffectiveStats(host,state.bot),petBattleEffectiveStats(state.bot,host)]);
@@ -10581,6 +10602,7 @@ const PetBattleGame=(()=>{
         el('petBattleAllocation').dataset.state=remaining===0?'complete':remaining>0?'short':'over';
         el('petBattleRemaining').classList.toggle('invalid',remaining!==0);
         const meter=el('petBattleAllocationMeter');meter.max=budget;meter.value=Math.min(used,budget);
+        el('petBattleDraftPower').textContent=`${remaining===0?'Lực chiến':'Lực chiến tạm tính'}: ${petPowerLabel(petBattlePower(stats))}`;
         Object.entries(statInputs).forEach(([key,id])=>{
             el(id).previousElementSibling.textContent=stats[key];
         });
@@ -10670,6 +10692,7 @@ const PetBattleGame=(()=>{
                     if(!payload.opponentUid||payload.opponentUid===uid)throw new Error('Chọn một đối thủ khác.');
                     const stake=payload.stakeGrams;if(!Number.isSafeInteger(stake)||stake<100||stake%100!==0)throw new Error('Cược tối thiểu 0,1 kg, theo bước 0,1 kg.');
                     const fighter=petBattleFighter(user,ref.id,payload.petId,payload.stats,now,payload.element);
+                    patch.petBattleStatsByPet={...(user.petBattleStatsByPet||{}),[fighter.petId]:fighter.stats};
                     patch.attendancePet=petBattleChangeWeight(user.attendancePet,fighter.petId,-stake,now);
                     locks[id]={petId:fighter.petId,stakeGrams:stake,peerUid:payload.opponentUid,role:'challenger',createdAt:now,expiresAt:now+600000};patch.petBattleLocks=locks;
                     next={version:1,challengerUid:uid,opponentUid:payload.opponentUid,participantUids:[uid,payload.opponentUid],players:[fighter],stakeGrams:stake,status:'invited',createdMs:now,createdAt:serverTimestamp(),expiresAt:now+600000,rpsRound:0,commits:{},reveals:{},claims:{},turns:[],maxHp:[],winnerUid:null,startedAt:null};
@@ -10683,6 +10706,7 @@ const PetBattleGame=(()=>{
                         const challengerPet=challenger.exists()?attendancePetRecords(challenger.data().attendancePet,now).find(p=>p.id===next.players[0].petId):null;
                         if(!challengerPet||attendancePetView(challengerPet,now).dead||!challenger.data().petBattleLocks?.[id])throw new Error('Thú cưng đối thủ không còn sẵn sàng. Hãy từ chối lời mời.');
                         const fighter=petBattleFighter(user,ref.id,payload.petId,payload.stats,now,payload.element),stake=next.stakeGrams;
+                        patch.petBattleStatsByPet={...(user.petBattleStatsByPet||{}),[fighter.petId]:fighter.stats};
                         patch.attendancePet=petBattleChangeWeight(user.attendancePet,fighter.petId,-stake,now);
                         locks[id]={petId:fighter.petId,stakeGrams:stake,peerUid:next.challengerUid,role:'opponent',createdAt:now,expiresAt:now+600000};patch.petBattleLocks=locks;
                         next.players=[next.players[0],fighter];next.acceptedAt=serverTimestamp();
@@ -10783,9 +10807,9 @@ const PetBattleGame=(()=>{
         try{
             assertPetQuotaAvailable();
             let result;
-            if(PET_CLOUD_ENABLED)result=await petCloudRequest('bot',{...payload,action,id,difficulty:state.botDifficulty||'easy',stakeGrams:200});
+            if(PET_CLOUD_ENABLED)result=await petCloudRequest('bot',{...payload,action,id,difficulty:state.botDifficulty||'easy',stakeGrams:state.bot?.stakeGrams||200});
             else if(action==='start'){
-                const ref=ownRef(),stake=payload.stakeGrams,difficulty=state.botDifficulty||'easy';
+                const ref=ownRef(),stake=state.bot?.stakeGrams||payload.stakeGrams,difficulty=state.botDifficulty||'easy';
                 if(!ref||!Number.isSafeInteger(stake)||stake<100||stake%100)throw new Error('Cược tối thiểu 0,1 kg, theo bước 0,1 kg.');
                 if(!['easy','medium','hard'].includes(difficulty))throw new Error('Độ khó Bot không hợp lệ.');
                 const usageResult=await runTransaction(db,async transaction=>{
@@ -10799,16 +10823,18 @@ const PetBattleGame=(()=>{
                         throw new Error(`Đã dùng đủ ${BOT_DAILY_LIMIT} trận Bot ${label} hôm nay.`);
                     }
                     usage[difficulty]++;
-                    transaction.update(ref,{petBotDailyBattles:usage});
+                    const petBattleStatsByPet={...(profile.petBattleStatsByPet||{}),[player.petId]:player.stats};
+                    transaction.update(ref,{petBotDailyBattles:usage,petBattleStatsByPet});
                     return {profile,usage,player};
                 },{maxAttempts:2});
                 const player=usageResult.player;
                 const bot={...state.bot,uid:'workpic-bot'};
                 const players=[player,bot],firstUid=Math.random()<.5?uid:bot.uid,now=Date.now();
-                const match={id,bot:true,botDifficulty:difficulty,rewardMultiplier:bot.rewardMultiplier,
-                    participantUids:[uid],players,stakeGrams:stake,stakeXp:Math.floor(stake/200),status:'fighting',
+                const match={id,bot:true,botDifficulty:difficulty,rewardMultiplier:1,
+                    participantUids:[uid],players,stakeGrams:stake,stakeXp:1,status:'fighting',
                     createdMs:now,startedAt:now,firstUid,claims:{},...petBattleSimulation(players,firstUid)};
-                result={match,patch:{petBotDailyBattles:usageResult.usage}};
+                result={match,patch:{petBotDailyBattles:usageResult.usage,
+                    petBattleStatsByPet:{...(usageResult.profile.petBattleStatsByPet||{}),[player.petId]:player.stats}}};
             }else if(action==='claim'){
                 const ref=ownRef();
                 if(!ref)throw new Error('Chưa tải được hồ sơ.');
@@ -11018,8 +11044,8 @@ const PetBattleGame=(()=>{
         }else{
             el('petBattlePhase').textContent={invited:'Đang chờ đối thủ chấp nhận',rps:`Oẳn tù tì · Vòng ${m.rpsRound+1}`,fighting:play.finished?'Trận đấu đã kết thúc':play.count?`Lượt ${play.count}/${m.turns.length}`:'Chuẩn bị giao đấu…',finished:'Trận đấu đã kết thúc',cancelled:'Lời mời đã hủy',rejected:'Đối thủ đã từ chối',expired:'Hết thời gian'}[m.status];
         }
-        el('petBattlePot').textContent=m.bot&&m.rewardMultiplier===2
-            ?`Cược ${petWeightLabel(m.stakeGrams)} · Thắng nhận thêm ${petWeightLabel(m.stakeGrams*2)} và EXP ×2`
+        el('petBattlePot').textContent=m.bot
+            ?`Bot ${({easy:'Dễ',medium:'Trung bình',hard:'Khó'})[m.botDifficulty]||''} · Thắng +${petWeightLabel(m.stakeGrams)} và +1 EXP`
             :`Mỗi bên ${petWeightLabel(m.stakeGrams)} · Quỹ ${petWeightLabel(m.stakeGrams*2)}`;
         for(let i=0;i<2;i++){
             const p=m.players[i],guest=i===1?guestView:null;
@@ -11062,7 +11088,7 @@ const PetBattleGame=(()=>{
         const ended=m.status==='finished'||play.finished,closed=['cancelled','rejected','expired'].includes(m.status);
         const xpChange=m.xpChanges?.[state.uid];
         const xpResult=Number.isSafeInteger(xpChange)?` · ${xpChange>0?'+':xpChange<0?'−':''}${Math.abs(xpChange)} EXP`:'';
-        const resultWeight=m.bot&&m.rewardMultiplier===2&&m.winnerUid===state.uid?m.stakeGrams*2:m.stakeGrams;
+        const resultWeight=m.stakeGrams;
         el('petBattleResult').textContent=ended?(m.winnerUid?(m.winnerUid===state.uid?'Bạn thắng! +':'Bạn thua! −')+petWeightLabel(resultWeight)+xpResult:'Hòa trận: hoàn lại kg cược.')+(m.claims?.[state.uid]?' Đã cập nhật kết quả.':' Đang chờ cập nhật kết quả.'):(closed?'Hoàn lại kg đã giữ cho bên đặt cược.':'');
         if(ended){
             const winner=m.players.find(p=>p.uid===m.winnerUid);
@@ -11125,7 +11151,7 @@ const PetBattleGame=(()=>{
             else renderDraft();
         });
         Object.values(statInputs).forEach(id=>el(id).addEventListener('input',()=>{renderDraft();saveStatsDraft();}));
-        const payload=()=>({petId:el('petBattlePet').value,stats:draftStats(),element:el('petBattleElement').value,stakeGrams:state.botDraft?200:Math.round(Number(el('petBattleStake').value)*1000)});
+        const payload=()=>({petId:el('petBattlePet').value,stats:draftStats(),element:el('petBattleElement').value,stakeGrams:state.botDraft?(state.bot?.stakeGrams||200):Math.round(Number(el('petBattleStake').value)*1000)});
         el('petBattleOpponentList').addEventListener('click',event=>{
             const button=event.target.closest('[data-invite-uid]');
             if(!button||button.disabled)return;

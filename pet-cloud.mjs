@@ -13,12 +13,12 @@ const shared = source.split('// BEGIN SHARED HELPERS\n')[1].split('// END SHARED
 const helpers = await import('data:text/javascript;base64,' + Buffer.from(shared + `
     export { ATTENDANCE_PET_BRANCHES, attendancePetActivityTime, attendancePetRecords,
         attendancePetView, buildPetComparison, transitionPetHousehold, petBattleFighter,
-        petBattleChangeWeight, petBattleSimulation, petBattleTime,
+        petBattleChangeWeight, petBattlePower, petBattleBudget, petBattleSimulation, petBattleTime,
         petBattleSettleXp, petBattleCompletePet, makePetBattleBot, PET_BATTLE_STEP_MS };
 `).toString('base64'));
 const { ATTENDANCE_PET_BRANCHES, attendancePetActivityTime, attendancePetRecords,
     attendancePetView, buildPetComparison, transitionPetHousehold, petBattleFighter,
-    petBattleChangeWeight, petBattleSimulation, petBattleTime,
+    petBattleChangeWeight, petBattlePower, petBattleBudget, petBattleSimulation, petBattleTime,
     petBattleSettleXp, petBattleCompletePet, makePetBattleBot, PET_BATTLE_STEP_MS } = helpers;
 
 initializeApp();
@@ -31,6 +31,7 @@ const legacy = db.collection('users');
 const directory = db.collection('userDirectory');
 const week = 7 * 86400000;
 const pageSize = 20;
+const botDailyLimit = 5;
 let rankingCache;
 
 function requireId(value) {
@@ -209,7 +210,7 @@ async function battle(uid, data) {
             if (!owner || Object.keys(owner.petBattleLocks || {}).length >= 6) throw new HttpsError('failed-precondition', 'Hãy hoàn tất các trận đang giữ cược.');
             const player = petBattleFighter({ ...owner, displayName: owner.name }, uid, requireId(data.petId), data.stats, now, data.element);
             const pet = petBattleChangeWeight(owner.attendancePet, player.petId, -stake, now);
-            profilePatch = { ...activityPatch(pet, now), petBattleLocks: { ...owner.petBattleLocks,
+            profilePatch = { ...activityPatch(pet, now), petBattleStatsByPet:{...(owner.petBattleStatsByPet||{}),[player.petId]:player.stats}, petBattleLocks: { ...owner.petBattleLocks,
                 [id]: { petId: player.petId, stakeGrams: stake } } };
             match = { version: 1, roomFlow: true, challengerUid: uid, opponentUid, participantUids: [uid, opponentUid],
                 players: [player], stakeGrams: stake, stakeXp: Math.floor(stake / 200), status: 'invited', createdMs: now,
@@ -230,7 +231,7 @@ async function battle(uid, data) {
                     Object.keys(owner.petBattleLocks || {}).length >= 6) throw new HttpsError('failed-precondition', 'Thú cưng chưa sẵn sàng.');
                 const player = petBattleFighter({ ...owner, displayName: owner.name }, uid, requireId(data.petId), data.stats, now, data.element);
                 const pet = petBattleChangeWeight(owner.attendancePet, player.petId, -match.stakeGrams, now);
-                profilePatch = { ...activityPatch(pet, now), petBattleLocks: { ...owner.petBattleLocks,
+                profilePatch = { ...activityPatch(pet, now), petBattleStatsByPet:{...(owner.petBattleStatsByPet||{}),[player.petId]:player.stats}, petBattleLocks: { ...owner.petBattleLocks,
                     [id]: { petId: player.petId, stakeGrams: match.stakeGrams } } };
                 match = { ...match, players: [...match.players, player], status: 'ready', readyDeadline: now + 120000 };
             } else if (action === 'ready') {
@@ -262,25 +263,30 @@ async function battle(uid, data) {
 async function botBattle(uid, data) {
     if (data.action === 'start') {
         const difficulty = ['easy', 'medium', 'hard'].includes(data.difficulty) ? data.difficulty : 'easy';
-        const stake = 200;
         validateElement(data.element);
         const id = `bot-${randomUUID()}`, ref = profiles.doc(uid), matchRef = battles.doc(id);
-        const snapshot = await ref.get(), profile = snapshot.data(), now = Date.now();
-        if (!profile) throw new HttpsError('failed-precondition', 'Chưa mở hồ sơ thú cưng.');
-        if (Object.keys(profile.petBattleLocks || {}).length >= 6) {
-            throw new HttpsError('failed-precondition', 'Hãy hoàn tất các trận đang giữ cược.');
-        }
-        const player = petBattleFighter({ ...profile, displayName: profile.name }, uid,
-            requireId(data.petId), data.stats, now, data.element);
-        petBattleChangeWeight(profile.attendancePet, player.petId, -stake, now);
-        const bot = makePetBattleBot(player.appearance.level, difficulty);
-        const players = [player, { ...bot, uid: 'workpic-bot' }];
-        const firstUid = players[randomInt(2)].uid;
-        const match = { id, bot: true, botDifficulty: difficulty, rewardMultiplier: bot.rewardMultiplier,
-            participantUids: [uid], players, stakeGrams: stake, stakeXp: Math.floor(stake / 200),
-            status: 'fighting', createdMs: now, startedAt: now, firstUid, claims: {},
-            ...petBattleSimulation(players, firstUid) };
-        await matchRef.create(match);
+        let match;
+        await db.runTransaction(async tx => {
+            const snapshot = await tx.get(ref), profile = snapshot.data(), now = Date.now();
+            if (!profile) throw new HttpsError('failed-precondition', 'Chưa mở hồ sơ thú cưng.');
+            const day = new Date(now + 7 * 3600000).toISOString().slice(0, 10);
+            const stored = profile.petBotDailyBattles?.day === day ? profile.petBotDailyBattles : {};
+            const usage = {day,easy:Math.max(0,Number(stored.easy)||0),medium:Math.max(0,Number(stored.medium)||0),hard:Math.max(0,Number(stored.hard)||0)};
+            if (usage[difficulty] >= botDailyLimit) throw new HttpsError('failed-precondition', `Đã dùng đủ ${botDailyLimit} trận Bot hôm nay.`);
+            const player = petBattleFighter({ ...profile, displayName: profile.name }, uid,
+                requireId(data.petId), data.stats, now, data.element);
+            const bot = makePetBattleBot(player.appearance.level, difficulty),stake=bot.stakeGrams;
+            petBattleChangeWeight(profile.attendancePet, player.petId, -stake, now);
+            usage[difficulty]++;
+            const players = [player, { ...bot, uid: 'workpic-bot' }];
+            const firstUid = players[randomInt(2)].uid;
+            match = { id, bot: true, botDifficulty: difficulty, rewardMultiplier: 1,
+                participantUids: [uid], players, stakeGrams: stake, stakeXp: 1,
+                status: 'fighting', createdMs: now, startedAt: now, firstUid, claims: {},
+                ...petBattleSimulation(players, firstUid) };
+            tx.create(matchRef, match);
+            tx.update(ref,{petBotDailyBattles:usage,petBattleStatsByPet:{...(profile.petBattleStatsByPet||{}),[player.petId]:player.stats}});
+        }, { maxAttempts: 2 });
         const { turns, maxHp, winnerUid, ...publicMatch } = match;
         return { match: publicMatch, patch: {} };
     }
@@ -325,22 +331,24 @@ async function botBattle(uid, data) {
 
 async function ranking(data) {
     const branch = data.branch || 'all', offset = Number(data.offset || 0);
+    const mode=data.mode||'level';
     if (!Number.isSafeInteger(offset) || offset < 0 ||
-        (branch !== 'all' && branch !== 'base' && !Object.hasOwn(ATTENDANCE_PET_BRANCHES, branch))) {
+        (branch !== 'all' && branch !== 'base' && !Object.hasOwn(ATTENDANCE_PET_BRANCHES, branch)) ||
+        !['level','power'].includes(mode)) {
         throw new HttpsError('invalid-argument', 'Trang xếp hạng không hợp lệ.');
     }
     const now = Date.now();
     if (!rankingCache || now >= rankingCache.until) {
-        const pending = profiles.where('activityAt', '>', now - week).select('uid', 'name', 'attendancePet').get()
+        const pending = profiles.where('activityAt', '>', now - week).select('uid', 'name', 'attendancePet','petBattleStatsByPet').get()
             .then(snapshot => snapshot.docs.map(doc => {
-                const { uid, name, attendancePet } = doc.data();
-                return { id: doc.id, uid, displayName: name, attendancePet };
+                const { uid, name, attendancePet,petBattleStatsByPet } = doc.data();
+                return { id: doc.id, uid, displayName: name, attendancePet,petBattleStatsByPet };
             }));
         const cache = { until: now + 60000, pending };
         rankingCache = cache;
         pending.catch(() => { if (rankingCache === cache) rankingCache = undefined; });
     }
-    const rows = buildPetComparison(await rankingCache.pending, now, branch);
+    const rows = buildPetComparison(await rankingCache.pending, now, branch,mode);
     return { rows: rows.slice(offset, offset + pageSize).map(({ battleHistory, ...row }) => row),
         nextOffset: offset + pageSize < rows.length ? offset + pageSize : null };
 }
