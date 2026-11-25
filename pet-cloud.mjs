@@ -279,7 +279,7 @@ async function botBattle(uid, data) {
             petBattleChangeWeight(profile.attendancePet, player.petId, -stake, now);
             usage[difficulty]++;
             const players = [player, { ...bot, uid: 'workpic-bot' }];
-            const firstUid = players[randomInt(2)].uid;
+            const firstUid = uid;
             match = { id, bot: true, botDifficulty: difficulty, rewardMultiplier: 1,
                 participantUids: [uid], players, stakeGrams: stake, stakeXp: 1,
                 status: 'fighting', createdMs: now, startedAt: now, firstUid, claims: {},

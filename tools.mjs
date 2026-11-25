@@ -948,7 +948,7 @@ test('four evolution branches unlock at ray level and preserve progress through 
 
   assert.equal(attendancePetView({...change.pet,checkins:999},now).level,30);
   const switched=transitionAttendancePet({...change.pet,checkins:120},'branch:'+(branch==='bird'?'beast':'bird'),now);
-  assert.equal(switched.pet.checkins,120);assert.equal(attendancePetView(switched.pet,now).branchLevel,4);
+  assert.equal(switched.pet.checkins,120);assert.equal(switched.pet.branch,branch);assert.equal(switched.changed,false);
  }
  const moves=new Set();
  const common=attendancePetCatalog(null).map((form,index)=>({form,level:index+1}));

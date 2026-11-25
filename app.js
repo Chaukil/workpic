@@ -436,7 +436,7 @@ function transitionAttendancePet(raw, action, now = Date.now(), { ignoreFeedingC
     if (action.startsWith('branch:')) {
         const branch=action.slice(7);
         if(!Object.hasOwn(ATTENDANCE_PET_BRANCHES,branch))return {pet,changed:false,result:'invalid'};
-        if(!view.branchUnlocked)return {pet,changed:false,result:'branch-locked'};
+        if(!view.branchUnlocked||view.branch)return {pet,changed:false,result:'branch-locked'};
         if(branch===view.branch)return {pet,changed:false,result:'already-branch'};
         return {pet:{...pet,branch,updatedAt:now},changed:true,result:'branched'};
     }
@@ -720,7 +720,9 @@ function makePetBattleBot(level,difficulty='easy'){
     const levels={easy:{label:'Dễ',budget:100,stakeGrams:200},medium:{label:'Trung bình',budget:108,stakeGrams:300},hard:{label:'Khó',budget:120,stakeGrams:400}};
     const config=levels[difficulty]||levels.easy;
     const botLevel=config.budget===100?1:config.budget===108?9:15;
-    const branch=Object.keys(ATTENDANCE_PET_BRANCHES)[Math.floor(Math.random()*4)];
+    const branches=Object.keys(ATTENDANCE_PET_BRANCHES);
+    const seed=level+config.budget;
+    const branch=branches[seed%branches.length];
     const weights={attack:18,magic:18,defense:8,magicReduction:8,physicalReduction:8,dodge:10,luck:10,health:20};
     const stats=Object.fromEntries(Object.entries(weights).map(([key,weight])=>[key,Math.floor(config.budget*weight/100)]));
     let remaining=config.budget-Object.values(stats).reduce((sum,value)=>sum+value,0);
@@ -729,7 +731,7 @@ function makePetBattleBot(level,difficulty='easy'){
     }
     const form=attendancePetCatalog(branch)[botLevel-1],elements=[...PET_BATTLE_ELEMENTS.keys()];
     return {uid:'workpic-bot',name:`Bot ${config.label}`,petName:form.name,budgetVersion:2,statBudget:config.budget,difficulty,stakeGrams:config.stakeGrams,stakeXp:1,rewardMultiplier:1,stats,
-        element:elements[Math.floor(Math.random()*elements.length)],
+        element:elements[seed%elements.length],
         appearance:{form,level:botLevel,branch:botLevel>9?branch:null,dead:false,egg:false}};
 }
 function petBattleCompletePet(root,petId,match,uid,xpDelta,weightDelta,now){
@@ -9341,7 +9343,9 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
                 s.model.rotation.y=s.facingAngle+(reduced?0:Math.sin(s.t*.9)*(mode==='walk'?.06:.16));
                 s.model.rotation.z=alive?(reduced?0:Math.sin(s.t*1.3)*(mode==='walk'?.012:.035)):Math.PI*.75;
                 if(alive&&!reduced)s.rig.forEach(part=>{const pace=mode==='fly'?7:mode==='walk'?5:3.5;const intensity=mode==='walk'&&!walking&&!petDialogOpen?.08:1;part.mesh.rotation[part.axis]=(part.base||0)+Math.sin(s.t*pace+part.phase)*part.amount*intensity;});
-                const feeding=Math.max(0,1-(s.t-s.fedAt)/1.4);s.model.scale.setScalar(1+feeding*.07);if(s.mouth)s.mouth.scale.y=1+feeding*Math.abs(Math.sin(s.t*14));
+                const feeding=Math.max(0,1-(s.t-s.fedAt)/1.4);
+                s.model.scale.setScalar(Math.min(staged?1.25:1,attendancePetScale(s.view||{egg:true}))*(1+feeding*.07));
+                if(s.mouth)s.mouth.scale.y=1+feeding*Math.abs(Math.sin(s.t*14));
                 if(presentation==='arena'||s.previewAttack){
                     const pose=s.previewAttack||s.duel||{},attackAge=(Date.now()-(pose.attackAt||0))/1000,hitAge=(Date.now()-(pose.hitAt||0))/1000;
                     const lunge=attackAge>=0&&attackAge<.9?Math.sin(attackAge/.9*Math.PI):0,hurt=hitAge>=0&&hitAge<.5?(1-hitAge/.5):0;
@@ -9441,6 +9445,7 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
         if(s.renderer&&s.model){
             try{
                 s.model.rotation.y=.25;s.model.rotation.z=view.dead?Math.PI*.75:0;
+                s.model.scale.setScalar(Math.min(1.25,attendancePetScale(view)));
                 s.renderer.render(s.scene,s.camera);
                 const source=s.renderer.domElement.toDataURL('image/png');if(source.startsWith('data:image/png'))return source;
             }catch{}
@@ -9727,7 +9732,7 @@ function petComparisonThumbnail(view){
     if(petComparisonImagePending.has(key))return petComparisonImagePending.get(key);
     const generation=petComparisonImageGeneration;
     const task=petComparisonImageQueue.then(async()=>{
-        if(generation!==petComparisonImageGeneration||!document.getElementById('petCompareDialog')?.open)return null;
+        if(generation!==petComparisonImageGeneration||(!document.getElementById('petCompareDialog')?.open&&!document.getElementById('petGuideDialog')?.open))return null;
         if(!petComparisonImageWorker){
             const button=document.createElement('button'),art=document.createElement('span');button.id='petComparisonRenderWorker';button.type='button';button.hidden=true;button.setAttribute('aria-hidden','true');art.id='petComparisonRenderArt';button.appendChild(art);document.body.appendChild(button);
             const renderer=createAttendancePet3D(button.id,art.id,null);petComparisonImageWorker={button,renderer};renderer.start();
@@ -10095,16 +10100,16 @@ function renderAttendancePet() {
 
 function renderAttendancePetBranches(view){
     const panel=document.getElementById('attendancePetBranchPanel');panel.hidden=!view.branchUnlocked;
-    const launch=document.getElementById('attendancePetBranchOpen');launch.hidden=!view.branchUnlocked;
+    const launch=document.getElementById('attendancePetBranchOpen');launch.hidden=!view.needsBranch;
     launch.disabled=!attendancePetReady||attendancePetBusy||view.dead;
-    launch.textContent=view.branch?'Đổi nhánh tiến hóa':'Chọn nhánh tiến hóa';
+    launch.textContent='Chọn nhánh tiến hóa';
     const dialog=document.getElementById('attendancePetBranchDialog');
-    if((!view.branchUnlocked||view.dead)&&dialog.open)dialog.close();
-    document.getElementById('attendancePetBranchHint').textContent=view.branch?`Nhánh ${ATTENDANCE_PET_BRANCHES[view.branch].name} · Bậc ${view.branchLevel}/${ATTENDANCE_PET_BRANCHES[view.branch].forms.length}. Đổi nhánh vẫn giữ số ngày điểm danh.`:'Từ cá đuối cấp 9, chọn 1 trong 4 nhánh. Mỗi nhánh tiến hóa từ cấp 10 đến cấp 30.';
+    if((!view.needsBranch||view.dead)&&dialog.open)dialog.close();
+    document.getElementById('attendancePetBranchHint').textContent='Từ cấp 9, mỗi thú cưng được chọn một nhánh duy nhất. Thú cưng khác có thể chọn nhánh riêng.';
     panel.querySelectorAll('[data-pet-branch]').forEach(button=>{
         const selected=button.dataset.petBranch===view.branch;
         button.classList.toggle('is-selected',selected);button.setAttribute('aria-pressed',String(selected));
-        button.disabled=!attendancePetReady||attendancePetBusy||view.dead||selected;
+        button.disabled=!attendancePetReady||attendancePetBusy||view.dead||!!view.branch;
     });
     const road=document.getElementById('attendancePetRoad'),key=`${view.branch}:${view.level}`;
     if(road.dataset.path!==key){
@@ -10112,14 +10117,14 @@ function renderAttendancePetBranches(view){
         const shared=attendancePetCatalog(null);
         const sharedNodes=[{name:'Trứng'},...shared].map((form,level)=>`
             <li class="pet-road-node${level===view.level?' is-current':''}" ${level===view.level?'aria-current="step"':''}>
-                <small>${level?`Cấp ${level}`:'Nở sau 1 giờ'}</small><strong>${form.name}</strong>
+                <img data-road-level="${level}" alt="" hidden><small>${level?`Cấp ${level}`:'Nở sau 1 giờ'}</small><strong>${form.name}</strong>
             </li>`).join('');
         const branches=Object.entries(ATTENDANCE_PET_BRANCHES).map(([branchKey,branch])=>{
-            const steps=branch.forms.filter(form=>!form.juvenile).map((form,index)=>{
-                const firstLevel=shared.length+1+index*2,lastLevel=Math.min(ATTENDANCE_PET_MAX_LEVEL,firstLevel+1);
+            const steps=branch.forms.map((form,index)=>{
+                const firstLevel=shared.length+1+index,lastLevel=firstLevel;
                 const current=branchKey===view.branch&&view.level>=firstLevel&&view.level<=lastLevel;
                 return `<li class="pet-road-node${current?' is-current':''}" ${current?'aria-current="step"':''}>
-                    <small>Cấp ${firstLevel}${lastLevel!==firstLevel?`–${lastLevel}`:''}</small><strong>${form.name}</strong>
+                    <img data-road-level="${firstLevel}" alt="" hidden><small>Cấp ${firstLevel}${lastLevel!==firstLevel?`–${lastLevel}`:''}</small><strong>${form.name}</strong>
                 </li>`;
             }).join('');
             return `<section class="pet-road-branch" data-branch="${branchKey}" aria-labelledby="pet-road-${branchKey}">
@@ -10334,8 +10339,17 @@ function initAttendancePetUi() {
         balance.hidden=button.closest('dialog')?.id!=='petBattleDialog'||document.getElementById('petBattleSetup').hidden||!balance.textContent;
         guide.scrollTop=0;
         if(!guide.open)guide.showModal();
+        if(!battle)for(const image of guide.querySelectorAll('[data-road-level]')){
+            if(!image.hidden)continue;
+            const level=Number(image.dataset.roadLevel),branch=image.closest('[data-branch]')?.dataset.branch||null;
+            const form=attendancePetCatalog(branch)[Math.max(0,level-1)];
+            petComparisonThumbnail({form,branch,level,egg:level===0,dead:false}).then(source=>{
+                if(source&&image.isConnected){image.src=source;image.hidden=false;}
+            });
+        }
     }));
     document.getElementById('petGuideClose').addEventListener('click',()=>guide.close());
+    guide.addEventListener('close',()=>{if(!document.getElementById('petCompareDialog')?.open)stopPetComparisonThumbnails();});
     toggle.addEventListener('click',()=>{renderAttendancePet();if(!dialog.open)dialog.showModal();AttendancePet3D.preview(true);openAttendancePetBranch(true);});
     const petPreview=document.getElementById('attendancePetPreview');
     petPreview.addEventListener('click',previewAttendancePetSkill);
@@ -10431,7 +10445,7 @@ const PetBattleGame=(()=>{
             button.setAttribute('aria-disabled',String(button.disabled));
             button.setAttribute('aria-pressed',String(button.dataset.botDifficulty===selected));
             const small=button.querySelector('small');
-            small.textContent=`${small.dataset.botBase} · còn ${remaining}/${BOT_DAILY_LIMIT}`;
+            small.textContent=`${small.dataset.botBase} · ${BOT_DAILY_LIMIT-remaining}/${BOT_DAILY_LIMIT} lượt đã dùng`;
             button.title=remaining?`Còn ${remaining} trận hôm nay`:'Đã dùng đủ 5 trận hôm nay';
         });
     }
@@ -10839,7 +10853,7 @@ const PetBattleGame=(()=>{
                 },{maxAttempts:2});
                 const player=usageResult.player;
                 const bot={...state.bot,uid:'workpic-bot'};
-                const players=[player,bot],firstUid=Math.random()<.5?uid:bot.uid,now=Date.now();
+                const players=[player,bot],firstUid=uid,now=Date.now();
                 const match={id,bot:true,botDifficulty:difficulty,rewardMultiplier:1,
                     participantUids:[uid],players,stakeGrams:stake,stakeXp:1,status:'fighting',
                     createdMs:now,startedAt:now,firstUid,claims:{},...petBattleSimulation(players,firstUid)};
