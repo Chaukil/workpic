@@ -805,7 +805,7 @@ function jobColorStyle(job) {
 
 // Firebase Configuration - Chỉ sử dụng Firestore
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, where, writeBatch, runTransaction, orderBy, limit, serverTimestamp }
+import { getFirestore, collection, addDoc, setDoc, updateDoc, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, where, writeBatch, runTransaction, orderBy, limit, limitToLast, serverTimestamp }
     from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, EmailAuthProvider, reauthenticateWithCredential, updatePassword }
     from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
@@ -10559,10 +10559,13 @@ const PetBattleGame=(()=>{
         if(state.inviteUnsubscribe||state.inviteFailed||Date.now()<state.cooldown)return;
         try{assertPetQuotaAvailable();}catch{return;}
         const uid=state.uid;
-        const invitations=query(collection(db,PET_CLOUD_ENABLED?'petCloudBattles':'petBattles'),where('opponentUid','==',uid),limit(50));
+        const rooms=collection(db,PET_CLOUD_ENABLED?'petCloudBattles':'petBattles');
+        const invitations=PET_CLOUD_ENABLED
+            ?query(rooms,where('opponentUid','==',uid),limit(50))
+            :query(rooms,where('participantUids','array-contains',uid),orderBy('__name__'),limitToLast(50));
         state.inviteUnsubscribe=onSnapshot(invitations,snapshot=>{
             if(!mine()||state.uid!==uid)return;
-            const invited=snapshot.docs.filter(doc=>doc.data().status==='invited'&&doc.data().expiresAt>Date.now());
+            const invited=snapshot.docs.filter(doc=>{const room=doc.data();return room.opponentUid===uid&&room.status==='invited'&&room.expiresAt>Date.now();});
             const next=new Set(invited.map(doc=>doc.id));
             for(const id of state.invites)if(!next.has(id)&&!state.subs.has(id)&&state.matches.get(id)?.status==='invited')state.matches.delete(id);
             for(const doc of invited){
@@ -10724,7 +10727,11 @@ const PetBattleGame=(()=>{
         if(!mine()||state.busy)return;const uid=state.uid,ref=ownRef();if(!ref){fail(new Error('Chưa tải được hồ sơ.'));return;}
         const known=state.matches.get(targetId);
         if(action==='create'&&payload.configureLater&&!PET_CLOUD_ENABLED){
-            payload={...payload,element:undefined,stats:Object.fromEntries(Object.keys(statInputs).map(key=>[key,1]))};
+            const pet=attendancePetSelected(attendancePetData,payload.petId);
+            const budget=petBattleBudget(attendancePetView(pet).level);
+            const keys=Object.keys(statInputs);
+            const stats=Object.fromEntries(keys.map((key,index)=>[key,Math.floor(budget/keys.length)+(index<budget%keys.length?1:0)]));
+            payload={...payload,element:PET_BATTLE_ELEMENTS.keys().next().value,stats};
         }
         if(action==='ready'&&known?.ready?.[uid]||action==='claim'&&known?.claims?.[uid])return;
         if(action==='create'||action==='accept'){
@@ -10763,7 +10770,6 @@ const PetBattleGame=(()=>{
                     next={version:1,challengerUid:uid,opponentUid:payload.opponentUid,participantUids:[uid,payload.opponentUid],players:[fighter],stakeGrams:stake,status:'invited',createdMs:now,createdAt:serverTimestamp(),expiresAt:now+600000,rpsRound:0,commits:{},reveals:{},claims:{},turns:[],maxHp:[],winnerUid:null,startedAt:null};
                     next.stakeXp=Math.floor(stake/200);
                     next.roomFlow=payload.roomFlow===true;
-                    if(payload.configureLater)next.configureLater=true;
                 }else{
                     if(!next||next.version!==1||!next.participantUids?.includes(uid))throw new Error('Không có quyền xem trận này.');next={...next};
                     if(action==='accept'){
@@ -10786,7 +10792,7 @@ const PetBattleGame=(()=>{
                         else{
                             if(next.status!=='ready'||now>=next.readyDeadline)throw new Error('Phòng đã hết thời gian sẵn sàng.');
                             const player=next.players.find(player=>player.uid===uid);
-                            if(payload.stats||(next.configureLater&&!player.element)){
+                            if(payload.stats){
                                 if(!PET_BATTLE_ELEMENTS.has(payload.element))throw new Error('Chọn bổ trợ trước khi sẵn sàng.');
                                 const stats=petBattleStats(payload.stats,player.appearance.level);
                                 next.players=next.players.map(item=>item.uid===uid?{...item,stats,element:payload.element}:item);
@@ -11077,7 +11083,7 @@ const PetBattleGame=(()=>{
         const m=match(),incoming=m?.status==='invited'&&m.opponentUid===state.uid&&m.expiresAt>Date.now();
         const draft=!m&&state.creating;
         if(!draft&&state.draftModel)stopDraftModel();
-        const configuring=m?.status==='ready'&&!m.ready?.[state.uid]&&!PET_CLOUD_ENABLED;
+        const configuring=!PET_CLOUD_ENABLED&&(m?.status==='ready'&&!m.ready?.[state.uid]||m?.status==='invited'&&m.challengerUid===state.uid);
         el('petBattleSetup').hidden=!draft&&!incoming&&!configuring;el('petBattleRoom').hidden=!m;el('petBattleAccept').hidden=!incoming;el('petBattleReject').hidden=!incoming;
         el('petBattleDraftSlots').hidden=!draft;
         el('petBattleAddOpponent').hidden=!!state.botDraft;
@@ -11269,6 +11275,7 @@ const PetBattleGame=(()=>{
             const previous=state.active;
             mutate('create',{...payload(),opponentUid:button.dataset.inviteUid,roomFlow:true,configureLater:!PET_CLOUD_ENABLED}).then(()=>{
                 if(state.active!==previous&&el('petBattleInvitePicker').open)el('petBattleInvitePicker').close();
+                else if(state.message){el('petBattleInviteHint').textContent=state.message;el('petBattleInviteHint').hidden=false;}
             });
         });
         el('petBattleBotStart').addEventListener('click',()=>mutateBot('start',{...payload(),difficulty:state.botDifficulty||'easy'}));
