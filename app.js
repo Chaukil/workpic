@@ -650,13 +650,15 @@ function petBattleEffectiveStats(player,opponent){
     return Object.fromEntries(Object.entries(player.stats).map(([key,value])=>[key,value*1.01]));
 }
 function petBattleNumber(value){return Number(value.toFixed(2));}
-function petBattleMaxHp(stats){return petBattleNumber(500+stats.health*9);}
-function petBattlePower(stats,appearance={}){
+function petBattleMaxHp(stats,appearance={}){
+    const bonus=appearance.level===ATTENDANCE_PET_MAX_LEVEL?2000:appearance.branch&&appearance.level>=9?500:0;
+    return petBattleNumber(500+stats.health*9+bonus);
+}
+function petBattlePower(stats){
     const base=6*((Number(stats.attack)||0)+(Number(stats.magic)||0))+
         2*((Number(stats.defense)||0)+(Number(stats.magicReduction)||0)+(Number(stats.physicalReduction)||0))+
         4*((Number(stats.dodge)||0)+(Number(stats.luck)||0))+2*(Number(stats.health)||0);
-    const level=Math.max(1,Number(appearance.level)||1);
-    return base+10*(level-1)+(appearance.branch&&level>=9?1000:0)+(level===ATTENDANCE_PET_MAX_LEVEL?2000:0);
+    return base;
 }
 function petBattleBudget(level,legacy=false){
     const validLevel=Math.max(1,Math.min(ATTENDANCE_PET_MAX_LEVEL,Math.floor(Number(level)||1)));
@@ -678,23 +680,21 @@ function petBattleSimulation(players,firstUid){
     players.forEach(p=>petBattleStats(p.stats,p.appearance.level,
         !p.budgetVersion&&Object.values(p.stats||{}).reduce((sum,value)=>sum+Number(value),0)===petBattleBudget(p.appearance.level,true),p.statBudget));
     const stats=players.map((player,index)=>petBattleEffectiveStats(player,players[1-index]));
-    const power=players.map((player,index)=>petBattlePower(stats[index],player.appearance));
-    const hp=stats.map(petBattleMaxHp),maxHp=[...hp],turns=[];
+    const hp=stats.map((value,index)=>petBattleMaxHp(value,players[index].appearance)),maxHp=[...hp],turns=[];
     let attacker=players.findIndex(p=>p.uid===firstUid);
     let seed=2166136261;for(const c of JSON.stringify([players,firstUid],(key,value)=>key==='element'?undefined:value))seed=Math.imul(seed^c.charCodeAt(0),16777619)>>>0;
     const roll=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
-    const damageScale=power.map((value,index)=>Math.max(.5,Math.min(2,(value/Math.max(1,power[1-index]))**.8*(.95+roll()*.1))));
     while(hp.every(value=>value>0)&&turns.length<PET_BATTLE_MAX_TURNS){
         const defender=1-attacker,a=stats[attacker],d=stats[defender],attack=a.attack,defense=d.defense;
         const modern=Object.hasOwn(a,'magic')||Object.hasOwn(d,'magic');
         const dodged=modern&&roll()<Math.min(.4,(d.dodge||0)/200),critical=modern&&roll()<Math.min(.35,(a.luck||0)/200);
         const physical=(5+attack*2)*100/(100+defense)*100/(100+(d.physicalReduction||0)*2);
         const magic=(a.magic||0)*2*100/(100+defense)*100/(100+(d.magicReduction||0)*2);
-        const damage=modern?(dodged?0:Math.max(1,Math.round((physical+magic)*(critical?1.5:1)*damageScale[attacker]))):Math.max(1,Math.round((10+attack*2)*100/(100+defense)*damageScale[attacker]));
+        const damage=modern?(dodged?0:Math.max(1,Math.round((physical+magic)*(critical?1.5:1)))):Math.max(1,Math.round((10+attack*2)*100/(100+defense)));
         hp[defender]=Math.max(0,petBattleNumber(hp[defender]-damage));
         turns.push({index:turns.length+1,attacker:players[attacker].uid,defender:players[defender].uid,damage,dodged,critical,
-            physical:modern&&!dodged?physical*(critical?1.5:1)*damageScale[attacker]:0,
-            magic:modern&&!dodged?magic*(critical?1.5:1)*damageScale[attacker]:0,hp:[...hp]});attacker=defender;
+            physical:modern&&!dodged?physical*(critical?1.5:1):0,
+            magic:modern&&!dodged?magic*(critical?1.5:1):0,hp:[...hp]});attacker=defender;
     }
     return {maxHp,turns,winnerUid:hp[0]===0?players[1].uid:hp[1]===0?players[0].uid:null};
 }
@@ -11132,7 +11132,7 @@ const PetBattleGame=(()=>{
         renderStatComparison(m.players,effectiveStats);
         const guestPetId=incoming&&el('petBattlePet').value;
         const guestView=guestPetId?attendancePetView(attendancePetSelected(attendancePetData,guestPetId)):null;
-        ensureModels(m,guestView);const play=petBattlePlayback(m),battleEnded=m.status==='finished'||play.finished,full=m.maxHp?.length?m.maxHp:effectiveStats.map(petBattleMaxHp),hp=play.hp.length?play.hp:full;
+        ensureModels(m,guestView);const play=petBattlePlayback(m),battleEnded=m.status==='finished'||play.finished,full=m.maxHp?.length?m.maxHp:effectiveStats.map((stats,i)=>petBattleMaxHp(stats,m.players[i].appearance)),hp=play.hp.length?play.hp:full;
         const ready=m.status==='ready';
         el('petBattleReadyPanel').hidden=!ready;
         if(ready){

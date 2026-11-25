@@ -1006,8 +1006,10 @@ test('eight battle stats split damage and produce reproducible dodge and critica
  assert.equal(Object.keys(petBattleStats(stats,1)).length,8);
  assert.equal(petBattleStats({...stats,magic:19},1).magic,19);
  assert.equal(petBattleMaxHp(stats),590,'duel HP starts at 500 and adds nine per health point');
- assert.equal(petBattlePower(stats,{level:10,branch:'fish'}),petBattlePower(stats)+1090);
- assert.equal(petBattlePower(stats,{level:30,branch:'fish'}),petBattlePower(stats)+3290);
+ assert.equal(petBattlePower(stats,{level:30,branch:'fish'}),petBattlePower(stats));
+ assert.equal(petBattleMaxHp(stats,{level:8,branch:'fish'}),590);
+ assert.equal(petBattleMaxHp(stats,{level:9,branch:'fish'}),1090);
+ assert.equal(petBattleMaxHp(stats,{level:30,branch:'fish'}),2590);
  assert.throws(()=>petBattleStats({...stats,magic:21},1));assert.throws(()=>petBattleStats({...stats,dodge:0,health:20},1));
  const players=[{uid:'a',stats,appearance:{level:1}},{uid:'b',stats:{...stats},appearance:{level:1}}];
  const battle=petBattleSimulation(players,'a');assert.deepEqual(battle,petBattleSimulation(JSON.parse(JSON.stringify(players)),'a'));
@@ -1030,21 +1032,6 @@ test('eight battle stats split damage and produce reproducible dodge and critica
  assert.ok(resistant.magic/(resistant.critical?1.5:1)>baseHit.magic/(baseHit.critical?1.5:1),'lower magic resistance allows more magic damage');
 });
 
-test('a ten percent battle-power lead wins about seventy percent of balanced duels',()=>{
- const stronger={attack:20,magic:20,defense:10,magicReduction:10,physicalReduction:10,dodge:10,luck:10,health:10};
- const weaker={attack:20,magic:20,defense:16,magicReduction:16,physicalReduction:16,dodge:1,luck:1,health:10};
- const ratio=petBattlePower(stronger)/petBattlePower(weaker);
- assert.ok(ratio>=1.09&&ratio<=1.12,`expected a ten percent power lead, got ${ratio}`);
- let wins=0;const matches=1500;
- for(let i=0;i<matches;i++){
-  const result=petBattleSimulation([
-   {uid:'strong',petId:`strong-${i}`,stats:stronger,appearance:{level:1}},
-   {uid:'weak',petId:`weak-${i}`,stats:weaker,appearance:{level:1}}
-  ],i%2?'strong':'weak');
-  if(result.winnerUid==='strong')wins++;
- }
- assert.ok(wins/matches>=.65&&wins/matches<=.75,`observed win rate ${wins/matches}`);
-});
 
 test('battle power does not reward a health-only allocation over a stronger damage build',()=>{
  const damageBuild={attack:72,magic:10,defense:5,magicReduction:3,physicalReduction:3,dodge:3,luck:3,health:1};
