@@ -1449,7 +1449,7 @@ test('household maximum level grants exactly one new egg and attendance cares fo
  const capped={...newAttendancePet(now-7200000),branch:'bird',checkins:290,lastCheckinAt:now};
  const migrated=transitionPetHousehold(capped,'init',now);
  assert.equal(migrated.spawned,1);assert.equal(transitionPetHousehold(migrated.pet,'init',now).spawned,0,'legacy max pets receive one egg across reloads');
- const admin=transitionPetHousehold({...capped,checkins:0},'level',now,null,30);
+ const admin=transitionPetHousehold({...capped,checkins:80},'level',now,null,30);
  assert.equal(admin.spawned,1,'admin level-up follows the same one-egg rule');
  const expired={...root,companions:root.companions.map(p=>({...p,lastCheckinAt:now-73*3600000,bornAt:now-100*3600000}))};
  const survivorId=attendancePetRecords(expired)[0].id;

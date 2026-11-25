@@ -426,11 +426,11 @@ function attendancePetView(raw, now = Date.now()) {
     const diesAt = Math.max(pet.bornAt,Number(pet.lastCheckinAt)||pet.bornAt)+72*3600000;
     const dead = now >= diesAt;
     const egg = now < pet.hatchAt;
-    const branch=Object.hasOwn(ATTENDANCE_PET_BRANCHES,pet.branch)?pet.branch:null;
     const feedingXp=Math.max(0,Math.floor(Number(pet.feedingXp)||0));
     const battleXp=Number.isSafeInteger(pet.battleXp)?pet.battleXp:0;
     const xp=Math.max(0,checkins+feedingXp+battleXp);
     const earnedLevel=Math.min(ATTENDANCE_PET_MAX_LEVEL,1+Math.floor(xp/10));
+    const branch=!egg&&earnedLevel>=9&&Object.hasOwn(ATTENDANCE_PET_BRANCHES,pet.branch)?pet.branch:null;
     const level = egg ? 0 : Math.min(earnedLevel,branch?ATTENDANCE_PET_MAX_LEVEL:9);
     const form = attendancePetCatalog(branch)[Math.max(0,level-1)];
     const branchUnlocked=!egg&&earnedLevel>=9,maxed=!egg&&!!branch&&level===ATTENDANCE_PET_MAX_LEVEL;
@@ -464,12 +464,14 @@ function transitionAttendancePet(raw, action, now = Date.now(), { ignoreFeedingC
     }
     if (action==='checkin') {
         if (view.checkedToday) return {pet,changed:false,result:'already-checked'};
+        if(!view.branchUnlocked)pet.branch=null;
         pet.checkins=view.checkins+1;pet.lastCheckinAt=now;pet.lastCheckinDay=view.today;pet.updatedAt=now;
         return {pet,changed:true,result:'checked'};
     }
     if (action==='feed') {
         if (view.egg) return {pet,changed:false,result:'egg'};
         if (!view.hungry&&!ignoreFeedingCooldown) return {pet,changed:false,result:'already-fed'};
+        if(!view.branchUnlocked)pet.branch=null;
         pet.fedOn=view.today;pet.lastFedAt=now;pet.feeds=(Number(pet.feeds)||0)+1;pet.feedingXp=view.feedingXp+1;pet.weightGrams+=200;pet.updatedAt=now;
         return {pet,changed:true,result:'fed'};
     }
@@ -508,6 +510,7 @@ function adjustAdminPet(raw, action, level, now = Date.now()) {
         if (!Number.isInteger(next) || next<1 || next>ATTENDANCE_PET_MAX_LEVEL) throw new Error('Invalid pet level');
         if(next>9&&!view.branch)throw new Error('Choose pet branch first');
         pet.checkins = (next-1)*10; pet.feedingXp=0; delete pet.battleXp; pet.hatchAt = Math.min(pet.hatchAt,now);
+        if(next<9)pet.branch=null;
     } else throw new Error('Invalid pet action');
     return {...pet,updatedAt:now};
 }
@@ -653,7 +656,7 @@ function petBattlePower(stats,appearance={}){
         2*((Number(stats.defense)||0)+(Number(stats.magicReduction)||0)+(Number(stats.physicalReduction)||0))+
         4*((Number(stats.dodge)||0)+(Number(stats.luck)||0))+2*(Number(stats.health)||0);
     const level=Math.max(1,Number(appearance.level)||1);
-    return base+10*(level-1)+(appearance.branch?1000:0)+(level===ATTENDANCE_PET_MAX_LEVEL?2000:0);
+    return base+10*(level-1)+(appearance.branch&&level>=9?1000:0)+(level===ATTENDANCE_PET_MAX_LEVEL?2000:0);
 }
 function petBattleBudget(level,legacy=false){
     const validLevel=Math.max(1,Math.min(ATTENDANCE_PET_MAX_LEVEL,Math.floor(Number(level)||1)));
@@ -736,6 +739,7 @@ function petBattleSettleXp(root,petId,delta,now){
     const change=Math.max(-view.xp,delta);
     if(!change)return {pet:root,change:0};
     records[index]={...records[index],battleXp:view.battleXp+change,updatedAt:now};
+    if(!view.branchUnlocked||!attendancePetView(records[index],now).branchUnlocked)records[index].branch=null;
     const updated={...root,...records[0],companions:records.slice(1)};
     return {pet:transitionPetHousehold(updated,'init',now).pet,change};
 }
