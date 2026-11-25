@@ -15564,7 +15564,8 @@ body.modal-open .attendance-pet-swimmer,body:has(dialog[open]) .attendance-pet-s
 .pet-road-shared { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px 20px; }
 .pet-road-node { position:relative; display:grid; gap:3px; align-content:center; padding:7px 9px; border:1px solid var(--border); border-radius:9px; background:var(--surface); font-size:.72rem; line-height:1.35; overflow-wrap:anywhere; }
 .pet-road-node small,.pet-road-fork small { color:var(--muted); font-size:.65rem; }
-.pet-road-node > svg { display:block; width:100%; height:64px; }
+.pet-road-portrait { display:block; width:min(100%,112px); aspect-ratio:112/80; justify-self:center; background-image:url('./pet-portraits.webp'); background-size:1000% 1000%; background-repeat:no-repeat; }
+.pet-road-node.pet-road-divine { border-color:currentColor; }
 .pet-road-node.is-current { border-color:var(--primary); background:color-mix(in srgb,var(--primary) 13%,var(--surface)); }
 .pet-road-shared li:not(:last-child)::after { content:'→'; position:absolute; left:100%; width:20px; top:50%; transform:translateY(-50%); text-align:center; color:var(--muted); }
 @media(min-width:581px) { .pet-road-shared li:nth-child(5n)::after { display:none; } }

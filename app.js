@@ -8911,6 +8911,19 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
         disposeModel(s);
         s.result=null;
         const T=s.THREE,group=new T.Group();s.model=group;s.rig=[];s.mouth=null;s.scene.add(group);
+        if(view.level===ATTENDANCE_PET_MAX_LEVEL&&view.branch&&!view.dead&&!view.egg){
+            const canvas=document.createElement('canvas');canvas.width=canvas.height=128;
+            const ctx=canvas.getContext('2d'),color=view.form.color;
+            const glow=ctx.createRadialGradient(64,64,8,64,64,63);
+            glow.addColorStop(0,color+'72');glow.addColorStop(.65,color+'40');glow.addColorStop(1,color+'00');
+            ctx.fillStyle=glow;ctx.fillRect(0,0,128,128);
+            ctx.strokeStyle=color+'ac';ctx.lineWidth=2;
+            for(const radius of [42,48]){ctx.beginPath();ctx.arc(64,64,radius,0,Math.PI*2);ctx.stroke();}
+            const map=new T.CanvasTexture(canvas);map.colorSpace=T.SRGBColorSpace;
+            const aura=new T.Sprite(new T.SpriteMaterial({map,depthWrite:false,transparent:true}));
+            aura.position.set(-.15,.35,-.95);aura.scale.set(3.3,3.3,1);aura.renderOrder=-1;
+            group.add(aura);
+        }
         const applyBattleResult=()=>{
             if(s.duel?.result)setBattleResult(s,s.duel.result);
             else startBattleCritical(s,s.duel?.criticalAt);
@@ -10101,11 +10114,12 @@ function renderAttendancePet() {
     renderPetComparison();
 }
 
-function attendancePetRoadArt(form,level,branch){
-    const prefix=`pet-road-art-${branch}-${level}`;
-    return attendancePetSvg({form,egg:level===0})
-        .replaceAll('pet-egg-light',prefix+'-egg')
-        .replaceAll('pet-fish-light',prefix+'-fish');
+function attendancePetRoadArt(level,branch){
+    const branches=Object.keys(ATTENDANCE_PET_BRANCHES);
+    const branchIndex=branches.indexOf(branch);
+    const index=branchIndex<0?level:level+branchIndex*(ATTENDANCE_PET_MAX_LEVEL-9);
+    const row=Math.floor(index/10),column=index%10;
+    return `<span class="pet-road-portrait" aria-hidden="true" style="background-position:${column/9*100}% ${row/9*100}%"></span>`;
 }
 
 function renderAttendancePetBranches(view){
@@ -10127,14 +10141,14 @@ function renderAttendancePetBranches(view){
         const shared=attendancePetCatalog(null);
         const sharedNodes=[{name:'Trứng'},...shared].map((form,level)=>`
             <li class="pet-road-node${level===view.level?' is-current':''}" ${level===view.level?'aria-current="step"':''}>
-                ${attendancePetRoadArt(form,level,'base')}<small>${level?`Cấp ${level}`:'Nở sau 1 giờ'}</small><strong>${form.name}</strong>
+                ${attendancePetRoadArt(level,'base')}<small>${level?`Cấp ${level}`:'Nở sau 1 giờ'}</small><strong>${form.name}</strong>
             </li>`).join('');
         const branches=Object.entries(ATTENDANCE_PET_BRANCHES).map(([branchKey,branch])=>{
             const steps=branch.forms.map((form,index)=>{
                 const firstLevel=shared.length+1+index,lastLevel=firstLevel;
                 const current=branchKey===view.branch&&view.level>=firstLevel&&view.level<=lastLevel;
-                return `<li class="pet-road-node${current?' is-current':''}" ${current?'aria-current="step"':''}>
-                    ${attendancePetRoadArt(form,firstLevel,branchKey)}<small>Cấp ${firstLevel}${lastLevel!==firstLevel?`–${lastLevel}`:''}</small><strong>${form.name}</strong>
+                return `<li class="pet-road-node${current?' is-current':''}${firstLevel===ATTENDANCE_PET_MAX_LEVEL?' pet-road-divine':''}" ${current?'aria-current="step"':''}>
+                    ${attendancePetRoadArt(firstLevel,branchKey)}<small>Cấp ${firstLevel}${lastLevel!==firstLevel?`–${lastLevel}`:''}</small><strong>${form.name}</strong>
                 </li>`;
             }).join('');
             return `<section class="pet-road-branch" data-branch="${branchKey}" aria-labelledby="pet-road-${branchKey}">

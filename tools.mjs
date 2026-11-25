@@ -44,6 +44,7 @@ try {
     await mkdir('dist', { recursive: true });
     await writeFile('dist/index.html', html);
     await copyFile('sw.js', 'dist/sw.js');
+    await copyFile('pet-portraits.webp', 'dist/pet-portraits.webp');
 } finally { await bundle.close(); }
 console.log(`Deploy dist/: index.html (${((await stat('dist/index.html')).size / 1024).toFixed(1)} KB) + sw.js`);
     },
@@ -2451,21 +2452,44 @@ try {
 })();
 
 // ===== attendance-pet GPU checks =====
-if(process.argv.includes('--pet')) await (async()=>{
+if(process.argv.includes('--pet')||process.argv.includes('--pet-portraits')) await (async()=>{
+ const portraits=process.argv.includes('--pet-portraits');
  const chrome=['C:/Program Files/Google/Chrome/Application/chrome.exe','C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(fs.existsSync);assert.ok(chrome,'browser required');
  const temp=fs.mkdtempSync(path.join(os.tmpdir(),'workpic-pet-'));
  try{
   const response=await fetch('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js',{signal:AbortSignal.timeout(15000)});assert.ok(response.ok);fs.writeFileSync(path.join(temp,'three.module.js'),await response.text());
-  const source=fs.readFileSync('app.js','utf8');
+  const source=fs.readFileSync('app.js','utf8').replace(/\r\n/g,'\n');
   const shared=source.split('// BEGIN SHARED HELPERS\n')[1].split('// END SHARED HELPERS')[0];
   let code=source.slice(source.indexOf('function attendancePetSvg('),source.indexOf('let attendancePetData ='));
-  code=code.replace("import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js')",'Promise.resolve(THREE)').replace('return {start,stop,update,preview,thumbnail,duelPose:pose=>{if(state)state.duel=pose;},feed:','return {inspect:()=>state,start,stop,update,preview,thumbnail,duelPose:pose=>{if(state)state.duel=pose;},feed:');
+  code=code.replace("import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js')",'Promise.resolve(THREE)').replace('return {start,stop,update,preview,thumbnail,','return {inspect:()=>state,start,stop,update,preview,thumbnail,');
   const script=`import * as THREE from './three.module.js';
 ${shared}
 const renderAttendancePet=()=>{};
 ${code}
 try {
  const check=(ok,message)=>{if(!ok)throw Error(message)};
+ if(PORTRAITS_MODE){
+  const renderer=AttendancePet3D;
+  renderer.start();
+  const state=renderer.inspect();await state.ready;
+  check(state.renderer,'3D renderer is unavailable');
+  cancelAnimationFrame(state.raf);
+  const common=attendancePetCatalog(null);
+  const views=[{form:common[0],egg:true,level:0},...common.map((form,i)=>({form,level:i+1})),
+   ...Object.entries(ATTENDANCE_PET_BRANCHES).flatMap(([branch,data])=>data.forms.map((form,i)=>({form,branch,level:10+i})))];
+  const atlas=document.createElement('canvas'),width=112,height=80;
+  atlas.width=width*10;atlas.height=height*Math.ceil(views.length/10);
+  const ctx=atlas.getContext('2d');
+  for(const [i,view] of views.entries()){
+   renderer.update(view);
+   state.model.rotation.y=.28;
+   state.model.scale.setScalar(Math.min(1.15,attendancePetScale(view)));
+   state.renderer.render(state.scene,state.camera);
+   ctx.drawImage(state.renderer.domElement,(i%10)*width,Math.floor(i/10)*height,width,height);
+  }
+  renderer.stop();
+  document.body.innerHTML='<pre id="pet-result">PASS:'+atlas.toDataURL('image/webp',.84).split(',')[1]+'</pre>';
+ } else {
  AttendancePet3D.start();
  let now=Date.now(),pet={...newAttendancePet(now-7200000),lastCheckinAt:now};
  AttendancePet3D.update(attendancePetView(pet,now));
@@ -2534,12 +2558,15 @@ try {
  peerRenderer.stop();peerButton.remove();check(s.renderer.domElement.parentElement.id==='attendancePetArt','disposing companion preserves selected pet');
  AttendancePet3D.feed();AttendancePet3D.stop();check(!document.querySelector('#attendancePetArt canvas'),'renderer disposes on stop');
  document.body.innerHTML='<main class="pet-gallery">'+cards.join('')+'</main><pre id="pet-result">PASS: all real 3D pet forms render visible pixels; renderer cleanup works</pre>';
+ }
 }catch(error){document.body.innerHTML='<pre id="pet-result">FAIL: '+error.stack+'</pre>';}
 `;
-  fs.writeFileSync(path.join(temp,'pet.html'),'<!doctype html><meta charset="utf-8"><style>'+fs.readFileSync('styles.css','utf8')+'body{background:#0c1524!important;color:white;padding:20px;height:auto;overflow:auto}.pet-gallery{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}.pet-gallery article{display:grid;justify-items:center;gap:8px;padding:15px;background:#172337;border:1px solid #29405c;border-radius:14px}.pet-gallery img{width:190px;height:137px;object-fit:contain}.pet-gallery strong{font:13px sans-serif}#pet-result{color:#7dd3fc}</style><body><button id="attendancePetSwimmer" class="attendance-pet-swimmer"><span id="attendancePetArt"></span></button><script type="module">'+script+'</script>');
-  fs.mkdirSync('.artifacts',{recursive:true});
-  const result=spawnSync(chrome,['--headless','--no-first-run','--disable-extensions','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--allow-file-access-from-files','--user-data-dir='+path.join(temp,'profile'),'--window-size=1500,3900','--screenshot='+path.resolve(process.argv.includes('--pet-fleet-only')?'.artifacts/attendance-pet-fleet.png':'.artifacts/attendance-pet-stages.png'),'--dump-dom','--virtual-time-budget=30000',pathToFileURL(path.join(temp,'pet.html')).href],{encoding:'utf8',timeout:180000,windowsHide:true,maxBuffer:12*1024*1024});
-  const output=result.stdout?.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'').match(/<pre id="pet-result">([\s\S]*?)<\/pre>/)?.[1];assert.ok(output?.startsWith('PASS:'),output||result.error?.message||result.stderr?.slice(-1500)||'No pet result');console.log(output);
+  fs.writeFileSync(path.join(temp,'pet.html'),'<!doctype html><meta charset="utf-8"><style>'+fs.readFileSync('styles.css','utf8')+'body{background:#0c1524!important;color:white;padding:20px;height:auto;overflow:auto}.pet-gallery{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}.pet-gallery article{display:grid;justify-items:center;gap:8px;padding:15px;background:#172337;border:1px solid #29405c;border-radius:14px}.pet-gallery img{width:190px;height:137px;object-fit:contain}.pet-gallery strong{font:13px sans-serif}#pet-result{color:#7dd3fc}</style><body><button id="attendancePetSwimmer" class="attendance-pet-swimmer"><span id="attendancePetArt"></span></button><script type="module">'+script.replace('PORTRAITS_MODE',String(portraits))+'</script>');
+  if(!portraits)fs.mkdirSync('.artifacts',{recursive:true});
+  const result=spawnSync(chrome,['--headless','--no-first-run','--disable-extensions','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--allow-file-access-from-files','--user-data-dir='+path.join(temp,'profile'),...(portraits?['--window-size=800,600']:['--window-size=1500,3900','--screenshot='+path.resolve(process.argv.includes('--pet-fleet-only')?'.artifacts/attendance-pet-fleet.png':'.artifacts/attendance-pet-stages.png')]),'--dump-dom','--virtual-time-budget=30000',pathToFileURL(path.join(temp,'pet.html')).href],{encoding:'utf8',timeout:180000,windowsHide:true,maxBuffer:12*1024*1024});
+  const output=result.stdout?.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'').match(/<pre id="pet-result">([\s\S]*?)<\/pre>/)?.[1];assert.ok(output?.startsWith('PASS:'),output||result.error?.message||result.stderr?.slice(-1500)||'No pet result');
+  if(portraits)await writeFile('pet-portraits.webp',Buffer.from(output.slice(5),'base64'));
+  else console.log(output);
  }finally{const resolved=path.resolve(temp);if(resolved.startsWith(path.resolve(os.tmpdir())+path.sep)&&path.basename(resolved).startsWith('workpic-pet-'))fs.rmSync(resolved,{recursive:true,force:true,maxRetries:5,retryDelay:200});}
 })();
 
