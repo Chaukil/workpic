@@ -10101,6 +10101,13 @@ function renderAttendancePet() {
     renderPetComparison();
 }
 
+function attendancePetRoadArt(form,level,branch){
+    const prefix=`pet-road-art-${branch}-${level}`;
+    return attendancePetSvg({form,egg:level===0})
+        .replaceAll('pet-egg-light',prefix+'-egg')
+        .replaceAll('pet-fish-light',prefix+'-fish');
+}
+
 function renderAttendancePetBranches(view){
     const panel=document.getElementById('attendancePetBranchPanel');panel.hidden=!view.branchUnlocked;
     const launch=document.getElementById('attendancePetBranchOpen');launch.hidden=!view.needsBranch;
@@ -10120,14 +10127,14 @@ function renderAttendancePetBranches(view){
         const shared=attendancePetCatalog(null);
         const sharedNodes=[{name:'Trứng'},...shared].map((form,level)=>`
             <li class="pet-road-node${level===view.level?' is-current':''}" ${level===view.level?'aria-current="step"':''}>
-                <img data-road-level="${level}" alt="" hidden><small>${level?`Cấp ${level}`:'Nở sau 1 giờ'}</small><strong>${form.name}</strong>
+                ${attendancePetRoadArt(form,level,'base')}<small>${level?`Cấp ${level}`:'Nở sau 1 giờ'}</small><strong>${form.name}</strong>
             </li>`).join('');
         const branches=Object.entries(ATTENDANCE_PET_BRANCHES).map(([branchKey,branch])=>{
             const steps=branch.forms.map((form,index)=>{
                 const firstLevel=shared.length+1+index,lastLevel=firstLevel;
                 const current=branchKey===view.branch&&view.level>=firstLevel&&view.level<=lastLevel;
                 return `<li class="pet-road-node${current?' is-current':''}" ${current?'aria-current="step"':''}>
-                    <img data-road-level="${firstLevel}" alt="" hidden><small>Cấp ${firstLevel}${lastLevel!==firstLevel?`–${lastLevel}`:''}</small><strong>${form.name}</strong>
+                    ${attendancePetRoadArt(form,firstLevel,branchKey)}<small>Cấp ${firstLevel}${lastLevel!==firstLevel?`–${lastLevel}`:''}</small><strong>${form.name}</strong>
                 </li>`;
             }).join('');
             return `<section class="pet-road-branch" data-branch="${branchKey}" aria-labelledby="pet-road-${branchKey}">
@@ -10342,14 +10349,6 @@ function initAttendancePetUi() {
         balance.hidden=button.closest('dialog')?.id!=='petBattleDialog'||document.getElementById('petBattleSetup').hidden||!balance.textContent;
         guide.scrollTop=0;
         if(!guide.open)guide.showModal();
-        if(!battle)for(const image of guide.querySelectorAll('[data-road-level]')){
-            if(!image.hidden)continue;
-            const level=Number(image.dataset.roadLevel),branch=image.closest('[data-branch]')?.dataset.branch||null;
-            const form=attendancePetCatalog(branch)[Math.max(0,level-1)];
-            const svg=attendancePetSvg({form,egg:level===0});
-            image.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
-            image.hidden=false;
-        }
     }));
     document.getElementById('petGuideClose').addEventListener('click',()=>guide.close());
     toggle.addEventListener('click',()=>{renderAttendancePet();if(!dialog.open)dialog.showModal();AttendancePet3D.preview(true);openAttendancePetBranch(true);});
