@@ -15818,6 +15818,12 @@ body.theme-dark .pet-power-badge { border-color:#fbbf2480; background:linear-gra
     font-size:.72rem;
 }
 .pet-battle-stat-value { color:var(--primary); font-size:.85rem; font-weight:700; font-variant-numeric:tabular-nums; }
+.pet-battle-setup .pet-battle-stat-fields .pet-battle-stat-manual {
+    width:4.6em;
+    margin:0;
+    padding:3px 5px;
+    text-align:center;
+}
 .pet-battle-elements { display:flex; flex-wrap:wrap; gap:7px; min-width:0; padding:0; margin:12px 0 0; border:0; }
 .pet-battle-elements legend { float:none; margin:0 0 6px; font-size:.76rem; font-weight:600; }
 .pet-battle-dialog .pet-battle-elements button { flex:1 1 54px; padding:7px; border-bottom:2px solid var(--element-color); }

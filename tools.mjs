@@ -978,7 +978,8 @@ test('pet motion respects species, floor, sky and small viewport bounds', () => 
  assert.equal(attendancePetMotion(view('dino','sea')),'swim');
  for(const shape of ['trex','dragon','baby']){
   const b=attendancePetTravelBounds(view('dino',shape),1366,768);
-  assert.equal(b.mode,'walk');assert.equal(b.minY,b.maxY);assert.equal(b.maxY,660);
+  assert.equal(b.mode,'walk');assert.equal(b.minY,b.maxY);
+  assert.equal(b.maxY,768-104*attendancePetScale(view('dino',shape))-4);
  }
  const bird=attendancePetTravelBounds(view('bird','eagle'),1366,768);
  assert.equal(bird.mode,'fly');assert.ok(bird.maxY<768*.6);
@@ -1003,6 +1004,7 @@ test('battle stats, RPS and automatic turn timeline are deterministic for both v
 test('eight battle stats split damage and produce reproducible dodge and critical turns',()=>{
  const stats={attack:20,magic:20,defense:10,physicalReduction:10,magicReduction:10,dodge:10,luck:10,health:10};
  assert.equal(Object.keys(petBattleStats(stats,1)).length,8);
+ assert.equal(petBattleStats({...stats,magic:19},1).magic,19);
  assert.equal(petBattleMaxHp(stats),590,'duel HP starts at 500 and adds nine per health point');
  assert.equal(petBattlePower(stats,{level:10,branch:'fish'}),petBattlePower(stats)+1000,'branch evolution adds 1000 power');
  assert.equal(petBattlePower(stats,{level:30,branch:'fish'}),petBattlePower(stats)+3000,'level 30 adds another 2000 power');
@@ -2483,7 +2485,9 @@ try {
   for(const [i,view] of views.entries()){
    renderer.update(view);
    state.model.rotation.y=.28;
-   state.model.scale.setScalar(Math.min(1.15,attendancePetScale(view)));
+   state.model.scale.setScalar(attendancePetScale(view));
+   state.camera.position.z=7;
+   state.camera.updateProjectionMatrix();
    state.renderer.render(state.scene,state.camera);
    ctx.drawImage(state.renderer.domElement,(i%10)*width,Math.floor(i/10)*height,width,height);
   }

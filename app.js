@@ -361,7 +361,24 @@ for(const [key,branch] of Object.entries(ATTENDANCE_PET_BRANCHES)){
 }
 const ATTENDANCE_PET_MAX_LEVEL=ATTENDANCE_PET_FORMS.length+Math.max(...Object.values(ATTENDANCE_PET_BRANCHES).map(branch=>branch.forms.length));
 function attendancePetCatalog(branch){return ATTENDANCE_PET_FORMS.concat(ATTENDANCE_PET_BRANCHES[branch]?.forms||[]);}
-function attendancePetScale(view){return view.egg ? .8 : (view.form.scale||[.55,.65,.7,.75,.8,.85,.9,.95,1][view.level-1]||1);}
+// Approximate adult body length (or wingspan for flying birds), in meters.
+// Fictional forms use game estimates. Compress the range for small screens.
+const PET_SPECIES_METERS={
+    small:.025,gold:.25,clown:.08,angel:.25,tang:.3,lion:.38,puffer:.45,sword:3,ray:1.4,
+    hammer:4,shark:5,orca:8,humpback:15,sperm:16,mermaid:1.7,blue:27,megalodon:17,sea:29,
+    baby:1,triceratops:8,stego:7,ankylosaur:6,raptor:2,trex:12,spino:14,brachio:22,dragon:13,
+    kingfisher:.25,parrot:1,owl:1.45,eagle:2.1,crane:2.3,peacock:1.8,condor:3.1,albatross:3.4,phoenix:5,
+    cub:.45,lynx:.95,leopard:1.7,panther:1.7,cougar:1.9,tiger:2.8,sabertooth:2.2,tortoise:4
+};
+function attendancePetScale(view){
+    if(view.egg)return .44;
+    if(view.level===ATTENDANCE_PET_MAX_LEVEL&&view.branch)return 1.65;
+    const key=view.form.kind==='beast'&&view.form.shape==='lion'?'bigLion':view.form.shape;
+    let meters=key==='bigLion'?2.7:(PET_SPECIES_METERS[key]||1);
+    if(view.form.juvenile)meters*=.55;
+    if(view.form.crest)meters*=1.16;
+    return .4+.92*Math.log1p(meters/.15)/Math.log1p(34/.15);
+}
 
 function attendancePetMotion(view) {
     if(view?.egg || view?.dead)return 'rest';
@@ -560,7 +577,7 @@ function buildPetComparison(profiles,now=Date.now(),branch='all',mode='level'){
             const budget=petBattleBudget(view.level),saved=profile.petBattleStatsByPet?.[pet.id];
             const battleStats=Object.fromEntries(['attack','magic','defense','magicReduction','physicalReduction','dodge','luck','health']
                 .map(stat=>[stat,Number.isInteger(saved?.[stat])&&saved[stat]>=1?saved[stat]:1]));
-            if(Object.values(battleStats).reduce((sum,value)=>sum+value,0)!==budget){
+            if(Object.values(battleStats).reduce((sum,value)=>sum+value,0)>budget){
                 const base=Math.floor(budget/8),remainder=budget%8;
                 Object.keys(battleStats).forEach((stat,index)=>battleStats[stat]=base+(index<remainder?1:0));
             }
@@ -640,7 +657,7 @@ function petBattleStats(stats,level,legacy=false,budgetOverride=0){
     const keys=Object.hasOwn(stats||{},'magic')?['attack','magic','defense','magicReduction','physicalReduction','dodge','luck','health']:['attack','defense','health'];
     const values=keys.map(key=>Number(stats?.[key]));
     const budget=Number.isSafeInteger(budgetOverride)&&budgetOverride>=keys.length?budgetOverride:petBattleBudget(level,legacy);
-    if(values.some(value=>!Number.isInteger(value)||value<1)||values.reduce((a,b)=>a+b,0)!==budget)throw new Error('Tổng chỉ số phải bằng điểm được cấp; mỗi chỉ số tối thiểu 1.');
+    if(values.some(value=>!Number.isInteger(value)||value<1)||values.reduce((a,b)=>a+b,0)>budget)throw new Error('Tổng chỉ số không được vượt điểm được cấp; mỗi chỉ số tối thiểu 1.');
     return Object.fromEntries(keys.map((key,i)=>[key,values[i]]));
 }
 function petBattleRps(first,second){
@@ -8910,18 +8927,17 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
     function build(s,view) {
         disposeModel(s);
         s.result=null;
-        const T=s.THREE,group=new T.Group();s.model=group;s.rig=[];s.mouth=null;s.scene.add(group);
+        const T=s.THREE,group=new T.Group();s.model=group;s.rig=[];s.mouth=null;s.divineGlow=null;s.scene.add(group);
         if(view.level===ATTENDANCE_PET_MAX_LEVEL&&view.branch&&!view.dead&&!view.egg){
             const canvas=document.createElement('canvas');canvas.width=canvas.height=128;
             const ctx=canvas.getContext('2d'),color=view.form.color;
             const glow=ctx.createRadialGradient(64,64,8,64,64,63);
             glow.addColorStop(0,color+'72');glow.addColorStop(.65,color+'40');glow.addColorStop(1,color+'00');
             ctx.fillStyle=glow;ctx.fillRect(0,0,128,128);
-            ctx.strokeStyle=color+'ac';ctx.lineWidth=2;
-            for(const radius of [42,48]){ctx.beginPath();ctx.arc(64,64,radius,0,Math.PI*2);ctx.stroke();}
             const map=new T.CanvasTexture(canvas);map.colorSpace=T.SRGBColorSpace;
             const aura=new T.Sprite(new T.SpriteMaterial({map,depthWrite:false,transparent:true}));
-            aura.position.set(-.15,.35,-.95);aura.scale.set(3.3,3.3,1);aura.renderOrder=-1;
+            aura.position.set(-.2,.36,-1.05);aura.scale.set(3.1,2.5,1);aura.renderOrder=-1;
+            s.divineGlow=aura.material;
             group.add(aura);
         }
         const applyBattleResult=()=>{
@@ -9318,7 +9334,7 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
         const key=width+':'+height;
         if(s.sizeKey===key)return;s.sizeKey=key;
         s.renderer.setSize(width,height);s.camera.aspect=width/height;
-        s.camera.zoom=staged?Math.min(1,width/height):1;
+        s.camera.zoom=staged?.83*Math.min(1,width/height):1;
         s.camera.updateProjectionMatrix();
     }
     function start(){
@@ -9360,7 +9376,10 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
                 s.model.rotation.z=alive?(reduced?0:Math.sin(s.t*1.3)*(mode==='walk'?.012:.035)):Math.PI*.75;
                 if(alive&&!reduced)s.rig.forEach(part=>{const pace=mode==='fly'?7:mode==='walk'?5:3.5;const intensity=mode==='walk'&&!walking&&!petDialogOpen?.08:1;part.mesh.rotation[part.axis]=(part.base||0)+Math.sin(s.t*pace+part.phase)*part.amount*intensity;});
                 const feeding=Math.max(0,1-(s.t-s.fedAt)/1.4);
-                s.model.scale.setScalar(Math.min(staged?1.25:1,attendancePetScale(s.view||{egg:true}))*(1+feeding*.07));
+                const size=attendancePetScale(s.view||{egg:true});
+                const fitted=staged?size:Math.min(1,size);
+                s.model.scale.setScalar(fitted*(1+feeding*.07));
+                if(s.divineGlow)s.divineGlow.opacity=reduced?.75:.58+.31*Math.sin(s.t*7)+.11*Math.sin(s.t*15);
                 if(s.mouth)s.mouth.scale.y=1+feeding*Math.abs(Math.sin(s.t*14));
                 if(presentation==='arena'||s.previewAttack){
                     const pose=s.previewAttack||s.duel||{},attackAge=(Date.now()-(pose.attackAt||0))/1000,hitAge=(Date.now()-(pose.hitAt||0))/1000;
@@ -9461,7 +9480,7 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
         if(s.renderer&&s.model){
             try{
                 s.model.rotation.y=.25;s.model.rotation.z=view.dead?Math.PI*.75:0;
-                s.model.scale.setScalar(Math.min(1.25,attendancePetScale(view)));
+                s.model.scale.setScalar(attendancePetScale(view));
                 s.renderer.render(s.scene,s.camera);
                 const source=s.renderer.domElement.toDataURL('image/png');if(source.startsWith('data:image/png'))return source;
             }catch{}
@@ -10634,16 +10653,19 @@ const PetBattleGame=(()=>{
     function renderDraft(){
         const record=attendancePetSelected(attendancePetData,el('petBattlePet').value),view=attendancePetView(record),budget=petBattleBudget(view.level),stats=draftStats(),used=Object.values(stats).reduce((sum,value)=>sum+value,0);
         const remaining=budget-used;
-        state.draftPointsValid=remaining===0;
+        const invalidStat=Object.values(statInputs).some(id=>el(id+'Manual')?.matches(':invalid'));
+        state.draftPointsValid=remaining>=0&&!invalidStat;
         el('petBattleBudget').textContent=budget;
         el('petBattleUsed').textContent=`Đã phân bổ ${used} / ${budget} điểm`;
-        el('petBattleRemaining').textContent=remaining===0?'Đủ điểm':remaining>0?`Thiếu ${remaining} điểm`:`Dư ${Math.abs(remaining)} điểm`;
+        el('petBattleRemaining').textContent=remaining===0?'Đã dùng hết điểm':remaining>0?`Còn ${remaining} điểm chưa dùng`:`Vượt ${Math.abs(remaining)} điểm`;
         el('petBattleAllocation').dataset.state=remaining===0?'complete':remaining>0?'short':'over';
-        el('petBattleRemaining').classList.toggle('invalid',remaining!==0);
+        if(invalidStat)el('petBattleRemaining').textContent='Nhập số nguyên từ 1 trở lên cho từng chỉ số';
+        el('petBattleRemaining').classList.toggle('invalid',remaining<0||invalidStat);
         const meter=el('petBattleAllocationMeter');meter.max=budget;meter.value=Math.min(used,budget);
         el('petBattleDraftPower').textContent=petPowerLabel(petBattlePower(stats,view));
         Object.entries(statInputs).forEach(([key,id])=>{
-            el(id).previousElementSibling.textContent=stats[key];
+            const field=el(id+'Manual');
+            if(field&&document.activeElement!==field)field.value=stats[key];
         });
         el('petBattleDraftPet').textContent=el('petBattlePet').value?view.displayName:'Chưa có thú cưng sẵn sàng';
         updateDraftModel(view);
@@ -10658,11 +10680,11 @@ const PetBattleGame=(()=>{
         el('petBattleBotStart').hidden=!state.botDraft||!canSubmit;
         el('petBattleBotStart').disabled=!canSubmit||!botAvailable;
         if(state.botDraft)renderBotBattleLimits();
-        el('petBattleInviteHint').hidden=canSubmit;
+        el('petBattleInviteHint').hidden=!!pet.value;
         for(const button of el('petBattleOpponentList').querySelectorAll('button')){
             button.disabled=state.busy;
-            button.setAttribute('aria-disabled',String(!canSubmit));
-            button.title=canSubmit?'Gửi lời mời':'Cần chọn bổ trợ và phân bổ đủ điểm trước';
+            button.setAttribute('aria-disabled',String(!pet.value||button.disabled));
+            button.title=pet.value?'Gửi lời mời':'Chọn thú cưng trước khi gửi lời mời';
         }
         el('petBattleCycleHost').disabled=el('petBattleCycleGuest').disabled=state.busy||pet.options.length<2;
         for(const button of el('petBattleSetup').querySelectorAll('[data-battle-element]')){
@@ -10689,17 +10711,21 @@ const PetBattleGame=(()=>{
             row.append(info,invite);return row;
         }));
         if(!opponents.length)list.textContent='Chưa có thành viên để mời.';
-        const records=attendancePetRecords(attendancePetData).filter(p=>{const v=attendancePetView(p);return !v.egg&&!v.dead&&!Object.values(state.own?.petBattleLocks||{}).some(lock=>lock.petId===p.id);});
+        const reserved=m?.players.find(player=>player.uid===state.uid);
+        const records=attendancePetRecords(attendancePetData).filter(p=>{const v=attendancePetView(p);return reserved?p.id===reserved.petId:!v.egg&&!v.dead&&!Object.values(state.own?.petBattleLocks||{}).some(lock=>lock.petId===p.id);});
         el('petBattlePet').replaceChildren(...records.map(p=>{const v=attendancePetView(p);return new Option(`${v.displayName} · Cấp ${v.level} · ${petWeightLabel(v.weightGrams)}`,p.id);}));
         if(records.some(p=>p.id===selectedAttendancePetId))el('petBattlePet').value=selectedAttendancePetId;
         el('petBattleStake').disabled=!!m||state.botDraft;
         el('petBattleStake').value=m?m.stakeGrams/1000:0.2;
-        el('petBattleElement').value='';
+        el('petBattleElement').value=reserved?.element||'';
         loadStatsDraft();
     }
     async function mutate(action,payload={},targetId=state.active){
         if(!mine()||state.busy)return;const uid=state.uid,ref=ownRef();if(!ref){fail(new Error('Chưa tải được hồ sơ.'));return;}
         const known=state.matches.get(targetId);
+        if(action==='create'&&payload.configureLater&&!PET_CLOUD_ENABLED){
+            payload={...payload,element:undefined,stats:Object.fromEntries(Object.keys(statInputs).map(key=>[key,1]))};
+        }
         if(action==='ready'&&known?.ready?.[uid]||action==='claim'&&known?.claims?.[uid])return;
         if(action==='create'||action==='accept'){
             try{
@@ -10731,12 +10757,13 @@ const PetBattleGame=(()=>{
                     if(!payload.opponentUid||payload.opponentUid===uid)throw new Error('Chọn một đối thủ khác.');
                     const stake=payload.stakeGrams;if(!Number.isSafeInteger(stake)||stake<100||stake%100!==0)throw new Error('Cược tối thiểu 0,1 kg, theo bước 0,1 kg.');
                     const fighter=petBattleFighter(user,ref.id,payload.petId,payload.stats,now,payload.element);
-                    patch.petBattleStatsByPet={...(user.petBattleStatsByPet||{}),[fighter.petId]:fighter.stats};
+                    if(!payload.configureLater)patch.petBattleStatsByPet={...(user.petBattleStatsByPet||{}),[fighter.petId]:fighter.stats};
                     patch.attendancePet=petBattleChangeWeight(user.attendancePet,fighter.petId,-stake,now);
                     locks[id]={petId:fighter.petId,stakeGrams:stake,peerUid:payload.opponentUid,role:'challenger',createdAt:now,expiresAt:now+600000};patch.petBattleLocks=locks;
                     next={version:1,challengerUid:uid,opponentUid:payload.opponentUid,participantUids:[uid,payload.opponentUid],players:[fighter],stakeGrams:stake,status:'invited',createdMs:now,createdAt:serverTimestamp(),expiresAt:now+600000,rpsRound:0,commits:{},reveals:{},claims:{},turns:[],maxHp:[],winnerUid:null,startedAt:null};
                     next.stakeXp=Math.floor(stake/200);
                     next.roomFlow=payload.roomFlow===true;
+                    if(payload.configureLater)next.configureLater=true;
                 }else{
                     if(!next||next.version!==1||!next.participantUids?.includes(uid))throw new Error('Không có quyền xem trận này.');next={...next};
                     if(action==='accept'){
@@ -10758,6 +10785,12 @@ const PetBattleGame=(()=>{
                         if(next.ready?.[uid])changed=false;
                         else{
                             if(next.status!=='ready'||now>=next.readyDeadline)throw new Error('Phòng đã hết thời gian sẵn sàng.');
+                            const player=next.players.find(player=>player.uid===uid);
+                            if(payload.stats||(next.configureLater&&!player.element)){
+                                if(!PET_BATTLE_ELEMENTS.has(payload.element))throw new Error('Chọn bổ trợ trước khi sẵn sàng.');
+                                const stats=petBattleStats(payload.stats,player.appearance.level);
+                                next.players=next.players.map(item=>item.uid===uid?{...item,stats,element:payload.element}:item);
+                            }
                             next.ready={...next.ready,[uid]:true};
                             if(next.participantUids.every(player=>next.ready[player])){
                                 next.status='rps';next.rpsDeadline=now+120000;next.rpsRound=0;next.commits={};next.reveals={};
@@ -11044,7 +11077,8 @@ const PetBattleGame=(()=>{
         const m=match(),incoming=m?.status==='invited'&&m.opponentUid===state.uid&&m.expiresAt>Date.now();
         const draft=!m&&state.creating;
         if(!draft&&state.draftModel)stopDraftModel();
-        el('petBattleSetup').hidden=!draft&&!incoming;el('petBattleRoom').hidden=!m;el('petBattleAccept').hidden=!incoming;el('petBattleReject').hidden=!incoming;
+        const configuring=m?.status==='ready'&&!m.ready?.[state.uid]&&!PET_CLOUD_ENABLED;
+        el('petBattleSetup').hidden=!draft&&!incoming&&!configuring;el('petBattleRoom').hidden=!m;el('petBattleAccept').hidden=!incoming;el('petBattleReject').hidden=!incoming;
         el('petBattleDraftSlots').hidden=!draft;
         el('petBattleAddOpponent').hidden=!!state.botDraft;
         el('petBattleBotSlot').hidden=!draft||!state.botDraft;
@@ -11061,7 +11095,7 @@ const PetBattleGame=(()=>{
         const endDelay=PET_CLOUD_ENABLED&&m?.status==='fighting'
             ?Date.now()-petBattleTime(m.startedAt)-2000-m.turns.length*PET_BATTLE_STEP_MS:Infinity;
         el('petBattleClaim').hidden=!awaitingClaim||endDelay<15000||!(petBattleClaimAmount(m,state.uid)!==null||roomExpired(m));
-        if(draft||incoming)setup(m);
+        if(draft||incoming||configuring)setup(m);
         el('petBattleAddOpponent').disabled=state.busy||!el('petBattlePet').value;
         el('petBattleSetup').querySelectorAll('button').forEach(button=>button.disabled=state.busy);
         if(draft||incoming)syncDraftControls();
@@ -11165,7 +11199,13 @@ const PetBattleGame=(()=>{
         });
         el('petBattleAddOpponent').addEventListener('click',()=>el('petBattleInvitePicker').showModal());
         el('petBattleInvitePickerClose').addEventListener('click',()=>el('petBattleInvitePicker').close());
-        el('petBattleReady').addEventListener('click',()=>mutate('ready'));
+        el('petBattleReady').addEventListener('click',()=>{
+            if(PET_CLOUD_ENABLED){mutate('ready');return;}
+            if(!state.draftPointsValid||!PET_BATTLE_ELEMENTS.has(el('petBattleElement').value)){
+                state.message='Chọn bổ trợ và giữ tổng chỉ số trong giới hạn trước khi sẵn sàng.';render();return;
+            }
+            mutate('ready',payload());
+        });
         el('petBattleViewInvite').addEventListener('click',event=>{
             const id=event.currentTarget.dataset.matchId;
             if(el('petBattleInvite').open)el('petBattleInvite').close();
@@ -11192,16 +11232,42 @@ const PetBattleGame=(()=>{
             if(match()){syncDraftControls();render();}
             else renderDraft();
         });
-        Object.values(statInputs).forEach(id=>el(id).addEventListener('input',()=>{renderDraft();saveStatsDraft();}));
+        for(const id of Object.values(statInputs)){
+            const slider=el(id),field=document.createElement('input');
+            field.id=id+'Manual';
+            field.className='pet-battle-stat-value pet-battle-stat-manual';
+            field.type='number';field.inputMode='numeric';field.min='1';field.max='10000';field.step='1';field.required=true;
+            field.value=slider.value;
+            const label=slider.parentElement.firstElementChild.textContent;
+            field.setAttribute('aria-label',label+' (nhập tay)');
+            slider.setAttribute('aria-label',label+' (thanh kéo)');
+            slider.previousElementSibling.replaceWith(field);
+            slider.addEventListener('input',()=>{
+                field.value=slider.value;
+                renderDraft();saveStatsDraft();
+            });
+            field.addEventListener('input',()=>{
+                if(field.validity.valid){
+                    slider.max=Math.max(draftBudget()-Object.keys(statInputs).length+1,field.valueAsNumber);
+                    slider.value=field.value;
+                    saveStatsDraft();
+                }
+                renderDraft();
+            });
+            field.addEventListener('blur',()=>{
+                if(!field.validity.valid)field.value=slider.value;
+                renderDraft();
+            });
+        }
         const payload=()=>({petId:el('petBattlePet').value,stats:draftStats(),element:el('petBattleElement').value,stakeGrams:state.botDraft?(state.bot?.stakeGrams||200):Math.round(Number(el('petBattleStake').value)*1000)});
         el('petBattleOpponentList').addEventListener('click',event=>{
             const button=event.target.closest('[data-invite-uid]');
             if(!button||button.disabled)return;
-            if(!el('petBattlePet').value||!state.draftPointsValid||!PET_BATTLE_ELEMENTS.has(el('petBattleElement').value)){
+            if(!el('petBattlePet').value){
                 el('petBattleInviteHint').hidden=false;el('petBattleInviteHint').classList.add('invalid');return;
             }
             const previous=state.active;
-            mutate('create',{...payload(),opponentUid:button.dataset.inviteUid,roomFlow:true}).then(()=>{
+            mutate('create',{...payload(),opponentUid:button.dataset.inviteUid,roomFlow:true,configureLater:!PET_CLOUD_ENABLED}).then(()=>{
                 if(state.active!==previous&&el('petBattleInvitePicker').open)el('petBattleInvitePicker').close();
             });
         });
