@@ -8767,20 +8767,23 @@ function toggleQuickChatPanel() {
     }
 }
 
-function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendancePetArt',previewId='attendancePetPreview',presentation='roam'){
-    let state=null,generation=0;
-    const staged=presentation!=='roam';
-    const fallback = view => {
-        const art=document.getElementById(artId);
-        if (!art) return;
+function attendancePetSvg(view){
         const color=view.dead?'#94a3b8':view.form.color;
-        art.innerHTML=view.egg?`<svg viewBox="0 0 140 100" aria-hidden="true"><defs><radialGradient id="pet-egg-light"><stop stop-color="#fffef5"/><stop offset="1" stop-color="#b9c6d8"/></radialGradient></defs><ellipse cx="70" cy="53" rx="29" ry="38" fill="url(#pet-egg-light)"/><path d="m58 35 9 6-6 9 14 6-8 10" fill="none" stroke="#d5ab66" stroke-width="2"/><circle cx="82" cy="31" r="5" fill="#e4c989"/></svg>`
+        return view.egg?`<svg viewBox="0 0 140 100" aria-hidden="true"><defs><radialGradient id="pet-egg-light"><stop stop-color="#fffef5"/><stop offset="1" stop-color="#b9c6d8"/></radialGradient></defs><ellipse cx="70" cy="53" rx="29" ry="38" fill="url(#pet-egg-light)"/><path d="m58 35 9 6-6 9 14 6-8 10" fill="none" stroke="#d5ab66" stroke-width="2"/><circle cx="82" cy="31" r="5" fill="#e4c989"/></svg>`
             :view.form.kind==='beast'?`<svg viewBox="0 0 140 100" aria-hidden="true"><path d="M28 51Q4 30 10 60M35 58 31 88 42 88 48 62 80 62 85 88 96 88 92 57" fill="none" stroke="${color}" stroke-width="9" stroke-linecap="round"/><ellipse cx="63" cy="51" rx="37" ry="19" fill="${color}"/><circle cx="101" cy="41" r="21" fill="${color}"/><path d="m87 27-3-15 16 11 13-12 4 18" fill="${color}"/><ellipse cx="111" cy="47" rx="12" ry="8" fill="#e4d7b8"/><circle cx="107" cy="35" r="3" fill="#18212a"/></svg>`
             :view.form.kind==='bird'?`<svg viewBox="0 0 140 100" aria-hidden="true"><path d="M70 54Q27 8 8 25L46 65 19 77 72 68Q100 72 110 52L133 48 116 40Q102 23 90 46Z" fill="${color}"/><path d="M62 53Q68 5 95 13L83 57" fill="${color}" stroke="#ffffff55" stroke-width="2"/><circle cx="108" cy="43" r="3" fill="#18212a"/></svg>`
             :view.form.kind==='dino'&&view.form.shape!=='sea'?`<svg viewBox="0 0 140 100" aria-hidden="true"><path d="M20 66 4 51 35 59Q45 31 77 43L91 29 116 28 131 42 125 56 103 53 92 68 91 88 80 88 76 69 57 70 51 88 40 88 43 66Z" fill="${color}"/><path d="m47 45 5-13 8 9 9-16 8 19" fill="#fbbf24"/><circle cx="115" cy="38" r="3" fill="#0f172a"/></svg>`
             :view.form.shape==='clown'?`<svg viewBox="0 0 140 100" aria-hidden="true" ${view.dead?'style="filter:grayscale(1)"':''}><g transform="translate(140 0) scale(-1 1)" fill="${color}" stroke="#251a1b" stroke-width="2.5" stroke-linejoin="round"><path class="pet-fallback-tail" d="M104 46Q114 36 125 39Q133 48 125 63Q113 65 104 54Z"/><path d="M48 31Q48 14 62 18Q76 20 82 32M45 63Q45 81 59 81Q66 79 62 68"/><path d="M15 50Q20 28 55 28Q84 25 108 44L110 55Q81 75 53 73Q22 70 15 50Z"/><path fill="#fff6e8" d="M27 35L38 31Q51 49 36 69L25 63Q37 52 27 35ZM60 28L75 29Q65 45 73 71L59 73Q51 55 60 28ZM96 35L105 41Q101 50 107 58L98 63Q90 50 96 35Z"/><path d="M47 48Q60 51 55 61Q51 67 45 58"/><circle cx="25" cy="48" r="3" fill="#231c21" stroke="none"/><circle cx="24" cy="47" r="1" fill="white" stroke="none"/></g></svg>`
             :`<svg viewBox="0 0 140 100" aria-hidden="true"><defs><radialGradient id="pet-fish-light"><stop stop-color="#ecfeff"/><stop offset="1" stop-color="${color}"/></radialGradient></defs><path class="pet-fallback-tail" d="m42 50-28-24 4 24-4 24Z" fill="${color}"/><ellipse cx="76" cy="50" rx="42" ry="${view.form.kind==='whale'?25:29}" fill="url(#pet-fish-light)"/><path d="m61 26 19-16 12 21M61 73l22 13 7-15" fill="${color}"/><circle cx="101" cy="41" r="7" fill="white"/><circle cx="104" cy="42" r="4" fill="#0f172a"/><path d="M113 58q-8 4-12 0" fill="none" stroke="#0f172a" stroke-width="2"/></svg>`;
-        art.innerHTML=art.innerHTML.replaceAll('pet-egg-light',artId+'-egg-light').replaceAll('pet-fish-light',artId+'-fish-light');
+}
+
+function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendancePetArt',previewId='attendancePetPreview',presentation='roam'){
+    let state=null,generation=0;
+    const staged=presentation!=='roam';
+    const fallback = view => {
+        const art=document.getElementById(artId);
+        if(!art)return;
+        art.innerHTML=attendancePetSvg(view).replaceAll('pet-egg-light',artId+'-egg-light').replaceAll('pet-fish-light',artId+'-fish-light');
         if(state?.previewMode)document.getElementById(previewId).innerHTML=art.innerHTML.replaceAll(artId+'-egg-light',previewId+'-egg-light').replaceAll(artId+'-fish-light',previewId+'-fish-light');
     };
     function disposeModel(s) {
@@ -9732,7 +9735,7 @@ function petComparisonThumbnail(view){
     if(petComparisonImagePending.has(key))return petComparisonImagePending.get(key);
     const generation=petComparisonImageGeneration;
     const task=petComparisonImageQueue.then(async()=>{
-        if(generation!==petComparisonImageGeneration||(!document.getElementById('petCompareDialog')?.open&&!document.getElementById('petGuideDialog')?.open))return null;
+        if(generation!==petComparisonImageGeneration||!document.getElementById('petCompareDialog')?.open)return null;
         if(!petComparisonImageWorker){
             const button=document.createElement('button'),art=document.createElement('span');button.id='petComparisonRenderWorker';button.type='button';button.hidden=true;button.setAttribute('aria-hidden','true');art.id='petComparisonRenderArt';button.appendChild(art);document.body.appendChild(button);
             const renderer=createAttendancePet3D(button.id,art.id,null);petComparisonImageWorker={button,renderer};renderer.start();
@@ -10343,13 +10346,12 @@ function initAttendancePetUi() {
             if(!image.hidden)continue;
             const level=Number(image.dataset.roadLevel),branch=image.closest('[data-branch]')?.dataset.branch||null;
             const form=attendancePetCatalog(branch)[Math.max(0,level-1)];
-            petComparisonThumbnail({form,branch,level,egg:level===0,dead:false}).then(source=>{
-                if(source&&image.isConnected){image.src=source;image.hidden=false;}
-            });
+            const svg=attendancePetSvg({form,egg:level===0});
+            image.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
+            image.hidden=false;
         }
     }));
     document.getElementById('petGuideClose').addEventListener('click',()=>guide.close());
-    guide.addEventListener('close',()=>{if(!document.getElementById('petCompareDialog')?.open)stopPetComparisonThumbnails();});
     toggle.addEventListener('click',()=>{renderAttendancePet();if(!dialog.open)dialog.showModal();AttendancePet3D.preview(true);openAttendancePetBranch(true);});
     const petPreview=document.getElementById('attendancePetPreview');
     petPreview.addEventListener('click',previewAttendancePetSkill);

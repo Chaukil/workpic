@@ -2458,7 +2458,7 @@ if(process.argv.includes('--pet')) await (async()=>{
   const response=await fetch('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js',{signal:AbortSignal.timeout(15000)});assert.ok(response.ok);fs.writeFileSync(path.join(temp,'three.module.js'),await response.text());
   const source=fs.readFileSync('app.js','utf8');
   const shared=source.split('// BEGIN SHARED HELPERS\n')[1].split('// END SHARED HELPERS')[0];
-  let code=source.slice(source.indexOf('function createAttendancePet3D('),source.indexOf('let attendancePetData ='));
+  let code=source.slice(source.indexOf('function attendancePetSvg('),source.indexOf('let attendancePetData ='));
   code=code.replace("import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js')",'Promise.resolve(THREE)').replace('return {start,stop,update,preview,thumbnail,duelPose:pose=>{if(state)state.duel=pose;},feed:','return {inspect:()=>state,start,stop,update,preview,thumbnail,duelPose:pose=>{if(state)state.duel=pose;},feed:');
   const script=`import * as THREE from './three.module.js';
 ${shared}
