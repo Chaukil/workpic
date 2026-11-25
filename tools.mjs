@@ -1006,8 +1006,8 @@ test('eight battle stats split damage and produce reproducible dodge and critica
  assert.equal(Object.keys(petBattleStats(stats,1)).length,8);
  assert.equal(petBattleStats({...stats,magic:19},1).magic,19);
  assert.equal(petBattleMaxHp(stats),590,'duel HP starts at 500 and adds nine per health point');
- assert.equal(petBattlePower(stats,{level:10,branch:'fish'}),petBattlePower(stats)+1000,'branch evolution adds 1000 power');
- assert.equal(petBattlePower(stats,{level:30,branch:'fish'}),petBattlePower(stats)+3000,'level 30 adds another 2000 power');
+ assert.equal(petBattlePower(stats,{level:10,branch:'fish'}),petBattlePower(stats)+1090);
+ assert.equal(petBattlePower(stats,{level:30,branch:'fish'}),petBattlePower(stats)+3290);
  assert.throws(()=>petBattleStats({...stats,magic:21},1));assert.throws(()=>petBattleStats({...stats,dodge:0,health:20},1));
  const players=[{uid:'a',stats,appearance:{level:1}},{uid:'b',stats:{...stats},appearance:{level:1}}];
  const battle=petBattleSimulation(players,'a');assert.deepEqual(battle,petBattleSimulation(JSON.parse(JSON.stringify(players)),'a'));
@@ -2485,7 +2485,7 @@ try {
   for(const [i,view] of views.entries()){
    renderer.update(view);
    state.model.rotation.y=.28;
-   state.model.scale.setScalar(attendancePetScale(view));
+   state.model.scale.setScalar(attendancePetPortraitScale(view));
    state.camera.position.z=7;
    state.camera.updateProjectionMatrix();
    state.renderer.render(state.scene,state.camera);

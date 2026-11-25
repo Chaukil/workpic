@@ -370,7 +370,7 @@ const PET_SPECIES_METERS={
     kingfisher:.25,parrot:1,owl:1.45,eagle:2.1,crane:2.3,peacock:1.8,condor:3.1,albatross:3.4,phoenix:5,
     cub:.45,lynx:.95,leopard:1.7,panther:1.7,cougar:1.9,tiger:2.8,sabertooth:2.2,tortoise:4
 };
-function attendancePetScale(view){
+function attendancePetPortraitScale(view){
     if(view.egg)return .44;
     if(view.level===ATTENDANCE_PET_MAX_LEVEL&&view.branch)return 1.65;
     const key=view.form.kind==='beast'&&view.form.shape==='lion'?'bigLion':view.form.shape;
@@ -378,6 +378,11 @@ function attendancePetScale(view){
     if(view.form.juvenile)meters*=.55;
     if(view.form.crest)meters*=1.16;
     return .4+.92*Math.log1p(meters/.15)/Math.log1p(34/.15);
+}
+function attendancePetScale(view){
+    if(view.egg)return .44;
+    const level=Math.max(1,Math.min(ATTENDANCE_PET_MAX_LEVEL,Number(view.level)||1));
+    return .5+(level-1)*1.15/(ATTENDANCE_PET_MAX_LEVEL-1);
 }
 
 function attendancePetMotion(view) {
@@ -647,7 +652,8 @@ function petBattlePower(stats,appearance={}){
     const base=6*((Number(stats.attack)||0)+(Number(stats.magic)||0))+
         2*((Number(stats.defense)||0)+(Number(stats.magicReduction)||0)+(Number(stats.physicalReduction)||0))+
         4*((Number(stats.dodge)||0)+(Number(stats.luck)||0))+2*(Number(stats.health)||0);
-    return base+(appearance.branch?1000:0)+(Number(appearance.level)===ATTENDANCE_PET_MAX_LEVEL?2000:0);
+    const level=Math.max(1,Number(appearance.level)||1);
+    return base+10*(level-1)+(appearance.branch?1000:0)+(level===ATTENDANCE_PET_MAX_LEVEL?2000:0);
 }
 function petBattleBudget(level,legacy=false){
     const validLevel=Math.max(1,Math.min(ATTENDANCE_PET_MAX_LEVEL,Math.floor(Number(level)||1)));
@@ -9377,7 +9383,7 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
                 if(alive&&!reduced)s.rig.forEach(part=>{const pace=mode==='fly'?7:mode==='walk'?5:3.5;const intensity=mode==='walk'&&!walking&&!petDialogOpen?.08:1;part.mesh.rotation[part.axis]=(part.base||0)+Math.sin(s.t*pace+part.phase)*part.amount*intensity;});
                 const feeding=Math.max(0,1-(s.t-s.fedAt)/1.4);
                 const size=attendancePetScale(s.view||{egg:true});
-                const fitted=staged?size:Math.min(1,size);
+                const fitted=staged||s.previewMode?size:1;
                 s.model.scale.setScalar(fitted*(1+feeding*.07));
                 if(s.divineGlow)s.divineGlow.opacity=reduced?.75:.58+.31*Math.sin(s.t*7)+.11*Math.sin(s.t*15);
                 if(s.mouth)s.mouth.scale.y=1+feeding*Math.abs(Math.sin(s.t*14));
@@ -9480,7 +9486,7 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
         if(s.renderer&&s.model){
             try{
                 s.model.rotation.y=.25;s.model.rotation.z=view.dead?Math.PI*.75:0;
-                s.model.scale.setScalar(attendancePetScale(view));
+                s.model.scale.setScalar(attendancePetPortraitScale(view));
                 s.renderer.render(s.scene,s.camera);
                 const source=s.renderer.domElement.toDataURL('image/png');if(source.startsWith('data:image/png'))return source;
             }catch{}
@@ -10666,7 +10672,9 @@ const PetBattleGame=(()=>{
         if(invalidStat)el('petBattleRemaining').textContent='Nhập số nguyên từ 1 trở lên cho từng chỉ số';
         el('petBattleRemaining').classList.toggle('invalid',remaining<0||invalidStat);
         const meter=el('petBattleAllocationMeter');meter.max=budget;meter.value=Math.min(used,budget);
-        el('petBattleDraftPower').textContent=petPowerLabel(petBattlePower(stats,view));
+        const fighter={stats,element:el('petBattleElement').value};
+        const opponent=state.botDraft?state.bot:match()?.players.find(player=>player.uid!==state.uid);
+        el('petBattleDraftPower').textContent=petPowerLabel(petBattlePower(petBattleEffectiveStats(fighter,opponent),view));
         Object.entries(statInputs).forEach(([key,id])=>{
             const field=el(id+'Manual');
             if(field&&document.activeElement!==field)field.value=stats[key];
@@ -10751,7 +10759,7 @@ const PetBattleGame=(()=>{
                 ?await petCloudRequest('battle',{...payload,id,action})
                 :await runTransaction(db,async tx=>{
                 const battleRef=doc(db,'petBattles',id);
-                const usesProfile=['create','accept','cancel','claim'].includes(action);
+                const usesProfile=['create','accept','cancel','claim'].includes(action)||(action==='ready'&&!!payload.stats);
                 const [userSnapshot,battleSnapshot]=await Promise.all([
                     usesProfile?tx.get(ref):null,
                     action==='create'?null:tx.get(battleRef)
@@ -10797,6 +10805,7 @@ const PetBattleGame=(()=>{
                                 if(!PET_BATTLE_ELEMENTS.has(payload.element))throw new Error('Chọn bổ trợ trước khi sẵn sàng.');
                                 const stats=petBattleStats(payload.stats,player.appearance.level);
                                 next.players=next.players.map(item=>item.uid===uid?{...item,stats,element:payload.element}:item);
+                                patch.petBattleStatsByPet={...user.petBattleStatsByPet,[player.petId]:stats};
                             }
                             next.ready={...next.ready,[uid]:true};
                             if(next.participantUids.every(player=>next.ready[player])){
@@ -11146,7 +11155,12 @@ const PetBattleGame=(()=>{
             el(`petBattleStats${i}`).textContent=view?`Cấp ${view.level}${element?` · ${element.label}`:''}${bonus}`:'';
             const powerBadge=el(`petBattlePower${i}`);
             powerBadge.hidden=!p;
-            if(p)powerBadge.textContent=petPowerLabel(petBattlePower(p.stats,p.appearance));
+            if(p){
+                const editing=configuring&&p.uid===state.uid;
+                const fighter=editing?{stats:draftStats(),element:el('petBattleElement').value}:p;
+                const appearance=editing?attendancePetView(attendancePetSelected(attendancePetData,p.petId)):p.appearance;
+                powerBadge.textContent=petPowerLabel(petBattlePower(petBattleEffectiveStats(fighter,m.players[1-i]),appearance));
+            }
             const badge=el(`petBattleReady${i}`),isReady=!!m.ready?.[p?.uid];
             badge.hidden=!ready||!p;
             badge.classList.toggle('is-ready',isReady);
