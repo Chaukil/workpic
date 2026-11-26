@@ -141,7 +141,7 @@ test('Firestore-only Bot settlement uses one idempotent client transaction', () 
     assert.match(mutateBot, /runTransaction\(db/);
     assert.match(mutateBot, /profile\.petBotClaims/);
     assert.match(mutateBot, /transaction\.update\(ref,patch\)/);
-    assert.match(mutateBot, /usage\[difficulty\]>=BOT_DAILY_LIMIT/);
+    assert.match(mutateBot, /usage\[difficulty\]>=botBattleLimit\(usage,difficulty\)/);
     assert.match(mutateBot, /transaction\.update\(ref,\{petBotDailyBattles:usage,petBattleStatsByPet\}\)/);
     assert.match(client, /const BOT_DAILY_LIMIT=5/);
     const botBattle = backend.slice(backend.indexOf('async function botBattle('), backend.indexOf('async function ranking('));
