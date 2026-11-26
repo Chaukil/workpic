@@ -10866,12 +10866,12 @@ const PetBattleGame=(()=>{
         if(['ready','rps','fighting'].includes(data.status)&&!state.autoOpened.has(id)){state.autoOpened.add(id);open(id);}
         updateInvites();render();process();
     }
-    function listenBattleInvites(){
+    function listenBattleInvites(useRecipientQuery=false){
         if(state.inviteUnsubscribe||state.inviteFailed||Date.now()<state.cooldown)return;
         try{assertPetQuotaAvailable();}catch{return;}
         const uid=state.uid;
         const rooms=collection(db,PET_CLOUD_ENABLED?'petCloudBattles':'petBattles');
-        const invitations=PET_CLOUD_ENABLED
+        const invitations=PET_CLOUD_ENABLED||useRecipientQuery
             ?query(rooms,where('opponentUid','==',uid),limit(50))
             :query(rooms,where('participantUids','array-contains',uid),orderBy('__name__'),limitToLast(50));
         state.inviteUnsubscribe=onSnapshot(invitations,snapshot=>{
@@ -10884,7 +10884,17 @@ const PetBattleGame=(()=>{
                 if(!match||match.status==='invited')receiveMatch({id:doc.id,...doc.data()});
             }
             state.invites=next;updateInvites();render();
-        },error=>{state.inviteUnsubscribe=null;state.inviteFailed=true;fail(error);});
+        },error=>{
+            if(!mine()||state.uid!==uid)return;
+            state.inviteUnsubscribe=null;
+            if(!PET_CLOUD_ENABLED&&!useRecipientQuery&&['permission-denied','failed-precondition'].includes(error.code)){
+                listenBattleInvites(true);
+                return;
+            }
+            state.inviteFailed=true;
+            console.warn('Không thể nhận lời mời đấu qua Firestore.',error);
+            render();
+        });
     }
     function sync(){
         if(!mine())return;state.lastSync=Date.now();const wanted=new Set(Object.keys(state.own?.petBattleLocks||{}).filter(id=>!id.startsWith('bot-'))),offers=[];
@@ -10913,7 +10923,7 @@ const PetBattleGame=(()=>{
         el('petBattleBadge').textContent=incoming.length?String(incoming.length):'';
         if(!incoming.length){if(notice.open)notice.close();return;}
         const invitation=incoming.find(room=>!(el('petBattleDialog').open&&state.active===room.id));
-        if(!invitation||el('petBattleLobby').open){if(notice.open)notice.close();return;}
+        if(!invitation){if(notice.open)notice.close();return;}
         el('petBattleInviteText').textContent=`${invitation.players[0].name} thách đấu ${petWeightLabel(invitation.stakeGrams)} mỗi bên.`;
         el('petBattleViewInvite').dataset.matchId=invitation.id;
         el('petBattleSnoozeInvite').dataset.matchId=invitation.id;
@@ -11393,7 +11403,9 @@ const PetBattleGame=(()=>{
     }
     function render(){
         if(!mine()||(!el('petBattleDialog').open&&!el('petBattleLobby').open))return;
-        const matches=[...state.matches.values()].filter(m=>m.opponentUid===state.uid&&m.status==='invited'&&m.players.length===1&&m.expiresAt>Date.now()).sort((a,b)=>b.createdMs-a.createdMs);
+        const matches=[...state.matches.values()].filter(m=>m.status==='invited'&&m.players.length===1&&m.expiresAt>Date.now()&&(m.opponentUid===state.uid||m.challengerUid===state.uid)).sort((a,b)=>b.createdMs-a.createdMs);
+        const inviteStatus=el('petBattleLobbyInviteStatus');
+        if(inviteStatus)inviteStatus.hidden=!state.inviteFailed;
         const listKey=JSON.stringify(matches.map(m=>m.id));
         const picker=el('petBattleMatches');
         if(state.listKey!==listKey){
@@ -11409,7 +11421,8 @@ const PetBattleGame=(()=>{
             picker.replaceChildren(...options);
             picker.value=matches.some(m=>m.id===selected)||selected==='bot:new'?selected:'';
         }
-        el('petBattleNew').textContent=matches.some(m=>m.id===picker.value)?'Tham gia':'Tạo phòng';
+        const selectedRoom=matches.find(m=>m.id===picker.value);
+        el('petBattleNew').textContent=selectedRoom?(selectedRoom.challengerUid===state.uid?'Mở phòng':'Tham gia'):'Tạo phòng';
         if(!el('petBattleDialog').open)return;
         el('petBattleStatus').textContent=state.message;el('petBattleDialog').setAttribute('aria-busy',String(state.busy));
         const m=match(),incoming=m?.status==='invited'&&m.opponentUid===state.uid&&m.expiresAt>Date.now();
@@ -11557,7 +11570,7 @@ const PetBattleGame=(()=>{
             if(id==='bot:new'){open('',true);return;}
             if(!id){open();return;}
             const room=state.matches.get(id);
-            if(room?.status==='invited'&&room.opponentUid===state.uid&&room.players.length===1&&room.expiresAt>Date.now())open(id);
+            if(room?.status==='invited'&&(room.opponentUid===state.uid||room.challengerUid===state.uid)&&room.players.length===1&&room.expiresAt>Date.now())open(id);
             else render();
         });
         el('petBattleMatches').addEventListener('change',event=>{
