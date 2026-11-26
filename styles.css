@@ -15501,6 +15501,27 @@ body.modal-open .attendance-pet-swimmer,body:has(dialog[open]) .attendance-pet-s
 .pet-admin-level-stepper .btn { min-width:0; white-space:normal; }
 .pet-admin-summary { padding:12px; border:1px solid var(--border); border-radius:12px; background:var(--surface-muted); font-size:.8rem; line-height:1.6; }
 @media(max-width:560px) { .pet-admin-actions { grid-template-columns:repeat(2,minmax(0,1fr)); } .pet-admin-fields { flex-wrap:wrap; } .pet-admin-level-stepper { grid-template-columns:1fr 1fr; }.pet-admin-level-stepper strong { grid-column:1/-1; grid-row:1; } }
+.pet-admin-dialog > header h5 { min-width:0; overflow-wrap:anywhere; }
+.pet-admin-dialog > header > button { flex:none; width:36px; height:36px; border:1px solid var(--border); border-radius:10px; color:var(--text); background:var(--surface-muted); }
+.pet-admin-dialog :is(.pet-admin-panel,.account-section-heading > div,.account-field-grid > div,.pet-admin-bot,.pet-admin-bot-fields > div) { min-width:0; }
+.pet-admin-dialog :is(.form-label,.pet-admin-bot label) { display:block; margin-bottom:5px; font-size:.78rem; line-height:1.4; }
+.pet-admin-dialog :is(.form-control,.form-select) { min-width:0; max-width:100%; }
+.pet-admin-dialog :is(.btn,.account-save-status,.account-section-heading p) { white-space:normal; overflow-wrap:anywhere; }
+.pet-admin-dialog .pet-admin-fields { display:grid; grid-template-columns:minmax(0,1fr) auto; }
+.pet-admin-bot { margin:18px 0 0; padding:12px; border:1px solid var(--border); border-radius:12px; }
+.pet-admin-bot legend { float:none; width:auto; padding:0 6px; margin:0; font-size:.85rem; font-weight:700; line-height:1.4; }
+.pet-admin-bot-fields { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) auto; align-items:end; gap:10px; }
+@media(max-width:560px) {
+    .pet-admin-dialog .pet-admin-panel { padding:12px; }
+    .pet-admin-dialog .account-field-grid,
+    .pet-admin-dialog .pet-admin-weight { grid-template-columns:minmax(0,1fr); }
+    .pet-admin-bot-fields { grid-template-columns:minmax(0,1.5fr) minmax(0,1fr); }
+    .pet-admin-bot-fields > button { grid-column:1/-1; }
+    .pet-admin-dialog .admin-control-account-actions { grid-template-columns:minmax(0,1fr); }
+}
+@media(max-width:380px) {
+    .pet-admin-dialog .pet-admin-fields { grid-template-columns:minmax(0,1fr); }
+}
 .attendance-pet-dialog::backdrop { background: #020617aa; }
 .attendance-pet-dialog > header { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 20px; }
 .attendance-pet-dialog header small { color: var(--muted); font-size: .64rem; letter-spacing: .12em; }

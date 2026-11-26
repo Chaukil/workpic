@@ -506,7 +506,11 @@ async function listWorkpicAdminJobs(collectionName) {
     }).sort((a, b) => b.createdAt - a.createdAt);
 }
 
-export const workpicAdminControl = onCall({ region, maxInstances: 3 }, async request => {
+export const workpicAdminControl = onCall({
+    region,
+    maxInstances: 3,
+    cors: ['https://chaukil.github.io', /^http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/]
+}, async request => {
     requireWorkpicAdmin(request);
     const data = request.data || {};
     if (data.action === 'list-users') return { users: await listWorkpicAdminUsers() };

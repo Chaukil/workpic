@@ -9696,8 +9696,15 @@ async function adminControlRequest(action, data = {}) {
         const { getFunctions, httpsCallable } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js');
         workpicAdminControl = httpsCallable(getFunctions(app, 'us-central1'), 'workpicAdminControl');
     }
-    const response = await workpicAdminControl({ ...data, action });
-    return response.data;
+    try {
+        const response = await workpicAdminControl({ ...data, action });
+        return response.data;
+    } catch (error) {
+        if (['functions/internal','functions/unavailable'].includes(error.code)) {
+            throw new Error('Không kết nối được dịch vụ quản trị. Kiểm tra Cloud Function workpicAdminControl ở vùng us-central1 và cấu hình CORS.', { cause: error });
+        }
+        throw error;
+    }
 }
 
 let adminControlUsers = [], adminControlJobs = [], adminControlLoad = 0, adminControlReady = false, adminControlBusy = false;

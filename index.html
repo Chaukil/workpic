@@ -1494,11 +1494,13 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
                         <div class="pet-admin-fields pet-admin-weight"><div><label class="form-label" for="petAdminWeightAmount">Điều chỉnh cân nặng</label><div class="input-group"><input class="form-control" id="petAdminWeightAmount" type="number" min="0.1" max="100" step="0.1" value="0.2"><span class="input-group-text">kg</span></div></div><div class="pet-admin-weight-actions"><button type="button" class="btn btn-outline-danger" data-pet-admin-weight="-1"><i class="bi bi-dash-lg" aria-hidden="true"></i> Giảm</button><button type="button" class="btn btn-outline-success" data-pet-admin-weight="1"><i class="bi bi-plus-lg" aria-hidden="true"></i> Tăng</button></div></div>
                         <div class="pet-admin-fields"><div><label class="form-label" for="petAdminBranch">Nhánh tiến hóa</label><select class="form-select" id="petAdminBranch"></select></div><button type="button" class="btn btn-outline-primary" id="petAdminApplyBranch">Áp dụng nhánh</button></div>
 <div class="pet-admin-fields"><div><label class="form-label" for="petAdminLevel">Chọn cấp tiến hóa</label><select class="form-select" id="petAdminLevel"></select></div><button type="button" class="btn btn-primary" data-pet-admin="level">Áp dụng cấp</button></div>
-                        <fieldset class="pet-admin-fields">
+                        <fieldset class="pet-admin-bot">
                             <legend>Lượt Bot cộng thêm hôm nay</legend>
+                            <div class="pet-admin-bot-fields">
                             <div><label for="petAdminBotDifficulty">Độ khó</label><select id="petAdminBotDifficulty" class="form-select"><option value="easy">Dễ</option><option value="medium">Trung bình</option><option value="hard">Khó</option></select></div>
                             <div><label for="petAdminBotAmount">Số lượt</label><input id="petAdminBotAmount" type="number" class="form-control" min="1" max="100" step="1" value="1" required></div>
                             <button type="button" id="petAdminBotGrant" class="btn btn-outline-primary">Cộng lượt</button>
+                            </div>
                         </fieldset>
                         <p id="petAdminStatus" class="account-save-status" role="status" aria-live="polite"></p>
                     </section></dialog>
