@@ -636,12 +636,19 @@ function saveStormWater(water, storage) {
 
 const PET_BATTLE_STEP_MS=1800,PET_BATTLE_MAX_TURNS=240;
 const PET_BATTLE_ELEMENTS = new Map([
-    ['metal', {label:'Kim', color:'#e2e8f0', gives:'water'}],
-    ['wood', {label:'Mộc', color:'#4ade80', gives:'fire'}],
-    ['water', {label:'Thủy', color:'#38bdf8', gives:'wood'}],
-    ['fire', {label:'Hỏa', color:'#fb7185', gives:'earth'}],
+    ['metal', {label:'Kim · Bạch Hổ', color:'#e2e8f0', gives:'water'}],
+    ['wood', {label:'Mộc · Thanh Long', color:'#4ade80', gives:'fire'}],
+    ['water', {label:'Thủy · Huyền Vũ', color:'#38bdf8', gives:'wood'}],
+    ['fire', {label:'Hỏa · Chu Tước', color:'#fb7185', gives:'earth'}],
     ['earth', {label:'Thổ', color:'#fbbf24'}],
 ]);
+const PET_BATTLE_SPIRITS={
+    wood:{name:'Thanh Long',move:'Long Mạch Hồi Sinh',color:'#48e0ad',motion:'slam',effect:'wave'},
+    fire:{name:'Chu Tước',move:'Chu Tước Liệt Vũ',color:'#ff633d',motion:'dive',effect:'fire'},
+    water:{name:'Huyền Vũ',move:'Huyền Giáp Thiên Thuẫn',color:'#48c9ee',motion:'shield',effect:'wave'},
+    metal:{name:'Bạch Hổ',move:'Bạch Hổ Phá Quân',color:'#f5d477',motion:'claw',effect:'claw'},
+};
+function petBattleSpirit(element){return PET_BATTLE_SPIRITS[element]||null;}
 function petBattleReceivesBonus(player,opponent){
     return PET_BATTLE_ELEMENTS.has(player.element) && PET_BATTLE_ELEMENTS.get(opponent?.element)?.gives===player.element;
 }
@@ -681,20 +688,58 @@ function petBattleSimulation(players,firstUid){
         !p.budgetVersion&&Object.values(p.stats||{}).reduce((sum,value)=>sum+Number(value),0)===petBattleBudget(p.appearance.level,true),p.statBudget));
     const stats=players.map((player,index)=>petBattleEffectiveStats(player,players[1-index]));
     const hp=stats.map((value,index)=>petBattleMaxHp(value,players[index].appearance)),maxHp=[...hp],turns=[];
+    const attackCounts=[0,0],burnTurns=[0,0],burnDamage=[0,0],turtleShields=[false,false];
     let attacker=players.findIndex(p=>p.uid===firstUid);
     let seed=2166136261;for(const c of JSON.stringify([players,firstUid],(key,value)=>key==='element'?undefined:value))seed=Math.imul(seed^c.charCodeAt(0),16777619)>>>0;
     const roll=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
     while(hp.every(value=>value>0)&&turns.length<PET_BATTLE_MAX_TURNS){
         const defender=1-attacker,a=stats[attacker],d=stats[defender],attack=a.attack,defense=d.defense;
         const modern=Object.hasOwn(a,'magic')||Object.hasOwn(d,'magic');
-        const dodged=modern&&roll()<Math.min(.4,(d.dodge||0)/200),critical=modern&&roll()<Math.min(.35,(a.luck||0)/200);
+        const spirit=petBattleSpirit(players[attacker].element),targetSpirit=petBattleSpirit(players[defender].element);
+        const special=!!spirit&&++attackCounts[attacker]%4===0;
+        if(!spirit)attackCounts[attacker]++;
+        let scorched=0;
+        if(burnTurns[attacker]>0){
+            scorched=Math.min(hp[attacker],burnDamage[attacker]);
+            hp[attacker]=Math.max(0,petBattleNumber(hp[attacker]-scorched));
+            burnTurns[attacker]--;
+            if(!burnTurns[attacker])burnDamage[attacker]=0;
+        }
+        if(hp[attacker]===0){
+            turns.push({index:turns.length+1,attacker:players[attacker].uid,defender:players[defender].uid,
+                damage:0,dodged:false,critical:false,physical:0,magic:0,burnDamage:scorched,hp:[...hp]});
+            break;
+        }
+        const tiger=players[attacker].element==='metal',turtle=players[defender].element==='water';
+        const turtleBlock=turtle&&turtleShields[defender];
+        if(turtleBlock)turtleShields[defender]=false;
+        const dodged=turtleBlock||(modern&&roll()<Math.min(.4,(d.dodge||0)/200));
+        const critChance=modern?Math.min(.5,Math.min(.35,(a.luck||0)/200)+(tiger?.18:0)+(special&&tiger?.27:0)):0;
+        const critical=modern&&!dodged&&roll()<critChance;
+        const criticalMultiplier=special&&tiger?2.5:1.5;
         const physical=(5+attack*2)*100/(100+defense)*100/(100+(d.physicalReduction||0)*2);
         const magic=(a.magic||0)*2*100/(100+defense)*100/(100+(d.magicReduction||0)*2);
-        const damage=modern?(dodged?0:Math.max(1,Math.round((physical+magic)*(critical?1.5:1)))):Math.max(1,Math.round((10+attack*2)*100/(100+defense)));
+        const turtleReduction=turtle?.98:1;
+        const damage=modern?(dodged?0:Math.max(1,Math.round((physical+magic)*(critical?criticalMultiplier:1)*turtleReduction))):Math.max(1,Math.round((10+attack*2)*100/(100+defense)));
         hp[defender]=Math.max(0,petBattleNumber(hp[defender]-damage));
+        let healed=0,appliedBurn=0;
+        if(special&&players[attacker].element==='wood'&&hp[attacker]>0){
+            healed=Math.min(maxHp[attacker]-hp[attacker],Math.round(maxHp[attacker]*.04));
+            hp[attacker]=petBattleNumber(hp[attacker]+healed);
+        }
+        if(special&&players[attacker].element==='fire'&&hp[defender]>0){
+            burnTurns[defender]=3;burnDamage[defender]=Math.max(1,Math.round(maxHp[defender]*.015));appliedBurn=burnDamage[defender];
+        }
+        if(special&&players[attacker].element==='water')turtleShields[attacker]=true;
         turns.push({index:turns.length+1,attacker:players[attacker].uid,defender:players[defender].uid,damage,dodged,critical,
-            physical:modern&&!dodged?physical*(critical?1.5:1):0,
-            magic:modern&&!dodged?magic*(critical?1.5:1):0,hp:[...hp]});attacker=defender;
+            physical:modern&&!dodged?physical*(critical?criticalMultiplier:1):0,
+            magic:modern&&!dodged?magic*(critical?criticalMultiplier:1):0,
+            ...(special?{special:players[attacker].element,specialName:spirit.move,spiritName:spirit.name}:{}),
+            ...(turtleBlock?{blocked:true}:{}),...(scorched?{burnDamage:scorched}:{}),
+            ...(appliedBurn?{burnApplied:appliedBurn,burnTurns:burnTurns[defender]}:{}),
+            ...(healed?{healed}:{}),...(special&&players[attacker].element==='water'?{shielded:true}:{}),
+            hp:[...hp]});
+        attacker=defender;
     }
     return {maxHp,turns,winnerUid:hp[0]===0?players[1].uid:hp[1]===0?players[0].uid:null};
 }
@@ -787,7 +832,9 @@ const PET_BATTLE_SKILL_NAMES={
     bird:['Mũi Mổ Lam','Lông Vũ Ngũ Sắc','Đêm Tuyết','Ưng Lao','Hạc Xuyên Mây','Quạt Công','Sải Cánh Andes','Gió Hải Âu','Phượng Hỏa','Thiên Hỏa','Chu Tước Hỏa Vũ'],
     beast:['Vồ Cỏ','Chớp Tai Nhọn','Vuốt Hoa Mai','Bóng Đen','Vồ Vách Đá','Hổ Vồ Xé Gió','Vuốt Băng','Sư Tử Gầm','Bờm Ánh Trăng','Nanh Kiếm','Bạch Hổ Phá Sơn']
 };
-function petBattleSkill({form,level,branch}){
+function petBattleSkill({form,level,branch},element=null,special=false){
+    const spirit=special?petBattleSpirit(element):null;
+    if(spirit)return {label:spirit.move,motion:spirit.motion,effect:spirit.effect,variant:128+['metal','wood','water','fire'].indexOf(element)};
     const branchLevel=level-ATTENDANCE_PET_FORMS.length-1;
     const key=branchLevel>=0&&PET_BATTLE_SKILL_NAMES[branch]?branch:'base';
     const index=key==='base'?level-1:Math.floor(branchLevel/2);
@@ -4052,6 +4099,7 @@ function updateUserProfileUI() {
 function openUserProfileModal() {
     if (!currentUser) return;
     initPetAdminPanel();
+    initAdminControlPanel();
     accessControl.apply();
     document.getElementById('profileEmail').textContent = currentUser.email || '---';
 
@@ -8796,6 +8844,15 @@ function toggleQuickChatPanel() {
 
 function attendancePetSvg(view){
         const color=view.dead?'#94a3b8':view.form.color;
+        if(view.level===ATTENDANCE_PET_MAX_LEVEL&&view.branch&&!view.dead&&!view.egg){
+            const divine={
+                dino:`<svg viewBox="0 0 140 100" aria-hidden="true"><defs><linearGradient id="spirit-dragon" x2="0" y2="1"><stop stop-color="#b9fff0"/><stop offset=".48" stop-color="#31bba4"/><stop offset="1" stop-color="#14574f"/></linearGradient><radialGradient id="spirit-glow"><stop stop-color="#58efc4" stop-opacity=".42"/><stop offset="1" stop-color="#58efc4" stop-opacity="0"/></radialGradient></defs><ellipse cx="70" cy="51" rx="66" ry="47" fill="url(#spirit-glow)"/><circle cx="70" cy="49" r="39" fill="none" stroke="#e4cc7d" stroke-width="1.5"/><circle cx="70" cy="49" r="35" fill="none" stroke="#9de9d4" stroke-width=".7" stroke-dasharray="2 3"/><path d="M25 67Q39 29 66 44Q84 54 88 34Q90 17 111 19Q126 21 117 35L134 40 119 47Q108 44 102 53L110 70 101 69 94 58Q80 69 63 59Q43 49 34 77L23 82 29 72Z" fill="url(#spirit-dragon)" stroke="#124d48" stroke-width="2"/><path d="m103 25-2-12 9 9 10-10 2 14M116 36l14-4-8 9M96 35l12 6M50 54l7 10m8-11 7 11m9-9 7 10" fill="none" stroke="#f2d783" stroke-width="2" stroke-linecap="round"/><path d="m42 47-8-13 18 7m31-2-7-15 19 10" fill="#287e70" stroke="#d4b96c" stroke-width="1.5"/><circle cx="115" cy="31" r="2" fill="#ffe58c"/></svg>`,
+                bird:`<svg viewBox="0 0 140 100" aria-hidden="true"><defs><linearGradient id="spirit-phoenix" x2="0" y2="1"><stop stop-color="#ffe89a"/><stop offset=".45" stop-color="#ff812f"/><stop offset="1" stop-color="#9d171b"/></linearGradient><radialGradient id="phoenix-glow"><stop stop-color="#ff833d" stop-opacity=".55"/><stop offset="1" stop-color="#ff5833" stop-opacity="0"/></radialGradient></defs><ellipse cx="70" cy="53" rx="65" ry="45" fill="url(#phoenix-glow)"/><circle cx="70" cy="51" r="38" fill="none" stroke="#f4d276" stroke-width="1.5"/><path d="M70 56Q48 37 26 20L47 50 16 44 45 67Q62 75 76 63Q92 76 108 63L131 48 101 51 115 24 83 48Z" fill="url(#spirit-phoenix)" stroke="#83241c" stroke-width="2"/><path d="M70 55Q58 20 68 8Q72 26 78 39Q84 18 95 13Q90 38 83 54" fill="url(#spirit-phoenix)" stroke="#f7cf71" stroke-width="2"/><path d="M68 64Q37 78 26 94Q53 88 73 70Q86 91 113 95Q104 77 82 63" fill="url(#spirit-phoenix)" stroke="#f7cf71" stroke-width="2"/><path d="m46 50 19 11m-32-8 24 14m37-15L77 63m33-10-25 16" stroke="#ffe59a" stroke-width="2" opacity=".85"/><path d="m83 47 20-2-12 9" fill="#ffe08a"/><circle cx="85" cy="44" r="2" fill="#fff6c4"/></svg>`,
+                fish:`<svg viewBox="0 0 140 100" aria-hidden="true"><defs><linearGradient id="spirit-turtle" x2="0" y2="1"><stop stop-color="#b5f6db"/><stop offset=".5" stop-color="#378f83"/><stop offset="1" stop-color="#183c49"/></linearGradient></defs><circle cx="70" cy="49" r="40" fill="none" stroke="#e6d18b" stroke-width="1.5"/><circle cx="70" cy="49" r="35" fill="none" stroke="#6de0d1" stroke-width="1" stroke-dasharray="2 3"/><path d="M28 52Q31 20 68 20Q104 21 108 52Q103 79 66 78Q32 76 28 52Z" fill="url(#spirit-turtle)" stroke="#183d43" stroke-width="3"/><path d="M31 49Q68 10 105 49M34 59Q68 88 102 59M52 23Q44 48 53 73M82 23Q92 49 81 74M38 40Q68 50 98 40" fill="none" stroke="#e2c879" stroke-width="2"/><path d="M100 48Q113 37 124 43L133 51 121 58Q110 61 101 54Z" fill="#68bda6" stroke="#e6d18b" stroke-width="2"/><path d="m105 43-2-12 9 8 8-11 1 17m3 8 13-4-10 10M44 70l-7 13 16-7m34-4 9 13-17-7" fill="#3c8f82" stroke="#cbb66f" stroke-width="2" stroke-linejoin="round"/><path d="M15 88Q41 78 65 88T119 88" fill="none" stroke="#5bd9e5" stroke-width="3" opacity=".8"/><circle cx="117" cy="49" r="2" fill="#fff0a1"/></svg>`,
+                beast:`<svg viewBox="0 0 140 100" aria-hidden="true"><defs><linearGradient id="spirit-tiger" x2="0" y2="1"><stop stop-color="#fffdf3"/><stop offset=".58" stop-color="#d8d8d1"/><stop offset="1" stop-color="#8f9697"/></linearGradient></defs><circle cx="70" cy="50" r="41" fill="none" stroke="#e9cf87" stroke-width="1.6"/><path d="M19 58Q8 38 17 30L34 38Q48 28 73 33Q91 32 102 41L117 35 127 48 119 58Q112 65 98 63L87 77 74 77 70 63 49 63 43 79 31 79 32 61Q25 63 19 58Z" fill="url(#spirit-tiger)" stroke="#50565a" stroke-width="2.5"/><path d="M86 40 94 26 101 37 111 27 114 42M32 40l9 8-8 7m27-17 8 13-9 5m28-14 8 10-9 5m14 4 9 5m-61 8-3 13m26-16 7 13" fill="none" stroke="#bd913d" stroke-width="4" stroke-linecap="round"/><path d="M96 46Q110 41 122 48L114 55 100 54Z" fill="#ece3cb" stroke="#b48b43" stroke-width="1.5"/><path d="m121 49 15-3-10 8" fill="#f3d87c"/><circle cx="108" cy="44" r="2.4" fill="#d79c39"/><path d="M54 32 50 20 64 28 75 16 80 32" fill="#e7d594" stroke="#93723e" stroke-width="1.5"/></svg>`
+            };
+            if(divine[view.branch])return divine[view.branch];
+        }
         return view.egg?`<svg viewBox="0 0 140 100" aria-hidden="true"><defs><radialGradient id="pet-egg-light"><stop stop-color="#fffef5"/><stop offset="1" stop-color="#b9c6d8"/></radialGradient></defs><ellipse cx="70" cy="53" rx="29" ry="38" fill="url(#pet-egg-light)"/><path d="m58 35 9 6-6 9 14 6-8 10" fill="none" stroke="#d5ab66" stroke-width="2"/><circle cx="82" cy="31" r="5" fill="#e4c989"/></svg>`
             :view.form.kind==='beast'?`<svg viewBox="0 0 140 100" aria-hidden="true"><path d="M28 51Q4 30 10 60M35 58 31 88 42 88 48 62 80 62 85 88 96 88 92 57" fill="none" stroke="${color}" stroke-width="9" stroke-linecap="round"/><ellipse cx="63" cy="51" rx="37" ry="19" fill="${color}"/><circle cx="101" cy="41" r="21" fill="${color}"/><path d="m87 27-3-15 16 11 13-12 4 18" fill="${color}"/><ellipse cx="111" cy="47" rx="12" ry="8" fill="#e4d7b8"/><circle cx="107" cy="35" r="3" fill="#18212a"/></svg>`
             :view.form.kind==='bird'?`<svg viewBox="0 0 140 100" aria-hidden="true"><path d="M70 54Q27 8 8 25L46 65 19 77 72 68Q100 72 110 52L133 48 116 40Q102 23 90 46Z" fill="${color}"/><path d="M62 53Q68 5 95 13L83 57" fill="${color}" stroke="#ffffff55" stroke-width="2"/><circle cx="108" cy="43" r="3" fill="#18212a"/></svg>`
@@ -8938,11 +8995,13 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
         disposeModel(s);
         s.result=null;
         const T=s.THREE,group=new T.Group();s.model=group;s.rig=[];s.mouth=null;s.divineGlow=null;s.scene.add(group);
-        if(view.level===ATTENDANCE_PET_MAX_LEVEL&&view.branch&&!view.dead&&!view.egg){
+        const divineForm=view.level===ATTENDANCE_PET_MAX_LEVEL&&view.branch&&!view.dead&&!view.egg;
+        const divineColor={dino:'#42d9b2',bird:'#ff6842',fish:'#45c8e8',beast:'#f0d283'}[view.branch]||view.form.color;
+        if(divineForm){
             const canvas=document.createElement('canvas');canvas.width=canvas.height=128;
-            const ctx=canvas.getContext('2d'),color=view.form.color;
+            const ctx=canvas.getContext('2d'),color=divineColor;
             const glow=ctx.createRadialGradient(64,64,8,64,64,63);
-            glow.addColorStop(0,color+'72');glow.addColorStop(.65,color+'40');glow.addColorStop(1,color+'00');
+            glow.addColorStop(0,color+'a0');glow.addColorStop(.55,color+'55');glow.addColorStop(1,color+'00');
             ctx.fillStyle=glow;ctx.fillRect(0,0,128,128);
             const map=new T.CanvasTexture(canvas);map.colorSpace=T.SRGBColorSpace;
             const aura=new T.Sprite(new T.SpriteMaterial({map,depthWrite:false,transparent:true}));
@@ -8951,6 +9010,69 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
             group.add(aura);
         }
         const applyBattleResult=()=>{
+            if(divineForm){
+                const gold=material('#f2d783'),darkGold=material('#a97932'),glow=new T.MeshBasicMaterial({color:divineColor,transparent:true,opacity:.72});
+                const halo=new T.Mesh(new T.TorusGeometry(1.38,.025,8,64),gold);
+                halo.position.set(-.18,.34,-1.15);halo.scale.set(1,.82,1);group.add(halo);
+                const innerHalo=new T.Mesh(new T.TorusGeometry(1.23,.009,6,64),glow);
+                innerHalo.position.copy(halo.position);innerHalo.scale.copy(halo.scale);group.add(innerHalo);
+                for(let i=0;i<8;i++){
+                    const angle=i*Math.PI/4;
+                    sphere(group,-.18+Math.cos(angle)*1.38,.34+Math.sin(angle)*1.13,-1.12,.045,.045,.028,i%2?gold:darkGold);
+                    tube(group,[[-.18+Math.cos(angle)*1.12,.34+Math.sin(angle)*.92,-1.1],
+                        [-.18+Math.cos(angle)*1.22,.34+Math.sin(angle)*1.0,-1.1]],[.018,.004],gold);
+                }
+                if(view.branch==='dino'){
+                    for(const side of [-1,1]){
+                        tube(group,[[1.05,1.08,side*.13],[.98,1.35,side*.17],[.8,1.53,side*.19],[.68,1.56,side*.19]],[.095,.073,.035,.002],gold);
+                        tube(group,[[1.31,.69,side*.11],[1.51,.64,side*.18],[1.69,.75,side*.19]],[.04,.025,.002],gold);
+                    }
+                    for(let i=0;i<5;i++){
+                        const x=.22+i*.12;
+                        fin(group,[[x,-.22],[x-.03,-.43],[x+.07,-.52],[x+.13,-.34]],i%2?gold:darkGold,0.31);
+                    }
+                    sphere(group,1.15,1.02,.245,.09,.055,.025,glow);
+                    sphere(group,1.15,1.02,-.245,.09,.055,.025,glow);
+                }else if(view.branch==='bird'){
+                    const flame=material('#ff9a42'),sun=material('#ffe79b');
+                    for(let i=0;i<5;i++){
+                        const spread=(i-2)*.12;
+                        fin(group,[[-.55,-.12+spread],[-1.02,-.47+spread],[-1.42,-.57+spread],[-1.21,-.19+spread],[-1.49,.08+spread],[-.91,.12+spread]],i%2?flame:sun,-.12+i*.055);
+                    }
+                    for(const side of [-1,1]){
+                        fin(group,[[.8,.65],[.9,1.02],[1.02,1.24],[1.08,.82]],sun,side*.12);
+                        fin(group,[[.72,.63],[.68,1.0],[.82,1.15],[.9,.75]],flame,side*.14);
+                    }
+                    sphere(group,.95,.25,.19,.16,.12,.08,sun);
+                }else if(view.branch==='fish'){
+                    const shellGold=material('#d4b86e'),shellLight=material('#82d4c2');
+                    const crown= new T.Mesh(new T.TorusGeometry(.68,.045,8,32),gold);
+                    crown.position.set(-.23,.14,.53);crown.rotation.x=Math.PI/2;group.add(crown);
+                    for(let i=0;i<6;i++){
+                        const x=-.68+i*.22,y=.38+Math.sin(i/5*Math.PI)*.13;
+                        tube(group,[[x-.13,y-.07,.42],[x,y+.08,.55],[x+.13,y-.07,.42]],[.016,.028,.004],i%2?shellLight:shellGold);
+                    }
+                    for(const side of [-1,1]){
+                        cone(group,.94,.61,side*.12,.07,.29,gold,-side*.42);
+                        sphere(group,.98,.44,side*.17,.09,.06,.025,glow);
+                    }
+                    tube(group,[[-.85,.23,0],[-1.04,.44,.03],[-1.15,.62,.03]],[.08,.045,.004],shellGold);
+                }else if(view.branch==='beast'){
+                    const mane=material('#f6edda'),stripe=material('#a77935');
+                    const maneRing=new T.Mesh(new T.TorusGeometry(.46,.13,10,32),mane);
+                    maneRing.position.set(.66,.38,0);maneRing.scale.set(1,.85,1);group.add(maneRing);
+                    for(const side of [-1,1]){
+                        tube(group,[[.82,.64,side*.16],[.98,.85,side*.19],[1.13,.91,side*.17]],[.08,.055,.002],gold);
+                        tube(group,[[1.12,.27,side*.2],[1.07,.05,side*.19],[.99,-.11,side*.16]],[.035,.023,.002],mane);
+                    }
+                    for(let i=0;i<5;i++){
+                        const x=.25+i*.12;
+                        tube(group,[[x,.45,.29],[x+.12,.29,.31],[x+.2,.08,.28]],[.025,.035,.002],stripe);
+                    }
+                    sphere(group,1.05,.48,.246,.055,.055,.025,glow);
+                    sphere(group,1.05,.48,-.246,.055,.055,.025,glow);
+                }
+            }
             if(s.duel?.result)setBattleResult(s,s.duel.result);
             else startBattleCritical(s,s.duel?.criticalAt);
         };
@@ -8989,7 +9111,15 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
             ctx.beginPath();ctx.ellipse(x,y,3.8,3.2,0,0,Math.PI*2);ctx.fill();ctx.stroke();
             ctx.fillStyle='rgba(255,245,210,.12)';ctx.fillRect(x-2,y-2,2,1);
         }
-        if(view.form.stripes){ctx.strokeStyle='#302c27';ctx.lineWidth=5;for(let i=0;i<18;i++){const x=i*30;ctx.beginPath();ctx.moveTo(x,0);ctx.bezierCurveTo(x+35,60,x-25,110,x+15,175);ctx.stroke();}}
+        if(view.form.stripes){
+            const divineTiger=divineForm&&view.branch==='beast';
+            for(let i=0;i<(divineTiger?22:18);i++){
+                const x=i*(512/(divineTiger?22:18));
+                ctx.strokeStyle=divineTiger?(i%2?'#9d7134':'#e6ce86'):'#302c27';ctx.lineWidth=divineTiger?7:5;
+                ctx.beginPath();ctx.moveTo(x,0);ctx.bezierCurveTo(x+35,60,x-25,110,x+15,175);ctx.stroke();
+                if(divineTiger){ctx.strokeStyle='#fff3c2';ctx.lineWidth=1.5;ctx.stroke();}
+            }
+        }
         if(view.form.spots){ctx.fillStyle='#302c2780';for(let i=0;i<130;i++){ctx.beginPath();ctx.ellipse(random()*512,random()*256,3+random()*5,2+random()*4,random()*3,0,Math.PI*2);ctx.fill();}}
         const skin=new T.CanvasTexture(skinCanvas);skin.colorSpace=T.SRGBColorSpace;skin.anisotropy=4;
         const relief=skin.clone();relief.colorSpace=T.NoColorSpace;relief.needsUpdate=true;
@@ -9515,6 +9645,173 @@ function attendancePetFoodCursor(view){
 }
 
 const canControlPets = () => auth.currentUser?.email?.toLowerCase() === 'chauchikil01@gmail.com';
+const canUseAdminControl = () => auth.currentUser?.email?.toLowerCase() === 'chauchikil01@gmail.com';
+let workpicAdminControl;
+async function adminControlRequest(action, data = {}) {
+    if (!canUseAdminControl()) throw new Error('Bạn không có quyền sử dụng trung tâm điều khiển.');
+    if (!workpicAdminControl) {
+        const { getFunctions, httpsCallable } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js');
+        workpicAdminControl = httpsCallable(getFunctions(app, 'us-central1'), 'workpicAdminControl');
+    }
+    const response = await workpicAdminControl({ ...data, action });
+    return response.data;
+}
+
+let adminControlUsers = [], adminControlJobs = [], adminControlLoad = 0, adminControlReady = false, adminControlBusy = false;
+function fillAdminControlUser() {
+    const user = adminControlUsers.find(item => item.uid === document.getElementById('adminControlUser').value);
+    if (!user) return;
+    document.getElementById('adminControlName').value = user.displayName;
+    document.getElementById('adminControlEmail').value = user.email;
+    document.getElementById('adminControlDepartment').value = user.department;
+    document.getElementById('adminControlShift').value = user.workShift;
+    document.getElementById('adminControlDeleteUser').disabled = user.uid === auth.currentUser?.uid;
+}
+async function loadAdminControlUsers() {
+    if (!canUseAdminControl() || adminControlBusy) return;
+    const token = ++adminControlLoad, status = document.getElementById('adminControlUserStatus');
+    status.textContent = 'Đang tải tài khoản…';
+    try {
+        const result = await adminControlRequest('list-users');
+        if (token !== adminControlLoad || !canUseAdminControl()) return;
+        const previous = document.getElementById('adminControlUser').value;
+        adminControlUsers = result.users;
+        const select = document.getElementById('adminControlUser');
+        select.replaceChildren(...adminControlUsers.map(user => new Option(`${user.displayName || user.email}${user.disabled ? ' · Đã khóa' : ''}`, user.uid)));
+        select.value = adminControlUsers.some(user => user.uid === previous) ? previous : adminControlUsers[0]?.uid || '';
+        fillAdminControlUser();
+        status.textContent = `${adminControlUsers.length} tài khoản được tải.`;
+    } catch (error) {
+        if (token === adminControlLoad) status.textContent = error.message || 'Không tải được danh sách tài khoản.';
+    }
+}
+async function saveAdminControlUser() {
+    if (!canUseAdminControl() || adminControlBusy) return;
+    const uid = document.getElementById('adminControlUser').value;
+    const status = document.getElementById('adminControlUserStatus');
+    const button = document.getElementById('adminControlSaveUser');
+    if (!uid) { status.textContent = 'Chọn tài khoản cần sửa.'; return; }
+    const values = {
+        uid,
+        displayName: document.getElementById('adminControlName').value.trim(),
+        email: document.getElementById('adminControlEmail').value.trim(),
+        department: document.getElementById('adminControlDepartment').value.trim(),
+        workShift: document.getElementById('adminControlShift').value
+    };
+    if (!values.displayName || !values.email) { status.textContent = 'Tên hiển thị và email không được để trống.'; return; }
+    adminControlBusy = true; button.disabled = true; status.textContent = 'Đang lưu thay đổi…';
+    try {
+        await adminControlRequest('update-user', values);
+        status.textContent = 'Đã cập nhật tài khoản và hồ sơ.';
+        adminControlBusy = false;
+        await loadAdminControlUsers();
+        document.getElementById('adminControlUser').value = uid;
+        fillAdminControlUser();
+    } catch (error) {
+        status.textContent = error.message || 'Không lưu được thay đổi tài khoản.';
+    } finally {
+        adminControlBusy = false; button.disabled = false;
+    }
+}
+function confirmAdminControlDeleteUser() {
+    if (!canUseAdminControl() || adminControlBusy) return;
+    const user = adminControlUsers.find(item => item.uid === document.getElementById('adminControlUser').value);
+    if (!user || user.uid === auth.currentUser?.uid) return;
+    showConfirmDialog({
+        title: 'Xóa tài khoản',
+        message: 'Tài khoản, hồ sơ, job thuộc tài khoản và dữ liệu liên quan sẽ bị xóa vĩnh viễn. Không thể hoàn tác.',
+        confirmText: 'Xóa tài khoản', confirmClass: 'btn-delete',
+        onConfirm: async () => {
+            const button = document.getElementById('adminControlDeleteUser');
+            const status = document.getElementById('adminControlUserStatus');
+            adminControlBusy = true; button.disabled = true; status.textContent = 'Đang xóa tài khoản và dữ liệu…';
+            try {
+                await adminControlRequest('delete-user', { uid: user.uid });
+                status.textContent = 'Đã xóa tài khoản và dữ liệu liên quan.';
+                adminControlBusy = false;
+                await loadAdminControlUsers();
+                await loadAdminControlJobs();
+            } catch (error) {
+                status.textContent = error.message || 'Không xóa được tài khoản.';
+            } finally {
+                adminControlBusy = false; button.disabled = false;
+            }
+        }
+    });
+}
+async function loadAdminControlJobs() {
+    if (!canUseAdminControl() || adminControlBusy) return;
+    const collection = document.getElementById('adminControlJobType').value;
+    const status = document.getElementById('adminControlJobStatus');
+    status.textContent = 'Đang tải job…';
+    try {
+        const result = await adminControlRequest('list-jobs', { collection });
+        if (!canUseAdminControl() || document.getElementById('adminControlJobType').value !== collection) return;
+        adminControlJobs = result.jobs;
+        const select = document.getElementById('adminControlJob'), previous = select.value;
+        select.replaceChildren(...adminControlJobs.map(job => new Option(`${job.title} · ${job.id}${job.owner ? ` · ${job.owner}` : ''}`, job.id)));
+        select.value = adminControlJobs.some(job => job.id === previous) ? previous : adminControlJobs[0]?.id || '';
+        status.textContent = `${adminControlJobs.length} job được tải.`;
+    } catch (error) {
+        status.textContent = error.message || 'Không tải được danh sách job.';
+    }
+}
+function confirmAdminControlDeleteJob() {
+    if (!canUseAdminControl() || adminControlBusy) return;
+    const id = document.getElementById('adminControlJob').value;
+    const job = adminControlJobs.find(item => item.id === id);
+    if (!job) return;
+    showConfirmDialog({
+        title: 'Xóa job',
+        message: 'Job đã chọn sẽ bị xóa vĩnh viễn. Không thể hoàn tác.',
+        confirmText: 'Xóa job', confirmClass: 'btn-delete',
+        onConfirm: async () => {
+            const button = document.getElementById('adminControlDeleteJob');
+            const status = document.getElementById('adminControlJobStatus');
+            adminControlBusy = true; button.disabled = true; status.textContent = 'Đang xóa job…';
+            try {
+                await adminControlRequest('delete-job', { collection: job.collection, id: job.id });
+                adminControlJobs = adminControlJobs.filter(item => item.id !== job.id);
+                const select = document.getElementById('adminControlJob');
+                [...select.options].find(option => option.value === job.id)?.remove();
+                status.textContent = 'Đã xóa job.';
+            } catch (error) {
+                status.textContent = error.message || 'Không xóa được job.';
+            } finally {
+                adminControlBusy = false; button.disabled = false;
+            }
+        }
+    });
+}
+function initAdminControlPanel() {
+    const launch = document.getElementById('adminControlOpen'), panel = document.getElementById('adminControlPanel');
+    const dialog = document.getElementById('adminControlDialog');
+    launch.hidden = !canUseAdminControl();
+    panel.hidden = !canUseAdminControl();
+    if (panel.hidden) {
+        adminControlLoad++; adminControlUsers = []; adminControlJobs = [];
+        if (dialog.open) dialog.close();
+        return;
+    }
+    if (adminControlReady) return;
+    adminControlReady = true;
+    launch.addEventListener('click', () => {
+        if (!canUseAdminControl()) return;
+        if (!dialog.open) dialog.showModal();
+        loadAdminControlUsers();
+        loadAdminControlJobs();
+    });
+    document.getElementById('adminControlClose').addEventListener('click', () => dialog.close());
+    dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
+    document.getElementById('adminControlUser').addEventListener('change', fillAdminControlUser);
+    document.getElementById('adminControlRefresh').addEventListener('click', loadAdminControlUsers);
+    document.getElementById('adminControlSaveUser').addEventListener('click', saveAdminControlUser);
+    document.getElementById('adminControlDeleteUser').addEventListener('click', confirmAdminControlDeleteUser);
+    document.getElementById('adminControlJobType').addEventListener('change', loadAdminControlJobs);
+    document.getElementById('adminControlRefreshJobs').addEventListener('click', loadAdminControlJobs);
+    document.getElementById('adminControlDeleteJob').addEventListener('click', confirmAdminControlDeleteJob);
+}
+
 let petAdminProfiles = [], petAdminBusy = false, petAdminLoad = 0;
 function renderPetAdminSummary(changedAction=null) {
     const preserveDrafts=typeof changedAction==='string';
@@ -10208,7 +10505,7 @@ async function actOnAttendancePet(action) {
             const change = transitionPetHousehold(snapshot.data().attendancePet,action,Date.now(),targetId);
             if (change.changed) transaction.update(ref,{attendancePet:change.pet});
             return change;
-        },{maxAttempts:2});
+        },{maxAttempts:2        });
         if (generation !== attendancePetGeneration || currentUser?.uid !== uid) return;
         attendancePetData = result.pet;
         if(result.spawned)selectedAttendancePetId=attendancePetRecords(result.pet)[0].id;
@@ -10347,6 +10644,10 @@ async function startAttendancePet() {
 
 function stopAttendancePet() {
     PetBattleGame.stop();
+    adminControlLoad++;adminControlUsers=[];adminControlJobs=[];
+    const controlPanel=document.getElementById('adminControlPanel');if(controlPanel)controlPanel.hidden=true;
+    const controlLaunch=document.getElementById('adminControlOpen');if(controlLaunch)controlLaunch.hidden=true;
+    const controlDialog=document.getElementById('adminControlDialog');if(controlDialog?.open)controlDialog.close();
     petAdminLoad++;petAdminProfiles=[];
     const adminPanel=document.getElementById('petAdminPanel');if(adminPanel)adminPanel.hidden=true;
     const adminLaunch=document.getElementById('petAdminOpen');if(adminLaunch)adminLaunch.hidden=true;
@@ -10706,6 +11007,15 @@ const PetBattleGame=(()=>{
         for(const button of el('petBattleSetup').querySelectorAll('[data-battle-element]')){
             button.setAttribute('aria-pressed',String(button.dataset.battleElement===element));
         }
+        const spirit=petBattleSpirit(element),info=el('petBattleSpiritInfo');
+        info.dataset.spirit=element||'';
+        info.textContent=element==='wood'?'Thanh Long · Mỗi tuyệt chiêu hồi 4% HP tối đa.':
+            element==='fire'?'Chu Tước · Thiêu đốt 1,5% HP tối đa trong 3 lượt mục tiêu.':
+                element==='water'?'Huyền Vũ · Giảm 2% sát thương; tuyệt chiêu chặn hoàn toàn đòn kế tiếp.':
+                    element==='metal'?'Bạch Hổ · +18% chí mạng; tuyệt chiêu +27% chí mạng và chí mạng x2,5.':
+                        element==='earth'?'Thổ · Không có tuyệt chiêu thần thú; vẫn giữ tương sinh ngũ hành.':
+                            'Chọn một trong bốn thần thú để xem tuyệt chiêu.';
+        info.classList.toggle('has-spirit',!!spirit);
     }
     function cyclePet(){
         const pet=el('petBattlePet');
@@ -11022,15 +11332,15 @@ const PetBattleGame=(()=>{
         if(!play.last||Date.now()-petBattleTime(m.startedAt)-(m.introMs===5000?5000:2000)-(play.count-1)*PET_BATTLE_STEP_MS>1200)return;
         const attacker=m.players.find(p=>p.uid===play.last.attacker);if(!attacker)return;
         const level=attacker.appearance.level,tier=Math.min(3,Math.floor((level-1)/8));
-        const skill=petBattleSkill(attacker.appearance),{effect,label,variant}=skill;
+        const specialSpirit=petBattleSpirit(play.last.special),skill=petBattleSkill(attacker.appearance,attacker.element,!!specialSpirit),{effect,label,variant}=skill;
         playPetSkillSound(attacker.appearance,skill);
         const glyph={water:'○',fang:'⟫',wave:'≋',fire:'✦',wind:'❯',claw:'╱'}[effect];
-        const fx=document.createElement('div');fx.className=`pet-battle-skill skill-${effect} tier-${tier}`;fx.dataset.direction=play.last.attacker===m.players[0].uid?'right':'left';fx.setAttribute('aria-hidden','true');
+        const fx=document.createElement('div');fx.className=`pet-battle-skill skill-${effect} tier-${tier}${specialSpirit?' is-special':''}`;fx.dataset.direction=play.last.attacker===m.players[0].uid?'right':'left';fx.setAttribute('aria-hidden','true');
         fx.style.setProperty('--power',String(1+tier*.35));
         const element=PET_BATTLE_ELEMENTS.get(attacker.element);
-        if(element)fx.style.setProperty('--skill-color',element.color);
-        for(let i=0;i<4+tier*4;i++){const spark=document.createElement('span');spark.textContent=glyph;spark.style.setProperty('--i',String(i));spark.style.setProperty('--y',`${Math.sin(i*2.399+variant)*(28+variant%15)}px`);fx.appendChild(spark);}
-        const caption=document.createElement('strong');caption.textContent=`${label} · Cấp ${level}`;fx.appendChild(caption);stage.appendChild(fx);
+        fx.style.setProperty('--skill-color',specialSpirit?.color||element?.color||attacker.appearance.form.color);
+        for(let i=0;i<(specialSpirit?16:4+tier*4);i++){const spark=document.createElement('span');spark.textContent=glyph;spark.style.setProperty('--i',String(i));spark.style.setProperty('--y',`${Math.sin(i*2.399+variant)*(28+variant%15)}px`);fx.appendChild(spark);}
+        const caption=document.createElement('strong');caption.textContent=`${specialSpirit?'✦ TUYỆT CHIÊU · ':''}${label} · Cấp ${level}`;fx.appendChild(caption);stage.appendChild(fx);
     }
     function renderStatComparison(players,stats){
         const comparison=el('petBattleStatComparison');
@@ -11176,12 +11486,19 @@ const PetBattleGame=(()=>{
             const result=battleEnded&&m.winnerUid&&p?(m.winnerUid===p.uid?'victory':'defeat'):null;
             state.models[i]?.duelPose({facing:i?Math.PI:0,attackAt:attacking?at:0,hitAt:hit?at+300:0,
                 criticalAt:hit&&play.last?.critical?at+300:0,defeated:result==='defeat',result,
-                kind:p?.appearance.form.kind,level:p?.appearance.level,skill:attacking?petBattleSkill(p.appearance):null,
+                kind:p?.appearance.form.kind,level:p?.appearance.level,skill:attacking?petBattleSkill(p.appearance,p.element,!!play.last?.special):null,
                 skillColor:element?.color||p?.appearance.form.color});
             el(`petBattleSide${i}`).classList.toggle('is-attacking',!!attacking&&Date.now()-at<1000);el(`petBattleSide${i}`).classList.toggle('is-hit',!!hit&&Date.now()-at<1000);
             const damage=el(`petBattleDamage${i}`),dodged=hit&&play.last?.dodged,critical=hit&&!dodged&&play.last?.critical;
-            damage.textContent=dodged?'NÉ ĐÒN':hit&&Number.isFinite(play.last?.damage)?`${critical?'CHÍ MẠNG · ':''}−${play.last.damage}`:'';
+            const notes=[];
+            if(hit)notes.push(play.last?.blocked?'HUYỀN VŨ · CHẶN ĐÒN':dodged?'NÉ ĐÒN':Number.isFinite(play.last?.damage)?`${critical?'CHÍ MẠNG · ':''}−${play.last.damage}`:'');
+            if(attacking&&play.last?.healed)notes.push(`HỒI +${play.last.healed} HP`);
+            if(attacking&&play.last?.burnDamage)notes.push(`THIÊU ĐỐT −${play.last.burnDamage} HP`);
+            if(attacking&&play.last?.shielded)notes.push('THẦN THUẪN KÍCH HOẠT');
+            if(attacking&&play.last?.specialName)notes.unshift(`✦ ${play.last.specialName}`);
+            damage.textContent=notes.filter(Boolean).join(' · ');
             damage.classList.toggle('is-dodged',!!dodged);damage.classList.toggle('is-critical',!!critical);
+            damage.classList.toggle('is-special',!!play.last?.special&&attacking);
         }
         el('petBattleRps').hidden=m.status!=='rps';el('petBattleRpsStatus').textContent=m.commits?.[state.uid]?'Đã khóa lựa chọn. Chờ cả hai bên để mở kết quả.':m.rpsRound?'Vừa hòa. Cả hai cùng chọn lại.':'Lựa chọn được giữ kín đến khi cả hai đã chọn.';
         el('petBattleRps').querySelectorAll('button').forEach(button=>button.disabled=state.busy||!!m.commits?.[state.uid]);

@@ -1470,6 +1470,7 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
                         <div class="input-group mt-3 d-none" id="profileNewDeptRow"><input type="text" class="form-control" id="profileNewDeptName" maxlength="40" placeholder="Tên bộ phận mới" aria-label="Tên bộ phận mới"><button class="btn account-save-name" type="button" id="profileNewDeptSaveBtn"><i class="bi bi-plus-lg"></i> Thêm</button></div>
                         <p class="account-inline-note"><i class="bi bi-check-circle"></i> Bộ phận và ca làm việc được lưu khi bạn thay đổi.</p>
                         <button type="button" class="btn btn-outline-primary pet-admin-launch" id="petAdminOpen" hidden><i class="bi bi-magic" aria-hidden="true"></i> Trung tâm điều khiển thú cưng</button>
+                        <button type="button" class="btn btn-outline-danger pet-admin-launch" id="adminControlOpen" hidden><i class="bi bi-sliders" aria-hidden="true"></i> Trung tâm điều khiển</button>
                         <p id="profileSaveStatus" class="account-save-status" role="status" aria-live="polite"></p>
                     </section>
 
@@ -1495,6 +1496,26 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
 <div class="pet-admin-fields"><div><label class="form-label" for="petAdminLevel">Chọn cấp tiến hóa</label><select class="form-select" id="petAdminLevel"></select></div><button type="button" class="btn btn-primary" data-pet-admin="level">Áp dụng cấp</button></div>
                         <p id="petAdminStatus" class="account-save-status" role="status" aria-live="polite"></p>
                     </section></dialog>
+<dialog id="adminControlDialog" class="pet-admin-dialog admin-control-dialog" aria-labelledby="adminControlTitle"><header><h5 id="adminControlTitle">Trung tâm điều khiển</h5><button type="button" id="adminControlClose" aria-label="Đóng">✕</button></header>
+    <section class="account-section pet-admin-panel" id="adminControlPanel" hidden>
+        <div class="account-section-heading"><span class="account-section-icon"><i class="bi bi-shield-lock"></i></span><div><h6>Quản lý tài khoản</h6><p>Sửa thông tin hồ sơ hoặc xóa tài khoản và dữ liệu liên quan.</p></div></div>
+        <div class="pet-admin-fields"><div><label class="form-label" for="adminControlUser">Tài khoản</label><select class="form-select" id="adminControlUser"></select></div><button type="button" class="btn btn-outline-secondary" id="adminControlRefresh">Tải lại</button></div>
+        <div class="account-field-grid">
+            <div><label class="form-label" for="adminControlName">Tên hiển thị</label><input class="form-control" id="adminControlName" maxlength="120" autocomplete="off"></div>
+            <div><label class="form-label" for="adminControlEmail">Email</label><input class="form-control" id="adminControlEmail" type="email" required autocomplete="off"></div>
+            <div><label class="form-label" for="adminControlDepartment">Bộ phận</label><input class="form-control" id="adminControlDepartment" maxlength="80"></div>
+            <div><label class="form-label" for="adminControlShift">Ca làm việc</label><select class="form-select" id="adminControlShift"><option value="day">Ca ngày</option><option value="night">Ca đêm</option></select></div>
+        </div>
+        <div class="pet-admin-actions admin-control-account-actions"><button type="button" class="btn btn-primary" id="adminControlSaveUser"><i class="bi bi-check2"></i> Lưu thay đổi</button><button type="button" class="btn btn-outline-danger" id="adminControlDeleteUser"><i class="bi bi-trash"></i> Xóa tài khoản</button></div>
+        <p id="adminControlUserStatus" class="account-save-status" role="status" aria-live="polite"></p>
+        <hr>
+        <div class="account-section-heading"><span class="account-section-icon"><i class="bi bi-briefcase"></i></span><div><h6>Xóa job</h6><p>Chọn loại và job cần xóa. Thao tác này không thể hoàn tác.</p></div></div>
+        <div class="pet-admin-fields"><div><label class="form-label" for="adminControlJobType">Loại job</label><select class="form-select" id="adminControlJobType"><option value="jobs">Job lịch</option><option value="quickJobs">Job trong ngày</option></select></div><button type="button" class="btn btn-outline-secondary" id="adminControlRefreshJobs">Tải lại</button></div>
+        <label class="form-label" for="adminControlJob">Job cần xóa</label><select class="form-select" id="adminControlJob"></select>
+        <button type="button" class="btn btn-outline-danger mt-3" id="adminControlDeleteJob"><i class="bi bi-trash"></i> Xóa job đã chọn</button>
+        <p id="adminControlJobStatus" class="account-save-status" role="status" aria-live="polite"></p>
+    </section>
+</dialog>
     <!-- Change Password Confirm Modal -->
     <div class="modal fade workpic-dialog" id="changePasswordConfirmModal" tabindex="-1">
         <div class="modal-dialog modal-md modal-dialog-centered">
@@ -2235,9 +2256,14 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
                 </ul>
             </section>
             <section class="attendance-pet-guide-card">
-                <h6><i class="bi bi-stars" aria-hidden="true"></i> Bổ trợ và chỉ số</h6>
+                <h6><i class="bi bi-stars" aria-hidden="true"></i> Thần thú và chỉ số</h6>
                 <ul class="attendance-pet-tips">
-                    <li><strong>Kim → Thủy → Mộc → Hỏa → Thổ</strong><span>Bên được tương sinh tăng 1% toàn bộ chỉ số trong trận.</span></li>
+                    <li><strong>Mỗi thần thú tung tuyệt chiêu ở đòn thứ 4</strong><span>Đánh thường 3 lần rồi kích hoạt kỹ năng; nhịp kỹ năng được tính riêng cho mỗi bên.</span></li>
+                    <li><strong>Thanh Long · Long Mạch Hồi Sinh</strong><span>Mỗi tuyệt chiêu hồi 4% HP tối đa, không vượt quá HP tối đa.</span></li>
+                    <li><strong>Chu Tước · Chu Tước Liệt Vũ</strong><span>Thiêu đốt 1,5% HP tối đa trong 3 lượt của mục tiêu. Hiệu ứng mới làm mới, không cộng dồn.</span></li>
+                    <li><strong>Huyền Vũ · Huyền Giáp Thiên Thuẫn</strong><span>Giảm 2% sát thương mỗi lần trúng đòn. Tuyệt chiêu tạo khiên chặn hoàn toàn đòn kế tiếp.</span></li>
+                    <li><strong>Bạch Hổ · Bạch Hổ Phá Quân</strong><span>Tăng 18 điểm phần trăm chí mạng; tuyệt chiêu tăng thêm 27 điểm phần trăm (tối đa 50%) và chí mạng nhân 2,5.</span></li>
+                    <li><strong>Kim → Thủy → Mộc → Hỏa → Thổ</strong><span>Bên được tương sinh tăng 1% toàn bộ chỉ số trong trận. Chọn thần thú theo Kim · Bạch Hổ, Thủy · Huyền Vũ, Mộc · Thanh Long và Hỏa · Chu Tước.</span></li>
                     <li><strong>Điểm phân bổ theo cấp</strong><span>Cấp 1 có 100 điểm. Từ cấp 2 đến 9, mỗi cấp thêm 1 điểm. Từ cấp 10, mỗi cấp thêm 2 điểm.</span></li>
                     <li><strong>Sát thương vật lý</strong><span>Sát thương gốc = 5 + 2 × điểm vật lý của bên đánh.</span></li>
                     <li><strong>Sát thương phép</strong><span>Sát thương gốc = 2 × điểm phép của bên đánh.</span></li>
@@ -2245,8 +2271,8 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
                     <li><strong>Giảm sát thương vật lý</strong><span>Phần vật lý nhân thêm 100 ÷ (100 + 2 × điểm giảm vật lý của bên đỡ).</span></li>
                     <li><strong>Giảm sát thương phép</strong><span>Phần phép nhân thêm 100 ÷ (100 + 2 × điểm giảm phép của bên đỡ).</span></li>
                     <li><strong>Né đòn</strong><span>Mỗi điểm cho 0,5 điểm phần trăm cơ hội né toàn bộ đòn, tối đa 40%.</span></li>
-                    <li><strong>Chí mạng</strong><span>Mỗi điểm cho 0,5 điểm phần trăm cơ hội chí mạng, tối đa 35%. Chí mạng nhân tổng sát thương sau giảm với 1,5.</span></li>
-                    <li><strong>Máu</strong><span>HP tối đa = 100 + 8 × điểm máu.</span></li>
+                    <li><strong>Chí mạng</strong><span>Mỗi điểm cho 0,5 điểm phần trăm cơ hội chí mạng, tối đa 35%. Bạch Hổ được cộng 18 điểm phần trăm; tuyệt chiêu cộng thêm 27 điểm phần trăm (tối đa 50%) và chí mạng nhân 2,5. Các thần thú khác chí mạng nhân 1,5.</span></li>
+                    <li><strong>Máu</strong><span>HP tối đa = 500 + 9 × điểm máu.</span></li>
                     <li><strong>Sát thương cuối cùng</strong><span>Cộng phần vật lý và phép sau khi giảm, tính chí mạng nếu có rồi làm tròn. Đòn trúng gây ít nhất 1 HP, đòn bị né gây 0 HP.</span></li>
                     <li><strong>Lưu phân bổ chỉ số</strong><span>Chỉ số tự lưu trên trình duyệt này cho từng thú cưng.</span></li>
                 </ul>
@@ -2303,14 +2329,15 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
             <select id="petBattlePet" hidden></select>
             <div class="pet-battle-fields"><label>Kg cược mỗi bên<input id="petBattleStake" type="number" min="0.1" step="0.1" value="0.2"></label></div>
             <fieldset class="pet-battle-elements">
-                <legend>Bổ trợ ngũ hành</legend>
+                <legend>Chọn thần thú hộ mệnh</legend>
                 <input type="hidden" id="petBattleElement" hidden>
-                <button type="button" data-battle-element="metal" aria-pressed="false">Kim</button>
-                <button type="button" data-battle-element="wood" aria-pressed="false">Mộc</button>
-                <button type="button" data-battle-element="water" aria-pressed="false">Thủy</button>
-                <button type="button" data-battle-element="fire" aria-pressed="false">Hỏa</button>
+                <button type="button" data-battle-element="metal" aria-pressed="false">⚔ Bạch Hổ</button>
+                <button type="button" data-battle-element="wood" aria-pressed="false">🐉 Thanh Long</button>
+                <button type="button" data-battle-element="water" aria-pressed="false">🐢 Huyền Vũ</button>
+                <button type="button" data-battle-element="fire" aria-pressed="false">🔥 Chu Tước</button>
                 <button type="button" data-battle-element="earth" aria-pressed="false">Thổ</button>
             </fieldset>
+            <p id="petBattleSpiritInfo" class="pet-battle-spirit-info" aria-live="polite"></p>
             <div class="pet-battle-stat-head"><strong>Phân bổ chỉ số · <span id="petBattleBudget">100</span> điểm</strong><button type="button" id="petBattleBalanceStats">Chia cân bằng</button></div>
             <div class="pet-battle-stat-fields">
                 <label><span>Sát thương vật lý</span><span class="pet-battle-stat-value" aria-hidden="true">13</span><input type="range" id="petBattleAttack" min="1" max="93" step="1" value="13"></label>

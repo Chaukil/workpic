@@ -51,8 +51,8 @@ console.log(`Deploy dist/: index.html (${((await stat('dist/index.html')).size /
 
     "test": async () => {
 const helperSource = fs.readFileSync('app.js', 'utf8').replace(/\r\n/g,'\n').split('// BEGIN SHARED HELPERS\n')[1].split('// END SHARED HELPERS')[0];
-const helperModule = helperSource + '\nexport { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater, attendancePetDay, newAttendancePet, attendancePetView, transitionAttendancePet, adjustAdminPet, attendancePetMotion, attendancePetTravelBounds, attendancePetCatalog, attendancePetScale, ATTENDANCE_PET_BRANCHES, normalizePetNickname, attendancePetRecords, attendancePetSelected, attendancePetHouseholdDay, transitionPetHousehold, attendancePetWeight, attendancePetActivityTime, buildPetComparison, unchangedPetAdminAction, petBattleBudget, petBattleStats, petBattleMaxHp, petBattlePower, petBattleRps, petBattleSimulation, petBattlePlayback, petBattleChangeWeight, petBattleFighter, petBattleClaimAmount, petBattleSettleXp, petBattleCompletePet, makePetBattleBot, petBattleSkill, petBattleCommitment };';
-const { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater, attendancePetDay, newAttendancePet, attendancePetView, transitionAttendancePet, adjustAdminPet, attendancePetMotion, attendancePetTravelBounds, attendancePetCatalog, attendancePetScale, ATTENDANCE_PET_BRANCHES, normalizePetNickname, attendancePetRecords, attendancePetSelected, attendancePetHouseholdDay, transitionPetHousehold, attendancePetWeight, attendancePetActivityTime, buildPetComparison, unchangedPetAdminAction, petBattleBudget, petBattleStats, petBattleMaxHp, petBattlePower, petBattleRps, petBattleSimulation, petBattlePlayback, petBattleChangeWeight, petBattleFighter, petBattleClaimAmount, petBattleSettleXp, petBattleCompletePet, makePetBattleBot, petBattleSkill, petBattleCommitment } = await import('data:text/javascript;base64,' + Buffer.from(helperModule).toString('base64'));
+const helperModule = helperSource + '\nexport { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater, attendancePetDay, newAttendancePet, attendancePetView, transitionAttendancePet, adjustAdminPet, attendancePetMotion, attendancePetTravelBounds, attendancePetCatalog, attendancePetScale, ATTENDANCE_PET_BRANCHES, normalizePetNickname, attendancePetRecords, attendancePetSelected, attendancePetHouseholdDay, transitionPetHousehold, attendancePetWeight, attendancePetActivityTime, buildPetComparison, unchangedPetAdminAction, petBattleBudget, petBattleStats, petBattleMaxHp, petBattlePower, petBattleRps, petBattleSimulation, petBattlePlayback, petBattleChangeWeight, petBattleFighter, petBattleClaimAmount, petBattleSettleXp, petBattleCompletePet, makePetBattleBot, petBattleSpirit, petBattleSkill, petBattleCommitment };';
+const { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater, attendancePetDay, newAttendancePet, attendancePetView, transitionAttendancePet, adjustAdminPet, attendancePetMotion, attendancePetTravelBounds, attendancePetCatalog, attendancePetScale, ATTENDANCE_PET_BRANCHES, normalizePetNickname, attendancePetRecords, attendancePetSelected, attendancePetHouseholdDay, transitionPetHousehold, attendancePetWeight, attendancePetActivityTime, buildPetComparison, unchangedPetAdminAction, petBattleBudget, petBattleStats, petBattleMaxHp, petBattlePower, petBattleRps, petBattleSimulation, petBattlePlayback, petBattleChangeWeight, petBattleFighter, petBattleClaimAmount, petBattleSettleXp, petBattleCompletePet, makePetBattleBot, petBattleSpirit, petBattleSkill, petBattleCommitment } = await import('data:text/javascript;base64,' + Buffer.from(helperModule).toString('base64'));
 
 
 
@@ -1001,6 +1001,60 @@ test('battle stats, RPS and automatic turn timeline are deterministic for both v
  assert.notEqual(await petBattleCommitment('id','a',0,'rock','nonce'),await petBattleCommitment('id','a',1,'rock','nonce'));
 });
 
+test('four spirit ultimates trigger after three attacks and stay within their combat rules',()=>{
+ const stats={attack:10,magic:10,defense:20,physicalReduction:10,magicReduction:10,dodge:10,luck:10,health:20};
+ const fighter=(uid,element)=>({uid,petId:uid,element,stats,appearance:{level:1}});
+ const battle=(a,b)=>petBattleSimulation([fighter('a',a),fighter('b',b)],'a');
+ assert.deepEqual(['wood','fire','water','metal'].map(key=>petBattleSpirit(key).name),['Thanh Long','Chu Tước','Huyền Vũ','Bạch Hổ']);
+
+ const dragon=battle('wood','earth'),dragonTurns=dragon.turns.filter(turn=>turn.attacker==='a');
+ assert.equal(dragonTurns[0].special,undefined);
+ assert.equal(dragonTurns[3].special,'wood','the fourth personal attack is the first ultimate');
+ assert.ok(dragonTurns[3].healed>0&&dragonTurns[3].healed<=Math.round(dragon.maxHp[0]*.04),'Dragon healing is capped at four percent of maximum HP');
+
+ const phoenix=battle('earth','fire'),fireTurn=phoenix.turns.find(turn=>turn.special==='fire');
+ assert.equal(fireTurn.burnTurns,3);
+ assert.ok(fireTurn.burnApplied>0&&fireTurn.burnApplied<=Math.round(phoenix.maxHp[0]*.015));
+ const burnTick=phoenix.turns.find(turn=>turn.attacker==='a'&&turn.burnDamage>0);
+ assert.equal(burnTick.burnDamage,fireTurn.burnApplied,'burn ticks on the target turn and does not stack');
+
+ const turtle=battle('earth','water'),turtleTurn=turtle.turns.find(turn=>turn.special==='water');
+ assert.ok(turtleTurn.shielded);
+ const shieldHit=turtle.turns.find(turn=>turn.blocked);
+ assert.equal(shieldHit.damage,0,'the shield fully blocks the next incoming hit');
+ assert.equal(shieldHit.defender,'b');
+
+ const tiger=battle('metal','earth'),tigerTurn=tiger.turns.find(turn=>turn.special==='metal');
+ assert.equal(tigerTurn.specialName,petBattleSpirit('metal').move);
+ if(tigerTurn.critical)assert.equal(tigerTurn.damage,Math.round((tigerTurn.physical+tigerTurn.magic)*2.5));
+ assert.equal(petBattleSkill({form:{kind:'dino'},level:30,branch:'dino'},'metal',true).label,'Bạch Hổ Phá Quân');
+});
+
+test('spirit matchups stay within a balanced win-rate band across six stat builds',()=>{
+ const profiles=[
+  {attack:10,magic:10,defense:20,physicalReduction:10,magicReduction:10,dodge:10,luck:10,health:20},
+  {attack:33,magic:5,defense:14,physicalReduction:5,magicReduction:14,dodge:5,luck:5,health:19},
+  {attack:5,magic:33,defense:14,physicalReduction:14,magicReduction:5,dodge:5,luck:5,health:19},
+  {attack:5,magic:5,defense:19,physicalReduction:17,magicReduction:17,dodge:7,luck:7,health:23},
+  {attack:6,magic:6,defense:14,physicalReduction:6,magicReduction:6,dodge:25,luck:10,health:27},
+  {attack:15,magic:15,defense:14,physicalReduction:8,magicReduction:8,dodge:8,luck:24,health:8}
+ ];
+ const elements=['wood','fire','water','metal'];
+ for(let x=0;x<elements.length;x++)for(let y=x+1;y<elements.length;y++){
+  let score=0,total=0;
+  for(let pa=0;pa<profiles.length;pa++)for(let pb=0;pb<profiles.length;pb++)for(let i=0;i<200;i++){
+   const players=[
+    {uid:'a',petId:`balance-a-${pa}-${pb}-${i}`,element:elements[x],stats:profiles[pa],appearance:{level:1}},
+    {uid:'b',petId:`balance-b-${pa}-${pb}-${i}`,element:elements[y],stats:profiles[pb],appearance:{level:1}}
+   ];
+   const result=petBattleSimulation(players,i%2?'a':'b');
+   total++;if(result.winnerUid==='a')score++;else if(!result.winnerUid)score+=.5;
+  }
+  const winRate=score/total;
+  assert.ok(winRate>=.38&&winRate<=.62,`${elements[x]} vs ${elements[y]} win rate ${(winRate*100).toFixed(1)}% is outside 38–62%`);
+ }
+});
+
 test('eight battle stats split damage and produce reproducible dodge and critical turns',()=>{
  const stats={attack:20,magic:20,defense:10,physicalReduction:10,magicReduction:10,dodge:10,luck:10,health:10};
  assert.equal(Object.keys(petBattleStats(stats,1)).length,8);
@@ -1931,7 +1985,6 @@ let PET_CLOUD_ENABLED=false;
 let petCloudRequest=()=>{throw new Error('Unexpected cloud request in the legacy fixture');};
 ${extract('let attendancePetData =', 'let sharedNotesUnsubscribe =').replace('return {init,start,stop,sync,profile,open};','return {init,start,stop,sync,profile,open,inspect:()=>state};')}
 let noteSnapshot, noteWrites = [], noteUpdates = [], noteDeletes = [], noteUnsubscribed = 0, rejectNoteWrite = false;
-const collection = (_, name) => name;
 const query = (...args) => args, orderBy = (...args) => args, limit = value => value;
 const serverTimestamp = () => 'server-timestamp';
 const onSnapshot = (_, callback) => { noteSnapshot = callback; return () => noteUnsubscribed++; };

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { createHash, randomInt, randomUUID } from 'node:crypto';
 import { initializeApp } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
 import { FieldPath, FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { getFunctions } from 'firebase-admin/functions';
 import { defineString } from 'firebase-functions/params';
@@ -23,6 +24,7 @@ const { ATTENDANCE_PET_BRANCHES, attendancePetActivityTime, attendancePetRecords
 
 initializeApp();
 const db = getFirestore();
+const firebaseAuth = getAuth();
 const region = 'us-central1';
 const adminUid = defineString('PET_ADMIN_UID');
 const profiles = db.collection('petProfiles');
@@ -381,6 +383,146 @@ export const workpicPets = onCall({ region, maxInstances: 3 }, async request => 
         if (error.code) throw error;
         throw new HttpsError('failed-precondition', error.message);
     }
+});
+
+const workpicAdminEmail = 'chauchikil01@gmail.com';
+
+function requireWorkpicAdmin(request) {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'Hãy đăng nhập.');
+    if (request.auth.token.email?.toLowerCase() !== workpicAdminEmail) {
+        throw new HttpsError('permission-denied', 'Bạn không có quyền sử dụng trung tâm điều khiển.');
+    }
+}
+
+async function deleteMatchingDocuments(collectionName, field, value) {
+    const snapshot = await db.collection(collectionName).where(field, '==', value).get();
+    for (let offset = 0; offset < snapshot.docs.length; offset += 400) {
+        const batch = db.batch();
+        snapshot.docs.slice(offset, offset + 400).forEach(document => batch.delete(document.ref));
+        await batch.commit();
+    }
+}
+
+async function listWorkpicAdminUsers() {
+    const profileSnapshot = await legacy.get();
+    const profilesByUid = new Map();
+    [...profileSnapshot.docs]
+        .sort((a, b) => String(a.data().updatedAt || a.data().createdAt || '').localeCompare(String(b.data().updatedAt || b.data().createdAt || '')))
+        .forEach(document => {
+            const profile = document.data();
+            if (typeof profile.uid === 'string' && profile.uid) profilesByUid.set(profile.uid, profile);
+        });
+
+    const users = [];
+    let pageToken;
+    do {
+        const page = await firebaseAuth.listUsers(1000, pageToken);
+        for (const account of page.users) {
+            const profile = profilesByUid.get(account.uid) || {};
+            users.push({
+                uid: account.uid,
+                email: account.email || profile.email || '',
+                displayName: profile.displayName || account.displayName || account.email?.split('@')[0] || '',
+                department: profile.department || '',
+                workShift: profile.workShift === 'night' ? 'night' : 'day',
+                disabled: account.disabled
+            });
+        }
+        pageToken = page.pageToken;
+    } while (pageToken);
+    users.sort((a, b) => (a.displayName || a.email).localeCompare(b.displayName || b.email, 'vi'));
+    return users;
+}
+
+async function updateWorkpicAdminUser(request) {
+    const uid = requireId(request.data?.uid);
+    const displayName = typeof request.data?.displayName === 'string' ? request.data.displayName.trim() : '';
+    const email = typeof request.data?.email === 'string' ? request.data.email.trim().toLowerCase() : '';
+    const department = typeof request.data?.department === 'string' ? request.data.department.trim() : '';
+    const workShift = request.data?.workShift;
+    if (!displayName || displayName.length > 120 || !email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+        || department.length > 80 || !['day', 'night'].includes(workShift)) {
+        throw new HttpsError('invalid-argument', 'Thông tin tài khoản không hợp lệ.');
+    }
+
+    await firebaseAuth.updateUser(uid, { displayName, email });
+    const profiles = await legacy.where('uid', '==', uid).get();
+    const profileData = { uid, displayName, email, department, workShift, updatedAt: new Date().toISOString() };
+    if (profiles.empty) {
+        await legacy.doc(uid).set(profileData);
+    } else {
+        for (let offset = 0; offset < profiles.docs.length; offset += 400) {
+            const batch = db.batch();
+            profiles.docs.slice(offset, offset + 400).forEach(document => batch.update(document.ref, profileData));
+            await batch.commit();
+        }
+    }
+    return { uid, displayName, email, department, workShift };
+}
+
+async function deleteWorkpicAdminUser(request) {
+    const uid = requireId(request.data?.uid);
+    if (uid === request.auth.uid) throw new HttpsError('failed-precondition', 'Không thể xóa tài khoản đang sử dụng.');
+    try {
+        await firebaseAuth.getUser(uid);
+    } catch (error) {
+        if (error.code !== 'auth/user-not-found') throw error;
+    }
+
+    await deleteMatchingDocuments('users', 'uid', uid);
+    await deleteMatchingDocuments('jobs', 'ownerId', uid);
+    await deleteMatchingDocuments('quickJobs', 'createdBy', uid);
+    await deleteMatchingDocuments('notifications', 'userId', uid);
+    await deleteMatchingDocuments('dayOffs', 'userId', uid);
+    await deleteMatchingDocuments('jobDayOverrides', 'userId', uid);
+    await deleteMatchingDocuments('transferRequests', 'fromUid', uid);
+    await deleteMatchingDocuments('transferRequests', 'toUid', uid);
+    await deleteMatchingDocuments('quickJobTransferRequests', 'fromUid', uid);
+    await deleteMatchingDocuments('quickJobTransferRequests', 'toUid', uid);
+    await Promise.all([db.collection('petProfiles').doc(uid).delete(), db.collection('userDirectory').doc(uid).delete()]);
+    try {
+        await firebaseAuth.deleteUser(uid);
+    } catch (error) {
+        if (error.code !== 'auth/user-not-found') throw error;
+    }
+    return { uid };
+}
+
+async function listWorkpicAdminJobs(collectionName) {
+    if (!['jobs', 'quickJobs'].includes(collectionName)) throw new HttpsError('invalid-argument', 'Loại job không hợp lệ.');
+    const snapshot = await db.collection(collectionName).get();
+    return snapshot.docs.map(document => {
+        const data = document.data();
+        const createdAt = typeof data.createdAt === 'number' ? data.createdAt
+            : typeof data.createdAt?.toMillis === 'function' ? data.createdAt.toMillis()
+                : Date.parse(data.createdAt || '') || 0;
+        return {
+            id: document.id,
+            collection: collectionName,
+            title: String(data.title || data.content || data.name || 'Job không có tiêu đề').slice(0, 180),
+            owner: String(data.ownerId || data.createdBy || data.assigneeUid || ''),
+            createdAt
+        };
+    }).sort((a, b) => b.createdAt - a.createdAt);
+}
+
+export const workpicAdminControl = onCall({ region, maxInstances: 3 }, async request => {
+    requireWorkpicAdmin(request);
+    const data = request.data || {};
+    if (data.action === 'list-users') return { users: await listWorkpicAdminUsers() };
+    if (data.action === 'update-user') return updateWorkpicAdminUser(request);
+    if (data.action === 'delete-user') return deleteWorkpicAdminUser(request);
+    if (data.action === 'list-jobs') return { jobs: await listWorkpicAdminJobs(data.collection) };
+    if (data.action === 'delete-job') {
+        const collectionName = data.collection;
+        if (!['jobs', 'quickJobs'].includes(collectionName)) throw new HttpsError('invalid-argument', 'Loại job không hợp lệ.');
+        const jobRef = db.collection(collectionName).doc(requireId(data.id));
+        const job = await jobRef.get();
+        if (!job.exists) throw new HttpsError('not-found', 'Không tìm thấy job cần xóa.');
+        await jobRef.delete();
+        return { id: jobRef.id, collection: collectionName };
+    }
+    throw new HttpsError('invalid-argument', 'Thao tác trung tâm điều khiển không hợp lệ.');
 });
 
 export const syncWorkpicUserDirectory = onDocumentWritten({ region, document: 'users/{profileId}' }, async event => {
