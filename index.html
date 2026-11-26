@@ -2267,11 +2267,12 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
                 <h6><i class="bi bi-stars" aria-hidden="true"></i> Thần thú và chỉ số</h6>
                 <ul class="attendance-pet-tips">
                     <li><strong>Mỗi thần thú tung tuyệt chiêu ở đòn thứ 4</strong><span>Đánh thường 3 lần rồi kích hoạt kỹ năng; nhịp kỹ năng được tính riêng cho mỗi bên.</span></li>
-                    <li><strong>Thanh Long · Long Mạch Hồi Sinh</strong><span>Mỗi tuyệt chiêu hồi 4% HP tối đa, không vượt quá HP tối đa.</span></li>
-                    <li><strong>Chu Tước · Chu Tước Liệt Vũ</strong><span>Thiêu đốt 1,5% HP tối đa trong 3 lượt của mục tiêu. Hiệu ứng mới làm mới, không cộng dồn.</span></li>
-                    <li><strong>Huyền Vũ · Huyền Giáp Thiên Thuẫn</strong><span>Giảm 2% sát thương mỗi lần trúng đòn. Tuyệt chiêu tạo khiên chặn hoàn toàn đòn kế tiếp.</span></li>
-                    <li><strong>Bạch Hổ · Bạch Hổ Phá Quân</strong><span>Tăng 18 điểm phần trăm chí mạng; tuyệt chiêu tăng thêm 27 điểm phần trăm (tối đa 50%) và chí mạng nhân 2,5.</span></li>
-                    <li><strong>Kim → Thủy → Mộc → Hỏa → Thổ</strong><span>Bên được tương sinh tăng 1% toàn bộ chỉ số trong trận. Chọn thần thú theo Kim · Bạch Hổ, Thủy · Huyền Vũ, Mộc · Thanh Long và Hỏa · Chu Tước.</span></li>
+                    <li><strong>Thanh Long · Long Vũ Tái Sinh</strong><span>+5% HP tối đa. Hồi 8% ngay và 4% mỗi lượt trong 2 lượt sau.</span></li>
+                    <li><strong>Chu Tước · Liệt Diễm Trùng Sinh</strong><span>Đòn trúng thiêu đốt 1% HP mỗi lượt trong 2 lượt, tối đa 3 cộng dồn. Tuyệt chiêu thiêu đốt thêm 2% mỗi lượt trong 3 lượt và tăng 10% sát thương nhận.</span></li>
+                    <li><strong>Huyền Vũ · Huyền Giáp Hộ Thân</strong><span>Giảm 6% sát thương nhận. Tuyệt chiêu chặn đòn tiếp theo và tăng 20% Phòng thủ trong 2 lượt.</span></li>
+                    <li><strong>Bạch Hổ · Hổ Gầm Trời</strong><span>Tăng 12 điểm phần trăm chí mạng. Trong 2 lượt sau tuyệt chiêu, tăng thêm 18 điểm phần trăm và chí mạng nhân 2.</span></li>
+                    <li><strong>Thổ Kỳ Lân Thạch Tâm · Phong Ấn Đại Địa</strong><span>Giảm 50% sát thương đòn trúng đầu tiên, sau đó giảm 6%. Tuyệt chiêu gây sát thương như đòn thường và câm lặng mục tiêu 2 lượt, giảm 10 điểm phần trăm chí mạng.</span></li>
+                    <li><strong>Kim → Thủy → Mộc → Hỏa → Thổ</strong><span>Bên được tương sinh tăng 1% toàn bộ chỉ số trong trận. Thổ chọn Thạch Tâm.</span></li>
                     <li><strong>Điểm phân bổ theo cấp</strong><span>Cấp 1 có 100 điểm. Từ cấp 2 đến 9, mỗi cấp thêm 1 điểm. Từ cấp 10, mỗi cấp thêm 2 điểm.</span></li>
                     <li><strong>Sát thương vật lý</strong><span>Sát thương gốc = 5 + 2 × điểm vật lý của bên đánh.</span></li>
                     <li><strong>Sát thương phép</strong><span>Sát thương gốc = 2 × điểm phép của bên đánh.</span></li>
@@ -2321,6 +2322,7 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
                 <small>Chủ phòng</small>
                 <div id="petBattleDraftModel" class="pet-battle-model pet-battle-draft-model" aria-hidden="true" hidden><span id="petBattleDraftArt"></span><div id="petBattleDraftStats0" class="pet-battle-model-stats side-0"></div></div>
                 <strong id="petBattleDraftPet"></strong>
+                <strong id="petBattleDraftPower" class="pet-power-badge" aria-live="polite"></strong>
             </div>
             <button type="button" id="petBattleAddOpponent" class="pet-battle-add-opponent"><span aria-hidden="true">+</span> Mời đối thủ</button>
             <div id="petBattleBotSlot" class="pet-battle-draft-host" hidden>
@@ -2361,7 +2363,6 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
             <div id="petBattleAllocation" class="pet-battle-allocation">
                 <div><strong id="petBattleUsed"></strong><span id="petBattleRemaining" role="status"></span></div>
                 <progress id="petBattleAllocationMeter" aria-label="Điểm chỉ số đã phân bổ" max="100" value="100"></progress>
-                <strong id="petBattleDraftPower" class="pet-power-badge" aria-live="polite"></strong>
             </div>
             <div class="pet-battle-actions"><button type="button" id="petBattleBotStart" hidden>Sẵn sàng</button><button type="button" id="petBattleAccept" hidden>Chấp nhận &amp; giữ kg cược</button><button type="button" id="petBattleReject" hidden>Từ chối</button></div>
         </section>

@@ -15787,7 +15787,7 @@ body.modal-open .attendance-pet-swimmer,body:has(dialog[open]) .attendance-pet-s
 .pet-battle-draft-host > small { grid-row:1; align-self:center; }
 .pet-battle-draft-host > .pet-battle-draft-model { grid-row:2; }
 .pet-battle-draft-host > strong { grid-row:3; align-self:center; }
-.pet-battle-draft-host > .pet-power-badge { grid-row:4; align-self:center; }
+.pet-battle-draft-host > .pet-power-badge { grid-row:4; align-self:center; justify-self:center; }
 .pet-battle-draft-host > .pet-battle-ready-tag { grid-row:5; align-self:center; margin:0; }
 .pet-battle-draft-host > .pet-battle-bot-levels { grid-row:6; align-self:end; }
 .pet-battle-dialog .pet-battle-cycle { position:absolute; top:7px; left:7px; z-index:2; display:grid; place-items:center; width:32px; height:32px; padding:0; font-size:1.05rem; }

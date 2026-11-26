@@ -640,13 +640,14 @@ const PET_BATTLE_ELEMENTS = new Map([
     ['wood', {label:'Mộc · Thanh Long', color:'#4ade80', gives:'fire'}],
     ['water', {label:'Thủy · Huyền Vũ', color:'#38bdf8', gives:'wood'}],
     ['fire', {label:'Hỏa · Chu Tước', color:'#fb7185', gives:'earth'}],
-    ['earth', {label:'Thổ', color:'#fbbf24'}],
+    ['earth', {label:'Thổ · Thạch Tâm', color:'#fbbf24'}],
 ]);
 const PET_BATTLE_SPIRITS={
-    wood:{name:'Thanh Long',move:'Long Mạch Hồi Sinh',color:'#48e0ad',motion:'slam',effect:'wave'},
-    fire:{name:'Chu Tước',move:'Chu Tước Liệt Vũ',color:'#ff633d',motion:'dive',effect:'fire'},
-    water:{name:'Huyền Vũ',move:'Huyền Giáp Thiên Thuẫn',color:'#48c9ee',motion:'shield',effect:'wave'},
-    metal:{name:'Bạch Hổ',move:'Bạch Hổ Phá Quân',color:'#f5d477',motion:'claw',effect:'claw'},
+    wood:{name:'Thanh Long',move:'Long Vũ Tái Sinh',color:'#48e0ad',motion:'slam',effect:'wave'},
+    fire:{name:'Chu Tước',move:'Liệt Diễm Trùng Sinh',color:'#ff633d',motion:'dive',effect:'fire'},
+    water:{name:'Huyền Vũ',move:'Huyền Giáp Hộ Thân',color:'#48c9ee',motion:'shield',effect:'wave'},
+    metal:{name:'Bạch Hổ',move:'Hổ Gầm Trời',color:'#f5d477',motion:'claw',effect:'claw'},
+    earth:{name:'Thổ Kỳ Lân Thạch Tâm',move:'Phong Ấn Đại Địa',color:'#fbbf24',motion:'slam',effect:'claw'},
 };
 function petBattleSpirit(element){return PET_BATTLE_SPIRITS[element]||null;}
 function petBattleReceivesBonus(player,opponent){
@@ -687,56 +688,65 @@ function petBattleSimulation(players,firstUid){
     players.forEach(p=>petBattleStats(p.stats,p.appearance.level,
         !p.budgetVersion&&Object.values(p.stats||{}).reduce((sum,value)=>sum+Number(value),0)===petBattleBudget(p.appearance.level,true),p.statBudget));
     const stats=players.map((player,index)=>petBattleEffectiveStats(player,players[1-index]));
-    const hp=stats.map((value,index)=>petBattleMaxHp(value,players[index].appearance)),maxHp=[...hp],turns=[];
-    const attackCounts=[0,0],burnTurns=[0,0],burnDamage=[0,0],turtleShields=[false,false];
+    const hp=stats.map((value,index)=>petBattleNumber(petBattleMaxHp(value,players[index].appearance)*(players[index].element==='wood'?1.05:1))),maxHp=[...hp],turns=[];
+    const effects=players.map(()=>({count:0,burns:[],ultimateBurn:0,shield:false,guard:0,burst:0,regen:0,silence:0,firstHit:true}));
     let attacker=players.findIndex(p=>p.uid===firstUid);
     let seed=2166136261;for(const c of JSON.stringify([players,firstUid],(key,value)=>key==='element'?undefined:value))seed=Math.imul(seed^c.charCodeAt(0),16777619)>>>0;
     const roll=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
     while(hp.every(value=>value>0)&&turns.length<PET_BATTLE_MAX_TURNS){
-        const defender=1-attacker,a=stats[attacker],d=stats[defender],attack=a.attack,defense=d.defense;
+        const defender=1-attacker,a=stats[attacker],d=stats[defender],attack=a.attack;
+        const self=effects[attacker],target=effects[defender],element=players[attacker].element,rival=players[defender].element;
+        const defense=d.defense*(target.guard>0?1.2:1);
         const modern=Object.hasOwn(a,'magic')||Object.hasOwn(d,'magic');
-        const spirit=petBattleSpirit(players[attacker].element),targetSpirit=petBattleSpirit(players[defender].element);
-        const special=!!spirit&&++attackCounts[attacker]%4===0;
-        if(!spirit)attackCounts[attacker]++;
-        let scorched=0;
-        if(burnTurns[attacker]>0){
-            scorched=Math.min(hp[attacker],burnDamage[attacker]);
-            hp[attacker]=Math.max(0,petBattleNumber(hp[attacker]-scorched));
-            burnTurns[attacker]--;
-            if(!burnTurns[attacker])burnDamage[attacker]=0;
-        }
+        const spirit=petBattleSpirit(element),silenced=self.silence>0,burst=self.burst>0;
+        const special=++self.count%4===0&&!!spirit&&!silenced;
+        const reduction=rival==='water'?.94:rival==='earth'?(target.firstHit?.5:.94):1;
+        const burnRate=self.burns.length*.01+(self.ultimateBurn>0?.02:0);
+        const burnReduction=element==='water'||element==='earth'&&!self.firstHit?.94:1;
+        const scorched=Math.min(hp[attacker],petBattleNumber(maxHp[attacker]*burnRate*burnReduction*(self.ultimateBurn>0?1.1:1)));
+        hp[attacker]=petBattleNumber(hp[attacker]-scorched);
+        self.burns=self.burns.map(left=>left-1).filter(left=>left>0);
+        for(const key of ['ultimateBurn','burst','silence'])self[key]=Math.max(0,self[key]-1);
         if(hp[attacker]===0){
             turns.push({index:turns.length+1,attacker:players[attacker].uid,defender:players[defender].uid,
                 damage:0,dodged:false,critical:false,physical:0,magic:0,burnDamage:scorched,hp:[...hp]});
             break;
         }
-        const tiger=players[attacker].element==='metal',turtle=players[defender].element==='water';
-        const turtleBlock=turtle&&turtleShields[defender];
-        if(turtleBlock)turtleShields[defender]=false;
-        const dodged=turtleBlock||(modern&&roll()<Math.min(.4,(d.dodge||0)/200));
-        const critChance=modern?Math.min(.5,Math.min(.35,(a.luck||0)/200)+(tiger?.18:0)+(special&&tiger?.27:0)):0;
-        const critical=modern&&!dodged&&roll()<critChance;
-        const criticalMultiplier=special&&tiger?2.5:1.5;
+        const turtleBlock=target.shield;
+        target.shield=false;
+        target.guard=Math.max(0,target.guard-1);
+        const dodged=!turtleBlock&&modern&&roll()<Math.min(.4,(d.dodge||0)/200);
+        const critChance=Math.max(0,Math.min(1,Math.min(.35,(a.luck||0)/200)+(element==='metal'?.12:0)+(burst?.18:0)-(silenced?.1:0)));
+        const critical=!turtleBlock&&!dodged&&roll()<critChance;
+        const criticalMultiplier=burst?2:1.5;
         const physical=(5+attack*2)*100/(100+defense)*100/(100+(d.physicalReduction||0)*2);
         const magic=(a.magic||0)*2*100/(100+defense)*100/(100+(d.magicReduction||0)*2);
-        const turtleReduction=turtle?.98:1;
-        const damage=modern?(dodged?0:Math.max(1,Math.round((physical+magic)*(critical?criticalMultiplier:1)*turtleReduction))):Math.max(1,Math.round((10+attack*2)*100/(100+defense)));
+        const multiplier=(critical?criticalMultiplier:1)*reduction*(target.ultimateBurn>0?1.1:1);
+        const damage=turtleBlock||dodged?0:Math.max(1,Math.round((modern?physical+magic:(10+attack*2)*100/(100+defense))*multiplier));
+        if(damage)target.firstHit=false;
         hp[defender]=Math.max(0,petBattleNumber(hp[defender]-damage));
         let healed=0,appliedBurn=0;
-        if(special&&players[attacker].element==='wood'&&hp[attacker]>0){
-            healed=Math.min(maxHp[attacker]-hp[attacker],Math.round(maxHp[attacker]*.04));
+        if(element==='wood'&&(special||self.regen>0)){
+            healed=Math.min(maxHp[attacker]-hp[attacker],petBattleNumber(maxHp[attacker]*((special?.08:0)+(self.regen>0?.04:0))));
             hp[attacker]=petBattleNumber(hp[attacker]+healed);
+            self.regen=special?2:self.regen-1;
         }
-        if(special&&players[attacker].element==='fire'&&hp[defender]>0){
-            burnTurns[defender]=3;burnDamage[defender]=Math.max(1,Math.round(maxHp[defender]*.015));appliedBurn=burnDamage[defender];
+        if(damage&&element==='fire'&&hp[defender]>0){
+            if(target.burns.length===3)target.burns.shift();
+            target.burns.push(2);
+            if(special)target.ultimateBurn=3;
+            appliedBurn=petBattleNumber(maxHp[defender]*(target.burns.length*.01+(target.ultimateBurn>0?.02:0)));
         }
-        if(special&&players[attacker].element==='water')turtleShields[attacker]=true;
+        if(special&&element==='water'){self.shield=true;self.guard=2;}
+        if(special&&element==='metal')self.burst=2;
+        if(special&&element==='earth'&&damage)target.silence=2;
         turns.push({index:turns.length+1,attacker:players[attacker].uid,defender:players[defender].uid,damage,dodged,critical,
-            physical:modern&&!dodged?physical*(critical?criticalMultiplier:1):0,
-            magic:modern&&!dodged?magic*(critical?criticalMultiplier:1):0,
+            physical:modern&&damage?physical*multiplier:0,
+            magic:modern&&damage?magic*multiplier:0,
             ...(special?{special:players[attacker].element,specialName:spirit.move,spiritName:spirit.name}:{}),
             ...(turtleBlock?{blocked:true}:{}),...(scorched?{burnDamage:scorched}:{}),
-            ...(appliedBurn?{burnApplied:appliedBurn,burnTurns:burnTurns[defender]}:{}),
+            ...(appliedBurn?{burnApplied:appliedBurn,burnTurns:target.ultimateBurn||2}:{}),
+            ...(silenced?{silenced:true}:{}),
             ...(healed?{healed}:{}),...(special&&players[attacker].element==='water'?{shielded:true}:{}),
             hp:[...hp]});
         attacker=defender;
@@ -11095,12 +11105,12 @@ const PetBattleGame=(()=>{
         }
         const spirit=petBattleSpirit(element),info=el('petBattleSpiritInfo');
         info.dataset.spirit=element||'';
-        info.textContent=element==='wood'?'Thanh Long · Mỗi tuyệt chiêu hồi 4% HP tối đa.':
-            element==='fire'?'Chu Tước · Thiêu đốt 1,5% HP tối đa trong 3 lượt mục tiêu.':
-                element==='water'?'Huyền Vũ · Giảm 2% sát thương; tuyệt chiêu chặn hoàn toàn đòn kế tiếp.':
-                    element==='metal'?'Bạch Hổ · +18% chí mạng; tuyệt chiêu +27% chí mạng và chí mạng x2,5.':
-                        element==='earth'?'Thổ · Không có tuyệt chiêu thần thú; vẫn giữ tương sinh ngũ hành.':
-                            'Chọn một trong bốn thần thú để xem tuyệt chiêu.';
+        info.textContent=element==='wood'?'Thanh Long · +5% HP tối đa. Hồi 8% ngay và 4% mỗi lượt trong 2 lượt tiếp theo.':
+            element==='fire'?'Chu Tước · Đòn trúng thiêu đốt 1% HP mỗi lượt, tối đa 3 cộng dồn. Tuyệt chiêu thiêu đốt 2% mỗi lượt trong 3 lượt và tăng 10% sát thương nhận.':
+                element==='water'?'Huyền Vũ · Giảm 6% sát thương. Chặn đòn kế tiếp và tăng 20% Phòng thủ trong 2 lượt.':
+                    element==='metal'?'Bạch Hổ · +12 điểm phần trăm chí mạng. Sau tuyệt chiêu, 2 lượt tiếp theo tăng thêm 18 điểm và chí mạng ×2.':
+                        element==='earth'?'Thạch Tâm · Giảm 50% ở đòn trúng đầu tiên, sau đó giảm 6%. Tuyệt chiêu câm lặng 2 lượt và giảm 10 điểm phần trăm chí mạng.':
+                            'Chọn bổ trợ để xem nội tại và tuyệt chiêu.';
         info.classList.toggle('has-spirit',!!spirit);
     }
     function cyclePet(){
@@ -11584,6 +11594,7 @@ const PetBattleGame=(()=>{
             if(hit)notes.push(play.last?.blocked?'HUYỀN VŨ · CHẶN ĐÒN':dodged?'NÉ ĐÒN':Number.isFinite(play.last?.damage)?`${critical?'CHÍ MẠNG · ':''}−${play.last.damage}`:'');
             if(attacking&&play.last?.healed)notes.push(`HỒI +${play.last.healed} HP`);
             if(attacking&&play.last?.burnDamage)notes.push(`THIÊU ĐỐT −${play.last.burnDamage} HP`);
+            if(attacking&&play.last?.silenced)notes.push('CÂM LẶNG');
             if(attacking&&play.last?.shielded)notes.push('THẦN THUẪN KÍCH HOẠT');
             if(attacking&&play.last?.specialName)notes.unshift(`✦ ${play.last.specialName}`);
             damage.textContent=notes.filter(Boolean).join(' · ');
