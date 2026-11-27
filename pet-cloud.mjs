@@ -138,8 +138,8 @@ function settleProfile(profile, player, match, id, endedAt, now, finished) {
     let pet = amount ? petBattleChangeWeight(profile.attendancePet, player.petId, amount, now) : profile.attendancePet;
     let xpChange = 0;
     if (finished) {
-        if (match.winnerUid && match.stakeXp) {
-            const xp = petBattleSettleXp(pet, player.petId, won ? match.stakeXp : -match.stakeXp, now);
+        if (match.winnerUid) {
+            const xp = petBattleSettleXp(pet, player.petId, won ? 1 : -1, now);
             pet = xp.pet; xpChange = xp.change;
         }
         const opponent = match.players.find(other => other.uid !== player.uid);
@@ -215,7 +215,7 @@ async function battle(uid, data) {
             profilePatch = { ...activityPatch(pet, now), petBattleStatsByPet:{...(owner.petBattleStatsByPet||{}),[player.petId]:player.stats}, petBattleLocks: { ...owner.petBattleLocks,
                 [id]: { petId: player.petId, stakeGrams: stake } } };
             match = { version: 1, roomFlow: true, challengerUid: uid, opponentUid, participantUids: [uid, opponentUid],
-                players: [player], stakeGrams: stake, stakeXp: Math.floor(stake / 200), status: 'invited', createdMs: now,
+                players: [player], stakeGrams: stake, stakeXp: 1, status: 'invited', createdMs: now,
                 expiresAt: now + 600000, ready: {}, claims: {}, turns: [], maxHp: [], winnerUid: null, startedAt: null };
             tx.create(ref, match);
         } else {

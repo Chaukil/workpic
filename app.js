@@ -11297,7 +11297,7 @@ const PetBattleGame=(()=>{
                     patch.attendancePet=petBattleChangeWeight(user.attendancePet,fighter.petId,-stake,now);
                     locks[id]={petId:fighter.petId,stakeGrams:stake,peerUid:payload.opponentUid,role:'challenger',createdAt:now,expiresAt:now+600000};patch.petBattleLocks=locks;
                     next={version:1,challengerUid:uid,opponentUid:payload.opponentUid,participantUids:[uid,payload.opponentUid],players:[fighter],stakeGrams:stake,status:'invited',createdMs:now,createdAt:serverTimestamp(),expiresAt:now+600000,rpsRound:0,commits:{},reveals:{},claims:{},turns:[],maxHp:[],winnerUid:null,startedAt:null};
-                    next.stakeXp=Math.floor(stake/200);
+                    next.stakeXp=1;
                     next.roomFlow=payload.roomFlow===true;
                 }else{
                     if(!next||next.version!==1||!next.participantUids?.includes(uid))throw new Error('Không có quyền xem trận này.');next={...next};
@@ -11361,8 +11361,8 @@ const PetBattleGame=(()=>{
                             if(amount===null||!lock)throw new Error('Chưa có kết quả hoặc không có kg cần nhận.');
                             if(lock.stakeGrams!==next.stakeGrams||!next.players.some(player=>player.uid===uid&&player.petId===lock.petId))throw new Error('Thông tin cược không khớp.');
                             if(amount>0)patch.attendancePet=petBattleChangeWeight(user.attendancePet,lock.petId,amount,now);
-                            if(next.status==='finished'&&next.winnerUid&&Number.isSafeInteger(next.stakeXp)&&next.stakeXp>0){
-                                const delta=next.winnerUid===uid?next.stakeXp:-next.stakeXp;
+                            if(next.status==='finished'&&next.winnerUid){
+                                const delta=next.winnerUid===uid?1:-1;
                                 const result=petBattleSettleXp(patch.attendancePet||user.attendancePet,lock.petId,delta,now);
                                 if(result.change)patch.attendancePet=result.pet;
                                 next.xpChanges={...next.xpChanges,[uid]:result.change};
