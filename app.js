@@ -830,7 +830,7 @@ function petBattleCompletePet(root,petId,match,uid,xpDelta,weightDelta,now){
         const battleWinStreak=won?(Number(p.battleWinStreak)||0)+1:0;
         const expiryField=won?'victoryAuraUntil':'defeatAuraUntil';
         const aura=match.winnerUid&&until>(Number(p[expiryField])||0)
-            ?won?{victoryAuraUntil:until}:{defeatAuraUntil:until,defeatOpponentName:entry.opponentName}
+            ?won?{victoryAuraUntil:until,victoryOpponentName:entry.opponentName}:{defeatAuraUntil:until,defeatOpponentName:entry.opponentName}
             :{};
         return {...p,battleHistory,battleWinStreak,...aura};
     });
@@ -9016,6 +9016,7 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
             const aura=new T.Sprite(new T.SpriteMaterial({map,depthWrite:false,transparent:true}));
             aura.position.set(-.2,.36,-1.05);aura.scale.set(3.1,2.5,1);aura.renderOrder=-1;
             s.divineGlow=aura.material;
+            s.divineAura=aura;
             group.add(aura);
         }
         const applyBattleResult=()=>{
@@ -9683,7 +9684,13 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
                 const size=attendancePetScale(s.view||{egg:true});
                 const fitted=staged||s.previewMode?size:1;
                 s.model.scale.setScalar(fitted*(1+feeding*.07));
-                if(s.divineGlow)s.divineGlow.opacity=reduced?.75:.58+.31*Math.sin(s.t*7)+.11*Math.sin(s.t*15);
+                if(s.divineGlow){
+                    const cycle=s.t%3.1,beat=Math.min(2,Math.floor(cycle/.8));
+                    const pulse=cycle<2.4?Math.sin(Math.PI*(cycle%.8)/.8)**2:0;
+                    const swell=reduced?1:1+pulse*(beat+1)*.17;
+                    s.divineGlow.opacity=reduced?.65:.18+pulse*(.42+beat*.13);
+                    s.divineAura.scale.set(3.1*swell,2.5*swell,1);
+                }
                 if(s.mouth)s.mouth.scale.y=1+feeding*Math.abs(Math.sin(s.t*14));
                 if(presentation==='arena'||s.previewAttack){
                     const pose=s.previewAttack||s.duel||{},attackAge=(Date.now()-(pose.attackAt||0))/1000,hitAge=(Date.now()-(pose.hitAt||0))/1000;
@@ -10418,15 +10425,19 @@ function renderPetHungerBubble(button,view){
     const now=Date.now(),victoryUntil=Number(view.pet.victoryAuraUntil)||0;
     const defeatUntil=Number(view.pet.defeatAuraUntil)||0;
     const defeated=!view.egg&&defeatUntil>now&&defeatUntil>=victoryUntil;
-    const victorious=!view.dead&&!view.egg&&victoryUntil>now&&victoryUntil>defeatUntil;
+    const streak=Math.max(0,Math.floor(Number(view.pet.battleWinStreak)||0));
+    const victorious=!view.dead&&!view.egg&&streak>0&&victoryUntil>now&&victoryUntil>defeatUntil;
     button.classList.toggle('pet-victory-aura',victorious);
-    button.classList.toggle('pet-victory-aura-strong',victorious&&(Number(view.pet.battleWinStreak)||0)>=3);
+    const tier=Math.min(6,Math.floor(streak/3));
+    button.style.setProperty('--pet-victory-glow',`${13+tier*5}px`);
     button.classList.toggle('pet-defeat-aura',defeated);
     let bubble=button.querySelector('.pet-hunger-bubble');
     if(!bubble){bubble=document.createElement('span');bubble.className='attendance-pet-bubble pet-hunger-bubble';bubble.setAttribute('aria-hidden','true');button.appendChild(bubble);}
-    const message=defeated?`Tôi đã thua trận khi thách đấu ${view.pet.defeatOpponentName||'đối thủ'}`:'Tôi đang đói, cho ăn lẹ đi!';
+    const opponent=view.pet.victoryOpponentName||view.pet.battleHistory?.find(entry=>entry.result==='win')?.opponentName||'đối thủ';
+    const message=victorious?`Vừa thắng ${opponent} · ${streak} trận thắng liên tiếp`
+        :defeated?`Tôi đã thua trận khi thách đấu ${view.pet.defeatOpponentName||'đối thủ'}`:'Tôi đang đói, cho ăn lẹ đi!';
     if(bubble.textContent!==message)bubble.textContent=message;
-    bubble.hidden=(!defeated&&!view.hungry)||!attendancePetReady||!attendancePetVisible;
+    bubble.hidden=(!victorious&&!defeated&&!view.hungry)||!attendancePetReady||!attendancePetVisible;
 }
 function stopAttendancePetFleet(){for(const entry of attendancePetFleet.values()){entry.renderer.stop();entry.button.remove();}attendancePetFleet.clear();}
 function renderAttendancePetFleet(){
