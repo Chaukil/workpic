@@ -9690,8 +9690,8 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
                     const peak=aerial?.74:claw?.61:heavy?.18:.10;
                     const reach=(motion==='shield'?.22:heavy?.72:.48+(variant%11)*.017)*(s.previewAttack?1.75:1);
                     const dive=aerial&&attackAge>=0&&attackAge<.9?Math.sin(Math.PI*Math.min(1,attackAge/.61)):lunge;
-                    s.model.position.set(reduced?0:direction*lunge*reach*power+(Math.sin(s.t*65)*hurt*.035),reduced?0:dive*peak+Math.sin(s.t*2)*.025,0);
-                    s.model.rotation.z=pose.defeated?Math.PI*.65:reduced?0:Math.sin(s.t*50)*hurt*.04+(aerial?-direction*lunge*.60:claw?direction*lunge*.32:-direction*lunge*.12);
+                    s.model.position.set(reduced?0:direction*(lunge*reach*power-hurt*.18),reduced?0:dive*peak+Math.sin(s.t*2)*.025,0);
+                    s.model.rotation.z=pose.defeated?Math.PI*.65:reduced?0:direction*hurt*.22+(aerial?-direction*lunge*.60:claw?direction*lunge*.32:-direction*lunge*.12);
                     updateBattleBurst(s,pose,attackAge,direction,reduced);
                     }
                     if(s.previewAttack&&attackAge>=1.15){s.previewAttack=null;disposeBattleBurst(s);}
@@ -11044,10 +11044,6 @@ const PetBattleGame=(()=>{
     function receiveMatch(data){
         const id=data.id,uid=state.uid;
         if(!data.participantUids?.includes(uid))return;
-        const previous=state.matches.get(id);
-        if(previous&&JSON.stringify(previous.players?.map(player=>[player.uid,player.petId,player.appearance?.level]))!==JSON.stringify(data.players?.map(player=>[player.uid,player.petId,player.appearance?.level]))){
-            disposeModels();state.modelKey='';
-        }
         state.matches.set(id,data);
         if(['ready','rps','fighting'].includes(data.status)&&!state.autoOpened.has(id)){state.autoOpened.add(id);open(id);}
         updateInvites();render();process();
@@ -11128,7 +11124,7 @@ const PetBattleGame=(()=>{
     }
     function open(id='',bot=false){
         if(!canOpen())return;
-        el('petBattleLobby').close();el('petBattleInvitePicker').hidden=true;el('petBattleExitDialog').close();
+        el('petBattleLobby').close();el('petBattleInvitePicker').close();el('petBattleExitDialog').close();
         state.active=id;state.creating=!id;state.botDraft=bot;state.botKey='';state.bot=null;state.setupKey='';state.lastTurn='';state.message='';
         if(bot)try{state.botDifficulty=localStorage.getItem(`workpic-bot-difficulty:${state.uid}`)||'easy';}catch{state.botDifficulty='easy';}
         if(!el('petBattleDialog').open)el('petBattleDialog').showModal();
@@ -11228,7 +11224,19 @@ const PetBattleGame=(()=>{
             const row=document.createElement('div'),info=document.createElement('span'),name=document.createElement('strong'),meta=document.createElement('small'),invite=document.createElement('button');
             const label=profile.displayName||profile.email||profile.uid;
             const rival=profile.attendancePet&&attendancePetRecords(profile.attendancePet,Date.now()).map(p=>attendancePetView(p)).find(v=>!v.dead&&!v.egg);
-            name.textContent=label;meta.textContent=rival?`${rival.displayName} · Cấp ${rival.level} · ${petWeightLabel(rival.weightGrams)}`:'Mời đấu để kiểm tra thú cưng';info.append(name,meta);invite.type='button';invite.textContent='+';
+            name.textContent=label;
+            meta.textContent=rival?rival.displayName:'Chưa có dữ liệu thú cưng';
+            const metrics=document.createElement('span');
+            metrics.className='pet-invite-metrics';
+            if(rival){
+                const saved=profile.petBattleStatsByPet?.[rival.pet.id],budget=petBattleBudget(rival.level);
+                const keys=Object.keys(statInputs);
+                let stats;
+                try{stats=petBattleStats(saved,rival.level);}catch{}
+                if(!stats||!keys.every(key=>Object.hasOwn(stats,key)))stats=Object.fromEntries(keys.map((key,i)=>[key,Math.floor(budget/keys.length)+(i<budget%keys.length?1:0)]));
+                metrics.textContent=`Cấp ${rival.level} · Lực chiến ${petPowerLabel(petBattlePower(stats))}`;
+            }else metrics.textContent='Cấp — · Lực chiến —';
+            info.append(name,meta,metrics);invite.type='button';invite.textContent='+';
             invite.dataset.inviteUid=profile.uid;invite.setAttribute('aria-label',`Mời ${label}`);
             row.append(info,invite);return row;
         }));
@@ -11383,7 +11391,6 @@ const PetBattleGame=(()=>{
             if(PET_CLOUD_ENABLED)id=result.match.id;
             result.patch||={};
             const previous=state.matches.get(id);
-            if(previous&&JSON.stringify(previous.players?.map(player=>[player.uid,player.petId,player.appearance?.level]))!==JSON.stringify(result.match.players?.map(player=>[player.uid,player.petId,player.appearance?.level]))){disposeModels();state.modelKey='';}
             if(result.match.status==='ready'&&previous?.ready&&(
                 previous.status!=='ready'||Object.keys(previous.ready).length>Object.keys(result.match.ready).length
             ))result.match=previous;
@@ -11515,14 +11522,20 @@ const PetBattleGame=(()=>{
         }
     }
     function ensureModels(m,guestView){
-        const key=JSON.stringify([m.id,m.players.map(p=>[p.uid,p.petId,p.petName,p.appearance]),guestView&&[guestView.pet.id,guestView.displayName,guestView.level,guestView.branch,guestView.form]]);
-        if(state.modelKey===key)return;
-        disposeModels();state.modelKey=key;
         const views=m.players.map(player=>({...player.appearance,displayName:player.petName}));
         if(guestView)views.push(guestView);
+        const key=JSON.stringify([m.id,views.map(view=>[view.level,view.branch,view.form.name,view.dead,view.egg])]);
+        if(state.modelKey===key)return;
+        state.modelKey=key;
+        while(state.models.length>views.length)state.models.pop().stop();
         views.forEach((view,index)=>{
-            const renderer=createAttendancePet3D(`petBattleModel${index}`,`petBattleArt${index}`,null,'arena');
-            state.models.push(renderer);renderer.start();renderer.update(view);
+            let renderer=state.models[index];
+            if(!renderer){
+                renderer=createAttendancePet3D(`petBattleModel${index}`,`petBattleArt${index}`,null,'arena');
+                state.models[index]=renderer;
+                renderer.start();
+            }
+            renderer.update(view);
         });
     }
     function renderStrike(m,play){
@@ -11536,6 +11549,15 @@ const PetBattleGame=(()=>{
         const glyph={water:'○',fang:'⟫',wave:'≋',fire:'✦',wind:'❯',claw:'╱'}[effect];
         const fx=document.createElement('div');fx.className=`pet-battle-skill skill-${effect} tier-${tier}${specialSpirit?' is-special':''}`;fx.dataset.direction=play.last.attacker===m.players[0].uid?'right':'left';fx.setAttribute('aria-hidden','true');
         fx.style.setProperty('--power',String(1+tier*.35));
+        const index=m.players.findIndex(player=>player.uid===attacker.uid);
+        const arena=stage.getBoundingClientRect();
+        const source=el(`petBattleModel${index}`).getBoundingClientRect();
+        const target=el(`petBattleModel${1-index}`).getBoundingClientRect();
+        const x=source.left+source.width/2,y=source.top+source.height/2;
+        fx.style.setProperty('--strike-x',`${x-arena.left}px`);
+        fx.style.setProperty('--strike-y',`${y-arena.top}px`);
+        fx.style.setProperty('--strike-dx',`${target.left+target.width/2-x}px`);
+        fx.style.setProperty('--strike-dy',`${target.top+target.height/2-y}px`);
         const element=PET_BATTLE_ELEMENTS.get(attacker.element);
         fx.style.setProperty('--skill-color',specialSpirit?.color||element?.color||attacker.appearance.form.color);
         for(let i=0;i<(specialSpirit?16:4+tier*4);i++){const spark=document.createElement('span');spark.textContent=glyph;spark.style.setProperty('--i',String(i));spark.style.setProperty('--y',`${Math.sin(i*2.399+variant)*(28+variant%15)}px`);fx.appendChild(spark);}
@@ -11687,8 +11709,9 @@ const PetBattleGame=(()=>{
             el(`petBattleHp${i}`).hidden=!p;
             const at=petBattleTime(m.startedAt)+(m.introMs===5000?5000:2000)+(play.count-1)*PET_BATTLE_STEP_MS,attacking=!!p&&!!play.last&&play.last.attacker===p.uid,hit=!!p&&!!play.last&&play.last.defender===p.uid;
             const result=battleEnded&&m.winnerUid&&p?(m.winnerUid===p.uid?'victory':'defeat'):null;
-            state.models[i]?.duelPose({facing:i?Math.PI:0,attackAt:attacking?at:0,hitAt:hit?at+300:0,
-                criticalAt:hit&&play.last?.critical?at+300:0,defeated:result==='defeat',result,
+            const impact=hit&&play.last.damage>0?at+630:0;
+            state.models[i]?.duelPose({facing:i?Math.PI:0,attackAt:attacking?at:0,hitAt:impact,
+                criticalAt:impact&&play.last?.critical?impact:0,defeated:result==='defeat',result,
                 kind:p?.appearance.form.kind,level:p?.appearance.level,skill:attacking?petBattleSkill(p.appearance,p.element,!!play.last?.special):null,
                 skillColor:element?.color||p?.appearance.form.color});
             el(`petBattleSide${i}`).classList.toggle('is-attacking',!!attacking&&Date.now()-at<1000);el(`petBattleSide${i}`).classList.toggle('is-hit',!!hit&&Date.now()-at<1000);
@@ -11794,10 +11817,9 @@ const PetBattleGame=(()=>{
         });
         el('petBattleAddOpponent').addEventListener('click',()=>{
             const picker=el('petBattleInvitePicker');
-            picker.hidden=!picker.hidden;
-            if(!picker.hidden)el('petBattleInvitePickerClose').focus();
+            if(!picker.open)picker.showModal();
         });
-        el('petBattleInvitePickerClose').addEventListener('click',()=>{el('petBattleInvitePicker').hidden=true;el('petBattleAddOpponent').focus();});
+        el('petBattleInvitePickerClose').addEventListener('click',()=>el('petBattleInvitePicker').close());
         el('petBattleReady').addEventListener('click',()=>{
             if(PET_CLOUD_ENABLED){mutate('ready');return;}
             if(!state.draftPointsValid||!PET_BATTLE_ELEMENTS.has(el('petBattleElement').value)){
@@ -11868,7 +11890,7 @@ const PetBattleGame=(()=>{
             }
             const previous=state.active;
             mutate('create',{...payload(),opponentUid:button.dataset.inviteUid,roomFlow:true,configureLater:!PET_CLOUD_ENABLED}).then(()=>{
-                if(state.active!==previous)el('petBattleInvitePicker').hidden=true;
+                if(state.active!==previous)el('petBattleInvitePicker').close();
                 else if(state.message){el('petBattleInviteHint').textContent=state.message;el('petBattleInviteHint').hidden=false;}
             });
         });

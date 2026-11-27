@@ -2308,15 +2308,15 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
         <p>Bạn có muốn rời phòng đấu?</p>
         <div class="pet-battle-actions"><button type="button" id="petBattleStay">Ở lại</button><button type="button" id="petBattleExitConfirm">Rời phòng</button></div>
     </dialog>
+    <dialog id="petBattleInvitePicker" class="pet-battle-dialog pet-battle-overlay pet-battle-invite-picker" aria-labelledby="petBattleInvitePickerTitle">
+        <header><h5 id="petBattleInvitePickerTitle">Mời đối thủ</h5><button type="button" id="petBattleInvitePickerClose" aria-label="Đóng danh sách">✕</button></header>
+        <div id="petBattleOpponentList" class="pet-battle-opponents"></div>
+        <p id="petBattleInviteHint" class="pet-battle-note" role="status" hidden>Chọn thú cưng trước khi gửi lời mời.</p>
+    </dialog>
     <dialog id="petBattleDialog" class="pet-battle-dialog" aria-labelledby="petBattleTitle">
         <header><div><small>ĐẤU TRƯỜNG THÚ CƯNG</small><h5 id="petBattleTitle">Phòng đấu</h5></div><button type="button" id="petBattleClose" aria-label="Đóng">✕</button></header>
         <div class="pet-battle-actions"><button type="button" data-pet-guide="battle" aria-haspopup="dialog" aria-controls="petGuideDialog">Hướng dẫn cách chơi</button></div>
         <p id="petBattleStatus" class="pet-battle-status" role="status" aria-live="polite"></p>
-        <section id="petBattleInvitePicker" class="pet-battle-rps" aria-labelledby="petBattleInvitePickerTitle" hidden>
-            <header><strong id="petBattleInvitePickerTitle">Mời đối thủ</strong> <button type="button" id="petBattleInvitePickerClose">Thu gọn</button></header>
-            <div id="petBattleOpponentList" class="pet-battle-opponents"></div>
-            <p id="petBattleInviteHint" class="pet-battle-note" hidden>Chọn thú cưng trước khi gửi lời mời.</p>
-        </section>
         <div id="petBattleDraftSlots" class="pet-battle-draft-slots" hidden>
             <div class="pet-battle-draft-host">
                 <button type="button" id="petBattleCycleHost" class="pet-battle-cycle" aria-label="Đổi thú cưng ra trận" title="Đổi thú cưng ra trận"><i class="bi bi-arrow-repeat" aria-hidden="true"></i></button>

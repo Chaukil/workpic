@@ -15812,6 +15812,10 @@ body.theme-dark .pet-power-badge { border-color:#fbbf2480; background:linear-gra
 .pet-battle-opponents strong { min-width:0; overflow-wrap:anywhere; font-size:.82rem; }
 .pet-battle-opponents small { color:var(--muted); font-size:.67rem; line-height:1.45; overflow-wrap:anywhere; }
 .pet-battle-opponents button { flex:0 0 34px; height:34px; padding:0; color:var(--primary); font-size:1.25rem; }
+.pet-battle-invite-picker .pet-battle-opponents { grid-template-columns:minmax(0,1fr); }
+.pet-battle-invite-picker .pet-battle-opponents > div { padding:10px 12px; text-align:left; }
+.pet-battle-invite-picker .pet-battle-opponents button { flex:0 0 40px; height:40px; }
+.pet-invite-metrics { color:var(--primary); font-size:.72rem; font-weight:650; }
 #petBattleReady { justify-self:center; min-width:140px; }
 .pet-battle-exit { text-align:center; }
 .pet-battle-exit h5 { color:var(--primary); margin-bottom:12px; overflow-wrap:anywhere; }
@@ -16023,6 +16027,16 @@ body.theme-dark .pet-power-badge { border-color:#fbbf2480; background:linear-gra
 .pet-battle-skill.is-special::after { width:min(38vw,220px); border-style:dashed; animation-name:pet-spirit-seal-inner; }
 .pet-battle-skill span { position:absolute; left:25%; top:48%; font-size:calc(22px * var(--power)); font-weight:900; text-shadow:0 0 8px currentColor,0 0 20px currentColor; animation:pet-skill-flight 1.1s calc(var(--i) * .025s) both; }
 .pet-battle-skill[data-direction=left] span { left:75%; animation-name:pet-skill-flight-left; }
+.pet-battle-skill span,.pet-battle-skill[data-direction=left] span {
+    left:var(--strike-x); top:var(--strike-y);
+    animation:pet-arena-projectile .9s calc(var(--i) * .012s) both;
+}
+@keyframes pet-arena-projectile {
+    0% { opacity:0; transform:translate(-50%,-50%) scale(.3); }
+    20% { opacity:1; }
+    70% { opacity:1; transform:translate(calc(-50% + var(--strike-dx)),calc(-50% + var(--strike-dy))) scale(var(--power)); }
+    100% { opacity:0; transform:translate(calc(-50% + var(--strike-dx)),calc(-50% + var(--strike-dy) + var(--y))) scale(.65); }
+}
 .pet-battle-skill strong { position:absolute; bottom:24%; left:15%; right:15%; text-align:center; font-size:.82rem; text-shadow:0 2px 6px #000; animation:pet-battle-hit 1.4s both; }
 .pet-battle-skill.is-special strong { bottom:16%; color:#fff4c2; font-size:1rem; letter-spacing:.045em; text-shadow:0 2px 5px #21150c,0 0 18px var(--skill-color); }
 .pet-battle-skill.is-special span { font-size:calc(30px * var(--power)); text-shadow:0 0 12px currentColor,0 0 30px currentColor; }
