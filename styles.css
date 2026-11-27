@@ -15767,8 +15767,8 @@ body.modal-open .attendance-pet-swimmer,body:has(dialog[open]) .attendance-pet-s
 .pet-battle-dialog button:hover:not(:disabled) { border-color:#bc944f; background:color-mix(in srgb,#bc944f 12%,var(--surface)); }
 .pet-battle-dialog button:disabled { opacity:.5; cursor:wait; }
 .pet-battle-dialog.pet-battle-overlay { width:min(92vw,440px); }
-.pet-battle-dialog.pet-guide-dialog { width:min(94vw,660px); }
-.pet-battle-dialog.pet-guide-dialog[data-topic=care] { width:min(94vw,900px); }
+.pet-battle-dialog.pet-guide-dialog { width:min(94vw,740px); }
+.pet-battle-dialog.pet-guide-dialog[data-topic=care] { width:min(94vw,980px); }
 #petBattleBalance { margin:0 0 14px; font-weight:600; }
 .pet-battle-overlay .pet-battle-actions { margin-bottom:0; justify-content:flex-end; }
 .pet-battle-draft-slots { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
