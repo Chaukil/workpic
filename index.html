@@ -1484,16 +1484,19 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
         </div>
     </div>
 
-<dialog id="petAdminDialog" class="pet-admin-dialog" aria-labelledby="petAdminTitle"><header><h5 id="petAdminTitle">Trung tâm điều khiển thú cưng</h5><button type="button" id="petAdminClose" aria-label="Đóng">✕</button></header>                    <section class="account-section pet-admin-panel" id="petAdminPanel" hidden>
-                        <div class="account-section-heading"><span class="account-section-icon"><i class="bi bi-magic"></i></span><div><h6>Trung tâm điều khiển thú cưng</h6><p>Chọn thành viên để chăm sóc và điều chỉnh tiến hóa.</p></div></div>
-                        <div class="pet-admin-fields"><div><label class="form-label" for="petAdminUser">Thú cưng của thành viên</label><select class="form-select" id="petAdminUser"></select></div><button type="button" class="btn btn-outline-secondary" id="petAdminRefresh">Tải lại</button></div>
-                        <label class="form-label" for="petAdminPet">Thú cưng trong đàn</label><select class="form-select" id="petAdminPet"></select>
+<dialog id="petAdminDialog" class="pet-admin-dialog pet-control-dialog" aria-labelledby="petAdminTitle"><header class="pet-control-header"><div class="pet-control-heading"><span class="pet-control-icon"><i class="bi bi-stars" aria-hidden="true"></i></span><div><small>WORKPIC · QUẢN TRỊ</small><h5 id="petAdminTitle">Trung tâm điều khiển thú cưng</h5></div></div><button type="button" id="petAdminClose" aria-label="Đóng"><i class="bi bi-x-lg" aria-hidden="true"></i></button></header>                    <section class="account-section pet-admin-panel" id="petAdminPanel" hidden>
+                        <div class="pet-admin-fields pet-admin-selectors"><div><label class="form-label" for="petAdminUser">Thành viên</label><select class="form-select" id="petAdminUser"></select></div><div><label class="form-label" for="petAdminPet">Thú cưng</label><select class="form-select" id="petAdminPet"></select></div><button type="button" class="btn btn-outline-secondary" id="petAdminRefresh"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Tải lại</button></div>
                         <p id="petAdminSummary" class="pet-admin-summary"></p>
+                        <details class="pet-admin-group" open><summary>Chăm sóc và cân nặng</summary>
                         <div class="pet-admin-actions"><button type="button" class="btn btn-outline-primary" data-pet-admin="checkin">Điểm danh hôm nay</button><button type="button" class="btn btn-outline-primary" data-pet-admin="feed">Cho ăn ngay</button><button type="button" class="btn btn-outline-primary" data-pet-admin="hatch">Nở trứng ngay</button><button type="button" class="btn btn-outline-primary" data-pet-admin="revive">Hồi sinh giữ cấp</button><button type="button" class="btn btn-outline-secondary" data-pet-admin="egg">Trở về trứng</button></div>
-                        <div class="pet-admin-level-stepper" aria-label="Tăng giảm cấp thú cưng"><button type="button" class="btn btn-outline-danger" data-pet-admin-level="-1"><i class="bi bi-dash-lg" aria-hidden="true"></i> Giảm 1 cấp</button><strong id="petAdminCurrentLevel">Cấp 1</strong><button type="button" class="btn btn-outline-success" data-pet-admin-level="1"><i class="bi bi-plus-lg" aria-hidden="true"></i> Tăng 1 cấp</button></div>
                         <div class="pet-admin-fields pet-admin-weight"><div><label class="form-label" for="petAdminWeightAmount">Điều chỉnh cân nặng</label><div class="input-group"><input class="form-control" id="petAdminWeightAmount" type="number" min="0.1" max="100" step="0.1" value="0.2"><span class="input-group-text">kg</span></div></div><div class="pet-admin-weight-actions"><button type="button" class="btn btn-outline-danger" data-pet-admin-weight="-1"><i class="bi bi-dash-lg" aria-hidden="true"></i> Giảm</button><button type="button" class="btn btn-outline-success" data-pet-admin-weight="1"><i class="bi bi-plus-lg" aria-hidden="true"></i> Tăng</button></div></div>
+                        </details>
+                        <details class="pet-admin-group"><summary>Cấp và nhánh tiến hóa</summary>
+                        <div class="pet-admin-level-stepper" aria-label="Tăng giảm cấp thú cưng"><button type="button" class="btn btn-outline-danger" data-pet-admin-level="-1"><i class="bi bi-dash-lg" aria-hidden="true"></i> Giảm 1 cấp</button><strong id="petAdminCurrentLevel">Cấp 1</strong><button type="button" class="btn btn-outline-success" data-pet-admin-level="1"><i class="bi bi-plus-lg" aria-hidden="true"></i> Tăng 1 cấp</button></div>
                         <div class="pet-admin-fields"><div><label class="form-label" for="petAdminBranch">Nhánh tiến hóa</label><select class="form-select" id="petAdminBranch"></select></div><button type="button" class="btn btn-outline-primary" id="petAdminApplyBranch">Áp dụng nhánh</button></div>
 <div class="pet-admin-fields"><div><label class="form-label" for="petAdminLevel">Chọn cấp tiến hóa</label><select class="form-select" id="petAdminLevel"></select></div><button type="button" class="btn btn-primary" data-pet-admin="level">Áp dụng cấp</button></div>
+                        </details>
+                        <details class="pet-admin-group"><summary>Lượt đánh Bot</summary>
                         <fieldset class="pet-admin-bot">
                             <legend>Lượt Bot cộng thêm hôm nay</legend>
                             <div class="pet-admin-bot-fields">
@@ -1502,6 +1505,7 @@ Hệ thống tự nhận diện cột theo tên header, không cần đúng th�
                             <button type="button" id="petAdminBotGrant" class="btn btn-outline-primary">Cộng lượt</button>
                             </div>
                         </fieldset>
+                        </details>
                         <p id="petAdminStatus" class="account-save-status" role="status" aria-live="polite"></p>
                     </section></dialog>
 <dialog id="adminControlDialog" class="pet-admin-dialog admin-control-dialog" aria-labelledby="adminControlTitle"><header><h5 id="adminControlTitle">Trung tâm điều khiển</h5><button type="button" id="adminControlClose" aria-label="Đóng">✕</button></header>

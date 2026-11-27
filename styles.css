@@ -15503,6 +15503,29 @@ body.modal-open .attendance-pet-swimmer,body:has(dialog[open]) .attendance-pet-s
 @media(max-width:560px) { .pet-admin-actions { grid-template-columns:repeat(2,minmax(0,1fr)); } .pet-admin-fields { flex-wrap:wrap; } .pet-admin-level-stepper { grid-template-columns:1fr 1fr; }.pet-admin-level-stepper strong { grid-column:1/-1; grid-row:1; } }
 .pet-admin-dialog > header h5 { min-width:0; overflow-wrap:anywhere; }
 .pet-admin-dialog > header > button { flex:none; width:36px; height:36px; border:1px solid var(--border); border-radius:10px; color:var(--text); background:var(--surface-muted); }
+.pet-control-dialog { width:min(94vw,760px); max-height:88dvh; padding:18px; border-color:color-mix(in srgb,#b89a5c 35%,var(--border)); background:linear-gradient(155deg,color-mix(in srgb,#b89a5c 7%,var(--surface)),var(--surface) 44%); }
+.pet-control-dialog > .pet-control-header { position:sticky; top:-18px; z-index:4; margin:-18px -18px 12px; padding:14px 18px 12px; border-bottom:1px solid color-mix(in srgb,#b89a5c 28%,var(--border)); background:var(--surface); }
+.pet-control-heading { display:flex; align-items:center; gap:11px; min-width:0; }
+.pet-control-icon { display:grid; place-items:center; flex:0 0 40px; width:40px; height:40px; border:1px solid #c5a86566; border-radius:12px; background:linear-gradient(145deg,#c5a8652e,#38bdf81a); color:#b7964e; font-size:1.05rem; }
+.pet-control-heading small { display:block; margin-bottom:3px; color:#b7964e; font-size:.62rem; font-weight:800; letter-spacing:.13em; }
+.pet-control-dialog > .pet-control-header h5 { font-size:1.03rem; line-height:1.3; }
+.pet-control-dialog .pet-admin-panel { padding:0; border:0; background:transparent; }
+.pet-control-dialog .pet-admin-selectors { grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) auto; gap:10px; align-items:end; margin:0 0 12px; }
+.pet-control-dialog .pet-admin-selectors .btn { min-height:40px; padding:8px 11px; }
+.pet-control-dialog .pet-admin-selectors .form-label { margin-bottom:5px; color:var(--muted); font-size:.7rem; font-weight:700; }
+.pet-control-dialog .pet-admin-selectors .form-select { min-height:40px; border-radius:10px; }
+.pet-control-dialog .pet-admin-summary { margin:0 0 10px; padding:9px 12px; border-color:color-mix(in srgb,#b89a5c 25%,var(--border)); border-radius:10px; font-size:.74rem; }
+.pet-control-dialog .pet-admin-group { margin:7px 0; padding:0 11px; border-color:var(--border); border-radius:11px; background:color-mix(in srgb,var(--surface-muted) 78%,var(--surface)); }
+.pet-control-dialog .pet-admin-group > summary { padding:9px 0; font-size:.77rem; }
+.pet-control-dialog .pet-admin-group[open] { padding-bottom:9px; }
+.pet-control-dialog .pet-admin-actions { grid-template-columns:repeat(5,minmax(0,1fr)); gap:7px; }
+.pet-control-dialog .pet-admin-actions .btn { display:flex; min-height:48px; align-items:center; justify-content:center; padding:7px; font-size:.69rem; line-height:1.25; }
+.pet-control-dialog .pet-admin-level-stepper { margin:10px 0; }
+.pet-control-dialog .pet-admin-level-stepper .btn { min-height:40px; padding:7px 9px; font-size:.72rem; }
+.pet-control-dialog .pet-admin-group .pet-admin-fields { margin:8px 0; }
+.pet-control-dialog .pet-admin-bot { margin-top:10px; padding:9px 11px; }
+.pet-control-dialog .pet-admin-bot-fields { gap:8px; }
+.pet-control-dialog #petAdminStatus { margin:8px 0 0; }
 .pet-admin-dialog :is(.pet-admin-panel,.account-section-heading > div,.account-field-grid > div,.pet-admin-bot,.pet-admin-bot-fields > div) { min-width:0; }
 .pet-admin-dialog :is(.form-label,.pet-admin-bot label) { display:block; margin-bottom:5px; font-size:.78rem; line-height:1.4; }
 .pet-admin-dialog :is(.form-control,.form-select) { min-width:0; max-width:100%; }
@@ -15511,6 +15534,11 @@ body.modal-open .attendance-pet-swimmer,body:has(dialog[open]) .attendance-pet-s
 .pet-admin-bot { margin:18px 0 0; padding:12px; border:1px solid var(--border); border-radius:12px; }
 .pet-admin-bot legend { float:none; width:auto; padding:0 6px; margin:0; font-size:.85rem; font-weight:700; line-height:1.4; }
 .pet-admin-bot-fields { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) auto; align-items:end; gap:10px; }
+.pet-admin-group { margin-block:8px; padding:0 12px; border:1px solid var(--border); border-radius:10px; background:var(--surface-muted); }
+.pet-admin-group > summary { padding:10px 0; cursor:pointer; font-weight:700; font-size:.82rem; }
+.pet-admin-group[open] { padding-bottom:8px; }
+.pet-admin-group .pet-admin-fields,.pet-admin-group .pet-admin-level-stepper { margin:8px 0; }
+.pet-admin-group .pet-admin-bot { margin-top:4px; }
 @media(max-width:560px) {
     .pet-admin-dialog .pet-admin-panel { padding:12px; }
     .pet-admin-dialog .account-field-grid,
@@ -15518,6 +15546,22 @@ body.modal-open .attendance-pet-swimmer,body:has(dialog[open]) .attendance-pet-s
     .pet-admin-bot-fields { grid-template-columns:minmax(0,1.5fr) minmax(0,1fr); }
     .pet-admin-bot-fields > button { grid-column:1/-1; }
     .pet-admin-dialog .admin-control-account-actions { grid-template-columns:minmax(0,1fr); }
+}
+@media(max-width:560px) {
+    .pet-control-dialog { width:calc(100vw - 12px); max-width:calc(100vw - 12px); padding:12px; }
+    .pet-control-dialog > .pet-control-header { top:-12px; margin:-12px -12px 10px; padding:10px 12px; }
+    .pet-control-icon { flex-basis:34px; width:34px; height:34px; border-radius:10px; }
+    .pet-control-dialog .pet-admin-panel { padding:0; }
+    .pet-control-dialog .pet-admin-selectors { grid-template-columns:minmax(0,1fr) auto; gap:8px; }
+    .pet-control-dialog .pet-admin-selectors > div:nth-child(2) { grid-column:1/-1; }
+    .pet-control-dialog .pet-admin-selectors .btn { min-width:40px; padding:8px; font-size:0; }
+    .pet-control-dialog .pet-admin-selectors .btn i { font-size:.9rem; }
+    .pet-control-dialog .pet-admin-actions { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .pet-control-dialog .pet-admin-actions .btn { min-height:42px; }
+    .pet-control-dialog .pet-admin-level-stepper { grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); }
+    .pet-control-dialog .pet-admin-level-stepper strong { grid-column:auto; grid-row:auto; min-width:52px; }
+    .pet-control-dialog .pet-admin-bot-fields { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+    .pet-control-dialog .pet-admin-bot-fields > button { grid-column:1/-1; }
 }
 @media(max-width:380px) {
     .pet-admin-dialog .pet-admin-fields { grid-template-columns:minmax(0,1fr); }
