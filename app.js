@@ -9010,7 +9010,7 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
             const canvas=document.createElement('canvas');canvas.width=canvas.height=128;
             const ctx=canvas.getContext('2d'),color=divineColor;
             const glow=ctx.createRadialGradient(64,64,8,64,64,63);
-            glow.addColorStop(0,color+'a0');glow.addColorStop(.55,color+'55');glow.addColorStop(1,color+'00');
+            glow.addColorStop(0,color+'ee');glow.addColorStop(.42,color+'99');glow.addColorStop(.72,color+'40');glow.addColorStop(1,color+'00');
             ctx.fillStyle=glow;ctx.fillRect(0,0,128,128);
             const map=new T.CanvasTexture(canvas);map.colorSpace=T.SRGBColorSpace;
             const aura=new T.Sprite(new T.SpriteMaterial({map,depthWrite:false,transparent:true}));
@@ -9609,13 +9609,14 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
             }
         }
         if(!s.renderer)return;
-        const width=staged?Math.min(360,s.button.clientWidth):s.previewMode?320:s.width;
-        const height=staged?s.button.clientHeight:s.previewMode?220:s.height;
+        const preview=s.previewMode?document.getElementById(previewId):null;
+        const width=staged?Math.min(360,s.button.clientWidth):preview?(preview.clientWidth||320):s.width;
+        const height=staged?s.button.clientHeight:preview?(preview.clientHeight||220):s.height;
         if(!width||!height)return;
         const key=width+':'+height;
         if(s.sizeKey===key)return;s.sizeKey=key;
         s.renderer.setSize(width,height);s.camera.aspect=width/height;
-        s.camera.zoom=staged?.83*Math.min(1,width/height):1;
+        s.camera.zoom=preview?.73*Math.min(1,width/height):staged?.83*Math.min(1,width/height):1;
         s.camera.updateProjectionMatrix();
     }
     function start(){
@@ -9688,7 +9689,7 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
                     const cycle=s.t%3.1,beat=Math.min(2,Math.floor(cycle/.8));
                     const pulse=cycle<2.4?Math.sin(Math.PI*(cycle%.8)/.8)**2:0;
                     const swell=reduced?1:1+pulse*(beat+1)*.17;
-                    s.divineGlow.opacity=reduced?.65:.18+pulse*(.42+beat*.13);
+                    s.divineGlow.opacity=reduced?.85:.42+pulse*(.34+beat*.12);
                     s.divineAura.scale.set(3.1*swell,2.5*swell,1);
                 }
                 if(s.mouth)s.mouth.scale.y=1+feeding*Math.abs(Math.sin(s.t*14));

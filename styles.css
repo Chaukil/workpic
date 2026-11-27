@@ -15682,6 +15682,10 @@ body.modal-open .attendance-pet-swimmer,body:has(dialog[open]) .attendance-pet-s
  .pet-game-hud > div { padding:8px; }
 }
 @media(max-height:720px) { #attendancePetDialog .attendance-pet-preview { height:145px; } #attendancePetDialog .attendance-pet-preview canvas,#attendancePetDialog .attendance-pet-preview svg { max-height:145px; } }
+#attendancePetDialog .attendance-pet-preview { height:clamp(185px,34dvh,290px); min-width:0; }
+#attendancePetDialog .attendance-pet-preview > canvas { width:100%!important; height:100%!important; max-height:none; object-fit:contain; }
+#attendancePetDialog .attendance-pet-layout > * { min-width:0; }
+@media(max-width:900px) { #attendancePetDialog .attendance-pet-layout { grid-template-columns:minmax(0,1fr); } }
 
 .settings-notification-details { margin-top:8px; font-size:.7rem; color:var(--muted); }
 .settings-notification-details summary { cursor:pointer; }
