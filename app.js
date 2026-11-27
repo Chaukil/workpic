@@ -8548,12 +8548,10 @@ async function listenUsersAvatars() {
         usersInfoCache = {};
         usersFullInfoLoaded = false;
         usersDeptLatest = {};
-        departmentCalendarUsers = {};
         snapshot.forEach(d => {
             const u = d.data();
 
             if (u.uid) {
-                departmentCalendarUsers[u.uid] = { uid: u.uid, displayName: u.displayName || '', avatar: u.avatar || null, status: u.status || 'active' };
                 if (u.avatar) usersAvatarCache[u.uid] = u.avatar;
                 usersInfoCache[u.uid] = {
                     displayName: u.displayName || '',
@@ -9145,7 +9143,7 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
         const cone=(parent,x,y,z,radius,length,mat,angle=0)=>{const mesh=new T.Mesh(new T.ConeGeometry(radius*(view.form.juvenile?.8:1),length*(view.form.juvenile?.7:1),32,4),mat);mesh.position.set(x,y,z);mesh.rotation.z=angle;parent.add(mesh);return mesh;};
         const tube=(parent,points,radii,mat)=>{
             const curve=new T.CatmullRomCurve3(points.map(point=>new T.Vector3(...point)));
-            const segments=48,sides=12,frames=curve.computeFrenetFrames(segments,false),positions=[],indices=[],uv=[];
+            const segments=points.length>5?36:Math.max(8,points.length*5),sides=10,frames=curve.computeFrenetFrames(segments,false),positions=[],indices=[],uv=[];
             for(let i=0;i<=segments;i++){
                 const t=i/segments,p=curve.getPointAt(t),r=t*(radii.length-1),j=Math.min(radii.length-2,Math.floor(r)),radius=T.MathUtils.lerp(radii[j],radii[j+1],r-j);
                 for(let k=0;k<=sides;k++){const a=k/sides*Math.PI*2;const v=p.clone().addScaledVector(frames.normals[i],Math.cos(a)*radius).addScaledVector(frames.binormals[i],Math.sin(a)*radius);positions.push(v.x,v.y,v.z);uv.push(k/sides,t);if(i<segments&&k<sides){const n=i*(sides+1)+k;indices.push(n,n+sides+1,n+1,n+1,n+sides+1,n+sides+2);}}
@@ -9165,7 +9163,7 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
                     distance=Math.min(distance,d)-h*h*.035;
                 }return distance;
             };
-            const low=[-1.3,-.6,-.65],high=[1.75,1.35,.65],count=[44,30,22],values=[],points=[];
+            const low=[-1.3,-.6,-.65],high=[1.75,1.35,.65],count=[32,23,17],values=[],points=[];
             const stride=count[0]+1,plane=stride*(count[1]+1);
             for(let z=0;z<=count[2];z++)for(let y=0;y<=count[1];y++)for(let x=0;x<=count[0];x++){
                 const p=[low[0]+x/count[0]*(high[0]-low[0]),low[1]+y/count[1]*(high[1]-low[1]),low[2]+z/count[2]*(high[2]-low[2])];points.push(p);values.push(field(...p));
@@ -9364,6 +9362,26 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
             }
             applyBattleResult();return;
         }
+        if(shape==='dragon'&&view.branch==='dino'&&view.level===ATTENDANCE_PET_MAX_LEVEL){
+            const gold=material('#e4ba62'),jade=material('#78d8a4');
+            const spine=[[1.15,.62,0],[.65,.32,.04],[.12,-.42,.15],[-.54,-.52,.27],[-1.26,-.07,.12],[-1.61,.54,-.09],[-2.16,.39,-.18],[-2.45,.16,-.1]];
+            tube(group,spine,[.24,.29,.28,.23,.18,.13,.07,.006],bodyMat);
+            tube(group,spine.map(([x,y,z])=>[x,y-.09,z+.12]),[.17,.2,.17,.14,.11,.07,.035,.003],jade);
+            sphere(group,1.19,.68,0,.34,.25,.26,bodyMat);
+            sphere(group,1.52,.59,0,.31,.12,.2,jade);
+            eyes(group,1.33,.75,.21);
+            for(const side of [-1,1]){
+                tube(group,[[1.1,.83,side*.15],[.91,1.15,side*.19],[.72,1.36,side*.32]],[.068,.045,.004],gold);
+                tube(group,[[1,.99,side*.17],[1.15,1.18,side*.25]],[.047,.004],gold);
+                tube(group,[[1.57,.58,side*.16],[1.84,.4,side*.33],[1.58,.3,side*.54],[1.3,.44,side*.64]],[.023,.018,.012,.002],gold);
+                for(const [x,y] of [[.66,.23],[-.75,-.4]]){
+                    tube(group,[[x,y,side*.16],[x-.15,y-.18,side*.34],[x+.05,y-.34,side*.43]],[.097,.065,.041],bodyMat);
+                    for(let j=0;j<3;j++)tube(group,[[x+.04,y-.34,side*(.38+j*.04)],[x+.20,y-.38,side*(.37+j*.05)]],[.025,.003],gold);
+                }
+            }
+            for(const [x,y,z] of spine.slice(1,-1))cone(group,x,y+.22,z,.09,.29,gold,Math.PI*.83);
+            applyBattleResult();return;
+        }
         if(kind==='dino'){
             const bodyParts=[[-.1,0,0,.92+(variant?(view.level%4)*.06:0),.5,.43],[.52,.25,0,.32,.42,.3]];
             if(shape!=='brachio')bodyParts.push([.68,.46,0,.28,.43,.28],[1.02,.72,0,.5,.36,.35]);
@@ -9516,9 +9534,15 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
     }
     function resizePet(s){
         if(!staged){
-            const scale=Math.min(s.view?attendancePetScale(s.view):1,Math.max(.35,(window.innerWidth-16)/144),Math.max(.35,(window.innerHeight-16)/104));
-            s.width=Math.round(144*scale);s.height=Math.round(104*scale);
-            s.button.style.width=s.width+'px';s.button.style.height=s.height+'px';
+            const width=window.innerWidth,height=window.innerHeight;
+            const petScale=s.view?attendancePetScale(s.view):1;
+            const boundsKey=`${width}:${height}:${petScale}`;
+            if(s.elementSizeKey!==boundsKey){
+                s.elementSizeKey=boundsKey;
+                const scale=Math.min(petScale,Math.max(.35,(width-16)/144),Math.max(.35,(height-16)/104));
+                s.width=Math.round(144*scale);s.height=Math.round(104*scale);
+                s.button.style.width=s.width+'px';s.button.style.height=s.height+'px';
+            }
         }
         if(!s.renderer)return;
         const width=staged?Math.min(360,s.button.clientWidth):s.previewMode?320:s.width;
@@ -9538,13 +9562,18 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
         s.enter=()=>{s.hover=true;};s.leave=()=>{s.hover=false;};button.addEventListener('mouseenter',s.enter);button.addEventListener('mouseleave',s.leave);button.addEventListener('focus',s.enter);button.addEventListener('blur',s.leave);
         const frame=now=>{
             if(state!==s||document.hidden)return;s.raf=requestAnimationFrame(frame);
-            if(s.last&&now-s.last<32)return;const dt=s.last?Math.min(.06,(now-s.last)/1000):.033;s.last=now;s.t+=dt;
+            if(s.last&&now-s.last<(presentation==='arena'?33:50))return;const dt=s.last?Math.min(.08,(now-s.last)/1000):.05;s.last=now;s.t+=dt;
             const petDialogOpen=document.getElementById('attendancePetDialog')?.open;
             if(!staged&&(document.body.classList.contains('modal-open')||(document.querySelector('dialog[open]')&&!s.previewMode)))return;
             if(button.hidden&&!s.previewMode)return;
             const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
             resizePet(s);
-            const bounds=attendancePetTravelBounds(s.view,window.innerWidth,window.innerHeight);
+            const boundsKey=`${window.innerWidth}:${window.innerHeight}:${s.signature}`;
+            if(s.boundsKey!==boundsKey){
+                s.boundsKey=boundsKey;
+                s.bounds=attendancePetTravelBounds(s.view,window.innerWidth,window.innerHeight);
+            }
+            const bounds=s.bounds;
             const {maxX,maxY,minY,mode}=bounds;
             if(s.motion!==mode){s.motion=mode;s.nextTarget=0;s.targetY=minY;}
             const previousX=s.x;
@@ -9635,7 +9664,7 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
         s.ready=import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js').then(T=>{
             if(state!==s||token!==generation)return;
             try{
-                const renderer=new T.WebGLRenderer({alpha:true,antialias:true,powerPreference:'low-power'});renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.75));renderer.setSize(144,104);renderer.setClearColor(0,0);renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;
+                const renderer=new T.WebGLRenderer({alpha:true,antialias:staged,powerPreference:'low-power'});renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,staged?1.25:1));renderer.setSize(144,104);renderer.setClearColor(0,0);renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;
                 s.THREE=T;s.renderer=renderer;s.scene=new T.Scene();s.camera=new T.PerspectiveCamera(38,144/104,.1,30);s.camera.position.set(.2,.35,5.7);s.camera.lookAt(0,0,0);
                 s.scene.add(new T.HemisphereLight('#e5f8ff','#344b6a',2));const light=new T.DirectionalLight('#fff7d6',3);light.position.set(2,4,5);s.scene.add(light);const rim=new T.DirectionalLight('#67d8ff',2);rim.position.set(-3,1,-3);s.scene.add(rim);
                 if(s.view)build(s,s.view);
@@ -10938,7 +10967,13 @@ const PetBattleGame=(()=>{
     }
     function start(){stop();if(!currentUser||!attendancePetRef)return;state.uid=currentUser.uid;state.own=(PET_CLOUD_ENABLED?attendanceCloudProfile:authenticatedProfileSnapshot?.data())||{uid:state.uid,attendancePet:attendancePetData};
         try{const pending=JSON.parse(localStorage.getItem(`workpic-bot-pending:${state.uid}`)||'null');if(pending?.bot&&pending.participantUids?.includes(state.uid))state.matches.set(pending.id,pending);}catch{}
-        state.timer=setInterval(()=>{if(!mine())return;if(Date.now()-state.lastSync>15000)sync();process();if(el('petBattleDialog').open&&!document.hidden)render();},200);sync();}
+        state.timer=setInterval(()=>{
+            if(!mine())return;
+            if(Date.now()-state.lastSync>15000)sync();
+            if(state.matches.size)process();
+            const room=match();
+            if(room&&['ready','rps','fighting'].includes(room.status)&&el('petBattleDialog').open&&!document.hidden)render();
+        },250);sync();}
     function profile(snapshot,refresh=true){if(mine()&&snapshot?.exists()&&snapshot.data().uid===state.uid){state.own=snapshot.data();if(refresh)sync();}}
     function fail(error){const code=error.code?.split('/').pop();state.message=code==='permission-denied'?'Firebase chưa cho phép truy cập phòng đấu hoặc hồ sơ của bạn.':petQuotaErrorText(error)||error.message||'Chưa đồng bộ được trận đấu.';state.cooldown=code==='resource-exhausted'?(error.retryAt||Date.now()+300000):Infinity;el('petBattleRetry').hidden=false;render();}
     function receiveMatch(data){
@@ -15434,7 +15469,12 @@ function listenDayOffs() {
     const q = query(collection(db, DAYOFF_COLLECTION),
         where('date', '>=', localDateKey(lower)), where('date', '<', localDateKey(upper)));
     unsubscribeDayOffs = onSnapshot(q, (snapshot) => {
+        const draft = dayOffModalOpen ? getDayOffDiff() : null;
         dayOffsList = normalizeDayOffs(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+        if(draft){
+            dayOffSelected = new Set([...Object.keys(getMyOffMap()), ...draft.added]);
+            draft.removed.forEach(key=>dayOffSelected.delete(key));
+        }
         renderSchedule();
         if (dayOffModalOpen) renderDayOffModal();
         if (document.getElementById('statisticsModal')?.classList.contains('show')) renderStatisticsLineChart();
@@ -15553,6 +15593,7 @@ function getDayOffUserColor(uid) {
 async function openDayOffModal() {
     if (!accessControl.requireAccess('dayOffs', 'view')) return;
     if (!currentUser) return;
+    const uid=currentUser.uid;
     dayOffModalOpen = true;
     listenDayOffs();
     dayOffFocusUid = null;
@@ -15567,7 +15608,9 @@ async function openDayOffModal() {
 
     try {
         const snapshot = await getDocs(collection(db, 'users'));
+        if(currentUser?.uid!==uid||!dayOffModalOpen)return;
         const users = [];
+        const calendarProfiles = {};
         // Đồng thời nạp cache avatar từ kết quả fetch này (đề phòng listener
         // listenUsersAvatars chưa fire xong hoặc chưa có user nào có avatar)
         if (!usersAvatarCache) usersAvatarCache = {};
@@ -15577,6 +15620,8 @@ async function openDayOffModal() {
 
             if (user.uid) {
                 users.push(user);
+                const previous=calendarProfiles[user.uid];
+                if(!previous||String(user.updatedAt||'')>=String(previous.updatedAt||''))calendarProfiles[user.uid]=user;
                 collectUserDepts(user);
                 if (user.avatar) usersAvatarCache[user.uid] = user.avatar;
                 usersInfoCache[user.uid] = Object.assign(
@@ -15587,8 +15632,9 @@ async function openDayOffModal() {
             }
         });
         rebuildDepartmentsList();
+        departmentCalendarUsers=calendarProfiles;
         buildDayOffUsers(users);
-        if (dayOffModalOpen) renderDayOffModal();
+        if (dayOffModalOpen) {renderDayOffModal();renderSchedule();}
     } catch (error) {
         console.error('Lỗi tải danh sách user cho lịch off:', error);
     }
@@ -16955,7 +17001,7 @@ function getPersonalEvents(key) {
     const shared = department && typeof departmentCalendarUsers !== 'undefined'
         ? Object.entries(departmentCalendarUsers).flatMap(([uid, user]) =>
             uid !== currentUser.uid && String(user.department || '').trim() === department
-                ? (user.personalCalendarEvents || []).filter(e => e.scope === 'department' && e.department === department)
+                ? (Array.isArray(user.personalCalendarEvents)?user.personalCalendarEvents:[]).filter(e => e.scope === 'department' && String(e.department||'').trim() === department)
                     .map(e => ({ ...e, ownerUid: uid })) : []) : [];
     return [...own, ...shared].filter(e => personalEventOccurs(e, key))
         .sort((a, b) => (a.time || '24:00').localeCompare(b.time || '24:00'));
@@ -17398,7 +17444,10 @@ async function saveDayOffs(previewAccepted = false) {
         if (removed.length) parts.push(`hủy ${removed.length} ngày off`);
         showNotification('Đã lưu lịch off', `Bạn đã ${parts.join(' và ')}. Job trong ngày off đã được dời lên ngày làm việc liền trước.`, false, 'success');
     } catch (error) {
-        showNotification('Lỗi', 'Không thể lưu lịch off. Vui lòng thử lại.', false, 'danger');
+        console.error('Lỗi lưu lịch off:',error);
+        showNotification('Lỗi', error.code==='permission-denied'
+            ? 'Firestore từ chối quyền ghi lịch off. Kiểm tra Rules của dayOffs.'
+            : 'Không thể lưu lịch off. Vui lòng thử lại.', false, 'danger');
     } finally {
         btn.innerHTML = originalHTML;
         renderDayOffSummary();
