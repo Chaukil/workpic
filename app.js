@@ -387,6 +387,7 @@ function attendancePetScale(view){
 
 function attendancePetMotion(view) {
     if(view?.egg || view?.dead)return 'rest';
+    if(view?.branch==='dino'&&view.level===ATTENDANCE_PET_MAX_LEVEL)return 'fly';
     if(view?.form.kind==='bird')return 'fly';
     return view?.form.kind==='beast'||view?.form.kind==='dino' && view?.form.shape!=='sea' ? 'walk' : 'swim';
 }
@@ -9002,7 +9003,7 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
     function build(s,view) {
         disposeModel(s);
         s.result=null;
-        const T=s.THREE,group=new T.Group();s.model=group;s.rig=[];s.mouth=null;s.divineGlow=null;s.scene.add(group);
+        const T=s.THREE,group=new T.Group();s.model=group;s.rig=[];s.dragonWave=null;s.mouth=null;s.divineGlow=null;s.scene.add(group);
         const divineForm=view.level===ATTENDANCE_PET_MAX_LEVEL&&view.branch&&!view.dead&&!view.egg;
         const divineColor={dino:'#42d9b2',bird:'#ff6842',fish:'#45c8e8',beast:'#f0d283'}[view.branch]||view.form.color;
         if(divineForm){
@@ -9020,16 +9021,6 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
         const applyBattleResult=()=>{
             if(divineForm){
                 const gold=material('#f2d783'),darkGold=material('#a97932'),glow=new T.MeshBasicMaterial({color:divineColor,transparent:true,opacity:.72});
-                const halo=new T.Mesh(new T.TorusGeometry(1.38,.025,8,64),gold);
-                halo.position.set(-.18,.34,-1.15);halo.scale.set(1,.82,1);group.add(halo);
-                const innerHalo=new T.Mesh(new T.TorusGeometry(1.23,.009,6,64),glow);
-                innerHalo.position.copy(halo.position);innerHalo.scale.copy(halo.scale);group.add(innerHalo);
-                for(let i=0;i<8;i++){
-                    const angle=i*Math.PI/4;
-                    sphere(group,-.18+Math.cos(angle)*1.38,.34+Math.sin(angle)*1.13,-1.12,.045,.045,.028,i%2?gold:darkGold);
-                    tube(group,[[-.18+Math.cos(angle)*1.12,.34+Math.sin(angle)*.92,-1.1],
-                        [-.18+Math.cos(angle)*1.22,.34+Math.sin(angle)*1.0,-1.1]],[.018,.004],gold);
-                }
                 if(view.branch==='dino'){
                     for(const side of [-1,1]){
                         tube(group,[[1.05,1.08,side*.13],[.98,1.35,side*.17],[.8,1.53,side*.19],[.68,1.56,side*.19]],[.095,.073,.035,.002],gold);
@@ -9402,6 +9393,7 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
         if(shape==='dragon'&&view.branch==='dino'&&view.level===ATTENDANCE_PET_MAX_LEVEL){
             const gold=material('#e4ba62'),jade=material('#78d8a4');
             const spine=[[1.15,.62,0],[.65,.32,.04],[.12,-.42,.15],[-.54,-.52,.27],[-1.26,-.07,.12],[-1.61,.54,-.09],[-2.16,.39,-.18],[-2.45,.16,-.1]];
+            const firstPart=group.children.length;
             tube(group,spine,[.24,.29,.28,.23,.18,.13,.07,.006],bodyMat);
             tube(group,spine.map(([x,y,z])=>[x,y-.09,z+.12]),[.17,.2,.17,.14,.11,.07,.035,.003],jade);
             sphere(group,1.19,.68,0,.34,.25,.26,bodyMat);
@@ -9417,6 +9409,12 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
                 }
             }
             for(const [x,y,z] of spine.slice(1,-1))cone(group,x,y+.22,z,.09,.29,gold,Math.PI*.83);
+            s.dragonWave=group.children.slice(firstPart).map((mesh,index)=>{
+                const positions=index<2?mesh.geometry.attributes.position:null;
+                if(positions)mesh.frustumCulled=false;
+                return {mesh,positions,rest:positions?positions.array.slice():null,y:mesh.position.y,z:mesh.position.z,
+                    anchor:mesh.position.x||mesh.geometry.attributes.position.getX(0)};
+            });
             applyBattleResult();return;
         }
         if(kind==='dino'){
@@ -9662,6 +9660,25 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
                 s.model.rotation.y=s.facingAngle+(reduced?0:Math.sin(s.t*.9)*(mode==='walk'?.06:.16));
                 s.model.rotation.z=alive?(reduced?0:Math.sin(s.t*1.3)*(mode==='walk'?.012:.035)):Math.PI*.75;
                 if(alive&&!reduced)s.rig.forEach(part=>{const pace=mode==='fly'?7:mode==='walk'?5:3.5;const intensity=mode==='walk'&&!walking&&!petDialogOpen?.08:1;part.mesh.rotation[part.axis]=(part.base||0)+Math.sin(s.t*pace+part.phase)*part.amount*intensity;});
+                if(s.dragonWave){
+                    const phase=s.t*4.6;
+                    const wave=x=>!alive||reduced?0:Math.max(0,Math.min(1,(1.15-x)/3.6))*Math.sin(phase+x*3.3);
+                    for(const part of s.dragonWave){
+                        if(part.positions){
+                            const values=part.positions.array;
+                            for(let j=0;j<values.length;j+=3){
+                                const offset=wave(part.rest[j]);
+                                values[j+1]=part.rest[j+1]+offset*.24;
+                                values[j+2]=part.rest[j+2]+offset*.16;
+                            }
+                            part.positions.needsUpdate=true;
+                        }else{
+                            const offset=wave(part.anchor);
+                            part.mesh.position.y=part.y+offset*.24;
+                            part.mesh.position.z=part.z+offset*.16;
+                        }
+                    }
+                }
                 const feeding=Math.max(0,1-(s.t-s.fedAt)/1.4);
                 const size=attendancePetScale(s.view||{egg:true});
                 const fitted=staged||s.previewMode?size:1;
@@ -11719,6 +11736,9 @@ const PetBattleGame=(()=>{
             const notes=[];
             if(hit)notes.push(play.last?.blocked?'HUYỀN VŨ · CHẶN ĐÒN':dodged?'NÉ ĐÒN':Number.isFinite(play.last?.damage)?`${critical?'CHÍ MẠNG · ':''}−${play.last.damage}`:'');
             if(attacking&&play.last?.healed)notes.push(`HỒI +${play.last.healed} HP`);
+            if(attacking&&play.last?.burnApplied)notes.push('GÂY THIÊU ĐỐT');
+            if(attacking&&play.last?.special==='metal')notes.push('CƯỜNG HÓA CHÍ MẠNG · 2 LƯỢT');
+            if(attacking&&play.last?.special==='earth'&&play.last.damage>0)notes.push('GÂY CÂM LẶNG · 2 LƯỢT');
             if(attacking&&play.last?.burnDamage)notes.push(`THIÊU ĐỐT −${play.last.burnDamage} HP`);
             if(attacking&&play.last?.silenced)notes.push('CÂM LẶNG');
             if(attacking&&play.last?.shielded)notes.push('THẦN THUẪN KÍCH HOẠT');
