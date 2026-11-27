@@ -2304,6 +2304,7 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
     <dialog id="petBattleExitDialog" class="pet-battle-dialog pet-battle-overlay pet-battle-exit" aria-labelledby="petBattleExitWinner" aria-describedby="petBattleExitResult">
         <h5 id="petBattleExitWinner"></h5>
         <p id="petBattleExitResult"></p>
+        <details open><summary>Chi tiết trận đấu</summary><ul id="petBattleExitDetails" class="pet-battle-log"></ul></details>
         <p>Bạn có muốn rời phòng đấu?</p>
         <div class="pet-battle-actions"><button type="button" id="petBattleStay">Ở lại</button><button type="button" id="petBattleExitConfirm">Rời phòng</button></div>
     </dialog>
@@ -2346,7 +2347,7 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
                 <button type="button" data-battle-element="wood" aria-pressed="false">🐉 Thanh Long</button>
                 <button type="button" data-battle-element="water" aria-pressed="false">🐢 Huyền Vũ</button>
                 <button type="button" data-battle-element="fire" aria-pressed="false">🔥 Chu Tước</button>
-                <button type="button" data-battle-element="earth" aria-pressed="false">Thổ</button>
+                <button type="button" data-battle-element="earth" aria-pressed="false"><i class="bi bi-gem" aria-hidden="true"></i> Thổ</button>
             </fieldset>
             <p id="petBattleSpiritInfo" class="pet-battle-spirit-info" aria-live="polite"></p>
             <div class="pet-battle-stat-head"><strong>Phân bổ chỉ số · <span id="petBattleBudget">100</span> điểm</strong><button type="button" id="petBattleBalanceStats">Chia cân bằng</button></div>

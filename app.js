@@ -11174,7 +11174,9 @@ const PetBattleGame=(()=>{
         if(records.some(p=>p.id===selectedAttendancePetId))el('petBattlePet').value=selectedAttendancePetId;
         el('petBattleStake').disabled=!!m||state.botDraft;
         el('petBattleStake').value=m?m.stakeGrams/1000:0.2;
-        el('petBattleElement').value=reserved?.element||'';
+        let lastElement='';
+        try{lastElement=localStorage.getItem(`workpic-battle-element:${state.uid}`)||'';}catch{}
+        el('petBattleElement').value=PET_BATTLE_ELEMENTS.has(lastElement)?lastElement:'';
         loadStatsDraft();
     }
     async function mutate(action,payload={},targetId=state.active){
@@ -11185,7 +11187,7 @@ const PetBattleGame=(()=>{
             const budget=petBattleBudget(attendancePetView(pet).level);
             const keys=Object.keys(statInputs);
             const stats=Object.fromEntries(keys.map((key,index)=>[key,Math.floor(budget/keys.length)+(index<budget%keys.length?1:0)]));
-            payload={...payload,element:PET_BATTLE_ELEMENTS.keys().next().value,stats};
+            payload={...payload,element:undefined,stats};
         }
         if(action==='ready'&&known?.ready?.[uid]||action==='claim'&&known?.claims?.[uid])return;
         if(action==='create'||action==='accept'){
@@ -11574,7 +11576,8 @@ const PetBattleGame=(()=>{
         if(draft||incoming)syncDraftControls();
         if(!m){disposeModels();if(!state.botDraft||!state.bot)renderStatComparison([],[]);return;}
         const effectiveStats=m.players.map((p,i)=>petBattleEffectiveStats(p,m.players[1-i]));
-        renderStatComparison(m.players,effectiveStats);
+        const inCombat=m.status==='fighting'||m.status==='finished';
+        renderStatComparison(inCombat?m.players:[],inCombat?effectiveStats:[]);
         const guestPetId=incoming&&el('petBattlePet').value;
         const guestView=guestPetId?attendancePetView(attendancePetSelected(attendancePetData,guestPetId)):null;
         ensureModels(m,guestView);const play=petBattlePlayback(m),battleEnded=m.status==='finished'||play.finished,full=m.maxHp?.length?m.maxHp:effectiveStats.map((stats,i)=>petBattleMaxHp(stats,m.players[i].appearance)),hp=play.hp.length?play.hp:full;
@@ -11598,7 +11601,7 @@ const PetBattleGame=(()=>{
             const elementKey=p?.element||(guest?el('petBattleElement').value:'');
             const element=PET_BATTLE_ELEMENTS.get(elementKey);
             const bonus=p&&petBattleReceivesBonus(p,m.players[1-i])?' · Tương sinh +1%':'';
-            setElementAura(el(`petBattleModel${i}`),elementKey);
+            setElementAura(el(`petBattleModel${i}`),inCombat?elementKey:'');
             el(`petBattleName${i}`).textContent=p?`${p.petName} · ${p.name}`:guest?.displayName||'Chờ đối thủ vào phòng';
             const view=p?.appearance||guest;
             el(`petBattleStats${i}`).textContent=view?`Cấp ${view.level}${element?` · ${element.label}`:''}${bonus}`:'';
@@ -11638,13 +11641,14 @@ const PetBattleGame=(()=>{
         }
         el('petBattleRps').hidden=m.status!=='rps';el('petBattleRpsStatus').textContent=m.commits?.[state.uid]?'Đã khóa lựa chọn. Chờ cả hai bên để mở kết quả.':m.rpsRound?'Vừa hòa. Cả hai cùng chọn lại.':'Lựa chọn được giữ kín đến khi cả hai đã chọn.';
         el('petBattleRps').querySelectorAll('button').forEach(button=>button.disabled=state.busy||!!m.commits?.[state.uid]);
-        const symbols={rock:'✊',paper:'🖐',scissors:'✌'},rpsResult=el('petBattleRpsReveal');
-        rpsResult.hidden=!m.firstUid;
+        const rpsResult=el('petBattleRpsReveal');
+        const introEnd=petBattleTime(m.startedAt)+(m.introMs===5000?5000:2000);
+        const tied=m.status==='rps'&&m.rpsRound>0&&!Object.keys(m.commits||{}).length;
+        rpsResult.hidden=!tied&&(m.bot||!m.firstUid||Date.now()>=introEnd);
         if(!rpsResult.hidden){
-            const winner=m.players.find(p=>p.uid===m.firstUid),introEnd=petBattleTime(m.startedAt)+(m.introMs===5000?5000:2000);
-            el('petBattleRpsHands').textContent=m.players.map(p=>`${p.name} ${symbols[m.reveals?.[p.uid]?.choice]||'✊'}`).join('  VS  ');
-            el('petBattleRpsWinner').textContent=`${winner?.name||'Người thắng'} thắng oẳn tù tì — đánh trước!`;
-            el('petBattleRpsCountdown').textContent=Date.now()<introEnd?`Bắt đầu giao đấu sau ${Math.ceil((introEnd-Date.now())/1000)} giây`:'Đã bắt đầu giao đấu';
+            el('petBattleRpsHands').textContent='';
+            el('petBattleRpsWinner').textContent=tied?'HÒA':m.firstUid===state.uid?'THẮNG':'THUA';
+            el('petBattleRpsCountdown').textContent=tied?'Chọn lại để phân thắng thua':`Bắt đầu giao đấu sau ${Math.ceil((introEnd-Date.now())/1000)} giây`;
             rpsResult.classList.toggle('is-revealing',Date.now()<introEnd);
         }
         const ended=m.status==='finished'||play.finished,closed=['cancelled','rejected','expired'].includes(m.status);
@@ -11653,11 +11657,33 @@ const PetBattleGame=(()=>{
         const resultWeight=m.stakeGrams;
         el('petBattleResult').textContent=ended?(m.winnerUid?(m.winnerUid===state.uid?'Bạn thắng! +':'Bạn thua! −')+petWeightLabel(resultWeight)+xpResult:'Hòa trận: hoàn lại kg cược.')+(m.claims?.[state.uid]?' Đã cập nhật kết quả.':' Đang chờ cập nhật kết quả.'):(closed?'Hoàn lại kg đã giữ cho bên đặt cược.':'');
         if(ended){
-            const winner=m.players.find(p=>p.uid===m.winnerUid);
-            el('petBattleExitWinner').textContent=winner?`${winner.name} thắng trận!`:'Hòa trận';
+            el('petBattleExitWinner').textContent=m.winnerUid?(m.winnerUid===state.uid?'THẮNG TRẬN':'THUA TRẬN'):'HÒA TRẬN';
             el('petBattleExitResult').textContent=el('petBattleResult').textContent;
             el('petBattleExitConfirm').disabled=state.busy||awaitingClaim;
             if(state.resultPrompt!==m.id){
+                const turns=m.turns||[],hits=turns.filter(turn=>turn.damage>0);
+                const average=hits.reduce((sum,turn)=>sum+turn.damage,0)/Math.max(1,hits.length);
+                const moments=[];
+                for(const [i,turn] of turns.entries()){
+                    const notes=[];
+                    if(turn.damage>=Math.max(1,average*1.5))notes.push(`đòn mạnh ${turn.damage} sát thương`);
+                    if(turn.blocked)notes.push('chặn hoàn toàn đòn đánh');
+                    if(turn.healed)notes.push(`hồi ${turn.healed} HP`);
+                    if(turn.specialName)notes.push(turn.specialName);
+                    const before=turns[i-1]?.hp;
+                    if(before&&m.winnerUid){
+                        const side=m.players.findIndex(p=>p.uid===m.winnerUid);
+                        if(side>=0&&before[side]<before[1-side]&&turn.hp[side]>=turn.hp[1-side])notes.push('bên thắng bắt kịp hoặc vượt HP');
+                    }
+                    if(notes.length){
+                        const item=document.createElement('li');
+                        item.textContent=`Lượt ${turn.index} · ${m.players.find(p=>p.uid===turn.attacker)?.petName||''}: ${notes.join(' · ')}`;
+                        moments.push(item);
+                    }
+                }
+                const details=el('petBattleExitDetails');
+                details.replaceChildren(...moments.slice(-12));
+                if(!moments.length)details.textContent='Trận này không có tình huống nổi bật.';
                 state.resultPrompt=m.id;
                 el('petBattleExitDialog').showModal();
             }
@@ -11737,6 +11763,7 @@ const PetBattleGame=(()=>{
             });
         }
         el('petBattleElement').addEventListener('change',()=>{
+            try{localStorage.setItem(`workpic-battle-element:${state.uid}`,el('petBattleElement').value);}catch{}
             if(match()){syncDraftControls();render();}
             else renderDraft();
         });
