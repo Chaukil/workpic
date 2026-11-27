@@ -9195,11 +9195,14 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
         const shape=view.form.shape,kind=view.form.kind;
         if(shape==='tortoise'){
             const shell=material('#294b47'),rim=material('#acd7b6');
+            const jade=material('#388477');
             sphere(group,-.23,.09,0,.92,.47,.55,shell);
             sphere(group,-.18,-.22,0,.87,.18,.53,bodyMat);
             for(let i=0;i<8;i++){
                 const angle=i*Math.PI/4;
-                sphere(group,-.24+Math.cos(angle)*.57,.39,Math.sin(angle)*.32,.15,.055,.12,rim);
+                const x=-.24+Math.cos(angle)*.57,z=Math.sin(angle)*.32;
+                const plate=new T.Mesh(new T.CylinderGeometry(.12,.17,.075,6),i%2?jade:rim);
+                plate.position.set(x,.40,z);group.add(plate);
             }
             tube(group,[[.45,.06,0],[.68,.25,0],[.89,.37,0]],[.21,.16,.12],bodyMat);
             sphere(group,.98,.39,0,.25,.17,.19,bodyMat);eyes(group,1.03,.44,.16);
@@ -9208,6 +9211,8 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
                 s.rig.push({mesh:foot,axis:'z',amount:.22,phase:x+side});
             }
             tube(group,[[-.85,.04,0],[-1.12,.16,.22],[-1.26,.43,.3],[-1.1,.62,.18]],[.13,.095,.066,.024],finMat);
+            tube(group,[[-.94,.01,-.04],[-1.42,.18,-.28],[-1.49,.57,-.2],[-1.25,.81,.03]],[.13,.11,.08,.06],jade);
+            sphere(group,-1.18,.83,.08,.16,.105,.10,jade);
             applyBattleResult();return;
         }
         if(shape==='mermaid'){
@@ -9224,22 +9229,54 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
             applyBattleResult();return;
         }
         if(kind==='beast'){
-            organicBody([[-.2,.02,0,.8,.34,.27],[.42,.12,0,.36,.38,.29],[.64,.29,0,.26,.34,.25],[.93,.38,0,.32,.28,.26]],bodyMat);
-            sphere(group,1.12,.25,0,.25,.14,.23,cream);sphere(group,1.3,.29,0,.07,.045,.11,black);eyes(group,1.05,.48,.235);
+            // Body length, shoulder, head, muzzle, legs and tail vary by species.
+            const profiles={
+                cub:[.61,.28,.32,.16,.43,.45],lynx:[.68,.31,.29,.17,.68,.22],
+                leopard:[.85,.33,.28,.22,.60,.95],panther:[.89,.39,.30,.25,.56,1.03],
+                cougar:[.94,.32,.25,.29,.66,1.08],tiger:[.91,.46,.34,.24,.58,.84],
+                lion:[.89,.45,.32,.27,.68,.83],sabertooth:[.76,.52,.38,.28,.52,.31]
+            };
+            const divine=divineForm&&view.branch==='beast';
+            const [length,shoulder,head,muzzle,legLength,tailLength]=divine?[1.03,.57,.37,.30,.70,1.04]:profiles[shape]||profiles.cub;
+            const young=view.form.juvenile?.82:1;
+            const paw=(divine?.22:shape==='tiger'||shape==='sabertooth'?.18:.13)*young;
+            const neckWidth=shoulder*.69;
+            organicBody([[-.17,.02,0,length*young,shoulder*.81,neckWidth],[.4,.13,0,.38,shoulder,neckWidth],[.63,.27,0,.27,shoulder*.8,neckWidth*.88],[.91,.39,0,head,head*.88,head*.81]],bodyMat);
+            sphere(group,1.06+muzzle*.37,.25,0,muzzle,.135,head*.77,cream);
+            sphere(group,1.06+muzzle*1.25,.29,0,.064,.045,head*.35,black);
+            eyes(group,1.02,.48,head*.78);
             for(const side of [-1,1]){
-                const ear=sphere(group,.84,.65,side*.18,.11,.16,.075,bodyMat);ear.rotation.x=side*.25;sphere(ear,0,.1,side*.35,.55,.65,.5,finMat);
-                for(const x of [-.67,.53]){
-                    const leg=new T.Group();leg.position.set(x,-.13,side*.22);group.add(leg);
-                    tube(leg,[[0,0,0],[-.06,-.3,side*.02],[.04,-.62,side*.02]],[.12,.075,.055],bodyMat);sphere(leg,.11,-.66,side*.02,.16,.065,.1,bodyMat);
-                    for(let toe=0;toe<3;toe++)sphere(leg,.21,-.66,side*.02+(toe-1)*.05,.025,.018,.014,cream);
+                const ear=sphere(group,.83,.64,side*head*.65,.10,shape==='lynx'?.20:shape==='tiger'?.095:.145,.077,bodyMat);
+                ear.rotation.x=side*.25;sphere(ear,0,.1,side*.35,.55,.65,.5,finMat);
+                for(const x of [-length*.73,.53]){
+                    const leg=new T.Group();leg.position.set(x,-.13,side*neckWidth*.81);group.add(leg);
+                    const h=legLength*young;
+                    tube(leg,[[0,0,0],[x<0?-.15:-.04,-h*.46,side*.02],[.04,-h,side*.02]],[paw*.84,paw*.54,paw*.4],bodyMat);
+                    sphere(leg,.11,-h-.03,side*.02,paw,.067,paw*.72,bodyMat);
+                    if(divine)for(let toe=0;toe<3;toe++)sphere(leg,.11+paw*.84,-h-.03,side*.02+(toe-1)*.072,.044,.021,.018,cream);
                     s.rig.push({mesh:leg,axis:'z',amount:.27,phase:x*side>0?0:Math.PI});
                 }
                 for(let i=0;i<4;i++)tube(group,[[1.14,.23,side*.2],[1.25,.22-i*.02,side*.32],[1.35,.23-i*.03,side*.42]],[.004,.003,.001],cream);
             }
-            const tail=new T.Group();tail.position.set(-.85,.08,0);group.add(tail);tube(tail,[[0,0,0],[-.44,-.03,0],[-.62,.29,.06],[-.5,.49,.1]],[.06,.045,.035,.01],bodyMat);s.rig.push({mesh:tail,axis:'y',amount:.18,phase:0});
+            const tail=new T.Group();tail.position.set(-length*.87,.08,0);group.add(tail);
+            const tailTip=[-tailLength,tailLength*(shape==='cougar'?.1:.64),.13];
+            tube(tail,[[0,0,0],[-tailLength*.44,-.1,0],[-tailLength*.79,tailTip[1]*.43,.06],tailTip],[.071,.053,.041,.025],bodyMat);
+            s.rig.push({mesh:tail,axis:'y',amount:.18,phase:0});
             if(shape==='lion'){
                 const mane=material(mainColor.clone().multiplyScalar(.48));
-                for(let i=0;i<24;i++){const angle=i/24*Math.PI*2;sphere(group,.64,.36+Math.sin(angle)*.3,Math.cos(angle)*.29,.18,.13,.13,mane);}
+                const maneSize=view.form.juvenile?.24:.40;
+                for(let i=0;i<18;i++){const angle=i/18*Math.PI*2;sphere(group,.62,.33+Math.sin(angle)*maneSize,Math.cos(angle)*maneSize*.85,.23,.14,.14,mane);}
+                sphere(tail,...tailTip,.118,.084,.074,mane);
+            }
+            if(divine){
+                const snow=material('#fafaff'),stripe=material('#263044');
+                for(const side of [-1,1]){
+                    for(let i=0;i<4;i++){
+                        tube(group,[[.86,.40-i*.052,side*.27],[.67,.31-i*.055,side*.39],[.47,.23-i*.066,side*.44]],[.101,.078,.004],snow);
+                        tube(group,[[.18-i*.23,.50,side*.08],[.14-i*.23,.37,side*.24],[.03-i*.23,.22,side*.33]],[.025,.031,.003],stripe);
+                    }
+                    tube(group,[[.88,.59,side*.08],[1.00,.56,side*.15],[1.09,.52,side*.25]],[.027,.023,.004],stripe);
+                }
             }
             if(shape==='lynx')for(const side of [-1,1])cone(group,.84,.85,side*.18,.025,.18,black);
             if(shape==='sabertooth')for(const side of [-1,1])tube(group,[[1.16,.2,side*.16],[1.21,.03,side*.16],[1.15,-.12,side*.16]],[.035,.025,.001],cream);
@@ -9383,18 +9420,22 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
             applyBattleResult();return;
         }
         if(kind==='dino'){
-            const bodyParts=[[-.1,0,0,.92+(variant?(view.level%4)*.06:0),.5,.43],[.52,.25,0,.32,.42,.3]];
-            if(shape!=='brachio')bodyParts.push([.68,.46,0,.28,.43,.28],[1.02,.72,0,.5,.36,.35]);
+            const profiles={baby:[.7,.37,.29,.37],triceratops:[.90,.52,.46,.48],stego:[.95,.51,.37,.47],ankylosaur:[1.02,.35,.49,.31],brachio:[1.02,.47,.38,.72],dragon:[.97,.44,.34,.44]};
+            const [length,height,girth,legHeight]=profiles[shape]||profiles.baby;
+            const young=view.form.juvenile?.83:1;
+            const lowHead=['stego','ankylosaur'].includes(shape);
+            const headY=lowHead?.29:.64;
+            const bodyParts=[[-.1,0,0,length*young,height,girth],[.52,lowHead?.04:.25,0,.32,.34,girth*.73]];
+            if(shape!=='brachio')bodyParts.push([.68,headY*.64,0,.28,.30,.26],[1.02,headY,0,lowHead?.29:.43,lowHead?.18:.28,lowHead?.22:.31]);
             organicBody(bodyParts,bodyMat);
-            if(shape!=='brachio'){sphere(group,1.25,.6,0,.4,.2,.3,cream);eyes(group,1.19,.82,.31);}
+            if(shape!=='brachio'){sphere(group,lowHead?1.20:1.28,headY-.075,0,lowHead?.23:.33,.12,lowHead?.20:.26,cream);eyes(group,1.13,headY+.095,lowHead?.19:.27);}
             const tail=new T.Group();tail.position.set(-.76,.02,0);group.add(tail);tube(tail,[[0,0,0],[-.5,.02,0],[-1,.13,.03],[-1.45,.24,.07]],[.3,.2,.09,.005],bodyMat);s.rig.push({mesh:tail,axis:'y',amount:.17,phase:0});
-            const shortArms=shape==='trex';
-            for(const x of [-.55,.55])for(const z of [-.32,.32]){
+            for(const x of [-.55,.55])for(const z of [-girth*.77,girth*.77]){
                 const leg=new T.Group();leg.position.set(x,-.24,z);group.add(leg);
-                tube(leg,[[0,0,0],[-.06,-.27,0],[.04,-.56,0]],[.17,.12,.07],bodyMat);
+                const depth=legHeight*young*(shape==='brachio'&&x>0?1.15:1);
+                tube(leg,[[0,0,0],[-.06,-depth*.53,0],[.04,-depth,0]],[girth*.39,girth*.28,girth*.21],bodyMat);
                 s.rig.push({mesh:leg,axis:'z',amount:.22,phase:x*z>0?0:Math.PI});
-                sphere(leg,.12,-.61,.02,.21,.07,.13,finMat);
-                for(let toe=0;toe<3;toe++)tube(leg,[[.2,-.61,(toe-1)*.07],[.31,-.63,(toe-1)*.08],[.34,-.66,(toe-1)*.08]],[.027,.019,.001],cream);
+                sphere(leg,.11,-depth-.035,.02,girth*.49,.07,girth*.31,finMat);
             }
             if(shape==='triceratops'){
                 sphere(group,.84,.93,0,.13,.48,.56,finMat);cone(group,1.13,1.2,.22,.07,.5,cream,-.4);cone(group,1.13,1.2,-.22,.07,.5,cream,-.4);cone(group,1.54,.83,0,.07,.27,cream,-.7);
@@ -9407,7 +9448,14 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
                 tube(group,[[.65,.4,0],[.83,.85,0],[.92,1.27,0],[1.03,1.4,0]],[.22,.18,.13,.1],bodyMat);
                 sphere(group,1.1,1.4,0,.26,.15,.16,bodyMat);eyes(group,1.24,1.45,.14);group.scale.setScalar(.82);
             }
-            if(['stego','dragon','sea'].includes(shape)||variant){
+            if(shape==='stego'){
+                for(let i=0;i<7;i++){
+                    const x=-.97+i*.23,h=.21+.30*Math.sin(Math.PI*(i+1)/8);
+                    fin(group,[[x-.16,.33],[x-.08,.33+h*.75],[x+.04,.33+h],[x+.15,.34]],finMat,i%2?.10:-.10);
+                }
+                for(const side of [-1,1])for(const x of [-1.36,-1.08])tube(tail,[[x,.18,side*.05],[x-.12,.38,side*.26]],[.063,.003],cream);
+            }
+            if(shape==='dragon'||variant){
                 const count=variant?7+view.level%7:shape==='dragon'?9:6;
                 for(let i=0;i<count;i++)cone(group,-1.15+i*.25,.5+Math.sin(i/count*Math.PI)*.2,0,.13,.35+(i%2)*.15,material(shape==='stego'?'#fbbf24':'#e9d5ff'));
             }
@@ -9463,23 +9511,40 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
             applyBattleResult();return;
         }
         const round=shape==='puffer',disc=['angel','tang'].includes(shape),whale=kind==='whale',ray=shape==='ray';
-        const size=shape==='small'?.78:whale?1.2:1;
-        if(round||disc||ray)sphere(group,.05,0,0,size,ray?.2:round?.72:.76,ray?.86:round?.63:.3,bodyMat);
+        const profiles={
+            small:[.72,.32,.80],gold:[.89,.57,.79],tang:[.87,.67,.37],
+            sword:[1.09,.33,.72],hammer:[1.12,.36,.94],shark:[1.23,.46,.89],
+            megalodon:[1.32,.61,1.02],orca:[1.27,.55,.90],humpback:[1.39,.52,.9],
+            sperm:[1.33,.58,1],blue:[1.51,.45,.88]
+        };
+        const [length,depth,width]=profiles[shape]||[whale?1.2:1,.46,.82];
+        const size=length*(view.form.juvenile?.86:1);
+        if(round||disc||ray)sphere(group,.05,0,0,size,ray?.13:round?.72:depth,ray?.90:round?.63:width,bodyMat);
         else{
-            const profile=new T.SplineCurve([[-size,.05],[-size*.8,.18],[-size*.45,.38],[0,whale?.56:.46],[size*.43,whale?.48:.39],[size*.79,.24],[size,.035]].map(([x,r])=>new T.Vector2(r,x)));
-            const geometry=new T.LatheGeometry(profile.getPoints(72),48);geometry.rotateZ(-Math.PI/2);geometry.scale(1,1,.82);geometry.computeVertexNormals();group.add(new T.Mesh(geometry,bodyMat));
+            const profile=new T.SplineCurve([[-size,.035],[-size*.78,depth*.30],[-size*.45,depth*.76],[0,depth],[size*.43,depth*.89],[size*.79,depth*.57],[size,.025]].map(([x,r])=>new T.Vector2(r,x)));
+            const geometry=new T.LatheGeometry(profile.getPoints(48),32);geometry.rotateZ(-Math.PI/2);geometry.scale(1,1,width);geometry.computeVertexNormals();group.add(new T.Mesh(geometry,bodyMat));
         }
         if(whale||kind==='shark')sphere(group,.2,-.23,.01,.8,.25,.34,cream);
         if(shape==='sperm')sphere(group,.61,.07,0,.6,.43,.37,bodyMat);
         if(shape==='humpback')for(let i=0;i<7;i++)sphere(group,.58+i*.06,.19-i*.02,.31,.035,.025,.025,finMat);
         const tail=new T.Group();tail.position.x=-size*.85;group.add(tail);
         if(ray){cone(tail,-.7,0,0,.045,1.5,finMat,Math.PI/2);group.rotation.x=.7;}
-        else fin(tail,[[0,0],[-.75,.5],[-.58,0],[-.75,-.5]],shape==='gold'?material('#f97316'):shape==='tang'?material('#fde047'):finMat);
+        else if(whale)fin(tail,[[0,0],[-.26,.32],[-.48,.82],[-.69,.45],[-.53,0],[-.69,-.45],[-.48,-.82],[-.26,-.32]],finMat);
+        else if(shape==='gold')fin(tail,[[0,0],[-.54,.64],[-.88,.46],[-.72,.06],[-.89,-.40],[-.59,-.54]],material('#f97316'));
+        else fin(tail,[[0,0],[-.70,.56],[-.55,0],[-.73,kind==='shark'?-.37:-.52]],shape==='tang'?material('#fde047'):finMat);
         if(whale)tail.rotation.x=Math.PI/2;
         s.rig.push({mesh:tail,axis:whale?'z':'y',amount:.32,phase:0});
-        if(!ray)fin(group,[[-.48,.2],[-.25,kind==='shark'?1:shape==='angel'?1.2:.76],[.35,.35]],finMat);
+        if(!ray&&shape!=='sperm'){
+            const dorsal=shape==='orca'?1.12:shape==='blue'?.45:shape==='humpback'?.57:kind==='shark'?.95:.72;
+            const offset=shape==='blue'||shape==='humpback'?-.45:0;
+            fin(group,[[-.48+offset,.20],[-.30+offset,dorsal],[.26+offset,depth*.75]],finMat);
+        }
         if(shape==='angel')fin(group,[[-.4,-.3],[.1,-1.1],[.4,-.32]],finMat);
-        for(const side of [-1,1]){const wing=fin(group,[[.3,.1],[-.3,-.62],[-.57,-.15]],finMat,side*.3);wing.rotation.x=side*.65;s.rig.push({mesh:wing,axis:'x',base:side*.65,amount:.15,phase:side});}
+        if(!ray)for(const side of [-1,1]){
+            const reach=shape==='humpback'?1.16:shape==='orca'?.66:.55;
+            const wing=fin(group,[[.35,.05],[-.27,-reach],[-.61,-.10]],finMat,side*depth*width*.77);
+            wing.rotation.x=side*.65;s.rig.push({mesh:wing,axis:'x',base:side*.65,amount:.15,phase:side});
+        }
         // Fine fin rays and gill folds catch the light without polygonal slabs.
         if(!whale)for(const side of [-1,1]){
             for(let i=0;i<5;i++)tube(group,[[size*.43,.05,side*.32],[size*.4-i*.035,-.08,side*.36],[size*.38-i*.038,-.22,side*.3]],[.008,.009,.003],finMat);
