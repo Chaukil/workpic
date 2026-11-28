@@ -21,7 +21,7 @@
         rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="styles.css?v=20261128-pet-matchup">
+    <link rel="stylesheet" href="styles.css?v=20261128-arthropod">
     <link rel="icon"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>📅</text></svg>">
 </head>
@@ -2319,7 +2319,7 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
         <p id="petBattleExitResult"></p>
         <details open><summary>Chi tiết trận đấu</summary><ul id="petBattleExitDetails" class="pet-battle-log"></ul></details>
         <p>Bạn có muốn rời phòng đấu?</p>
-        <div class="pet-battle-actions"><button type="button" id="petBattleStay">Ở lại</button><button type="button" id="petBattleExitConfirm">Rời phòng</button></div>
+        <div class="pet-battle-actions"><button type="button" id="petBattleStay">Ở lại</button><button type="button" id="petBattleExitRematch" hidden>Đấu lại</button><button type="button" id="petBattleExitConfirm">Rời phòng</button></div>
     </dialog>
     <dialog id="petBattleInvitePicker" class="pet-battle-dialog pet-battle-overlay pet-battle-invite-picker" aria-labelledby="petBattleInvitePickerTitle">
         <header><h5 id="petBattleInvitePickerTitle">Mời đối thủ</h5><button type="button" id="petBattleInvitePickerClose" aria-label="Đóng danh sách">✕</button></header>
@@ -2410,7 +2410,7 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
             <p id="petBattleResult" class="pet-battle-result"></p><ol id="petBattleLog" class="pet-battle-log"></ol>
         </section>
         <section id="petBattleStatComparison" class="pet-battle-stat-comparison" aria-label="So sánh chỉ số hai thú cưng" hidden></section>
-        <div class="pet-battle-actions"><button type="button" id="petBattleCancel" hidden>Hủy lời mời &amp; nhận lại cược</button><button type="button" id="petBattleClaim" hidden>Nhận kết quả / hoàn cược</button><button type="button" id="petBattleFinish" hidden>Rời phòng</button><button type="button" id="petBattleRetry" hidden>Thử đồng bộ lại</button></div>
+        <div class="pet-battle-actions"><button type="button" id="petBattleCancel" hidden>Hủy lời mời &amp; nhận lại cược</button><button type="button" id="petBattleClaim" hidden>Nhận kết quả / hoàn cược</button><button type="button" id="petBattleRematch" hidden>Đấu lại</button><button type="button" id="petBattleFinish" hidden>Rời phòng</button><button type="button" id="petBattleRetry" hidden>Thử đồng bộ lại</button></div>
     </dialog>
     <dialog id="petCompareDialog" class="pet-compare-dialog" aria-labelledby="petCompareTitle">
         <header><div><small>ĐẤU TRƯỜNG THÚ CƯNG</small><h5 id="petCompareTitle">Xếp hạng</h5></div><button type="button" id="petCompareClose" aria-label="Đóng">✕</button></header>
@@ -2552,7 +2552,7 @@ Thứ 6 hàng tuần gửi báo cáo cho sếp."></textarea>
     <div class="noel-room-decor" aria-hidden="true"><svg class="noel-ribbon-tree" viewBox="0 0 120 184"><use href="#noel-ribbon-tree"/></svg><svg class="noel-golden-deer" viewBox="0 0 150 156"><use href="#noel-golden-deer"/></svg></div>
     <div class="noel-fairy-lights noel-global-lights" aria-hidden="true"><svg viewBox="0 0 280 98" focusable="false"><use href="#noel-wire-strand"/></svg><svg viewBox="0 0 280 98" focusable="false"><use href="#noel-wire-strand"/></svg><svg viewBox="0 0 280 98" focusable="false"><use href="#noel-wire-strand"/></svg><svg viewBox="0 0 280 98" focusable="false"><use href="#noel-wire-strand"/></svg><svg viewBox="0 0 280 98" focusable="false"><use href="#noel-wire-strand"/></svg><svg viewBox="0 0 280 98" focusable="false"><use href="#noel-wire-strand"/></svg><svg viewBox="0 0 280 98" focusable="false"><use href="#noel-wire-strand"/></svg><svg viewBox="0 0 280 98" focusable="false"><use href="#noel-wire-strand"/></svg></div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script type="module" src="app.js?v=20261128-pet-amounts"></script>
+    <script type="module" src="app.js?v=20261128-arthropod"></script>
 </body>
 
 </html>

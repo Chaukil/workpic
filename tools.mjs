@@ -924,7 +924,7 @@ test('pet nickname is bounded, normalized, idempotent and retained through evolu
  assert.equal(attendancePetView(cleared.pet,now).displayName,attendancePetView(cleared.pet,now).name);
 });
 
-test('four evolution branches unlock at ray level, finish at 30 and keep gaining one point per level', () => {
+test('five evolution branches unlock at ray level, finish at 30 and keep gaining one point per level', () => {
  const now=Date.UTC(2026,10,19),pet={...newAttendancePet(now-7200000),checkins:80,lastCheckinAt:now};
  assert.equal(attendancePetView(pet,now).level,9);
  assert.equal(attendancePetView(pet,now).needsBranch,true);
@@ -1372,6 +1372,32 @@ test('two-client battle escrow, hidden RPS, automatic fight, payout and refunds 
  assert.deepEqual(battles.get(room).claims,{a:true,b:true});
  assert.equal(reads-roomReads,14,'a complete room includes four bounded rock-paper-scissors transaction reads');
  assert.equal(writes-roomWrites,14,'one room includes four rock-paper-scissors writes and both payouts');
+ const rematchWeights=['a','b'].map(uid=>attendancePetView(profiles.get(uid).attendancePet,clock).weightGrams);
+ use('a',room);await game.mutate('rematch');
+ assert.equal(battles.get(room).status,'finished','one request keeps the current result');
+ assert.deepEqual(battles.get(room).rematch,{a:true});
+ use('b',room);await game.mutate('rematch');
+ assert.equal(battles.get(room).status,'ready');
+ assert.equal(battles.get(room).gameNumber,1,'both votes reopen the same room');
+ assert.deepEqual(battles.get(room).claims,{});
+ assert.equal(battles.get(room).startedAt,null);
+ use('a',room);await game.mutate('ready');
+ assert.equal(attendancePetView(profiles.get('a').attendancePet,clock).weightGrams,rematchWeights[0]-200);
+ use('b',room);await game.mutate('ready');
+ const rematchHashA=await petBattleCommitment(room,'a',0,'rock','rematch-a'),rematchHashB=await petBattleCommitment(room,'b',0,'scissors','rematch-b');
+ use('a',room);await game.mutate('commit',{hash:rematchHashA,round:0});use('b',room);await game.mutate('commit',{hash:rematchHashB,round:0});
+ use('a',room);await game.mutate('reveal',{choice:'rock',nonce:'rematch-a',round:0});use('b',room);await game.mutate('reveal',{choice:'scissors',nonce:'rematch-b',round:0});
+ m=battles.get(room);assert.equal(m.status,'fighting');
+ clock+=5000+m.turns.length*1800+1;
+ use('a',room);await game.mutate('claim');use('b',room);await game.mutate('claim');
+ assert.ok(profiles.get('a').attendancePet.battleHistory.some(entry=>entry.id===room));
+ assert.ok(profiles.get('a').attendancePet.battleHistory.some(entry=>entry.id===room+':game-1'));
+ const nextWeights=['a','b'].map(uid=>attendancePetView(profiles.get(uid).attendancePet,clock).weightGrams);
+ use('a',room);await game.mutate('rematch');use('b',room);await game.mutate('rematch');
+ use('a',room);await game.mutate('ready');use('b',room);await game.mutate('leave');
+ assert.equal(battles.get(room).status,'expired');assert.equal(battles.get(room).departedBy,'b');
+ use('a',room);await game.mutate('claim');
+ assert.deepEqual(['a','b'].map(uid=>attendancePetView(profiles.get(uid).attendancePet,clock).weightGrams),nextWeights,'leaving refunds a reserved rematch stake');
  const priorWeights=['a','b'].map(uid=>attendancePetView(profiles.get(uid).attendancePet,clock).weightGrams);
  use('a');await game.mutate('create',{...payload('a',statsA),roomFlow:true});const waiting=game.inspect().active;
  use('b',waiting);await game.mutate('accept',payload('b',statsB));await game.mutate('ready');
@@ -2214,7 +2240,7 @@ try {
     check(!document.getElementById('attendancePetBranchDialog').open&&document.getElementById('attendancePetDialog').open,'successful choice closes only branch form');
 
     petRecord.attendancePet={...petRecord.attendancePet,checkins:90};attendancePetData=petRecord.attendancePet;renderAttendancePet();
-    check(document.querySelectorAll('.pet-road-shared li').length===10&&document.querySelectorAll('.pet-road-branch').length===4,'journey shows the shared path and all four branches');
+    check(document.querySelectorAll('.pet-road-shared li').length===10&&document.querySelectorAll('.pet-road-branch').length===5,'journey shows the shared path and all five branches');
     check([...document.querySelectorAll('.pet-road-branch')].every(branch=>branch.querySelectorAll('li').length===21&&branch.textContent.includes('Cấp 30')),'every branch shows twenty species and a final evolution');
     const guide=document.getElementById('petGuideDialog');
     document.querySelector('[data-pet-guide="care"]').click();
@@ -2690,12 +2716,23 @@ if(process.argv.includes('--pet')||process.argv.includes('--pet-portraits')) awa
  const chrome=['C:/Program Files/Google/Chrome/Application/chrome.exe','C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'].find(fs.existsSync);assert.ok(chrome,'browser required');
  const temp=fs.mkdtempSync(path.join(os.tmpdir(),'workpic-pet-'));
  try{
-  const response=await fetch('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js',{signal:AbortSignal.timeout(15000)});assert.ok(response.ok);fs.writeFileSync(path.join(temp,'three.module.js'),await response.text());
   const source=fs.readFileSync('app.js','utf8').replace(/\r\n/g,'\n');
   const shared=source.split('// BEGIN SHARED HELPERS\n')[1].split('// END SHARED HELPERS')[0];
   let code=source.slice(source.indexOf('function attendancePetSvg('),source.indexOf('let attendancePetData ='));
-  code=code.replace("import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js')",'Promise.resolve(THREE)').replace('return {start,stop,update,preview,thumbnail,','return {inspect:()=>state,start,stop,update,preview,thumbnail,');
-  const script=`import * as THREE from './three.module.js';
+  const moduleUrl=code.match(/import\('(https:\/\/cdn\.jsdelivr\.net\/npm\/three@[^']+)'\)/)?.[1];
+  assert.ok(moduleUrl,'find the pinned pet renderer');
+  const moduleFile=path.posix.basename(new URL(moduleUrl).pathname);
+  const response=await fetch(moduleUrl,{signal:AbortSignal.timeout(15000)});
+  assert.ok(response.ok);
+  const moduleSource=await response.text();
+  await writeFile(path.join(temp,moduleFile),moduleSource);
+  await Promise.all([...new Set(moduleSource.match(/\.\/three\.[\w.]+\.js/g)||[])].map(async file=>{
+   const dependency=await fetch(new URL(file,moduleUrl),{signal:AbortSignal.timeout(15000)});
+   assert.ok(dependency.ok);
+   await writeFile(path.join(temp,file),await dependency.text());
+  }));
+  code=code.replace(`import('${moduleUrl}')`,'Promise.resolve(THREE)').replace('return {start,stop,update,preview,thumbnail,','return {inspect:()=>state,start,stop,update,preview,thumbnail,');
+  const script=`import * as THREE from './${moduleFile}';
 ${shared}
 const renderAttendancePet=()=>{};
 ${code}
@@ -2770,10 +2807,11 @@ try {
  const eggImage=await peerRenderer.thumbnail(attendancePetView(newAttendancePet(now),now));
  check(creatureImage.startsWith('data:image/png')&&eggImage.startsWith('data:image/png')&&creatureImage!==eggImage,'hidden renderer captures distinct real creature and egg images');
  const decoded=new Image();decoded.src=creatureImage;await decoded.decode();check(decoded.naturalWidth>0&&decoded.naturalHeight>0,'thumbnail is a decodable image');
- const arenaButton=document.createElement('div');arenaButton.id='arena-test';arenaButton.innerHTML='<span id="arena-test-art"></span>';document.body.appendChild(arenaButton);
+ const arenaButton=document.createElement('div');arenaButton.id='arena-test';arenaButton.className='pet-battle-model';arenaButton.innerHTML='<span id="arena-test-art"></span>';document.body.appendChild(arenaButton);
  const arenaRenderer=createAttendancePet3D('arena-test','arena-test-art',null,'arena');arenaRenderer.start();arenaRenderer.update(attendancePetView(pet,now));arenaRenderer.duelPose({facing:Math.PI,attackAt:Date.now(),skill:{motion:'claw',variant:4},skillColor:'#f97316'});
  await new Promise(resolve=>setTimeout(resolve,150));
  const arena=arenaRenderer.inspect();check(arena?.renderer&&arena.renderer!==peer.renderer,'arena has an independent real WebGL model');
+ check(arena.renderer.toneMapping===THREE.AgXToneMapping&&arena.platform?.children.length===4,'arena uses AgX and draws the lit 3D platform and contact shadow');
  if(MOBILE_BATTLE_MODE)check(Math.abs(arena.renderer.getPixelRatio()-.75)<.001&&!arena.renderer.getContext().getContextAttributes().antialias,'mobile arena caps pixel density and disables antialiasing');
  const sphereGeometries=new Set();arena.model.traverse(object=>{if(object.geometry?.type==='SphereGeometry')sphereGeometries.add(object.geometry);});
  check(sphereGeometries.size<=1,'battle model reuses its sphere geometry');
@@ -2782,11 +2820,13 @@ try {
  const clock=Date.now,criticalFrame=clock();
  try {
   Date.now=()=>criticalFrame;
-  arenaRenderer.duelPose({criticalAt:criticalFrame-360});
+  arenaRenderer.duelPose({criticalAt:criticalFrame-360,attackAt:criticalFrame-400,skill:{motion:'claw',variant:4}});
   arena.last=0;
   await new Promise(resolve=>requestAnimationFrame(resolve));
  } finally {Date.now=clock;}
  check(arena.model.visible&&!arena.resultGroup&&arena.model.scale.x>originalScale,'critical hit grows the attacking pet while keeping its model visible');
+ check(arena.burst?.mesh.isInstancedMesh&&arena.burst.mesh.count>1,'many strike particles render in one instanced draw');
+ check(arena.contactShadow.visible&&arena.model.position.y+arena.model.userData.arenaBottom*arena.model.scale.y>=arena.arenaFloorY,'combat model stays above the platform');
  arenaRenderer.duelPose({result:'defeat'});const gravePlaque=arena.resultGroup?.children.find(child=>child.material?.map);
  check(arena.resultGroup&&arena.resultGhost&&!arena.model.visible&&gravePlaque?.material.map.image.width===512,'defeated pet shows a grave with a high-resolution name plaque and clear ghost');
  check(arena.resultSpirit.children.some(child=>child.material?.color?.getHexString()==='163448'),'ghost has a visible face');

@@ -15654,18 +15654,19 @@ body.modal-open .attendance-pet-swimmer,body:has(dialog[open]) .attendance-pet-s
 .pet-road-shared { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px 20px; }
 .pet-road-node { position:relative; display:grid; gap:3px; align-content:center; padding:7px 9px; border:1px solid var(--border); border-radius:9px; background:var(--surface); font-size:.72rem; line-height:1.35; overflow-wrap:anywhere; }
 .pet-road-node small,.pet-road-fork small { color:var(--muted); font-size:.65rem; }
-.pet-road-portrait { display:block; width:min(100%,112px); aspect-ratio:112/80; justify-self:center; background-image:url('./pet-portraits.webp?v=20261128-evolution'); background-size:1000% 1000%; background-repeat:no-repeat; }
+.pet-road-portrait { display:block; width:min(100%,112px); aspect-ratio:112/80; justify-self:center; background-image:url('./pet-portraits.webp?v=20261128-arthropod'); background-size:1000% 1000%; background-repeat:no-repeat; }
 .pet-road-node.pet-road-divine { border-color:currentColor; }
 .pet-road-node.is-current { border-color:var(--primary); background:color-mix(in srgb,var(--primary) 13%,var(--surface)); }
 .pet-road-shared li:not(:last-child)::after { content:'→'; position:absolute; left:100%; width:20px; top:50%; transform:translateY(-50%); text-align:center; color:var(--muted); }
 @media(min-width:581px) { .pet-road-shared li:nth-child(5n)::after { display:none; } }
 .pet-road-fork { display:grid; justify-items:center; gap:4px; margin:15px 0 10px; text-align:center; color:var(--primary); font-size:.8rem; }
 .pet-road-fork::after { content:'↓'; font-size:1.1rem; line-height:1; }
-.pet-road-branches { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
+.pet-road-branches { display:grid; grid-template-columns:repeat(auto-fit,minmax(155px,1fr)); gap:10px; }
 .pet-road-branch { --branch-color:#38bdf8; min-width:0; padding:10px; border:1px solid var(--border); border-top:3px solid var(--branch-color); border-radius:10px; background:var(--surface-muted); }
 .pet-road-branch[data-branch=dino] { --branch-color:#65a765; }
 .pet-road-branch[data-branch=bird] { --branch-color:#a78bfa; }
 .pet-road-branch[data-branch=beast] { --branch-color:#d9954e; }
+.pet-road-branch[data-branch=arthropod] { --branch-color:#bb92f4; }
 .pet-road-branch h6 { flex-wrap:wrap; gap:5px; margin-bottom:10px; font-size:.76rem; }
 .pet-road-branch h6 i { color:var(--branch-color); }
 .pet-road-branch h6 small { color:var(--primary); font-size:.62rem; }
@@ -15994,6 +15995,8 @@ body.theme-dark .pet-power-badge { border-color:#fbbf2480; background:linear-gra
 .pet-battle-stat-row + .pet-battle-stat-row { border-top:1px solid var(--border); }
 .pet-battle-stat-row > :nth-child(2) { text-align:center; color:var(--muted); }
 .pet-battle-stat-heading > strong { overflow-wrap:anywhere; }
+.pet-battle-stat-heading small { display:block; margin-top:4px; color:#7bb9ed; font-size:.76em; font-weight:650; }
+#petBattleRematch,#petBattleExitRematch { border-color:#d4aa62; background:#d4aa62; color:#1e160c; font-weight:800; }
 .pet-battle-stat-heading > :last-child { text-align:right; }
 .pet-battle-stat-cell { display:flex; align-items:center; gap:6px; min-width:0; font-variant-numeric:tabular-nums; }
 .pet-battle-stat-cell.side-0 { flex-direction:row-reverse; }
@@ -16023,7 +16026,32 @@ body.theme-dark .pet-power-badge { border-color:#fbbf2480; background:linear-gra
 #petBattleCreate,#petBattleAccept { background:linear-gradient(130deg,#a78038,#d6b773); color:#17202a; border-color:#bb954d; font-weight:700; }
 .pet-battle-room-head { display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; padding:13px 0; font-size:.8rem; }
 .pet-battle-room-head span { color:#b99552; }
-.pet-battle-arena { display:grid; grid-template-columns:minmax(0,1fr) 45px minmax(0,1fr); align-items:center; gap:10px; padding:18px; border:1px solid #5999b54a; border-radius:18px; overflow:visible; background:radial-gradient(ellipse at 50% 0,#2588a629,transparent 65%),linear-gradient(180deg,var(--surface-muted),#16466120); perspective:900px; }
+.pet-battle-arena {
+    display:grid; grid-template-columns:minmax(0,1fr) 45px minmax(0,1fr); align-items:center;
+    gap:10px; padding:18px; border:1px solid #557183; border-radius:18px;
+    isolation:isolate; overflow:hidden; color-scheme:dark; color:#eaf6ff;
+    background:
+        radial-gradient(ellipse at 24% 12%,#297a9b57,transparent 50%),
+        radial-gradient(ellipse at 76% 12%,#a55a3a45,transparent 48%),
+        linear-gradient(180deg,#142335,#0b1424 58%,#172634 80%,#080f1a);
+}
+.pet-battle-arena::before {
+    content:''; position:absolute; z-index:-1; inset:54% 0 0; pointer-events:none;
+    background:repeating-linear-gradient(90deg,transparent 0 51px,#8ecbe51a 52px 53px),
+        repeating-linear-gradient(0deg,transparent 0 23px,#8ecbe522 24px 25px);
+    transform:perspective(270px) rotateX(49deg) scale(1.4); transform-origin:center top;
+    mask-image:linear-gradient(transparent,#000 45%,transparent);
+}
+.pet-battle-arena .pet-battle-model { background:none; }
+.pet-battle-arena .pet-battle-model canvas { filter:none; }
+.pet-battle-arena .pet-battle-side > small { color:#aebfd0; }
+.pet-battle-arena .pet-battle-side > progress {
+    width:100%; height:10px; overflow:hidden; border:0; border-radius:10px;
+    background:#071020; color:#42d39e; accent-color:#42d39e;
+}
+.pet-battle-arena .pet-battle-side > progress::-webkit-progress-bar { background:#071020; }
+.pet-battle-arena .pet-battle-side > progress::-webkit-progress-value { background:linear-gradient(90deg,#178979,#60e9b5); border-radius:10px; }
+.pet-battle-arena .pet-battle-side > progress::-moz-progress-bar { background:linear-gradient(90deg,#178979,#60e9b5); border-radius:10px; }
 .pet-battle-side { min-width:0; position:relative; text-align:center; border:1px solid transparent; border-radius:14px; padding:10px; transition:box-shadow .2s,border-color .2s; }
 .pet-battle-side h6 { margin:0 0 6px; overflow-wrap:anywhere; font-size:.88rem; line-height:1.5; }
 .pet-battle-side > small { display:block; font-size:.65rem; color:var(--muted); }

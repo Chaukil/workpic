@@ -341,13 +341,26 @@ const ATTENDANCE_PET_BRANCHES={
         petForm('Hổ trắng','beast','tiger','#d1cec2',1.25,{stripes:true}),
         petForm('Sư tử','beast','lion','#be9b61',1.3),
         petForm('Sư tử trắng','beast','lion','#d8d0b7',1.4),
-        petForm('Hổ răng kiếm','beast','sabertooth','#b58c54',1.5,{stripes:true})]}
+        petForm('Hổ răng kiếm','beast','sabertooth','#b58c54',1.5,{stripes:true})]},
+    arthropod:{name:'Côn trùng & Giáp xác',icon:'bi-bug',forms:[
+        petForm('Bọ rùa','arthropod','ladybug','#d63d42',1),
+        petForm('Ong mật','arthropod','bee','#db9a32',1),
+        petForm('Châu chấu','arthropod','grasshopper','#7faf43',1),
+        petForm('Bọ ngựa phong lan','arthropod','orchidMantis','#e590b3',1),
+        petForm('Bọ hung','arthropod','scarab','#32897d',1),
+        petForm('Bọ tê giác','arthropod','rhinoBeetle','#755239',1),
+        petForm('Bọ cánh cứng Goliath','arthropod','goliath','#a8a395',1),
+        petForm('Tôm hùm xanh','arthropod','lobster','#427bbf',1),
+        petForm('Bọ cạp hoàng đế','arthropod','emperorScorpion','#454953',1),
+        petForm('Cua nhện Nhật Bản','arthropod','spiderCrab','#bf6048',1)
+    ]}
 };
 const PET_BRANCH_FINALS={
     fish:petForm('Huyền Vũ','dino','tortoise','#57a59a',1.85),
     dino:petForm('Thanh Long','dino','dragon','#3aa99f',1.78,{crest:true}),
     bird:petForm('Chu Tước','bird','phoenix','#f27639',1.68,{crest:true}),
-    beast:petForm('Bạch Hổ','beast','tiger','#ece5df',1.65,{stripes:true,crest:true})
+    beast:petForm('Bạch Hổ','beast','tiger','#ece5df',1.65,{stripes:true,crest:true}),
+    arthropod:petForm('Thiên Giáp Bọ Cạp','arthropod','celestialScorpion','#524381',1.78,{crest:true})
 };
 const PET_BRANCH_ADDITIONS={
     fish:[
@@ -371,6 +384,13 @@ const PET_BRANCH_ADDITIONS={
         ['Kền kền râu','bird','beardedVulture','#735844'],['Chim sấm','bird','thunderbird','#5864a1'],
         ['Hỏa điểu','bird','firebird','#b74938'],['Kim Sí Điểu','bird','garuda','#c89443']
     ],
+    arthropod:[
+        ['Sâu bướm đuôi én','arthropod','caterpillar','#89bb54'],['Chuồn chuồn xanh','arthropod','dragonfly','#458fc0'],
+        ['Bọ que gai','arthropod','stickInsect','#927049'],['Bọ ngựa quỷ','arthropod','devilMantis','#729553'],
+        ['Bọ kẹp kìm','arthropod','stagBeetle','#7b4942'],['Bọ Hercules','arthropod','hercules','#a29762'],
+        ['Tôm bọ ngựa','arthropod','mantisShrimp','#429d76'],['Cua dừa','arthropod','coconutCrab','#9567ad'],
+        ['Bọ cạp sa mạc','arthropod','desertScorpion','#bd8a56'],['Cự Giáp Hổ Phách','arthropod','amberCrab','#b67336']
+    ],
     beast:[
         ['Mèo cá','beast','fishingCat','#857765'],['Linh miêu Caracal','beast','caracal','#a96243'],
         ['Báo săn','beast','cheetah','#d4a460'],['Báo tuyết','beast','snowLeopard','#b2c4cf'],
@@ -380,7 +400,7 @@ const PET_BRANCH_ADDITIONS={
     ]
 };
 for(const [key,branch] of Object.entries(ATTENDANCE_PET_BRANCHES)){
-    const [small,large]={fish:[.65,1.8],dino:[.6,1.75],bird:[.5,1.6],beast:[.5,1.5]}[key];
+    const [small,large]={fish:[.65,1.8],dino:[.6,1.75],bird:[.5,1.6],beast:[.5,1.5],arthropod:[.5,1.68]}[key];
     const stages=branch.forms.flatMap((form,index)=>{
         const [name,kind,shape,color]=PET_BRANCH_ADDITIONS[key][index];
         return [form,petForm(name,kind,shape,color,1)];
@@ -419,6 +439,10 @@ function attendancePetMotion(view) {
     if(view?.egg || view?.dead)return 'rest';
     if(view?.branch==='dino'&&view.level>=ATTENDANCE_PET_MAX_LEVEL)return 'fly';
     if(view?.form.kind==='bird')return 'fly';
+    if(view?.form.kind==='arthropod'){
+        if(['bee','dragonfly'].includes(view.form.shape))return 'fly';
+        return ['lobster','mantisShrimp','spiderCrab'].includes(view.form.shape)?'swim':'walk';
+    }
     return view?.form.kind==='beast'||view?.form.kind==='dino'&&!['sea','seaDragon','mosasaur'].includes(view.form.shape) ? 'walk' : 'swim';
 }
 
@@ -986,7 +1010,8 @@ const PET_BATTLE_SKILL_NAMES={
     fish:['Búa Xé Sóng','Hàm Trắng','Vây Sát Thủ','Đuôi Lưng Gù','Âm Vang Đại Dương','Khúc Ca Biển','Sóng Lam','Nanh Cổ Đại','Đại Triều Xanh','Vực Leviathan','Mai Huyền Vũ'],
     dino:['Móng Xé','Tam Giác Xung Kích','Phiến Giáp','Chùy Giáp','Móng Liềm','Hàm Bạo Chúa','Sống Gai','Quật Cổ Dài','Hơi Thở Rồng','Long Viêm Cổ','Thanh Long Giáng Thế'],
     bird:['Mũi Mổ Lam','Lông Vũ Ngũ Sắc','Đêm Tuyết','Ưng Lao','Hạc Xuyên Mây','Quạt Công','Sải Cánh Andes','Gió Hải Âu','Phượng Hỏa','Thiên Hỏa','Chu Tước Hỏa Vũ'],
-    beast:['Vồ Cỏ','Chớp Tai Nhọn','Vuốt Hoa Mai','Bóng Đen','Vồ Vách Đá','Hổ Vồ Xé Gió','Vuốt Băng','Sư Tử Gầm','Bờm Ánh Trăng','Nanh Kiếm','Bạch Hổ Phá Sơn']
+    beast:['Vồ Cỏ','Chớp Tai Nhọn','Vuốt Hoa Mai','Bóng Đen','Vồ Vách Đá','Hổ Vồ Xé Gió','Vuốt Băng','Sư Tử Gầm','Bờm Ánh Trăng','Nanh Kiếm','Bạch Hổ Phá Sơn'],
+    arthropod:['Vũ Điệu Đốm Đỏ','Kim Châm Hoàng Ong','Cước Gió','Song Liêm Lan','Giáp Ngọc Xoay','Cự Sừng Xung Kích','Giáp Goliath','Song Càng Lam','Vĩ Châm Hoàng Đế','Bát Trảo Đại Dương','Thiên Vĩ Phá Giáp']
 };
 function petBattleSkill({form,level,branch},element=null,special=false){
     const spirit=special?petBattleSpirit(element):null;
@@ -996,7 +1021,8 @@ function petBattleSkill({form,level,branch},element=null,special=false){
     const index=key==='base'?level-1:Math.floor(branchLevel/2);
     const label=(key!=='base'&&branchLevel%2?form.name:PET_BATTLE_SKILL_NAMES[key][index])||form.name;
     const variant=Object.keys(PET_BATTLE_SKILL_NAMES).indexOf(key)*32+Math.max(0,key==='base'?index:branchLevel);
-    const motion=form.kind==='bird'?'dive':form.kind==='beast'?'claw':form.shape==='tortoise'?'shield'
+    const motion=form.kind==='arthropod'?(['bee','dragonfly'].includes(form.shape)?'dive':/mantis|crab|scorpion|lobster/i.test(form.shape)?'claw':'slam')
+        :form.kind==='bird'?'dive':form.kind==='beast'?'claw':form.shape==='tortoise'?'shield'
         :form.shape==='mermaid'?'song':form.kind==='dino'?'slam':form.kind==='shark'?'bite':'swim';
     const effect={dive:'wind',claw:'claw',shield:'wave',song:'water',slam:'fire',bite:'fang',swim:form.kind==='whale'?'wave':'water'}[motion];
     return {label,motion,effect,variant};
@@ -8998,6 +9024,16 @@ function toggleQuickChatPanel() {
 
 function attendancePetSvg(view){
         const color=view.dead?'#94a3b8':view.form.color;
+        if(view.form.kind==='arthropod'){
+            const claws=/scorpion|crab|lobster|shrimp/i.test(view.form.shape);
+            const tail=/scorpion/i.test(view.form.shape);
+            return `<svg viewBox="0 0 140 100" aria-hidden="true"><g fill="${color}" stroke="#252239" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M48 57 35 73 20 76M59 60 51 79 35 87M74 58 76 78 89 86M85 53 96 70 114 76" fill="none"/>
+                ${tail?'<path d="M46 51Q13 39 34 19Q49 6 70 23L63 31" fill="none" stroke-width="10"/>':''}
+                <ellipse cx="57" cy="52" rx="33" ry="19"/><ellipse cx="86" cy="48" rx="17" ry="13"/>
+                ${claws?'<path d="M94 44 109 30 126 29 115 37 132 39 116 49 102 51ZM96 54 109 62 124 62 116 55 130 54 124 69 106 71Z"/>':'<path d="M94 42 105 28 115 25M96 47 115 38 126 40" fill="none"/>'}
+                <circle cx="92" cy="46" r="3" fill="#f9e5ff" stroke="none"/></g></svg>`;
+        }
         if(view.level>=ATTENDANCE_PET_MAX_LEVEL&&view.branch&&!view.dead&&!view.egg){
             const divine={
                 dino:`<svg viewBox="0 0 140 100" aria-hidden="true"><defs><linearGradient id="spirit-dragon" x2="0" y2="1"><stop stop-color="#b9fff0"/><stop offset=".48" stop-color="#31bba4"/><stop offset="1" stop-color="#14574f"/></linearGradient><radialGradient id="spirit-glow"><stop stop-color="#58efc4" stop-opacity=".42"/><stop offset="1" stop-color="#58efc4" stop-opacity="0"/></radialGradient></defs><ellipse cx="70" cy="51" rx="66" ry="47" fill="url(#spirit-glow)"/><circle cx="70" cy="49" r="39" fill="none" stroke="#e4cc7d" stroke-width="1.5"/><circle cx="70" cy="49" r="35" fill="none" stroke="#9de9d4" stroke-width=".7" stroke-dasharray="2 3"/><path d="M25 67Q39 29 66 44Q84 54 88 34Q90 17 111 19Q126 21 117 35L134 40 119 47Q108 44 102 53L110 70 101 69 94 58Q80 69 63 59Q43 49 34 77L23 82 29 72Z" fill="url(#spirit-dragon)" stroke="#124d48" stroke-width="2"/><path d="m103 25-2-12 9 9 10-10 2 14M116 36l14-4-8 9M96 35l12 6M50 54l7 10m8-11 7 11m9-9 7 10" fill="none" stroke="#f2d783" stroke-width="2" stroke-linecap="round"/><path d="m42 47-8-13 18 7m31-2-7-15 19 10" fill="#287e70" stroke="#d4b96c" stroke-width="1.5"/><circle cx="115" cy="31" r="2" fill="#ffe58c"/></svg>`,
@@ -9018,6 +9054,7 @@ function attendancePetSvg(view){
 function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendancePetArt',previewId='attendancePetPreview',presentation='roam'){
     let state=null,generation=0;
     const staged=presentation!=='roam';
+    const arena=presentation==='arena';
     const fallback = view => {
         const art=document.getElementById(artId);
         if(!art)return;
@@ -9121,7 +9158,7 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
         const battlePresentation=presentation==='arena';
         const divineForm=view.level>=ATTENDANCE_PET_MAX_LEVEL&&view.branch&&!view.dead&&!view.egg;
         group.userData.visualScale=divineForm&&view.branch==='fish'?1.1:1;
-        const divineColor={dino:'#42d9b2',bird:'#ff6842',fish:'#45c8e8',beast:'#f0d283'}[view.branch]||view.form.color;
+        const divineColor={dino:'#42d9b2',bird:'#ff6842',fish:'#45c8e8',beast:'#f0d283',arthropod:'#b29aff'}[view.branch]||view.form.color;
         if(divineForm){
             const canvas=document.createElement('canvas');canvas.width=canvas.height=128;
             const ctx=canvas.getContext('2d'),color=divineColor;
@@ -9340,16 +9377,99 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
             applyBattleResult();return;
         }
         if(shape==='mermaid'){
-            const skinTone=material(view.dead?'#8b929b':'#e8b99d'),hair=material('#6b404b'),tailMat=material(mainColor);
-            sphere(group,.54,.29,0,.31,.28,.20,skinTone);
-            sphere(group,.84,.56,0,.22,.24,.2,skinTone);
-            sphere(group,.72,.66,0,.25,.23,.23,hair);eyes(group,.94,.59,.15);
-            sphere(group,.55,.20,0,.23,.14,.22,tailMat);
-            for(const side of [-1,1])tube(group,[[.54,.42,side*.14],[.75,.25,side*.34],[.99,.32,side*.39]],[.065,.048,.025],skinTone);
-            const tail=new T.Group();group.add(tail);
-            tube(tail,[[.31,.12,0],[-.11,-.11,0],[-.62,-.28,.04],[-1.07,-.13,0]],[.21,.17,.12,.065],tailMat);
-            fin(tail,[[-.97,-.15],[-1.44,.20],[-1.7,.27],[-1.41,-.11],[-1.68,-.43],[-1.31,-.36]],material('#9ce4d8'));
-            s.rig.push({mesh:tail,axis:'y',amount:.26,phase:0});
+            const skinTone=material(view.dead?'#8b929b':'#c89579'),hair=material('#233553');
+            const gold=material('#d9ad68'),shell=material('#346c91'),membrane=material('#73e2d5');
+            organicBody([[.35,.05,0,.24,.26,.20],[.55,.28,0,.24,.29,.26],[.66,.48,0,.12,.23,.13]],shell);
+            sphere(group,.83,.70,0,.22,.25,.18,skinTone);
+            sphere(group,.73,.79,0,.23,.21,.20,hair);
+            sphere(group,1.034,.67,0,.046,.040,.049,skinTone);
+            eyes(group,.94,.735,.133);
+            tube(group,[[.82,.91,-.15],[.92,1.03,0],[.82,.91,.15]],[.033,.040,.033],gold);
+            sphere(group,.93,1.017,0,.043,.063,.040,membrane);
+            for(const side of [-1,1]){
+                tube(group,[[.55,.39,side*.22],[.72,.14,side*.38],[.96,.18,side*.44]],[.072,.051,.024],skinTone);
+                sphere(group,.88,.17,side*.42,.062,.057,.052,gold);
+                fin(group,[[.54,.40],[.36,.61],[.25,.43],[.46,.32]],gold,side*.22);
+                const locks=new T.Group();locks.position.set(.68,.77,side*.12);group.add(locks);
+                for(let i=0;i<3;i++)tube(locks,[[0,0,side*i*.041],[-.23,-.10,side*.09],[-.48,-.25-i*.07,side*.2],[-.76,-.17-i*.12,side*.26]],[.095,.083,.049,.004],i===1?shell:hair);
+                s.rig.push({mesh:locks,axis:'z',amount:.14,phase:side*.4});
+            }
+            const tail=new T.Group();tail.position.set(.24,-.10,0);group.add(tail);
+            tube(tail,[[0,0,0],[-.29,-.20,0],[-.66,-.36,.05],[-1.08,-.30,.08],[-1.43,-.04,.03]],[.24,.22,.16,.095,.045],bodyMat);
+            for(const side of [-1,1]){
+                const fan=new T.Group();fan.position.set(-1.38,-.03,.02);tail.add(fan);
+                const tip=[-.76,side*.68],edge=[-.51,side*.47];
+                fin(fan,[[0,0],[-.15,side*.32],tip,[-.60,side*.22],[-.38,0]],membrane);
+                for(const [x,y] of [tip,edge,[-.61,side*.24]])tube(fan,[[0,0,.012],[x*.55,y*.42,.022],[x,y,.012]],[.021,.013,.002],shell);
+                s.rig.push({mesh:fan,axis:'x',amount:.24,phase:side*.8});
+            }
+            tube(group,[[.22,.015,-.19],[.37,-.043,0],[.22,.015,.19]],[.028,.028,.028],gold);
+            s.rig.push({mesh:tail,axis:'z',amount:.19,phase:0});
+            applyBattleResult();return;
+        }
+        if(kind==='arthropod'){
+            const wings=['bee','dragonfly'].includes(shape),mantis=/mantis/i.test(shape)&&shape!=='mantisShrimp';
+            const scorpion=/scorpion/i.test(shape),crab=/crab/i.test(shape);
+            const shrimp=['lobster','mantisShrimp'].includes(shape),clawed=scorpion||crab||shrimp||shape==='stagBeetle';
+            const walkingLegs=scorpion||crab?4:3;
+            const plated=divineForm||scorpion||crab||shrimp;
+            const long=['dragonfly','caterpillar','grasshopper','stickInsect'].includes(shape)||mantis||shrimp;
+            const breadth=crab?.62:long?.24:.40;
+            const length=crab?.56:long?.84:.67;
+            const armor=material(divineForm?'#7863bd':mainColor.clone().multiplyScalar(.58));
+            const accent=material(divineForm?'#ddc1ff':cream.color);
+            const abdomenHeight=shape==='ladybug'?.37:crab?.26:long?.20:.29;
+            sphere(group,-.20,.07,0,length,abdomenHeight,breadth,bodyMat);
+            if(plated||long)for(let i=0;i<(long?6:4);i++){
+                const x=.14-i*(long?.19:.20),t=i/(long?6:4);
+                sphere(group,x,.09,0,.20,abdomenHeight*(1-t*.35),breadth*(1-t*.37),i%2?bodyMat:armor);
+            }
+            if(shape==='ladybug'){
+                tube(group,[[.31,.28,0],[-.20,.447,0],[-.71,.26,0]],[.018,.021,.005],black);
+                for(const side of [-1,1])for(let i=0;i<3;i++)
+                    sphere(group,.14-i*.26,.30+(i%2)*.05,side*(.24-(i%2)*.09),.083,.036,.078,black);
+            }
+            sphere(group,.48,mantis?.41:.15,0,crab?.19:.25,.19,breadth*.72,armor);
+            if(mantis)tube(group,[[.18,.03,0],[.33,.25,0],[.45,.42,0]],[.13,.105,.085],bodyMat);
+            eyes(group,.62,mantis?.48:.23,crab?.32:.14);
+            if(shape==='rhinoBeetle'||shape==='hercules')
+                tube(group,[[.55,.25,0],[.72,.45,0],[shape==='hercules'?1.13:.90,.68,0],[1.01,.79,0]],[.10,.084,.043,.003],armor);
+            for(const side of [-1,1]){
+                if(!scorpion&&!crab)tube(group,[[.61,.25,side*.09],[.80,.38,side*.19],[shrimp?1.36:.94,.35,side*.29]],[.026,.017,.004],accent);
+                for(let i=0;i<walkingLegs;i++){
+                    const x=.29-i*.29,reach=shape==='spiderCrab'?.95:crab?.66:.41;
+                    const leg=new T.Group();leg.position.set(x,0,side*breadth*.65);group.add(leg);
+                    const back=shape==='grasshopper'&&i===2;
+                    tube(leg,[[0,0,0],[back?-.40:-.10,back?.26:.01,side*reach*.59],[-.19,-.34,side*reach]],[back?.092:.052,.034,.005],armor);
+                    s.rig.push({mesh:leg,axis:'y',amount:.24,phase:(i+(side===1?1:0))*Math.PI});
+                }
+                if(clawed||mantis){
+                    const claw=new T.Group();claw.position.set(.42,mantis?.33:.02,side*breadth*.71);group.add(claw);
+                    tube(claw,[[0,0,0],[.31,mantis?.26:-.02,side*.33],[.61,mantis?.16:.05,side*.38]],[.081,.064,.048],bodyMat);
+                    const size=divineForm?.24:crab?.19:.14;
+                    if(!mantis)sphere(claw,.62,.05,side*.38,size,.11,size*.75,armor);
+                    for(const tip of [-1,1])tube(claw,[[.64,.07,side*.38+tip*.056],[.83,.10,side*.38+tip*size],[.99,.13,side*.38+tip*.035]],[.067,.039,.004],divineForm?accent:bodyMat);
+                    s.rig.push({mesh:claw,axis:'y',amount:.24,phase:side});
+                }
+                if(wings){
+                    const wing=new T.Group();wing.position.set(.20,.24,0);group.add(wing);
+                    const glass=new T.MeshPhysicalMaterial({color:'#bce7f5',transparent:true,opacity:.58,roughness:.24,depthWrite:false});
+                    const span=shape==='dragonfly'?1.18:.69;
+                    sphere(wing,-.17,.10,side*span*.54,.27,.025,span*.54,glass);
+                    if(shape==='dragonfly')sphere(wing,-.48,.084,side*span*.42,.23,.022,span*.44,glass);
+                    s.rig.push({mesh:wing,axis:'x',amount:.63,phase:side>0?0:Math.PI});
+                }
+            }
+            if(scorpion||shrimp){
+                const tail=new T.Group();tail.position.x=-.61;group.add(tail);
+                const curve=scorpion?[[-.02,.09,0],[-.50,.29,0],[-.68,.65,0],[-.43,1.08,0],[-.06,1.18,0],[.20,.97,0]]
+                    :[[0,0,0],[-.30,-.04,0],[-.56,-.14,0],[-.77,-.12,0]];
+                tube(tail,curve,scorpion?[.15,.14,.13,.105,.085,.006]:[.18,.16,.12,.05],armor);
+                for(let i=1;i<curve.length-1;i++)sphere(tail,...curve[i],.13-i*.014,.105-i*.008,.115-i*.012,bodyMat);
+                if(shrimp)for(const side of [-1,1])sphere(tail,-.77,-.12,side*.14,.25,.045,.23,armor);
+                if(divineForm)for(const [x,y,z] of curve.slice(1,-1))cone(tail,x-.05,y+.12,z,.075,.24,accent,.24);
+                s.rig.push({mesh:tail,axis:scorpion?'z':'y',amount:.19,phase:0});
+            }
             applyBattleResult();return;
         }
         if(kind==='beast'){
@@ -9361,23 +9481,31 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
                 lion:[.89,.45,.32,.27,.68,.83],sabertooth:[.76,.52,.38,.28,.52,.31]
             };
             const divine=divineForm&&view.branch==='beast';
-            const [length,shoulder,head,muzzle,legLength,tailLength]=divine?[1.03,.57,.37,.30,.70,1.04]:profiles[shape]||profiles.cub;
+            const adultPredator=['tiger','lion','sabertooth','panther'].includes(shape);
+            const [length,shoulder,head,muzzle,legLength,tailLength]=divine?[1.13,.61,.39,.30,.72,1.12]:profiles[shape]||profiles.cub;
             const young=view.form.juvenile?.82:1;
             const paw=(divine?.22:shape==='tiger'||shape==='sabertooth'?.18:.13)*young;
             const neckWidth=shoulder*.69;
-            organicBody([[-.17,.02,0,length*young,shoulder*.81,neckWidth],[.4,.13,0,.38,shoulder,neckWidth],[.63,.27,0,.27,shoulder*.8,neckWidth*.88],[.91,.39,0,head,head*.88,head*.81]],bodyMat);
+            organicBody([[-.17,.02,0,length*young,shoulder*.78,neckWidth],[.35,.12,0,.46,shoulder,neckWidth],
+                [.58,.22,0,.31,shoulder*.88,neckWidth*.95],[.91,.39,0,head,head*.88,head*.81]],bodyMat);
             sphere(group,1.06+muzzle*.37,.25,0,muzzle,.135,head*.77,cream);
             sphere(group,1.06+muzzle*1.25,.29,0,.064,.045,head*.35,black);
             eyes(group,1.02,.48,head*.78);
             for(const side of [-1,1]){
                 const ear=sphere(group,.83,.64,side*head*.65,.10,shape==='lynx'?.20:shape==='tiger'?.095:.145,.077,bodyMat);
                 ear.rotation.x=side*.25;sphere(ear,0,.1,side*.35,.55,.65,.5,finMat);
+                if(adultPredator){
+                    tube(group,[[.86,.54,side*head*.82],[1.04,.533,side*head*.83],[1.13,.487,side*head*.74]],[.061,.051,.014],bodyMat);
+                    sphere(group,1.14,.24,side*head*.38,muzzle*.65,.096,head*.44,cream);
+                    tube(group,[[1.26,.19,side*head*.32],[1.13,.151,side*head*.59],[.99,.16,side*head*.69]],[.017,.020,.005],black);
+                    if(shape!=='sabertooth')tube(group,[[1.22,.198,side*head*.40],[1.23,.132,side*head*.41],[1.21,.121,side*head*.40]],[.028,.019,.002],cream);
+                }
                 for(const x of [-length*.73,.53]){
                     const leg=new T.Group();leg.position.set(x,-.13,side*neckWidth*.81);group.add(leg);
                     const h=legLength*young;
                     tube(leg,[[0,0,0],[x<0?-.15:-.04,-h*.46,side*.02],[.04,-h,side*.02]],[paw*.84,paw*.54,paw*.4],bodyMat);
                     sphere(leg,.11,-h-.03,side*.02,paw,.067,paw*.72,bodyMat);
-                    if(divine)for(let toe=0;toe<3;toe++)sphere(leg,.11+paw*.84,-h-.03,side*.02+(toe-1)*.072,.044,.021,.018,cream);
+                    if(adultPredator)for(let toe=0;toe<3;toe++)sphere(leg,.11+paw*.84,-h-.06,side*.02+(toe-1)*paw*.33,.043,.020,.017,cream);
                     s.rig.push({mesh:leg,axis:'z',amount:.27,phase:x*side>0?0:Math.PI});
                 }
                 for(let i=0;i<4;i++)tube(group,[[1.14,.23,side*.2],[1.25,.22-i*.02,side*.32],[1.35,.23-i*.03,side*.42]],[.004,.003,.001],cream);
@@ -9400,6 +9528,8 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
                         tube(group,[[.18-i*.23,.50,side*.08],[.14-i*.23,.37,side*.24],[.03-i*.23,.22,side*.33]],[.025,.031,.003],stripe);
                     }
                     tube(group,[[.88,.59,side*.08],[1.00,.56,side*.15],[1.09,.52,side*.25]],[.027,.023,.004],stripe);
+                    tube(group,[[.57,.43,side*.28],[.27,.52,side*.38],[-.07,.42,side*.41]],[.077,.059,.004],snow);
+                    tube(group,[[.88,.64,side*.21],[.69,.75,side*.22],[.55,.90,side*.25]],[.055,.034,.004],snow);
                 }
             }
             if(shape==='lynx')for(const side of [-1,1])cone(group,.84,.85,side*.18,.025,.18,black);
@@ -9680,7 +9810,9 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
             megalodon:[1.32,.61,1.02],orca:[1.27,.55,.90],humpback:[1.39,.52,.9],
             sperm:[1.33,.58,1],blue:[1.51,.45,.88]
         };
-        const [length,depth,width]=profiles[shape]||[whale?1.2:1,.46,.82];
+        const speciesProfiles={frilled:[1.36,.26,.69],tigerShark:[1.26,.49,.93],goblin:[1.12,.36,.73],
+            finwhale:[1.56,.40,.84],livyatan:[1.37,.65,.93],eel:[1.48,.21,.63],sawfish:[1.09,.30,.96]};
+        const [length,depth,width]=speciesProfiles[species]||profiles[shape]||[whale?1.2:1,.46,.82];
         const size=length*(view.form.juvenile?.86:1);
         if(round||disc||ray)sphere(group,.05,0,0,size,ray?.13:round?.72:depth,ray?.90:round?.63:width,bodyMat);
         else{
@@ -9716,6 +9848,22 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
         if(ray)[-1,1].forEach(side=>{const wing=sphere(group,-.05,0,side*.72,.75,.08,.8,bodyMat);s.rig.push({mesh:wing,axis:'x',amount:.16,phase:side});});
         if(shape==='hammer'){sphere(group,.85,.03,0,.26,.19,.86,bodyMat);eyes(group,.95,.1,.81);}else eyes(group,size*.69,.13,round?.55:disc?.28:.35);
         if(shape==='sword')cone(group,1.35,-.06,0,.06,.95,bodyMat,-Math.PI/2);
+        if(species==='sawfish')for(const side of [-1,1])for(let tooth=0;tooth<7;tooth++){
+            const x=1.06+tooth*.092;
+            tube(group,[[x,-.06,side*.036],[x-.04,-.06,side*(.12-tooth*.006)]],[.020,.002],cream);
+        }
+        if(species==='goblin')tube(group,[[.83,.18,0],[1.19,.12,0],[1.58,.055,0]],[.14,.071,.005],bodyMat);
+        if(species==='eel')fin(group,[[-1.38,.12],[-1.13,.35],[-.59,.37],[.03,.32],[.70,.17]],finMat);
+        if(species==='armoredFish'){
+            for(const side of [-1,1])for(let row=0;row<3;row++){
+                const plate=sphere(group,.19+row*.19,.19-row*.13,side*(.55-row*.065),.40,.17,.055,finMat);
+                plate.rotation.z=-.24;
+            }
+        }
+        if(species==='tigerShark')for(const side of [-1,1])for(let i=0;i<6;i++){
+            const x=-.72+i*.20;
+            tube(group,[[x,.43,side*.12],[x+.055,.32,side*.30],[x+.015,.12,side*.41]],[.024,.028,.002],finMat);
+        }
         if(shape==='lion'||round)for(let i=0;i<14;i++){const angle=i/14*Math.PI*2;cone(group,Math.sin(angle)*.75,Math.cos(angle)*.63,0,.035,shape==='lion'?.65:.22,finMat,-angle);}
         if(round)for(let i=0;i<12;i++)sphere(group,Math.sin(i*2.4)*.68,Math.cos(i*1.7)*.5,.5,.035,.04,.025,finMat);
         if(shape==='orca')for(const side of [-1,1])sphere(group,.65,.28,side*.39,.21,.13,.025,cream);
@@ -9724,41 +9872,77 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
         const mouth=new T.Mesh(new T.TorusGeometry(.07,.018,8,18),finMat);mouth.position.set(size*.98,-.08,0);mouth.rotation.y=Math.PI/2;group.add(mouth);s.mouth=mouth;
         if(s.duel?.result)setBattleResult(s,s.duel.result);
     }
+    function buildArenaPlatform(s,mobile){
+        const T=s.THREE,platform=new T.Group(),segments=mobile?28:56;
+        const floorY=-1.25;
+        const base=new T.Mesh(new T.CylinderGeometry(1.54,1.71,.22,segments),
+            new T.MeshStandardMaterial({color:'#172634',roughness:.48,metalness:.28}));
+        base.position.y=floorY-.13;
+        const deck=new T.Mesh(new T.CylinderGeometry(1.49,1.54,.05,segments),
+            new T.MeshStandardMaterial({color:'#2c4554',roughness:.74,metalness:.18}));
+        deck.position.y=floorY;
+        const opponent=s.button.id==='petBattleModel1';
+        const trim=new T.Mesh(new T.RingGeometry(1.39,1.43,segments),
+            new T.MeshBasicMaterial({color:opponent?'#ed9e66':'#68d3e7',toneMapped:false}));
+        trim.rotation.x=-Math.PI/2;trim.position.y=floorY+.028;
+        const shadowCanvas=document.createElement('canvas');shadowCanvas.width=64;shadowCanvas.height=64;
+        const ctx=shadowCanvas.getContext('2d');
+        const paint=ctx.createRadialGradient(32,32,2,32,32,32);
+        paint.addColorStop(0,'rgba(2,5,12,.85)');paint.addColorStop(.42,'rgba(2,5,12,.55)');paint.addColorStop(1,'rgba(2,5,12,0)');
+        ctx.fillStyle=paint;ctx.fillRect(0,0,64,64);
+        const shadow=new T.Mesh(new T.PlaneGeometry(1.85,1.35),new T.MeshBasicMaterial({
+            map:new T.CanvasTexture(shadowCanvas),transparent:true,depthWrite:false,toneMapped:false
+        }));
+        shadow.rotation.x=-Math.PI/2;shadow.position.y=floorY+.031;
+        platform.add(base,deck,trim,shadow);s.scene.add(platform);
+        s.platform=platform;s.contactShadow=shadow;s.arenaFloorY=floorY+.025;
+    }
+    function disposeArenaPlatform(s){
+        if(!s.platform)return;
+        for(const mesh of s.platform.children){
+            mesh.geometry.dispose();mesh.material.map?.dispose();mesh.material.dispose();
+        }
+        s.scene.remove(s.platform);
+    }
     function stop(){
         generation++;const s=state;state=null;if(!s)return;
         cancelAnimationFrame(s.raf);document.removeEventListener('visibilitychange',s.visibility);
         delete s.button.dataset.modelLoading;
         const preview=document.getElementById(previewId);if(preview)delete preview.dataset.modelLoading;
         s.button.removeEventListener('mouseenter',s.enter);s.button.removeEventListener('mouseleave',s.leave);s.button.removeEventListener('focus',s.enter);s.button.removeEventListener('blur',s.leave);
-        if(s.renderer){disposeBattleBurst(s);disposeModel(s);s.renderer.dispose();s.renderer.forceContextLoss();s.renderer.domElement.remove();}
+        if(s.renderer){disposeBattleBurst(s);disposeModel(s);disposeArenaPlatform(s);s.renderer.dispose();s.renderer.forceContextLoss();s.renderer.domElement.remove();}
         document.getElementById(artId)?.replaceChildren();
         document.getElementById(previewId)?.replaceChildren();
     }
     function disposeBattleBurst(s){
         if(!s.burst)return;
-        s.scene.remove(s.burst.group);s.burst.geometry.dispose();s.burst.material.dispose();s.burst=null;
+        const {mesh}=s.burst;
+        s.scene.remove(mesh);mesh.geometry.dispose();mesh.material.dispose();mesh.dispose();s.burst=null;
     }
     function updateBattleBurst(s,pose,age,direction,reduced){
         if(reduced||!pose.skill||age<0||age>=.9){disposeBattleBurst(s);return;}
         const {motion,variant}=pose.skill,T=s.THREE;
         if(s.burst?.at!==pose.attackAt){
             disposeBattleBurst(s);
-            const group=new T.Group();
             const geometry=motion==='shield'||motion==='song'?new T.TorusGeometry(.1,.025,6,12):new T.OctahedronGeometry(.12);
             const material=new T.MeshBasicMaterial({color:pose.skillColor||'#7dd3fc',transparent:true,depthWrite:false,blending:T.AdditiveBlending});
-            for(let i=0;i<9+variant%6;i++)group.add(new T.Mesh(geometry,material));
-            s.scene.add(group);s.burst={at:pose.attackAt,group,geometry,material};
+            const mesh=new T.InstancedMesh(geometry,material,9+variant%6);
+            mesh.frustumCulled=false;mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);
+            s.scene.add(mesh);s.burst={at:pose.attackAt,mesh,transform:new T.Object3D()};
         }
         const progress=age/.9;
-        s.burst.material.opacity=Math.sin(Math.PI*progress)*.9;
-        s.burst.group.children.forEach((mesh,i)=>{
+        const {mesh,transform}=s.burst;
+        mesh.material.opacity=Math.sin(Math.PI*progress)*.9;
+        for(let i=0;i<mesh.count;i++){
             const angle=i*2.399+progress*(3+variant%7),spread=.15+progress*(.38+(variant%11)*.035);
             const lift=motion==='dive'?(1-progress)*.9:motion==='claw'?Math.sin(progress*Math.PI)*.7:0;
             const travel=motion==='shield'?.26:progress*(.95+(variant%13)*.035);
-            mesh.position.set(direction*travel+Math.cos(angle)*spread,lift+Math.sin(angle)*spread,Math.sin(angle*1.8)*spread);
-            mesh.rotation.set(angle,angle+progress,angle*.5);
-            mesh.scale.setScalar((1-progress*.5)*(.65+i%4*.18));
-        });
+            transform.position.set(direction*travel+Math.cos(angle)*spread,lift+Math.sin(angle)*spread,Math.sin(angle*1.8)*spread);
+            transform.rotation.set(angle,angle+progress,angle*.5);
+            transform.scale.setScalar((1-progress*.5)*(.65+i%4*.18));
+            transform.updateMatrix();mesh.setMatrixAt(i,transform.matrix);
+        }
+        mesh.instanceMatrix.needsUpdate=true;
     }
     function resizePet(s){
         if(!staged){
@@ -9780,7 +9964,7 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
         const key=width+':'+height;
         if(s.sizeKey===key)return;s.sizeKey=key;
         s.renderer.setSize(width,height);s.camera.aspect=width/height;
-        s.camera.zoom=preview?.73*Math.min(1,width/height):staged?.83*Math.min(1,width/height):1;
+        s.camera.zoom=preview?.73*Math.min(1,width/height):staged?(arena?.79:.83)*Math.min(1,width/height):1;
         s.camera.updateProjectionMatrix();
     }
     function start(){
@@ -9885,6 +10069,19 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
                     s.model.rotation.y=reduced?-.28:presentation==='showcase'?s.t*.62-.28:Math.sin(s.t*1.3)*.24-.2;
                     s.model.position.y=reduced?0:Math.sin(s.t*2)*.055;
                 }
+                if(s.contactShadow){
+                    const model=s.model;
+                    if(model.userData.arenaBottom===undefined){
+                        const bounds=new s.THREE.Box3().setFromObject(model);
+                        model.userData.arenaBottom=(bounds.min.y-model.position.y)/Math.max(.01,model.scale.y);
+                    }
+                    const height=Math.max(0,s.model.position.y),size=Math.min(1.34,Math.max(.52,s.model.scale.x));
+                    model.position.y+=Math.max(0,s.arenaFloorY+.045-model.userData.arenaBottom*model.scale.y);
+                    s.contactShadow.position.x=s.model.position.x*.63;
+                    s.contactShadow.scale.setScalar(size*(1+height*.18));
+                    s.contactShadow.material.opacity=Math.max(.32,1-height*.65);
+                    s.contactShadow.visible=s.model.visible;
+                }
                 s.renderer.render(s.scene,s.camera);
             }
         };
@@ -9894,15 +10091,23 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
             delete button.dataset.modelLoading;
             const preview=document.getElementById(previewId);if(preview)delete preview.dataset.modelLoading;
         };
-        s.ready=import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js').then(T=>{
+        s.ready=import('https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.min.js').then(T=>{
             if(state!==s||token!==generation)return;
             try{
-                const mobileBattle=presentation==='arena'&&window.matchMedia('(max-width: 700px), (pointer: coarse)').matches;
-                const renderer=new T.WebGLRenderer({alpha:true,antialias:staged&&presentation!=='arena',powerPreference:'low-power'});
-                renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,presentation==='arena'?(mobileBattle?.75:1):staged?1.25:1));
+                const mobileBattle=arena&&window.matchMedia('(max-width: 700px), (pointer: coarse)').matches;
+                const renderer=new T.WebGLRenderer({alpha:true,antialias:staged&&!mobileBattle,powerPreference:'low-power'});
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,arena?(mobileBattle?.75:1.35):staged?1.25:1));
                 renderer.setSize(144,104);renderer.setClearColor(0,0);renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;
                 s.THREE=T;s.renderer=renderer;s.scene=new T.Scene();s.camera=new T.PerspectiveCamera(38,144/104,.1,30);s.camera.position.set(.2,.35,5.7);s.camera.lookAt(0,0,0);
-                s.scene.add(new T.HemisphereLight('#e5f8ff','#344b6a',2));const light=new T.DirectionalLight('#fff7d6',3);light.position.set(2,4,5);s.scene.add(light);const rim=new T.DirectionalLight('#67d8ff',2);rim.position.set(-3,1,-3);s.scene.add(rim);
+                const light=new T.DirectionalLight('#fff2d9',arena?2.9:3);
+                const rim=new T.DirectionalLight(s.button.id==='petBattleModel1'?'#ffb38c':'#78d9ff',arena?3.3:2);
+                light.position.set(2,4,5);rim.position.set(-3,2,-3);
+                s.scene.add(new T.HemisphereLight('#e5f8ff','#344b6a',arena?1.45:2),light,rim);
+                if(arena){
+                    renderer.toneMapping=T.AgXToneMapping;renderer.toneMappingExposure=1.12;
+                    s.camera.position.set(0,1.05,5.7);s.camera.lookAt(0,-.35,0);
+                    buildArenaPlatform(s,mobileBattle);
+                }
                 if(s.view)build(s,s.view);
                 resizePet(s);
                 renderer.render(s.scene,s.camera);
@@ -9910,7 +10115,7 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
                 if(s.previewMode)preview(true);
                 endLoading();
             }catch(error){
-                if(s.renderer){disposeModel(s);s.renderer.dispose();s.renderer.forceContextLoss();s.renderer=null;}
+                if(s.renderer){disposeModel(s);disposeArenaPlatform(s);s.renderer.dispose();s.renderer.forceContextLoss();s.renderer=null;}
                 throw error;
             }
         }).catch(()=>{
@@ -10634,7 +10839,7 @@ function renderAttendancePetRoster(){
         host.dataset.signature=key;host.replaceChildren(...records.map(p=>{
             const v=attendancePetView(p),card=document.createElement('div'),button=document.createElement('button'),eye=document.createElement('button');
             card.className='pet-roster-card'+(p.id===selected?' is-selected':'');button.type='button';button.dataset.petId=p.id;button.className='pet-roster-select';button.setAttribute('aria-pressed',String(p.id===selected));
-            const icon=document.createElement('span'),name=document.createElement('strong'),meta=document.createElement('small');            icon.className='pet-roster-icon';icon.textContent=v.dead?'💤':v.egg?'🥚':{fish:'🐠',shark:'🦈',whale:'🐋',dino:'🦖',bird:'🦅',beast:'🦁'}[v.form.kind];name.textContent=v.displayName;meta.textContent=`Cấp ${v.level} · ${petWeightLabel(v.weightGrams)} · ${v.dead?'Đã chết':v.egg?'Đang ấp':v.maxed?'Dạng cuối':v.hungry?'Đang đói':'No bụng'}`;button.append(icon,name,meta);
+            const icon=document.createElement('span'),name=document.createElement('strong'),meta=document.createElement('small');            icon.className='pet-roster-icon';icon.textContent=v.dead?'💤':v.egg?'🥚':{fish:'🐠',shark:'🦈',whale:'🐋',dino:'🦖',bird:'🦅',beast:'🦁',arthropod:'🦂'}[v.form.kind];name.textContent=v.displayName;meta.textContent=`Cấp ${v.level} · ${petWeightLabel(v.weightGrams)} · ${v.dead?'Đã chết':v.egg?'Đang ấp':v.maxed?'Dạng cuối':v.hungry?'Đang đói':'No bụng'}`;button.append(icon,name,meta);
             eye.type='button';eye.className='pet-roster-eye';eye.dataset.petVisibility='';eye.innerHTML=`<i class="bi ${attendancePetVisible?'bi-eye-fill':'bi-eye-slash'}" aria-hidden="true"></i>`;eye.setAttribute('aria-label',attendancePetVisible?'Ẩn thú cưng trên màn hình':'Hiện thú cưng trên màn hình');eye.setAttribute('aria-pressed',String(attendancePetVisible));
             card.append(button,eye);return card;
         }));
@@ -10812,7 +11017,7 @@ function renderAttendancePet() {
     eggTimer.textContent = `Nở sau ${duration(view.untilHatch)}`;
     eggTimer.title = `Dự kiến nở lúc ${hatchTime}`;
     document.getElementById('attendancePetProgress').style.width = `${view.xp%10*10}%`;
-    const levelProgress=view.maxed?`Đã đạt hình thái cuối; còn ${view.nextEvolutionIn} XP lên cấp, mỗi cấp cộng 1 điểm chỉ số.`:view.needsBranch?'Đã mở 4 nhánh tiến hóa! Chọn nhánh bên dưới để tiếp tục.':`Còn ${view.nextEvolutionIn} XP để tiến hóa.`;
+    const levelProgress=view.maxed?`Đã đạt hình thái cuối; còn ${view.nextEvolutionIn} XP lên cấp, mỗi cấp cộng 1 điểm chỉ số.`:view.needsBranch?`Đã mở ${Object.keys(ATTENDANCE_PET_BRANCHES).length} nhánh tiến hóa! Chọn nhánh bên dưới để tiếp tục.`:`Còn ${view.nextEvolutionIn} XP để tiến hóa.`;
     document.getElementById('attendancePetProgressText').textContent = `${view.checkins} lần điểm danh + ${view.feedingXp} XP cho ăn${view.battleXp?` ${view.battleXp>0?'+':'−'} ${Math.abs(view.battleXp)} EXP thi đấu`:''} · ${levelProgress}`;
     renderAttendancePetBranches(view);
     const checkin = document.getElementById('attendancePetCheckin');
@@ -10842,7 +11047,8 @@ function attendancePetRoadArt(level,branch){
     const branchIndex=branches.indexOf(branch);
     const index=branchIndex<0?level:Math.min(ATTENDANCE_PET_MAX_LEVEL,level)+branchIndex*(ATTENDANCE_PET_MAX_LEVEL-9);
     const row=Math.floor(index/10),column=index%10;
-    return `<span class="pet-road-portrait" aria-hidden="true" style="background-position:${column/9*100}% ${row/9*100}%"></span>`;
+    const rows=Math.ceil((1+ATTENDANCE_PET_FORMS.length+Object.values(ATTENDANCE_PET_BRANCHES).reduce((sum,path)=>sum+path.forms.length,0))/10);
+    return `<span class="pet-road-portrait" aria-hidden="true" style="background-size:1000% ${rows*100}%;background-position:${column/9*100}% ${row/(rows-1)*100}%"></span>`;
 }
 
 function renderAttendancePetBranches(view){
@@ -10880,7 +11086,7 @@ function renderAttendancePetBranches(view){
             </section>`;
         }).join('');
         road.innerHTML=`<ol class="pet-road-shared" aria-label="Các cấp tiến hóa chung">${sharedNodes}</ol>
-            <div class="pet-road-fork"><strong>Cá đuối cấp ${shared.length} mở 4 nhánh</strong><small>Từ cấp 10 đến 29, mỗi cấp mở một thú cưng khác. Cấp 30 tiến hóa thành thần thú; mỗi cấp sau đó cộng thêm 1 điểm chỉ số.</small></div>
+            <div class="pet-road-fork"><strong>Cá đuối cấp ${shared.length} mở ${Object.keys(ATTENDANCE_PET_BRANCHES).length} nhánh</strong><small>Từ cấp 10 đến 29, mỗi cấp mở một thú cưng khác. Cấp 30 tiến hóa thành thần thú; mỗi cấp sau đó cộng thêm 1 điểm chỉ số.</small></div>
             <div class="pet-road-branches">${branches}</div>`;
     }
 }
@@ -11161,7 +11367,7 @@ function initAttendancePetUi() {
     document.getElementById('attendancePetFeed').addEventListener('click',interact);
     document.getElementById('attendancePetSwimmer').addEventListener('click',interact);
     document.getElementById('attendancePetRetry').addEventListener('click',startAttendancePet);
-    document.getElementById('attendancePetBranchOptions').innerHTML=Object.entries(ATTENDANCE_PET_BRANCHES).map(([key,branch])=>`<button type="button" data-pet-branch="${key}" aria-pressed="false"><span class="pet-branch-symbol" aria-hidden="true">${{fish:'🐋',dino:'🦖',bird:'🦅',beast:'🦁'}[key]}</span><strong>${branch.name}</strong><small>${branch.forms.length} cấp tiến hóa</small></button>`).join('');
+    document.getElementById('attendancePetBranchOptions').innerHTML=Object.entries(ATTENDANCE_PET_BRANCHES).map(([key,branch])=>`<button type="button" data-pet-branch="${key}" aria-pressed="false"><span class="pet-branch-symbol" aria-hidden="true">${{fish:'🐋',dino:'🦖',bird:'🦅',beast:'🦁',arthropod:'🦂'}[key]}</span><strong>${branch.name}</strong><small>${branch.forms.length} cấp tiến hóa</small></button>`).join('');
     document.getElementById('attendancePetBranchOptions').addEventListener('click',event=>{const button=event.target.closest('[data-pet-branch]');if(button&&!button.disabled)actOnAttendancePet('branch:'+button.dataset.petBranch);});
 }
 
@@ -11238,12 +11444,24 @@ const PetBattleGame=(()=>{
         }
     }
     function dismissed(){try{const ids=JSON.parse(localStorage.getItem('workpic-battle-dismissed:'+state.uid)||'[]');return Array.isArray(ids)?ids:[];}catch{return [];}}
-    function finishRoom(){
-        const m=match();if(!m||state.busy||(!m.claims?.[state.uid]&&state.own?.petBattleLocks?.[m.id])||!(['finished','cancelled','rejected','expired'].includes(m.status)||petBattlePlayback(m).finished))return;
+    function closeBattleRoom(m){
         try{localStorage.setItem('workpic-battle-dismissed:'+state.uid,JSON.stringify([...new Set([...dismissed(),m.id])].slice(-200)));}catch{state.message='Không lưu được danh sách trận đã kết thúc trên máy này.';render();return;}
         if(m.bot){try{localStorage.removeItem(`workpic-bot-pending:${state.uid}`);}catch{}}
-        state.subs.get(m.id)?.();state.subs.delete(m.id);state.matches.delete(m.id);state.active='';state.listKey='';disposeModels();el('petBattleExitDialog').close();el('petBattleDialog').close();openLobby();
+        if(!state.own?.petBattleLocks?.[m.id]){
+            state.subs.get(m.id)?.();state.subs.delete(m.id);state.matches.delete(m.id);
+        }
+        state.active='';state.listKey='';disposeModels();el('petBattleExitDialog').close();el('petBattleDialog').close();openLobby();
     }
+    function finishRoom(){
+        const m=match();
+        if(!m||state.busy)return;
+        if(!PET_CLOUD_ENABLED&&!m.bot&&['finished','ready','rps'].includes(m.status)){
+            void mutate('leave');return;
+        }
+        if((!m.claims?.[state.uid]&&state.own?.petBattleLocks?.[m.id])||!(['finished','cancelled','rejected','expired'].includes(m.status)||petBattlePlayback(m).finished))return;
+        closeBattleRoom(m);
+    }
+    const gameKey=m=>m.gameNumber?`${m.id}:game-${m.gameNumber}`:m.id;
     const secretKey=(id,round)=>`workpic-battle-rps:${state.uid}:${id}:${round}`;
     const secret=(id,round)=>{try{return JSON.parse(localStorage.getItem(secretKey(id,round))||'null');}catch{return null;}};
     function disposeModels(){state.models.forEach(model=>model.stop());state.models=[];state.modelKey='';}
@@ -11265,11 +11483,20 @@ const PetBattleGame=(()=>{
         },250);sync();}
     function profile(snapshot,refresh=true){if(mine()&&snapshot?.exists()&&snapshot.data().uid===state.uid){state.own=snapshot.data();if(refresh)sync();}}
     function fail(error){const code=error.code?.split('/').pop();state.message=code==='permission-denied'?'Firebase chưa cho phép truy cập phòng đấu hoặc hồ sơ của bạn.':petQuotaErrorText(error)||error.message||'Chưa đồng bộ được trận đấu.';state.cooldown=code==='resource-exhausted'?(error.retryAt||Date.now()+300000):Infinity;el('petBattleRetry').hidden=false;render();}
+    function updateActiveRoom(data,previous){
+        if(data.id!==state.active)return;
+        if(data.departedBy){closeBattleRoom(data);return;}
+        if(previous&&gameKey(previous)!==gameKey(data)){
+            state.setupKey='';state.lastTurn='';el('petBattleExitDialog').close();
+        }
+    }
     function receiveMatch(data){
         const id=data.id,uid=state.uid;
         if(!data.participantUids?.includes(uid))return;
-        state.matches.set(id,data);
-        if(['ready','rps','fighting'].includes(data.status)&&!state.autoOpened.has(id)){state.autoOpened.add(id);open(id);}
+        const previous=state.matches.get(id);
+        if((previous?.gameNumber||0)>(data.gameNumber||0)||previous?.departedBy&&!data.departedBy)return;
+        state.matches.set(id,data);updateActiveRoom(data,previous);
+        if(!data.departedBy&&['ready','rps','fighting'].includes(data.status)&&!state.autoOpened.has(id)){state.autoOpened.add(id);open(id);}
         updateInvites();render();process();
     }
     function listenBattleInvites(useRecipientQuery=false){
@@ -11310,7 +11537,10 @@ const PetBattleGame=(()=>{
             if(current&&['invited','ready','fighting'].includes(current.status)&&state.active)wanted.add(state.active);
         }else for(const profile of profileRows())if(profile.uid!==state.uid)for(const [id,lock]of Object.entries(profile.petBattleLocks||{}))if(lock.role==='challenger'&&lock.peerUid===state.uid&&lock.expiresAt>Date.now())offers.push({id,at:lock.createdAt});
         offers.sort((a,b)=>b.at-a.at).slice(0,12).forEach(offer=>wanted.add(offer.id));
+        const activeRoom=match();
+        if(!PET_CLOUD_ENABLED&&activeRoom&&!activeRoom.bot&&!activeRoom.departedBy&&el('petBattleDialog').open)wanted.add(activeRoom.id);
         for(const id of wanted){
+            if(id===activeRoom?.id&&!activeRoom.departedBy&&el('petBattleDialog').open)continue;
             const known=state.matches.get(id);
             if(known?.claims?.[state.uid]||(['finished','cancelled','rejected','expired'].includes(known?.status)&&!state.own?.petBattleLocks?.[id]))wanted.delete(id);
         }
@@ -11528,7 +11758,7 @@ const PetBattleGame=(()=>{
                 ?await petCloudRequest('battle',{...payload,id,action})
                 :await runTransaction(db,async tx=>{
                 const battleRef=doc(db,'petBattles',id);
-                const usesProfile=['create','accept','cancel','claim'].includes(action)||(action==='ready'&&!!payload.stats);
+                const usesProfile=['create','accept','cancel','claim'].includes(action)||(action==='ready'&&(!!payload.stats||!!known?.gameNumber));
                 const [userSnapshot,battleSnapshot]=await Promise.all([
                     usesProfile?tx.get(ref):null,
                     action==='create'?null:tx.get(battleRef)
@@ -11550,6 +11780,8 @@ const PetBattleGame=(()=>{
                     next.roomFlow=payload.roomFlow===true;
                 }else{
                     if(!next||next.version!==1||!next.participantUids?.includes(uid))throw new Error('Không có quyền xem trận này.');next={...next};
+                    if(action!=='leave'&&(known?.gameNumber||0)!==(next.gameNumber||0))
+                        return {match:next,patch,changed:false};
                     if(action==='accept'){
                         if(uid!==next.opponentUid||next.status!=='invited'||now>=next.expiresAt)throw new Error('Lời mời không còn hiệu lực.');
                         const challenger=await tx.get(doc(db,'users',next.players[0].profileId));
@@ -11570,7 +11802,15 @@ const PetBattleGame=(()=>{
                         else{
                             if(next.status!=='ready'||now>=next.readyDeadline)throw new Error('Phòng đã hết thời gian sẵn sàng.');
                             const player=next.players.find(player=>player.uid===uid);
-                            if(payload.stats){
+                            if(next.gameNumber){
+                                const fighter=petBattleFighter(user,ref.id,player.petId,payload.stats||player.stats,now,payload.element||player.element);
+                                patch.petBattleStatsByPet={...user.petBattleStatsByPet,[fighter.petId]:fighter.stats};
+                                patch.attendancePet=petBattleChangeWeight(user.attendancePet,fighter.petId,-next.stakeGrams,now);
+                                locks[id]={petId:fighter.petId,stakeGrams:next.stakeGrams,
+                                    peerUid:next.participantUids.find(other=>other!==uid),role:uid===next.challengerUid?'challenger':'opponent',createdAt:now,expiresAt:now+600000};
+                                patch.petBattleLocks=locks;
+                                next.players=next.players.map(item=>item.uid===uid?fighter:item);
+                            }else if(payload.stats){
                                 if(!PET_BATTLE_ELEMENTS.has(payload.element))throw new Error('Chọn bổ trợ trước khi sẵn sàng.');
                                 const stats=petBattleStats(payload.stats,player.appearance.level);
                                 next.players=next.players.map(item=>item.uid===uid?{...item,stats,element:payload.element}:item);
@@ -11581,6 +11821,23 @@ const PetBattleGame=(()=>{
                                 next.status='rps';next.rpsDeadline=now+120000;next.rpsRound=0;next.commits={};next.reveals={};
                             }
                         }
+                    }else if(action==='rematch'){
+                        if(next.departedBy||next.status!=='finished'||!next.participantUids.every(player=>next.claims?.[player]))
+                            throw new Error('Cần chờ hai bên nhận kết quả trước khi đấu lại.');
+                        if(next.rematch?.[uid])changed=false;
+                        else{
+                            next.rematch={...next.rematch,[uid]:true};
+                            if(next.participantUids.every(player=>next.rematch[player])){
+                                Object.assign(next,{gameNumber:(next.gameNumber||0)+1,status:'ready',ready:{},readyDeadline:now+120000,
+                                    rematch:{},rpsRound:0,commits:{},reveals:{},claims:{},turns:[],maxHp:[],xpChanges:{},winnerUid:null,firstUid:null,startedAt:null});
+                            }
+                        }
+                    }else if(action==='leave'){
+                        if(next.departedBy)changed=false;
+                        else if(['finished','ready','rps'].includes(next.status)){
+                            next.departedBy=uid;
+                            if(next.status!=='finished')next.status='expired';
+                        }else throw new Error('Trận đang diễn ra.');
                     }else if(action==='reject'||action==='cancel'){
                         if(next.status!=='invited'||uid!==(action==='reject'?next.opponentUid:next.challengerUid))throw new Error('Không thể hủy lời mời này.');
                         next.status=action==='reject'?'rejected':'cancelled';
@@ -11598,7 +11855,7 @@ const PetBattleGame=(()=>{
                             if(next.participantUids.every(player=>next.reveals[player])){
                                 const first=petBattleRps(next.reveals[next.challengerUid].choice,next.reveals[next.opponentUid].choice);
                                 if(first===null){next.rpsRound++;next.commits={};next.reveals={};}
-                                else{const simulation=petBattleSimulation(next.players,next.participantUids[first],id);next={...next,...simulation,status:'fighting',firstUid:next.participantUids[first],introMs:5000,startedAt:serverTimestamp()};}
+                                else{const simulation=petBattleSimulation(next.players,next.participantUids[first],gameKey({...next,id}));next={...next,...simulation,status:'fighting',firstUid:next.participantUids[first],introMs:5000,startedAt:serverTimestamp()};}
                             }
                         }
                     }else if(action==='claim'){
@@ -11618,7 +11875,7 @@ const PetBattleGame=(()=>{
                             }
                             if(next.status==='finished'){
                                 patch.attendancePet=petBattleCompletePet(patch.attendancePet||user.attendancePet,lock.petId,
-                                    {...next,id},uid,next.xpChanges?.[uid]||0,amount-lock.stakeGrams,now);
+                                    {...next,id:gameKey({...next,id})},uid,next.xpChanges?.[uid]||0,amount-lock.stakeGrams,now);
                             }
                             delete locks[id];patch.petBattleLocks=locks;next.claims={...next.claims,[uid]:true};
                         }
@@ -11631,25 +11888,41 @@ const PetBattleGame=(()=>{
                         if(next.xpChanges)claimPatch.xpChanges=next.xpChanges;
                         tx.update(battleRef,claimPatch);
                     }
+                    else if(action==='reveal'){
+                        const revealPatch={reveals:next.reveals};
+                        if(next.status==='fighting')Object.assign(revealPatch,{status:next.status,turns:next.turns,maxHp:next.maxHp,
+                            winnerUid:next.winnerUid,firstUid:next.firstUid,introMs:next.introMs,startedAt:next.startedAt});
+                        else if(next.rpsRound!==battleSnapshot.data().rpsRound)Object.assign(revealPatch,{rpsRound:next.rpsRound,commits:next.commits});
+                        tx.update(battleRef,revealPatch);
+                    }else if(action==='commit')tx.update(battleRef,{commits:next.commits});
                     else tx.update(battleRef,next);
                     if(Object.keys(patch).length)tx.update(ref,patch);
                 }
                 return {match:next,patch,changed};
-            },{maxAttempts:action==='claim'?5:['ready','commit','reveal'].includes(action)?4:1});
+            },{maxAttempts:['claim','ready','commit','reveal','rematch','leave'].includes(action)?5:1});
             if(!mine()||state.uid!==uid)return;
             if(PET_CLOUD_ENABLED)id=result.match.id;
             result.patch||={};
             const previous=state.matches.get(id);
-            if(result.match.status==='ready'&&previous?.ready&&(
+            if((previous?.gameNumber||0)>(result.match.gameNumber||0)||previous?.departedBy&&!result.match.departedBy)
+                result.match=previous;
+            const sameGame=previous&&(previous.gameNumber||0)===(result.match.gameNumber||0);
+            if(sameGame&&result.match.status==='ready'&&previous.ready&&(
                 previous.status!=='ready'||Object.keys(previous.ready).length>Object.keys(result.match.ready).length
             ))result.match=previous;
-            if(previous&&petBattleTime(previous.startedAt)&&!petBattleTime(result.match.startedAt))result.match.startedAt=previous.startedAt;
-            state.matches.set(id,{id,...result.match});
+            if(sameGame&&petBattleTime(previous.startedAt)&&!petBattleTime(result.match.startedAt))result.match.startedAt=previous.startedAt;
+            const updated={id,...result.match};
+            state.matches.set(id,updated);
             if(action==='create'){state.active=id;state.creating=false;}
             state.own={...state.own,...result.patch};state.message=action==='create'?'Đã gửi lời mời. Kg cược đang được giữ.':action==='claim'?'Đã cập nhật kết quả.':'';state.cooldown=0;el('petBattleRetry').hidden=true;
+            updateActiveRoom(updated,previous);
             if(result.patch.attendancePet){attendancePetData=result.patch.attendancePet;renderAttendancePet();}
             sync();
-        }catch(error){fail(error);}finally{state.busy=false;render();}
+        }catch(error){
+            fail(error);
+            if(['reveal','commit'].includes(action)&&['failed-precondition','aborted'].includes(error.code))
+                state.cooldown=Date.now()+1500;
+        }finally{state.busy=false;render();}
     }
     function roomExpired(m,now=Date.now()){
         if(m.status==='invited')return now>=m.expiresAt;
@@ -11738,9 +12011,9 @@ const PetBattleGame=(()=>{
         }catch(error){fail(error);}finally{state.busy=false;render();}
     }
     async function choose(choice){
-        const m=match();if(!m||m.status!=='rps'||state.busy)return;let saved=secret(m.id,m.rpsRound);
+        const m=match();if(!m||m.status!=='rps'||state.busy)return;let saved=secret(gameKey(m),m.rpsRound);
         if(!globalThis.crypto?.subtle||typeof crypto.randomUUID!=='function'){fail(new Error('Cần HTTPS hoặc localhost để chơi oẳn tù tì.'));return;}
-        if(!saved){saved={choice,nonce:crypto.randomUUID()};try{localStorage.setItem(secretKey(m.id,m.rpsRound),JSON.stringify(saved));}catch{fail(new Error('Cần cho phép bộ nhớ trình duyệt để giữ kín lựa chọn qua tải lại trang.'));return;}}
+        if(!saved){saved={choice,nonce:crypto.randomUUID()};try{localStorage.setItem(secretKey(gameKey(m),m.rpsRound),JSON.stringify(saved));}catch{fail(new Error('Cần cho phép bộ nhớ trình duyệt để giữ kín lựa chọn qua tải lại trang.'));return;}}
         try{const hash=await petBattleCommitment(m.id,state.uid,m.rpsRound,saved.choice,saved.nonce);await mutate('commit',{hash,round:m.rpsRound});}catch(error){fail(error);}
     }
     async function process(){
@@ -11751,8 +12024,17 @@ const PetBattleGame=(()=>{
                 return;
             }
             if(PET_CLOUD_ENABLED)continue;
-            if(m.status==='rps'&&!roomExpired(m)&&m.participantUids.every(uid=>m.commits?.[uid])&&!m.reveals?.[state.uid]){
-                const saved=secret(m.id,m.rpsRound);if(saved){const hash=await petBattleCommitment(m.id,state.uid,m.rpsRound,saved.choice,saved.nonce);if(state.busy)return;await mutate('reveal',{...saved,hash,round:m.rpsRound},m.id);return;}
+            if(m.status==='rps'&&!roomExpired(m)){
+                const saved=secret(gameKey(m),m.rpsRound);
+                if(saved&&!m.commits?.[state.uid]){
+                    const hash=await petBattleCommitment(m.id,state.uid,m.rpsRound,saved.choice,saved.nonce);
+                    if(state.busy||state.matches.get(m.id)!==m)return;
+                    await mutate('commit',{hash,round:m.rpsRound},m.id);return;
+                }
+                if(saved&&m.participantUids.every(uid=>m.commits?.[uid])&&!m.reveals?.[state.uid]&&
+                    (m.challengerUid===state.uid||m.reveals?.[m.challengerUid])){
+                    await mutate('reveal',{...saved,round:m.rpsRound},m.id);return;
+                }
             }
             if(state.own?.petBattleLocks?.[m.id]&&!m.claims?.[state.uid]){
                 if(roomExpired(m)||petBattleClaimAmount(m,state.uid)!==null){
@@ -11823,9 +12105,15 @@ const PetBattleGame=(()=>{
         const max=Math.max(1,...stats.flatMap(Object.values));
         const heading=document.createElement('div');
         heading.className='pet-battle-stat-row pet-battle-stat-heading';
-        for(const title of [players[0].petName,'Chỉ số',players[1].petName]){
+        for(const [index,title] of [players[0].petName,players[1].petName].entries()){
+            if(index===1){
+                const label=document.createElement('strong');label.textContent='Chỉ số';heading.append(label);
+            }
             const caption=document.createElement('strong');
             caption.textContent=title;
+            const total=document.createElement('small');
+            total.textContent=`Tổng ${petBattleNumber(Object.values(stats[index]).reduce((sum,value)=>sum+value,0)).toLocaleString('vi-VN')} điểm`;
+            caption.append(total);
             heading.append(caption);
         }
         const rows=Object.entries(statInputs).map(([key,id])=>{
@@ -11898,6 +12186,14 @@ const PetBattleGame=(()=>{
         el('petBattleCycleGuest').hidden=!incoming;
         el('petBattleCancel').hidden=!(m?.status==='invited'&&m.challengerUid===state.uid);
         const terminal=!!m&&(['finished','cancelled','rejected','expired'].includes(m.status)||petBattlePlayback(m).finished);
+        const rematchAvailable=terminal&&!PET_CLOUD_ENABLED&&!m.bot&&!m.departedBy&&(m.status==='finished'||m.status==='fighting');
+        const rematchReady=rematchAvailable&&m.status==='finished'&&m.participantUids.every(uid=>m.claims?.[uid]);
+        for(const id of ['petBattleRematch','petBattleExitRematch']){
+            const button=el(id);
+            button.hidden=!rematchAvailable;
+            button.disabled=state.busy||!rematchReady||!!m?.rematch?.[state.uid];
+            button.textContent=m?.rematch?.[state.uid]?'Chờ đối thủ đấu lại…':m?.rematch&&Object.values(m.rematch).some(Boolean)?'Đồng ý đấu lại':'Đấu lại';
+        }
         const awaitingClaim=!!m&&!m.claims?.[state.uid]&&(m.bot
             ?petBattleClaimAmount(m,state.uid)!==null
             :PET_CLOUD_ENABLED
@@ -12074,7 +12370,7 @@ const PetBattleGame=(()=>{
             el('petBattleExitWinner').textContent=m.winnerUid?(m.winnerUid===state.uid?'THẮNG TRẬN':'THUA TRẬN'):'HÒA TRẬN';
             el('petBattleExitResult').textContent=el('petBattleResult').textContent;
             el('petBattleExitConfirm').disabled=state.busy||awaitingClaim;
-            if(state.resultPrompt!==m.id){
+            if(state.resultPrompt!==gameKey(m)){
                 const turns=m.turns||[],hits=turns.filter(turn=>turn.damage>0);
                 const average=hits.reduce((sum,turn)=>sum+turn.damage,0)/Math.max(1,hits.length);
                 const moments=[];
@@ -12098,8 +12394,8 @@ const PetBattleGame=(()=>{
                 const details=el('petBattleExitDetails');
                 details.replaceChildren(...moments.slice(-12));
                 if(!moments.length)details.textContent='Trận này không có tình huống nổi bật.';
-                state.resultPrompt=m.id;
-                el('petBattleExitDialog').showModal();
+                state.resultPrompt=gameKey(m);
+                if(!el('petBattleExitDialog').open)el('petBattleExitDialog').showModal();
             }
         }
         const logKey=m.id+':'+play.count;if(state.lastTurn!==logKey){state.lastTurn=logKey;renderStrike(m,play);const energy=el('petBattleRoom').querySelector('.pet-battle-energy');energy.style.animation=play.last?`pet-battle-strike-${play.last.attacker===m.players[0].uid?'right':'left'} .65s ease-out both`:'';el('petBattleLog').replaceChildren(...(m.turns||[]).slice(Math.max(0,play.count-6),play.count).map(turn=>{const li=document.createElement('li');li.textContent=`Lượt ${turn.index}: ${m.players.find(p=>p.uid===turn.attacker).petName} ${turn.dodged?'bị né đòn':`gây ${petBattleAmount(turn.damage)} sát thương${turn.critical?' (chí mạng)':''}`}.`;return li;}));}
@@ -12111,6 +12407,9 @@ const PetBattleGame=(()=>{
         const closeRoom=async()=>{
             if(state.busy)return;
             const room=match();
+            if(room&&!room.bot&&!PET_CLOUD_ENABLED&&['finished','ready','rps'].includes(room.status)){
+                finishRoom();return;
+            }
             if(room?.status==='invited'&&room.challengerUid===state.uid){
                 await mutate('cancel');
                 const updated=state.matches.get(room.id);
@@ -12128,6 +12427,8 @@ const PetBattleGame=(()=>{
         });
         el('petBattleStay').addEventListener('click',()=>el('petBattleExitDialog').close());
         el('petBattleExitConfirm').addEventListener('click',finishRoom);
+        for(const id of ['petBattleRematch','petBattleExitRematch'])
+            el(id).addEventListener('click',()=>mutate('rematch'));
         el('petBattleNew').addEventListener('click',()=>{
             const id=el('petBattleMatches').value;
             if(id==='bot:new'){open('',true);return;}
