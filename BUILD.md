@@ -87,10 +87,10 @@ floor, and bird forms fly in the upper viewport. Cats, tigers and lions also wal
 Eggs and dead pets rest; reduced-motion mode stops roaming and articulation.
 
 Levels 1–9 are shared, ending with the ray. At 80 XP (level 9), users
-unlock four branches: fish, dinosaurs, birds, and cats/tigers/lions. Each branch
-has twenty paired forms at levels 10–29 and a final form at level 30 (290 XP). Each regular
-species has a juvenile and mature stage with increasing display size. Users may
-switch branches without losing check-ins; transactions persist the selected
+unlock nine branches, including Arthropods, Arctic Animals, Savanna Animals,
+Wetland Reptiles and Higher Plants. Each branch has twenty distinct forms at
+levels 10–29 and a final form at level 30 (290 XP). Each pet keeps its chosen
+branch; transactions persist the selected
 `branch` in the same profile. The last form is capped at level 30, but daily
 check-ins continue to keep it alive. Legacy profiles without a branch retain all
 check-ins and display the ray until a branch is chosen. Resurrection resets the

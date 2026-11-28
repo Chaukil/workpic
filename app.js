@@ -409,6 +409,27 @@ for(const [key,branch] of Object.entries(ATTENDANCE_PET_BRANCHES)){
     branch.forms.push(PET_BRANCH_FINALS[key]);
 }
 const ATTENDANCE_PET_MAX_LEVEL=ATTENDANCE_PET_FORMS.length+Math.max(...Object.values(ATTENDANCE_PET_BRANCHES).map(branch=>branch.forms.length));
+const PET_EXTENDED_BRANCHES={
+    arctic:['Thú Bắc Cực','bi-snow','#8dc6e9','arctic',[
+        'Lemming Bắc Cực','Thỏ Bắc Cực','Chồn ermine','Cáo Bắc Cực','Cú tuyết','Hải cẩu vòng','Hải cẩu râu','Chồn sói','Linh miêu Canada','Sói Bắc Cực','Tuần lộc','Bò xạ hương','Hải mã','Hải cẩu báo','Cá voi trắng','Kỳ lân biển','Gấu xám phương Bắc','Gấu Bắc Cực','Sói Băng Nguyên','Gấu Giáp Băng','Băng Hùng']],
+    savanna:['Thú Thảo Nguyên','bi-sun','#d49a52','savanna',[
+        'Cầy meerkat','Linh dương dik-dik','Linh dương gazelle','Lợn bướu','Ngựa vằn','Linh cẩu đốm','Linh dương đầu bò','Linh dương sừng kiếm','Báo săn đồng cỏ','Linh dương eland','Trâu rừng châu Phi','Hươu cao cổ','Hà mã','Tê giác đen','Tê giác trắng','Voi rừng châu Phi','Voi đồng cỏ châu Phi','Tê giác Bão Cát','Voi Giáp Đồng','Mãnh Tượng Sấm','Lôi Tượng']],
+    swamp:['Bò sát Đầm Lầy','bi-droplet','#75b382','swamp',[
+        'Thằn lằn bóng','Tắc kè hoa','Thằn lằn mào','Rùa hộp','Thằn lằn cổ diềm','Kỳ đà nước','Rắn ráo nước','Rùa cá sấu','Kỳ nhông biển','Rồng Komodo','Cá sấu lùn','Cá sấu mõm dài','Cá sấu Xiêm','Cá sấu Mỹ','Cá sấu sông Nile','Cá sấu nước mặn','Trăn gấm','Trăn Anaconda','Mãng Xà Giáp Đầm','Long Ngạc Đầm Sâu','Cửu Đầu Xà']],
+    plant:['Thực vật Bậc Cao','bi-flower2','#8dc851','plant',[
+        'Dương xỉ','Cỏ đuôi ngựa','Cây trinh nữ','Cây gọng vó','Sen nước','Lan mặt khỉ','Cây bắt ruồi','Cây nắp ấm','Xương rồng trụ','Hoa titan','Dây leo gai','Đỗ quyên đỏ','Tre khổng lồ','Cây bao báp','Đước rễ chống','Đa cổ thụ','Cự Diệp Ăn Thịt','Thụ Vệ Gai','Mộc Vệ Hổ Phách','Thụ Vương Ngàn Rễ','Mộc Linh Cổ Thụ']]
+};
+const PET_EXTENDED_COLORS={
+    arctic:'8b674e f0ecde b78d62 e4edf5 c9d4dc 697784 88736e 513a31 a9967b b6babc 8e6550 594539 a67869 52666f dbe6ed 6d7d9d 65513e f5edd8 6191ae abc8de dbefff',
+    savanna:'b88858 b69364 d7a659 73524b f4e7d0 b5925d 666161 d7c8ac eaaf50 a98066 494446 d99750 897389 576468 9f9990 77775b 839093 a26a48 b4814e 625b7f dba068',
+    swamp:'776d4d 66a044 7b935d 795b40 c87544 496e68 677848 4f604e 3c6570 9a845b 58633c 67816e 769158 586a57 686a39 4a6150 b6a77c 817e39 41666a 345765 435a85',
+    plant:'509644 637d48 6e9b53 b74f63 af5e9b ac7881 75ad45 8e593f 537a63 843d56 718746 b74951 95a650 85694c 90684b 665350 6bb476 476637 b78b41 536d49 327b60'
+};
+for(const [key,[name,icon,,kind,species]] of Object.entries(PET_EXTENDED_BRANCHES)){
+    const colors=PET_EXTENDED_COLORS[key].split(' ');
+    ATTENDANCE_PET_BRANCHES[key]={name,icon,forms:species.map((label,i)=>
+        petForm(label,kind,key+'-'+i,'#'+colors[i],.58+i*.057+(i===20?.20:0),{stage:i,...(i===20?{crest:true}:{})}))};
+}
 const ATTENDANCE_PET_MAX_SAFE_LEVEL=Math.floor(Number.MAX_SAFE_INTEGER/10)+1;
 function attendancePetCatalog(branch){return ATTENDANCE_PET_FORMS.concat(ATTENDANCE_PET_BRANCHES[branch]?.forms||[]);}
 // Approximate adult body length (or wingspan for flying birds), in meters.
@@ -439,6 +460,9 @@ function attendancePetMotion(view) {
     if(view?.egg || view?.dead)return 'rest';
     if(view?.branch==='dino'&&view.level>=ATTENDANCE_PET_MAX_LEVEL)return 'fly';
     if(view?.form.kind==='bird')return 'fly';
+    if(view?.branch==='arctic'&&view.form.stage===4)return 'fly';
+    if(view?.branch==='arctic'&&[5,6,12,13,14,15].includes(view.form.stage))return 'swim';
+    if(['arctic','savanna','swamp','plant'].includes(view?.form.kind))return 'walk';
     if(view?.form.kind==='arthropod'){
         if(['bee','dragonfly'].includes(view.form.shape))return 'fly';
         return ['lobster','mantisShrimp','spiderCrab'].includes(view.form.shape)?'swim':'walk';
@@ -703,18 +727,29 @@ const PET_BATTLE_ELEMENTS = new Map([
     ['qilin', {label:'Thổ · Kỳ Lân', icon:'🦄', color:'#c084fc', affinity:'earth'}],
 ]);
 const PET_BATTLE_SPIRITS={
-    wood:{name:'Thanh Long',move:'Long Vũ Tái Sinh',icon:'bi-heart-pulse',passive:'+3% HP tối đa.',ultimate:'Hồi 4% HP tối đa ngay; hồi thêm 2% mỗi lượt trong 2 lượt tiếp theo.',color:'#48e0ad',motion:'slam',effect:'wave',ability:'heal'},
-    fire:{name:'Chu Tước',move:'Liệt Diễm Tam Thức',icon:'bi-fire',passive:'Đòn trúng gây Thiêu Đốt 0,35% HP tối đa mỗi lượt trong 2 lượt, tối đa 2 cộng dồn.',ultimate:'Thiêu Đốt lần lượt 4%, 3% và 2% HP tối đa trong 3 lượt.',color:'#ff633d',motion:'dive',effect:'fire',ability:'burn'},
-    water:{name:'Huyền Vũ',move:'Huyền Giáp Hộ Thân',icon:'bi-shield-shaded',passive:'Giảm 6% sát thương nhận.',ultimate:'Chặn sát thương của đòn kế tiếp tối đa bằng 12% HP tối đa; phần vượt giới hạn vẫn gây sát thương. Chỉ chặn một đòn.',color:'#48c9ee',motion:'shield',effect:'wave',ability:'shield'},
-    metal:{name:'Bạch Hổ',move:'Hổ Gầm Trời',icon:'bi-crosshair',passive:'Tăng 12 điểm phần trăm chí mạng; yếu trước né tránh và khiên.',ultimate:'Trong 2 lượt đánh tiếp theo, đòn đánh chắc chắn chí mạng nếu trúng; sát thương chí mạng ×1,6.',color:'#f5d477',motion:'claw',effect:'claw',ability:'critical'},
-    kitsune:{name:'Cửu Vĩ Hồ',move:'Cửu Ảnh Mê Tung',icon:'bi-eye',passive:'Có 8% né đòn. Mỗi lần bị trúng tăng thêm 2,5 điểm phần trăm né (tối đa cộng thêm 30%).',ultimate:'Tăng né đòn thêm 20 điểm phần trăm trong 2 lượt đối thủ tấn công. Mỗi lần né thành công trong thời gian này hồi 1,5% HP tối đa và xóa Thiêu Đốt.',color:'#fb7185',motion:'dive',effect:'wind',ability:'evasion'},
+    wood:{name:'Thanh Long',move:'Long Vũ Tái Sinh',icon:'bi-heart-pulse',passive:'+3% HP tối đa.',ultimate:'Hồi 6% HP tối đa ngay, rồi hồi 3% mỗi lượt trong 2 lượt tiếp theo.',color:'#48e0ad',motion:'slam',effect:'wave',ability:'heal'},
+    fire:{name:'Chu Tước',move:'Liệt Diễm Tam Thức',icon:'bi-fire',passive:'Đòn trúng gây Thiêu Đốt 0,3% HP tối đa mỗi lượt trong 2 lượt. Đòn trúng làm mới thời gian.',ultimate:'Thiêu Đốt lần lượt 4% và 3% HP tối đa trong 2 lượt, cộng dồn với nội tại.',color:'#ff633d',motion:'dive',effect:'fire',ability:'burn'},
+    water:{name:'Huyền Vũ',move:'Huyền Giáp Hộ Thân',icon:'bi-shield-shaded',passive:'Giảm 6% sát thương nhận.',ultimate:'Trong 2 lượt đối thủ tấn công, chặn đòn gây sát thương kế tiếp tối đa bằng 10% HP tối đa. Phần vượt vẫn gây sát thương.',color:'#48c9ee',motion:'shield',effect:'wave',ability:'shield'},
+    metal:{name:'Bạch Hổ',move:'Hổ Gầm Trời',icon:'bi-crosshair',passive:'Tăng 12 điểm phần trăm chí mạng; yếu trước né tránh và khiên.',ultimate:'Trong 2 lượt đánh tiếp theo, đòn trúng chắc chắn chí mạng. Nhân thêm ×1,6 lên hệ số mặc định ×1,5, thành ×2,4.',color:'#f5d477',motion:'claw',effect:'claw',ability:'critical'},
+    kitsune:{name:'Cửu Vĩ Hồ',move:'Cửu Ảnh Mê Tung',icon:'bi-eye',passive:'Có 8% né đòn. Mỗi lần bị trúng tăng thêm 2,5 điểm phần trăm né (tối đa cộng thêm 30%).',ultimate:'Tăng né thêm 20 điểm phần trăm trong 2 lượt đối thủ tấn công. Né thành công hồi 2% HP tối đa và xóa Thiêu Đốt.',color:'#fb7185',motion:'dive',effect:'wind',ability:'evasion'},
     pixiu:{name:'Tỳ Hưu',move:'Tích Lũy Chiêu Tài',icon:'bi-coin',passive:'Tích trữ 25% sát thương gây ra, tối đa bằng 16% HP tối đa của bản thân.',ultimate:'Giải phóng toàn bộ sát thương đã tích trữ thành sát thương cộng thêm; phần này không thể chí mạng.',color:'#f5c451',motion:'shield',effect:'wave',ability:'charge'},
     griffin:{name:'Griffin',move:'Thiên Ưng Liệt Trảo',icon:'bi-wind',passive:'Tăng 15% sát thương gây ra.',ultimate:'Giảm 55% Phòng thủ của đối thủ (ít nhất 10 điểm) trong 2 đòn đánh tiếp theo. Phòng thủ có thể xuống âm và làm tăng sát thương nhận.',color:'#c4a878',motion:'dive',effect:'wind',ability:'pierce'},
-    cerberus:{name:'Cerberus',move:'Tam Đầu U Minh Viêm',icon:'bi-emoji-angry',passive:'Đòn trúng làm giảm 35% hiệu quả hồi máu của đối thủ trong 3 lượt.',ultimate:'Cắn 3 lần, mỗi lần gây 65% sát thương đòn thường. Từng cú cắn được tính riêng.',color:'#8b83f6',motion:'bite',effect:'fire',ability:'hellfire'},
+    cerberus:{name:'Cerberus',move:'Tam Đầu U Minh Viêm',icon:'bi-emoji-angry',passive:'Đòn trúng làm giảm 35% hiệu quả hồi máu của đối thủ trong 3 lượt.',ultimate:'Cắn 2 lần, mỗi lần gây 65% sát thương đòn thường. Từng cú cắn được tính riêng.',color:'#8b83f6',motion:'bite',effect:'fire',ability:'hellfire'},
     centaur:{name:'Nhân Mã',move:'Thiên Mã Hộ Thể',icon:'bi-shield-plus',passive:'Giảm 4% sát thương nhận; khi HP dưới 50%, tổng giảm sát thương tăng lên 6%.',ultimate:'Tạo khiên bằng 8% HP tối đa trong 2 lượt, giảm thêm 8% sát thương nhận khi khiên còn. Khi khiên vỡ, hồi 2% HP tối đa.',color:'#d9a441',motion:'slam',effect:'wave',ability:'guardian-shield'},
-    qilin:{name:'Kỳ Lân',move:'Lân Giáp Phản Chấn',icon:'bi-arrow-repeat',passive:'Phản lại 14% sát thương thực nhận lên đối thủ; sát thương phản không thể chí mạng.',ultimate:'Tăng phản sát thương lên 30% trong 2 đòn đối thủ tiếp theo.',color:'#c084fc',motion:'slam',effect:'wave',ability:'reflection'},
+    qilin:{name:'Kỳ Lân',move:'Lân Giáp Phản Chấn',icon:'bi-arrow-repeat',passive:'Phản lại 14% sát thương thực nhận lên đối thủ; sát thương phản không thể chí mạng.',ultimate:'Trong 2 lượt đối thủ tấn công, phản 30% sát thương thực nhận và hồi 1% HP tối đa khi nhận đòn chí mạng.',color:'#c084fc',motion:'slam',effect:'wave',ability:'reflection'},
 };
 function petBattleSpirit(element){return PET_BATTLE_SPIRITS[element]||null;}
+const PET_ULTIMATE_TUNING={
+    wood:[1,1,1],fire:[1,1,1],water:[1,1,1],metal:[1,1,1],kitsune:[1,1,1],
+    pixiu:[1,1,1],griffin:[1,1,1],cerberus:[1,1,1],centaur:[1,1,1],qilin:[1,1,1]
+};
+function petUltimateTuning(element,level){
+    const values=PET_ULTIMATE_TUNING[element];
+    if(!values)return 1;
+    const cap=Math.min(30,Math.max(1,Number(level)||1));
+    const index=cap<=15?0:1,fraction=index===0?(cap-1)/14:(cap-15)/15;
+    return values[index]+(values[index+1]-values[index])*fraction;
+}
 function petBattleCounters(source,target){
     return source?.overcomes===target||
         (source?.affinity==='wood'&&target==='earth')||
@@ -771,7 +806,7 @@ function petBattleSimulation(players,firstUid,matchId=''){
         !p.budgetVersion&&Object.values(p.stats||{}).reduce((sum,value)=>sum+Number(value),0)===petBattleBudget(p.appearance.level,true),p.statBudget));
     const stats=players.map((player,index)=>petBattleEffectiveStats(player,players[1-index]));
     const hp=stats.map((value,index)=>petBattleNumber(petBattleMaxHp(value,players[index].appearance)*(players[index].element==='wood'?1.03:1))),maxHp=[...hp],turns=[];
-    const effects=players.map(()=>({count:0,burns:[],ultimateBurns:[],regen:0,criticalTurns:0,foxDodgeBonus:0,evasion:0,storedDamage:0,armorBreak:0,healingReduction:0,healingReductionTurns:0,blockDamage:0,shieldHp:0,shieldTurns:0,reflectTurns:0}));
+    const effects=players.map(()=>({count:0,burns:[],ultimateBurns:[],regen:0,criticalTurns:0,foxDodgeBonus:0,evasion:0,storedDamage:0,armorBreak:0,healingReduction:0,healingReductionTurns:0,blockDamage:0,blockTurns:0,shieldHp:0,shieldTurns:0,reflectTurns:0}));
     let attacker=players.findIndex(p=>p.uid===firstUid);
     let seed=2166136261;for(const c of JSON.stringify([players,firstUid],(key,value)=>key==='element'?undefined:value))seed=Math.imul(seed^c.charCodeAt(0),16777619)>>>0;
     for(const char of matchId)seed=Math.imul(seed^char.charCodeAt(0),16777619)>>>0;
@@ -781,6 +816,7 @@ function petBattleSimulation(players,firstUid,matchId=''){
         const self=effects[attacker],target=effects[defender],element=players[attacker].element,rival=players[defender].element;
         const modern=Object.hasOwn(a,'magic')||Object.hasOwn(d,'magic');
         const spirit=petBattleSpirit(element);
+        const ultimate=petUltimateTuning(element,players[attacker].appearance.level),rivalUltimate=petUltimateTuning(rival,players[defender].appearance.level);
         const special=++self.count%4===0&&!!spirit;
         const burnRate=self.burns.reduce((sum,burn)=>sum+burn.rate,0)+(self.ultimateBurns[0]?.rate||0);
         const scorched=Math.min(hp[attacker],petBattleNumber(maxHp[attacker]*burnRate));
@@ -793,21 +829,21 @@ function petBattleSimulation(players,firstUid,matchId=''){
                 statuses:effects.map((effect,index)=>petBattleStatus(effect,players[index].element)),hp:[...hp]});
             break;
         }
-        const hits=element==='cerberus'&&special?3:1;
+        const hits=element==='cerberus'&&special?2:1;
         const hitResults=[];
         let damage=0,critical=false,dodged=false,healed=0,foxHealed=0,appliedBurn=0,physical=0,magic=0,landed=0,foxDodges=0;
         for(let hit=0;hit<hits;hit++){
-            const dodgeChance=Math.min(.75,(d.dodge||0)/200+(rival==='kitsune'?.08:0)+target.foxDodgeBonus+(target.evasion>0?.2:0));
+            const dodgeChance=Math.min(.75,(d.dodge||0)/200+(rival==='kitsune'?.08:0)+target.foxDodgeBonus+(target.evasion>0?.2*rivalUltimate:0));
             const hitDodged=modern&&roll()<dodgeChance;
             const critChance=Math.min(.75,Math.max(0,Math.min(.35,(a.luck||0)/200)+(element==='metal'?.12:0)));
             const guaranteed=self.criticalTurns>0&&!hitDodged;
             const hitCritical=!hitDodged&&(guaranteed||roll()<critChance);
-            const hitMultiplier=hitCritical?(guaranteed&&element==='metal'?1.6:1.5):1;
-            const hitDefense=d.defense-(target.armorBreak>0?Math.max(10,d.defense*.55):0);
+            const hitMultiplier=hitCritical?1.5*(guaranteed&&element==='metal'?1+.15*ultimate:1):1;
+            const hitDefense=d.defense-(target.armorBreak>0?Math.min(d.defense+65,Math.max(18,d.defense*.75)*ultimate):0);
             const defenseMultiplier=100/(100+hitDefense);
             const hitPhysical=modern?(5+attack*2)*defenseMultiplier*100/(100+(d.physicalReduction||0)*2):(10+attack*2)*defenseMultiplier;
             const hitMagic=modern?(a.magic||0)*2*defenseMultiplier*100/(100+(d.magicReduction||0)*2):0;
-            let hitDamage=hitDodged?0:Math.max(1,Math.round((modern?hitPhysical+hitMagic:hitPhysical)*hitMultiplier*(element==='griffin'?1.15:1)*(element==='cerberus'&&special?.65:1)));
+            let hitDamage=hitDodged?0:Math.max(1,Math.round((modern?hitPhysical+hitMagic:hitPhysical)*hitMultiplier*(element==='griffin'?1.15:1)*(element==='cerberus'&&special?1.12*ultimate:1)));
             if(target.armorBreak>0)target.armorBreak--;
             if(hitDodged&&rival==='kitsune'){
                 target.foxDodgeBonus=0;
@@ -823,7 +859,7 @@ function petBattleSimulation(players,firstUid,matchId=''){
         if(self.criticalTurns>0)self.criticalTurns--;
         dodged=hitResults.every(hit=>hit.dodged);
         if(foxDodges){
-            const foxHeal=Math.min(maxHp[defender]-hp[defender],petBattleNumber(maxHp[defender]*.015*foxDodges*(1-(target.healingReductionTurns>0?target.healingReduction:0))));
+            const foxHeal=Math.min(maxHp[defender]-hp[defender],petBattleNumber(maxHp[defender]*.008*rivalUltimate*foxDodges*(1-(target.healingReductionTurns>0?target.healingReduction:0))));
             foxHealed=foxHeal;hp[defender]=petBattleNumber(hp[defender]+foxHeal);
         }
         let damageReduction=rival==='water'?.94:rival==='centaur'?(hp[defender]/maxHp[defender]<.5?.94:.96):1;
@@ -831,14 +867,15 @@ function petBattleSimulation(players,firstUid,matchId=''){
         damage=petBattleNumber(damage*damageReduction);
         if(element==='pixiu'&&damage>0){
             const released=special?self.storedDamage:0;
-            self.storedDamage=special?0:Math.min(maxHp[attacker]*.16,self.storedDamage+damage*.25);
+            self.storedDamage=special?0:Math.min(maxHp[attacker]*.25,self.storedDamage+damage*.44*ultimate);
             if(special&&landed)damage=petBattleNumber(damage+released);
         }
         let blocked=0,absorbed=0,shieldBroken=false;
-        if(target.blockDamage>0){
+        if(target.blockDamage>0&&damage>0){
             blocked=Math.min(damage,target.blockDamage);
             damage-=blocked;target.blockDamage=0;
         }
+        if(target.blockTurns>0&&!--target.blockTurns)target.blockDamage=0;
         if(target.shieldHp>0){
             absorbed=Math.min(damage,target.shieldHp);
             target.shieldHp=petBattleNumber(target.shieldHp-absorbed);
@@ -848,38 +885,41 @@ function petBattleSimulation(players,firstUid,matchId=''){
         const damageTaken=Math.min(hp[defender],damage);
         hp[defender]=Math.max(0,petBattleNumber(hp[defender]-damage));
         const reflectedDamage=rival==='qilin'&&damageTaken>0
-            ?petBattleNumber(damageTaken*(target.reflectTurns>0?.3:.14)):0;
+            ?petBattleNumber(damageTaken*(target.reflectTurns>0?.14+.41*rivalUltimate:.14)):0;
         if(reflectedDamage){
             hp[attacker]=Math.max(0,petBattleNumber(hp[attacker]-reflectedDamage));
-            if(target.reflectTurns>0)target.reflectTurns--;
         }
+        const criticalHeal=rival==='qilin'&&target.reflectTurns>0&&critical&&damageTaken>0&&hp[defender]>0
+            ?Math.min(maxHp[defender]-hp[defender],petBattleNumber(maxHp[defender]*.01*(1-(target.healingReductionTurns>0?target.healingReduction:0)))):0;
+        hp[defender]=petBattleNumber(hp[defender]+criticalHeal);
+        if(target.reflectTurns>0)target.reflectTurns--;
         if(rival==='kitsune'&&landed>0)target.foxDodgeBonus=Math.min(.3,target.foxDodgeBonus+landed*.025);
         if(element==='cerberus'&&landed&&hp[defender]>0){target.healingReduction=.35;target.healingReductionTurns=3;}
         if(element==='fire'&&landed&&hp[defender]>0){
-            if(target.burns.length===2)target.burns.shift();
-            target.burns.push({left:2,rate:.0035});
-            if(special)target.ultimateBurns=[{left:1,rate:.04},{left:1,rate:.03},{left:1,rate:.02}];
+            target.burns=[{left:2,rate:.0015}];
+            if(special)[.013,.009].forEach((rate,i)=>{
+                target.ultimateBurns[i]={rate:rate*ultimate+(target.ultimateBurns[i]?.rate||0)};
+            });
             appliedBurn=petBattleNumber(maxHp[defender]*(target.burns.reduce((sum,burn)=>sum+burn.rate,0)+(target.ultimateBurns[0]?.rate||0)));
         }
         if(element==='wood'&&special){
-            const healedNow=Math.min(maxHp[attacker]-hp[attacker],petBattleNumber(maxHp[attacker]*.04*(1-(self.healingReductionTurns>0?self.healingReduction:0))));
+            const healedNow=Math.min(maxHp[attacker]-hp[attacker],petBattleNumber(maxHp[attacker]*.019*ultimate*(1-(self.healingReductionTurns>0?self.healingReduction:0))));
             healed+=healedNow;hp[attacker]=petBattleNumber(hp[attacker]+healedNow);self.regen=2;
         }
         if(self.regen>0&&element==='wood'&&!special){
-            const regenHeal=Math.min(maxHp[attacker]-hp[attacker],petBattleNumber(maxHp[attacker]*.02));
-            const reducedHeal=petBattleNumber(regenHeal*(1-(self.healingReductionTurns>0?self.healingReduction:0)));
+            const reducedHeal=Math.min(maxHp[attacker]-hp[attacker],petBattleNumber(maxHp[attacker]*.007*ultimate*(1-(self.healingReductionTurns>0?self.healingReduction:0))));
             healed+=reducedHeal;hp[attacker]=petBattleNumber(hp[attacker]+reducedHeal);self.regen--;
         }
         if(shieldBroken&&rival==='centaur'){
-            const centaurHeal=Math.min(maxHp[defender]-hp[defender],petBattleNumber(maxHp[defender]*.02*(1-(target.healingReductionTurns>0?target.healingReduction:0))));
+            const centaurHeal=Math.min(maxHp[defender]-hp[defender],petBattleNumber(maxHp[defender]*.006*rivalUltimate*(1-(target.healingReductionTurns>0?target.healingReduction:0))));
             hp[defender]=petBattleNumber(hp[defender]+centaurHeal);target.shieldHeal=centaurHeal;
             target.shieldTurns=0;
         }
-        if(special&&element==='water')self.blockDamage=petBattleNumber(maxHp[attacker]*.12);
+        if(special&&element==='water'){self.blockDamage=petBattleNumber(maxHp[attacker]*.10*ultimate);self.blockTurns=2;}
         if(special&&element==='metal')self.criticalTurns=2;
         if(special&&element==='kitsune')self.evasion=2;
         if(special&&element==='griffin')target.armorBreak=2;
-        if(special&&element==='centaur'){self.shieldHp=petBattleNumber(maxHp[attacker]*.08);self.shieldTurns=2;}
+        if(special&&element==='centaur'){self.shieldHp=petBattleNumber(maxHp[attacker]*.035*ultimate);self.shieldTurns=2;}
         if(special&&element==='qilin')self.reflectTurns=2;
         if(self.healingReductionTurns>0)self.healingReductionTurns--;
         if(target.evasion>0)target.evasion--;
@@ -889,9 +929,9 @@ function petBattleSimulation(players,firstUid,matchId=''){
             magic:modern&&damage?magic:0,
             ...(special?{special:players[attacker].element,specialName:spirit.move,spiritName:spirit.name,specialIcon:spirit.icon}:{}),
             ...(blocked||absorbed?{blocked:true,blockedDamage:petBattleNumber(blocked+absorbed)}:{}),...(reflectedDamage?{reflectedDamage}:{}),...(scorched?{burnDamage:scorched}:{}),
-            ...(appliedBurn?{burnApplied:appliedBurn,burnTurns:special&&element==='fire'?3:2}:{}),
+            ...(appliedBurn?{burnApplied:appliedBurn,burnTurns:2}:{}),
             ...(healed?{healed}:{}),...(special&&element==='water'?{shielded:true}:{}),
-            ...(foxHealed?{dodgeHealed:foxHealed}:{}),
+            ...(foxHealed?{dodgeHealed:foxHealed}:{}),...(criticalHeal?{criticalHeal}:{}),
             ...(special&&element==='centaur'?{shielded:true}:{}),...(hitResults.length>1?{hits:hitResults}:{}),
             ...(target.shieldHeal?{shieldHeal:target.shieldHeal}:{}),
             statuses,
@@ -1017,6 +1057,12 @@ function petBattleSkill({form,level,branch},element=null,special=false){
     const spirit=special?petBattleSpirit(element):null;
     if(spirit)return {label:spirit.move,motion:spirit.motion,effect:spirit.effect,    variant:128+Object.keys(PET_BATTLE_SPIRITS).indexOf(element)};
     const branchLevel=level-ATTENDANCE_PET_FORMS.length-1;
+    if(branchLevel>=0&&Object.hasOwn(PET_EXTENDED_BRANCHES,branch)){
+        const skills={arctic:['Băng Hùng Phá Băng','claw','claw'],savanna:['Lôi Tượng Chấn Địa','slam','fire'],
+            swamp:['Cửu Xà Xung Kích','bite','fang'],plant:['Cổ Thụ Trói Rễ','slam','wave']};
+        const [ultimate,motion,effect]=skills[branch];
+        return {label:level>=ATTENDANCE_PET_MAX_LEVEL?ultimate:form.name+' xung kích',motion,effect,variant:176+Object.keys(skills).indexOf(branch)*24+Math.min(20,branchLevel)};
+    }
     const key=branchLevel>=0&&PET_BATTLE_SKILL_NAMES[branch]?branch:'base';
     const index=key==='base'?level-1:Math.floor(branchLevel/2);
     const label=(key!=='base'&&branchLevel%2?form.name:PET_BATTLE_SKILL_NAMES[key][index])||form.name;
@@ -9152,12 +9198,22 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
         s.model.visible=false;s.scene.add(s.resultGroup);
     }
     function build(s,view) {
+        buildPetMesh(s,view);
+        if(!s.model||view.egg)return;
+        const T=s.THREE,bounds=new T.Box3();
+        for(const part of s.model.children)if(!part.isSprite)bounds.expandByObject(part);
+        if(bounds.isEmpty())return;
+        const size=bounds.getSize(new T.Vector3());
+        const span=Math.max(size.x,size.z,size.y*1.3,.5);
+        const divine=view.level>=ATTENDANCE_PET_MAX_LEVEL&&view.branch;
+        s.model.userData.visualScale=2.65/span*(divine?(view.branch==='swamp'?1.36:1.17):1);
+    }
+    function buildPetMesh(s,view) {
         disposeModel(s);
         s.result=null;
         const T=s.THREE,group=new T.Group();s.model=group;s.rig=[];s.dragonWave=null;s.mouth=null;s.divineGlow=null;s.scene.add(group);
-        const battlePresentation=presentation==='arena';
+        const battlePresentation=presentation==='arena'||presentation==='portrait';
         const divineForm=view.level>=ATTENDANCE_PET_MAX_LEVEL&&view.branch&&!view.dead&&!view.egg;
-        group.userData.visualScale=divineForm&&view.branch==='fish'?1.1:1;
         const divineColor={dino:'#42d9b2',bird:'#ff6842',fish:'#45c8e8',beast:'#f0d283',arthropod:'#b29aff'}[view.branch]||view.form.color;
         if(divineForm){
             const canvas=document.createElement('canvas');canvas.width=canvas.height=128;
@@ -9405,6 +9461,221 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
             }
             tube(group,[[.22,.015,-.19],[.37,-.043,0],[.22,.015,.19]],[.028,.028,.028],gold);
             s.rig.push({mesh:tail,axis:'z',amount:.19,phase:0});
+            applyBattleResult();return;
+        }
+        if(Object.hasOwn(PET_EXTENDED_BRANCHES,kind)){
+            const stage=view.form.stage,final=stage===20;
+            const accent=material({arctic:'#d8f7ff',savanna:'#e7b46d',swamp:'#a6d672',plant:'#ecaa4f'}[kind]);
+            if(kind==='plant'){
+                const bark=material(stage<13?'#536337':'#654935'),leaf=material(mainColor),height=stage<13?.48+(stage%5)*.13:.86+(stage-13)*.095;
+                if(stage<6||[8,11,12].includes(stage)){
+                    const flower=[3,4,5,11].includes(stage),stalks=[5,1,2,7,1,2,0,0,3,0,0,5,5][stage];
+                    const bloom=material(stage===4?'#ef9aca':stage===5?'#dfbd93':'#ffcf66');
+                    for(let i=0;i<stalks;i++){
+                        const x=(i-(stalks-1)/2)*.23,z=(i%2-.5)*.26,y=height*(.76+i%3*.18);
+                        tube(group,[[x*.6,-.52,z],[x,-.10,z],[x+.08,y,z]],[stage===8?.14:.055,.047,.021],leaf);
+                        if(flower){
+                            sphere(group,x+.08,y,z,.10,.08,.10,bloom);
+                            for(let j=0;j<(stage===4?10:5);j++){
+                                const angle=j*Math.PI*2/(stage===4?10:5);
+                                const petal=sphere(group,x+.08+Math.cos(angle)*.14,y+.03,z+Math.sin(angle)*.14,.15,.038,.070,leaf);
+                                petal.rotation.y=-angle;
+                            }
+                        }else for(let j=0;j<6;j++){
+                            const side=j%2?1:-1,reach=.22+(j%3)*.063;
+                            const blade=sphere(group,x+side*reach*.61,y*.15+.105*j,z,.20,.045,.075,leaf);
+                            blade.rotation.z=side*.43;
+                        }
+                    }
+                    applyBattleResult();return;
+                }
+                tube(group,[[0,-.47,0],[0,-.05,0],[.11,height*.60,0],[.02,height,0]],[.29,.25,.17,.075],bark);
+                for(let i=0;i<(final?9:6);i++){
+                    const angle=2.4*i,x=Math.cos(angle),z=Math.sin(angle),reach=.48+(i%3)*.14;
+                    tube(group,[[0,-.32,0],[x*.35,-.50,z*.35],[x*reach,-.61,z*reach]],[.106,.073,.006],bark);
+                    const branch=new T.Group();branch.position.y=height*(.24+i%3*.19);group.add(branch);
+                    const tip=[x*reach,.42+(i%2)*.19,z*reach];
+                    tube(branch,[[0,0,0],[x*.28,.16,z*.28],tip],[.080,.044,.005],leaf);
+                    if(stage<7||stage===8||stage===10||stage===12){
+                        const blade=sphere(branch,...tip,.24,.07,.14,leaf);blade.rotation.y=angle;
+                    }else sphere(branch,...tip,.20+(stage%3)*.035,.12+stage*.005,.19,i%3===0?accent:leaf);
+                    s.rig.push({mesh:branch,axis:'z',amount:.09,phase:i});
+                }
+                if([6,7,9,16].includes(stage))for(const side of [-1,1])
+                    sphere(group,.48,height*.54,side*.16,.27,.13,.20,accent);
+                if(stage===6||stage===16){
+                    const jaw=material('#b84e62');
+                    for(const side of [-1,1]){
+                        const lobe=sphere(group,.56,height*.63,side*.18,.31,.075,.21,jaw);
+                        lobe.rotation.x=side*.51;
+                        for(let i=0;i<5;i++)cone(group,.39+i*.085,height*.70,side*(.24+i*.013),.026,.11,accent,side*.34);
+                    }
+                }
+                if(stage===7){
+                    sphere(group,.55,height*.46,0,.25,.31,.22,leaf);
+                    const lip=new T.Mesh(new T.TorusGeometry(.17,.035,8,24),accent);
+                    lip.rotation.x=Math.PI/2;lip.position.set(.56,height*.64,.01);group.add(lip);
+                }
+                if(stage>=16)eyes(group,.24,height*.45,.18);
+                if(final){
+                    const cavity=material('#231621'),jaw=material('#8d3d46'),fang=material('#f0d09b');
+                    sphere(group,.24,.71,0,.27,.29,.37,cavity);
+                    for(const side of [-1,1]){
+                        tube(group,[[.21,.61,side*.31],[.44,.46,side*.25],[.50,.48,0]],[.10,.091,.075],jaw);
+                        tube(group,[[.19,.79,side*.32],[.45,.94,side*.25],[.52,.91,0]],[.12,.084,.069],bark);
+                        for(let i=0;i<4;i++){
+                            const z=side*(.055+i*.063);
+                            cone(group,.48-i*.027,.822,z,.030,.16,fang,Math.PI);
+                            cone(group,.47-i*.024,.568,z,.026,.13,fang);
+                        }
+                        sphere(group,.47,1.02,side*.18,.050,.041,.056,material('#ffa74d'));
+                    }
+                }
+                if(final)for(const side of [-1,1]){
+                    tube(group,[[.01,height*.62,side*.14],[.26,height*.64,side*.64],[.58,height*.35,side*.94],[.79,height*.23,side*.84]],[.14,.105,.079,.029],bark);
+                    for(let i=0;i<4;i++)sphere(group,.38-i*.17,height+.12-i*.06,side*(.30+i*.10),.30,.20,.25,i%2?accent:leaf);
+                }
+            }else if(kind==='swamp'){
+                const snake=[6,16,17,18,20].includes(stage),crocodile=stage>=10&&stage<=15||stage===19;
+                if(snake){
+                    const necks=final?9:1;
+                    tube(group,[[-1.45,-.36,0],[-.96,-.34,.38],[-.51,-.26,.43],[0,-.05,-.22],[.32,.25,0]],[.01,.12,.25,.31,.20],bodyMat);
+                    for(let i=0;i<necks;i++){
+                        const offset=i-(necks-1)/2,z=offset*.30;
+                        const neck=new T.Group();group.add(neck);
+                        const y=final?1.56-Math.abs(offset)*.237:.60;
+                        const x=final?.84-Math.abs(offset)*.16:.83;
+                        tube(neck,[[.18,-.06,0],[x-.24,y*.48,z*.47],[x-.17,y,z],[x,y+.02,z]],[.15,.13,.089,.055],bodyMat);
+                        sphere(neck,x+.06,y+.025,z,.18,.094,.087,accent);
+                        sphere(neck,x+.13,y+.054,z+.067,.017,.018,.010,black);
+                        if(final){
+                            for(const side of [-1,1])tube(neck,[[x-.03,y+.08,z+side*.05],[x-.09,y+.20,z+side*.10],[x-.18,y+.28,z+side*.12]],[.032,.021,.003],accent);
+                            tube(neck,[[x+.12,y-.029,z],[x+.23,y-.061,z],[x+.16,y-.090,z]],[.032,.020,.003],accent);
+                        }
+                        s.rig.push({mesh:neck,axis:'z',amount:.085,phase:i*.63});
+                    }
+                }else{
+                    const shell=[3,7].includes(stage);
+                    const [length,head,width]=[[.70,.18,.20],[.53,.22,.20],[.62,.22,.21],[.57,.16,.38],[.65,.23,.22],[.86,.25,.26],
+                        [0,0,0],[.73,.28,.43],[.71,.21,.31],[.94,.32,.34],[.78,.34,.29],[1.01,.65,.19],[.94,.46,.30],
+                        [1.04,.53,.29],[1.11,.45,.35],[1.18,.50,.39],[0,0,0],[0,0,0],[0,0,0],[1.14,.61,.38]][stage];
+                    organicBody([[-.2,.05,0,length,shell?.46:crocodile?.23:.24,width],[.55,.08,0,.37,.18,width*.82],[.88,.15,0,head,.13,width*.65]],bodyMat);
+                    if(shell)sphere(group,-.19,.18,0,.64,.38,.43,accent);
+                    if(stage===1){
+                        const coil=[[ -.42,.09,0],[-.84,.08,0],[-1.18,.29,0],[-1.05,.57,0],[-.78,.48,0],[-.86,.29,0]];
+                        tube(group,coil,[.12,.097,.073,.054,.027,.004],accent);
+                        sphere(group,.79,.31,0,.21,.22,.18,bodyMat);
+                    }
+                    if(stage===4)fin(group,[[.56,.11],[.43,.68],[.71,.57],[.88,.17]],accent);
+                    const tail=new T.Group();tail.position.x=-length*.75;group.add(tail);
+                    tube(tail,[[0,0,0],[-.4,-.03,.03],[-.86,.06,.20],[-1.22,.14,.06]],[.19,.14,.07,.004],bodyMat);
+                    s.rig.push({mesh:tail,axis:'y',amount:.26,phase:0});
+                    for(const side of [-1,1])for(const x of [-.52,.42]){
+                        const leg=new T.Group();leg.position.set(x,-.02,side*.20);group.add(leg);
+                        tube(leg,[[0,0,0],[.03,-.19,side*.25],[.18,-.31,side*.26]],[.094,.068,.025],bodyMat);
+                        s.rig.push({mesh:leg,axis:'z',amount:.27,phase:x*side>0?0:Math.PI});
+                    }
+                    if(crocodile){
+                        for(let i=0;i<6+stage%3;i++)cone(group,-.84+i*.17,.26,0,.057,.12+(stage%5)*.02,accent);
+                        for(const side of [-1,1]){
+                            tube(group,[[.72,.11,side*width*.47],[1.03,.09,side*width*.59],[.88+head,.11,side*width*.26]],[.018,.018,.003],black);
+                            for(let tooth=0;tooth<4;tooth++)cone(group,.83+head*.12*tooth,.075,side*width*.56,.018,.058,cream,Math.PI);
+                        }
+                    }
+                    eyes(group,.83,.23,.145);
+                }
+            }else{
+                const arctic=kind==='arctic',elephant=!arctic&&(stage>=15&&stage<=16||stage>=18),rhino=!arctic&&[13,14,17].includes(stage);
+                const seal=arctic&&[5,6,12,13,14,15].includes(stage),bear=arctic&&stage>=16&&stage!==18;
+                const horned=arctic?[10,11].includes(stage):[1,2,6,7,9,10,11].includes(stage);
+                const profiles=arctic?
+                    [[.53,.28,.24],[.64,.29,.53],[.82,.23,.28],[.77,.33,.44],[.58,.46,.25],[.81,.30,.25],[.92,.36,.31],[.79,.48,.43],[.81,.38,.57],[.91,.38,.61],[.88,.43,.72],[.98,.56,.44],[1.08,.55,.26],[1.02,.36,.26],[1.06,.42,.23],[1.19,.37,.24],[.98,.53,.50],[1.07,.57,.52],[1.03,.44,.66],[1.14,.62,.56],[1.20,.66,.60]]:
+                    [[.55,.28,.45],[.62,.25,.58],[.78,.31,.67],[.82,.42,.39],[.89,.43,.60],[.86,.42,.59],[.94,.46,.59],[.92,.36,.69],[.94,.29,.68],[.99,.49,.62],[1.10,.54,.49],[.96,.38,.84],[1.12,.55,.40],[1.03,.55,.46],[1.13,.58,.47],[1.08,.61,.62],[1.19,.66,.68],[1.15,.61,.52],[1.19,.68,.70],[1.25,.71,.72],[1.28,.74,.73]];
+                const [bodyLength,shoulder,limbLength]=profiles[stage];
+                const neckY=stage===11&&!arctic?1.18:elephant?.56:bear?.41:.35;
+                const tail=new T.Group();tail.position.set(-bodyLength*.91,.09,0);group.add(tail);
+                const coat=bodyMat;
+                if(arctic&&stage===4){
+                    sphere(group,-.14,.08,0,.55,.39,.31,coat);
+                    sphere(group,.33,.44,0,.29,.28,.28,accent);
+                    sphere(group,.56,.36,0,.14,.069,.067,material('#c6a66f'));
+                    eyes(group,.48,.46,.21);
+                    for(const side of [-1,1]){
+                        const wing=new T.Group();wing.position.set(-.12,.15,0);group.add(wing);
+                        for(let i=0;i<6;i++)sphere(wing,-.13-i*.07,-.05,side*(.32+i*.082),.33,.047,.13,i%2?coat:accent);
+                        s.rig.push({mesh:wing,axis:'x',amount:.49,phase:side<0?0:Math.PI});
+                    }
+                    applyBattleResult();return;
+                }
+                if(arctic&&[14,15].includes(stage)){
+                    organicBody([[-.38,.01,0,.88,.28,.25],[.27,.04,0,.74,.36,.30],[.82,.12,0,.35,.29,.26]],coat);
+                    sphere(group,1.04,-.013,0,.21,.11,.18,coat);
+                    eyes(group,.94,.145,.22);
+                    for(const side of [-1,1]){
+                        tube(group,[[.25,-.14,side*.16],[-.05,-.30,side*.36],[-.38,-.31,side*.56]],[.111,.075,.005],coat);
+                        sphere(tail,-.30,.01,side*.22,.23,.049,.25,coat);
+                    }
+                    if(stage===15)tube(group,[[1.06,.04,0],[1.43,.04,0],[1.91,.055,0]],[.048,.028,.003],accent);
+                    s.rig.push({mesh:tail,axis:'z',amount:.26,phase:0});
+                    applyBattleResult();return;
+                }
+                organicBody([[-.17,0,0,bodyLength,shoulder*.9,shoulder*.78],[.31,.16,0,.49,shoulder,shoulder*.69],
+                    [.60,neckY*.57,0,.25,.28,shoulder*.57],[.84,neckY,0,elephant?.33:.27,.24,.22]],coat);
+                if(neckY>1)tube(group,[[.48,.30,0],[.63,.75,0],[.82,neckY,0]],[.23,.15,.12],coat);
+                sphere(group,1.01,neckY-.083,0,elephant?.17:.24,.102,.16,coat);
+                eyes(group,.97,neckY+.075,.172);
+                const tailLength=arctic?([0,1,12,16,17,19,20].includes(stage)?.27:[2,3,8,9,18].includes(stage)?.78:.53):stage===8?.94:.56;
+                tube(tail,[[0,0,0],[-tailLength*.42,.01,0],[-tailLength,seal?-.17:.32,.11]],[arctic&&stage===3?.18:.09,arctic&&stage===3?.12:.055,.004],coat);
+                s.rig.push({mesh:tail,axis:'y',amount:.21,phase:0});
+                for(const side of [-1,1]){
+                    if(!seal)sphere(group,.72,neckY+.16,side*.18,.105,elephant?.32:arctic&&stage===1?.28:arctic&&[3,8,9,18].includes(stage)?.20:.12,elephant?.26:.080,coat);
+                    if(horned||elephant||arctic&&stage===12)tube(group,[[elephant?1.02:.78,neckY+.10,side*.15],[.91,neckY+(elephant?-.15:.39),side*.23],[elephant?1.42:1.02,neckY+(elephant?-.32:.68),side*.27]],[.058,.038,.004],accent);
+                    if(seal)fin(group,[[.33,-.10],[.03,-.48],[-.41,-.25]],coat,side*.28);
+                    else for(const x of [-.64,.43]){
+                        const leg=new T.Group();leg.position.set(x,-.16,side*shoulder*.70);group.add(leg);
+                        const h=limbLength;
+                        tube(leg,[[0,0,0],[-.05,-h*.57,0],[.04,-h,0]],[shoulder*.31,shoulder*.23,.062],coat);
+                        sphere(leg,.10,-h,0,shoulder*.29,.075,shoulder*.23,coat);
+                        s.rig.push({mesh:leg,axis:'z',amount:.24,phase:x*side>0?0:Math.PI});
+                    }
+                }
+                if(elephant||rhino){
+                    const points=elephant?[[1.02,neckY,0],[1.25,neckY-.24,0],[1.19,neckY-.63,0],[1.43,neckY-.68,0]]:[[1.02,neckY,0],[1.14,neckY+.15,0],[1.20,neckY+.37,0]];
+                    tube(group,points,elephant?[.137,.117,.075,.047]:[.091,.06,.004],elephant?coat:accent);
+                }
+                if(!arctic&&stage===4)for(const side of [-1,1])for(let i=0;i<7;i++){
+                    const x=-.78+i*.19;
+                    tube(group,[[x,.28,side*.10],[x+.04,.18,side*.23],[x-.04,-.13,side*.25]],[.023,.028,.004],black);
+                }
+                if(!arctic&&[5,8,11].includes(stage)||arctic&&stage===13){
+                    const spot=material(mainColor.clone().multiplyScalar(.47));
+                    for(const side of [-1,1])for(let i=0;i<10;i++){
+                        const x=.40-i*.12,y=.02+i%3*.083;
+                        sphere(group,x,y,side*shoulder*(.58+i%3*.04),.046+i%3*.009,.040,.017,spot);
+                    }
+                }
+                if(final||stage===19)for(let i=0;i<5;i++)cone(group,-.70+i*.25,shoulder+.06,0,.095,.25+(i%2)*.13,accent);
+                if(final)for(const side of [-1,1]){
+                    const plate=material(arctic?'#6facc9':'#805735');
+                    const guard=sphere(group,.35,.23,side*shoulder*.65,.42,.32,.14,plate);
+                    guard.rotation.z=-.24;
+                    for(let i=0;i<4;i++){
+                        const x=.59-i*.19;
+                        tube(group,[[x,.43,side*shoulder*.73],[x-.10,.53,side*shoulder*.96],[x-.15,.63,side*shoulder*.75]],[.057,.040,.004],accent);
+                    }
+                    if(arctic)tube(group,[[.65,neckY+.22,side*.17],[.51,neckY+.41,side*.24],[.34,neckY+.53,side*.24]],[.063,.047,.005],accent);
+                    if(!arctic){
+                        const gold=material('#ffd984'),azure=material('#78c9eb');
+                        tube(group,[[1.03,neckY-.10,side*.18],[1.39,neckY-.28,side*.31],[1.78,neckY+.12,side*.40]],[.092,.072,.004],gold);
+                        sphere(group,.81,neckY+.28,side*.19,.16,.11,.105,plate);
+                        const bolt=[[.29,.55,side*.50],[.54,.36,side*.56],[.35,.32,side*.57],[.53,.13,side*.53]];
+                        tube(group,bolt,[.043,.035,.033,.008],azure);
+                    }else{
+                        for(let i=0;i<4;i++)cone(group,.46-i*.22,.75+i*.031,side*(.22+i*.05),.10,.31+i*.04,accent,side*.34);
+                        sphere(group,1.16,neckY-.08,side*.14,.15,.074,.11,accent);
+                    }
+                }
+            }
             applyBattleResult();return;
         }
         if(kind==='arthropod'){
@@ -10839,7 +11110,7 @@ function renderAttendancePetRoster(){
         host.dataset.signature=key;host.replaceChildren(...records.map(p=>{
             const v=attendancePetView(p),card=document.createElement('div'),button=document.createElement('button'),eye=document.createElement('button');
             card.className='pet-roster-card'+(p.id===selected?' is-selected':'');button.type='button';button.dataset.petId=p.id;button.className='pet-roster-select';button.setAttribute('aria-pressed',String(p.id===selected));
-            const icon=document.createElement('span'),name=document.createElement('strong'),meta=document.createElement('small');            icon.className='pet-roster-icon';icon.textContent=v.dead?'💤':v.egg?'🥚':{fish:'🐠',shark:'🦈',whale:'🐋',dino:'🦖',bird:'🦅',beast:'🦁',arthropod:'🦂'}[v.form.kind];name.textContent=v.displayName;meta.textContent=`Cấp ${v.level} · ${petWeightLabel(v.weightGrams)} · ${v.dead?'Đã chết':v.egg?'Đang ấp':v.maxed?'Dạng cuối':v.hungry?'Đang đói':'No bụng'}`;button.append(icon,name,meta);
+            const icon=document.createElement('span'),name=document.createElement('strong'),meta=document.createElement('small');            icon.className='pet-roster-icon';icon.textContent=v.dead?'💤':v.egg?'🥚':{fish:'🐠',shark:'🦈',whale:'🐋',dino:'🦖',bird:'🦅',beast:'🦁',arthropod:'🦂',arctic:'🐻‍❄️',savanna:'🐘',swamp:'🐊',plant:'🌿'}[v.form.kind];name.textContent=v.displayName;meta.textContent=`Cấp ${v.level} · ${petWeightLabel(v.weightGrams)} · ${v.dead?'Đã chết':v.egg?'Đang ấp':v.maxed?'Dạng cuối':v.hungry?'Đang đói':'No bụng'}`;button.append(icon,name,meta);
             eye.type='button';eye.className='pet-roster-eye';eye.dataset.petVisibility='';eye.innerHTML=`<i class="bi ${attendancePetVisible?'bi-eye-fill':'bi-eye-slash'}" aria-hidden="true"></i>`;eye.setAttribute('aria-label',attendancePetVisible?'Ẩn thú cưng trên màn hình':'Hiện thú cưng trên màn hình');eye.setAttribute('aria-pressed',String(attendancePetVisible));
             card.append(button,eye);return card;
         }));
@@ -11066,6 +11337,7 @@ function renderAttendancePetBranches(view){
     });
     const road=document.getElementById('attendancePetRoad'),key=`${view.branch}:${view.level}`;
     if(road.dataset.path!==key){
+        const expanded=road.querySelector('details[open]')?.dataset.branch||view.branch||'fish';
         road.dataset.path=key;
         const shared=attendancePetCatalog(null);
         const sharedNodes=[{name:'Trứng'},...shared].map((form,level)=>`
@@ -11080,10 +11352,10 @@ function renderAttendancePetBranches(view){
                     ${attendancePetRoadArt(firstLevel,branchKey)}<small>Cấp ${firstLevel}${lastLevel!==firstLevel?`–${lastLevel}`:''}</small><strong>${form.name}</strong>
                 </li>`;
             }).join('');
-            return `<section class="pet-road-branch" data-branch="${branchKey}" aria-labelledby="pet-road-${branchKey}">
-                <h6 id="pet-road-${branchKey}"><i class="bi ${branch.icon}" aria-hidden="true"></i> ${branch.name}${branchKey===view.branch?' <small>Đang chọn</small>':''}</h6>
+            return `<details name="pet-road-branch" class="pet-road-branch" data-branch="${branchKey}" ${branchKey===expanded?'open':''}>
+                <summary>${attendancePetRoadArt(ATTENDANCE_PET_MAX_LEVEL,branchKey)}<span><strong><i class="bi ${branch.icon}" aria-hidden="true"></i> ${escapeHtml(branch.name)}</strong><small>${branch.forms.at(-1).name}${branchKey===view.branch?' · Đang nuôi':''}</small></span></summary>
                 <ol>${steps}</ol>
-            </section>`;
+            </details>`;
         }).join('');
         road.innerHTML=`<ol class="pet-road-shared" aria-label="Các cấp tiến hóa chung">${sharedNodes}</ol>
             <div class="pet-road-fork"><strong>Cá đuối cấp ${shared.length} mở ${Object.keys(ATTENDANCE_PET_BRANCHES).length} nhánh</strong><small>Từ cấp 10 đến 29, mỗi cấp mở một thú cưng khác. Cấp 30 tiến hóa thành thần thú; mỗi cấp sau đó cộng thêm 1 điểm chỉ số.</small></div>
@@ -11367,7 +11639,7 @@ function initAttendancePetUi() {
     document.getElementById('attendancePetFeed').addEventListener('click',interact);
     document.getElementById('attendancePetSwimmer').addEventListener('click',interact);
     document.getElementById('attendancePetRetry').addEventListener('click',startAttendancePet);
-    document.getElementById('attendancePetBranchOptions').innerHTML=Object.entries(ATTENDANCE_PET_BRANCHES).map(([key,branch])=>`<button type="button" data-pet-branch="${key}" aria-pressed="false"><span class="pet-branch-symbol" aria-hidden="true">${{fish:'🐋',dino:'🦖',bird:'🦅',beast:'🦁',arthropod:'🦂'}[key]}</span><strong>${branch.name}</strong><small>${branch.forms.length} cấp tiến hóa</small></button>`).join('');
+    document.getElementById('attendancePetBranchOptions').innerHTML=Object.entries(ATTENDANCE_PET_BRANCHES).map(([key,branch])=>`<button type="button" data-pet-branch="${key}" aria-pressed="false"><span class="pet-branch-symbol" aria-hidden="true">${{fish:'🐋',dino:'🦖',bird:'🦅',beast:'🦁',arthropod:'🦂',arctic:'🐻‍❄️',savanna:'🐘',swamp:'🐊',plant:'🌿'}[key]}</span><strong>${branch.name}</strong><small>${branch.forms.length} cấp tiến hóa</small></button>`).join('');
     document.getElementById('attendancePetBranchOptions').addEventListener('click',event=>{const button=event.target.closest('[data-pet-branch]');if(button&&!button.disabled)actOnAttendancePet('branch:'+button.dataset.petBranch);});
 }
 
@@ -12280,7 +12552,7 @@ const PetBattleGame=(()=>{
             setElementAura(el(`petBattleModel${i}`),spiritActive&&!hideGuardianIdentity?elementKey:'',spiritActive&&hideGuardianIdentity);
             const statusFx=el(`petBattleStatusFx${i}`);
             statusFx.classList.toggle('is-burning',!battleEnded&&!!status.burning);
-            const healing=Boolean(attacking&&play.last?.healed||hit&&(play.last?.shieldHeal||play.last?.dodgeHealed));
+            const healing=Boolean(attacking&&play.last?.healed||hit&&(play.last?.shieldHeal||play.last?.dodgeHealed||play.last?.criticalHeal));
             const turnKey=m.id+':'+play.count;
             const healKey=healing?turnKey:'';
             if(statusFx.dataset.healTurn!==healKey){
@@ -12326,6 +12598,7 @@ const PetBattleGame=(()=>{
             if(hit&&!dodged&&(!play.last.blocked||play.last.damage>0))notes.push(`${critical?'CHÍ MẠNG · ':''}−${petBattleAmount(play.last.damage)}`);
             if(attacking&&play.last?.healed)notes.push(`HỒI +${petBattleAmount(play.last.healed)} HP`);
             if(hit&&play.last?.dodgeHealed)notes.push(`HỒI +${petBattleAmount(play.last.dodgeHealed)} HP`);
+            if(hit&&play.last?.criticalHeal)notes.push('HỒI +'+petBattleAmount(play.last.criticalHeal)+' HP');
             if(attacking&&play.last?.burnApplied)notes.push('GÂY THIÊU ĐỐT');
             if(hit&&play.last?.shieldHeal)notes.push(`KHIÊN VỠ · HỒI +${petBattleAmount(play.last.shieldHeal)} HP`);
             if(attacking&&play.last?.reflectedDamage)notes.push(`PHẢN CHẤN −${petBattleAmount(play.last.reflectedDamage)} HP`);
@@ -12334,7 +12607,7 @@ const PetBattleGame=(()=>{
             if(!hideGuardianIdentity&&attacking&&play.last?.special==='qilin')notes.push('KỲ LÂN · PHẢN CHẤN 2 ĐÒN');
             if(!hideGuardianIdentity&&attacking&&play.last?.special==='pixiu'&&play.last.damage>0)notes.push('TỲ HƯU · GIẢI PHÓNG TÍCH TRỮ');
             if(!hideGuardianIdentity&&attacking&&play.last?.special==='griffin')notes.push('GRIFFIN · PHÁ GIÁP 2 ĐÒN');
-            if(!hideGuardianIdentity&&attacking&&play.last?.special==='cerberus')notes.push('CERBERUS · TAM ĐẦU CẮN');
+            if(!hideGuardianIdentity&&attacking&&play.last?.special==='cerberus')notes.push('CERBERUS · CẮN KÉP');
             if(attacking&&play.last?.burnDamage)notes.push(`THIÊU ĐỐT −${petBattleAmount(play.last.burnDamage)} HP`);
             if(!hideGuardianIdentity&&attacking&&play.last?.special==='kitsune')notes.push('CỬU VĨ · NÉ TRÁNH 2 LƯỢT');
             if(!hideGuardianIdentity&&attacking&&play.last?.special==='water')notes.push('HUYỀN VŨ · CHẮN ĐÒN KẾ TIẾP');
