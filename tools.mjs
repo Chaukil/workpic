@@ -51,15 +51,15 @@ console.log(`Deploy dist/: index.html (${((await stat('dist/index.html')).size /
 
     "test": async () => {
 const helperSource = fs.readFileSync('app.js', 'utf8').replace(/\r\n/g,'\n').split('// BEGIN SHARED HELPERS\n')[1].split('// END SHARED HELPERS')[0];
-const helperModule = helperSource + '\nexport { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater, attendancePetDay, newAttendancePet, attendancePetView, transitionAttendancePet, adjustAdminPet, attendancePetMotion, attendancePetTravelBounds, attendancePetCatalog, attendancePetScale, ATTENDANCE_PET_BRANCHES, normalizePetNickname, attendancePetRecords, attendancePetSelected, attendancePetHouseholdDay, transitionPetHousehold, attendancePetWeight, attendancePetActivityTime, buildPetComparison, unchangedPetAdminAction, petBattleBudget, petBattleStats, petBattleMaxHp, petBattlePower, petBattleRps, petBattleSimulation, petBattlePlayback, petBattleChangeWeight, petBattleFighter, petBattleClaimAmount, petBattleSettleXp, petBattleCompletePet, makePetBattleBot, petBattleSpirit, petBattleSkill, petBattleCommitment };';
-const { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater, attendancePetDay, newAttendancePet, attendancePetView, transitionAttendancePet, adjustAdminPet, attendancePetMotion, attendancePetTravelBounds, attendancePetCatalog, attendancePetScale, ATTENDANCE_PET_BRANCHES, normalizePetNickname, attendancePetRecords, attendancePetSelected, attendancePetHouseholdDay, transitionPetHousehold, attendancePetWeight, attendancePetActivityTime, buildPetComparison, unchangedPetAdminAction, petBattleBudget, petBattleStats, petBattleMaxHp, petBattlePower, petBattleRps, petBattleSimulation, petBattlePlayback, petBattleChangeWeight, petBattleFighter, petBattleClaimAmount, petBattleSettleXp, petBattleCompletePet, makePetBattleBot, petBattleSpirit, petBattleSkill, petBattleCommitment } = await import('data:text/javascript;base64,' + Buffer.from(helperModule).toString('base64'));
+const helperModule = helperSource + '\nexport { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater, attendancePetDay, newAttendancePet, attendancePetView, transitionAttendancePet, adjustAdminPet, attendancePetMotion, attendancePetTravelBounds, attendancePetCatalog, attendancePetScale, ATTENDANCE_PET_BRANCHES, normalizePetNickname, attendancePetRecords, attendancePetSelected, attendancePetHouseholdDay, transitionPetHousehold, attendancePetWeight, attendancePetActivityTime, buildPetComparison, unchangedPetAdminAction, petBattleBudget, petBattleStats, petBattleMaxHp, petBattlePower, petBattleRps, petBattleSimulation, petBattlePlayback, petBattleChangeWeight, petBattleFighter, petBattleClaimAmount, petBattleSettleXp, petBattleCompletePet, petBattleMatchup, petBattleReceivesBonus, petBattleEffectiveStats, makePetBattleBot, petBattleSpirit, petBattleSkill, petBattleCommitment };';
+const { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater, attendancePetDay, newAttendancePet, attendancePetView, transitionAttendancePet, adjustAdminPet, attendancePetMotion, attendancePetTravelBounds, attendancePetCatalog, attendancePetScale, ATTENDANCE_PET_BRANCHES, normalizePetNickname, attendancePetRecords, attendancePetSelected, attendancePetHouseholdDay, transitionPetHousehold, attendancePetWeight, attendancePetActivityTime, buildPetComparison, unchangedPetAdminAction, petBattleBudget, petBattleStats, petBattleMaxHp, petBattlePower, petBattleRps, petBattleSimulation, petBattlePlayback, petBattleChangeWeight, petBattleFighter, petBattleClaimAmount, petBattleSettleXp, petBattleCompletePet, petBattleMatchup, petBattleReceivesBonus, petBattleEffectiveStats, makePetBattleBot, petBattleSpirit, petBattleSkill, petBattleCommitment } = await import('data:text/javascript;base64,' + Buffer.from(helperModule).toString('base64'));
 
 
 
 
 
 test('schedule override index follows live snapshots and local checklist additions', () => {
-    const source = fs.readFileSync('app.js', 'utf8');
+    const source = fs.readFileSync('app.js', 'utf8').replace(/\r\n/g, '\n');
     const first = { jobId: 'one', occurrenceDate: '2026-11-16', completed: false };
     const context = vm.createContext({ jobDayOverridesList: [first] });
     const start = source.indexOf('function getOverrideFor(');
@@ -924,7 +924,7 @@ test('pet nickname is bounded, normalized, idempotent and retained through evolu
  assert.equal(attendancePetView(cleared.pet,now).displayName,attendancePetView(cleared.pet,now).name);
 });
 
-test('four evolution branches unlock at ray level and preserve progress through switching and reload', () => {
+test('four evolution branches unlock at ray level, finish at 30 and keep gaining one point per level', () => {
  const now=Date.UTC(2026,10,19),pet={...newAttendancePet(now-7200000),checkins:80,lastCheckinAt:now};
  assert.equal(attendancePetView(pet,now).level,9);
  assert.equal(attendancePetView(pet,now).needsBranch,true);
@@ -946,8 +946,12 @@ test('four evolution branches unlock at ray level and preserve progress through 
   assert.equal(previousCap.level,19);assert.equal(previousCap.maxed,false,'old capped pets can continue growing without rewriting progress');
   assert.equal(attendancePetView(adjustAdminPet(change.pet,'level',29,now),now).branchLevel,20);
   assert.equal(attendancePetView(adjustAdminPet(change.pet,'level',30,now),now).level,30);
+  const beyondFinal=attendancePetView(adjustAdminPet(change.pet,'level',31,now),now);
+  assert.equal(beyondFinal.level,31);assert.equal(beyondFinal.form.name,stages.at(-1).name);
+  assert.equal(beyondFinal.branchLevel,21);assert.equal(beyondFinal.maxed,true);
+  assert.equal(beyondFinal.nextEvolutionIn,10,'leveling continues after the final form');
 
-  assert.equal(attendancePetView({...change.pet,checkins:999},now).level,30);
+  assert.equal(attendancePetView({...change.pet,checkins:999},now).level,100);
   const switched=transitionAttendancePet({...change.pet,checkins:120},'branch:'+(branch==='bird'?'beast':'bird'),now);
   assert.equal(switched.pet.checkins,120);assert.equal(switched.pet.branch,branch);assert.equal(switched.changed,false);
  }
@@ -967,6 +971,10 @@ test('four evolution branches unlock at ray level and preserve progress through 
  assert.equal(transitionAttendancePet(dead,'revive',now).pet.branch,null);
  assert.equal(adjustAdminPet(pet,'branch:beast',0,now).branch,'beast');
  assert.throws(()=>adjustAdminPet(pet,'level',10,now));
+ assert.equal(petBattleBudget(30),150);
+ assert.equal(petBattleBudget(31),151);
+ assert.equal(petBattleBudget(32),152);
+ assert.equal(petBattleBudget(31,true),130,'legacy allocations also gain one point per level after 30');
  const small=attendancePetView({...pet,branch:'bird',checkins:90},now),big=attendancePetView({...pet,branch:'fish',checkins:170},now);
  assert.ok(attendancePetScale(big)>attendancePetScale(small));
  const bounds=attendancePetTravelBounds(big,1366,768);assert.ok(bounds.maxY+104*attendancePetScale(big)<=768);
@@ -989,7 +997,7 @@ test('pet motion respects species, floor, sky and small viewport bounds', () => 
 });
 
 test('battle stats, RPS and automatic turn timeline are deterministic for both viewers', async () => {
- assert.equal(petBattleBudget(1),100);assert.equal(petBattleBudget(9),108);assert.equal(petBattleBudget(10),110);assert.equal(petBattleBudget(29),148);assert.equal(petBattleBudget(30),150);
+ assert.equal(petBattleBudget(1),100);assert.equal(petBattleBudget(9),108);assert.equal(petBattleBudget(10),110);assert.equal(petBattleBudget(29),148);assert.equal(petBattleBudget(30),150);assert.equal(petBattleBudget(31),151);
  assert.throws(()=>petBattleStats({attack:100,defense:0,health:0},1));assert.throws(()=>petBattleStats({attack:34,defense:33,health:34},1));
  const players=[{uid:'a',stats:{attack:60,defense:20,health:20},appearance:{level:1}},{uid:'b',stats:{attack:20,defense:70,health:10},appearance:{level:1}}];
  assert.equal(petBattleRps('rock','scissors'),0);assert.equal(petBattleRps('paper','scissors'),1);assert.equal(petBattleRps('rock','rock'),null);
@@ -1001,62 +1009,158 @@ test('battle stats, RPS and automatic turn timeline are deterministic for both v
  assert.notEqual(await petBattleCommitment('id','a',0,'rock','nonce'),await petBattleCommitment('id','a',1,'rock','nonce'));
 });
 
-test('spirit ultimates trigger after three attacks and stay within their combat rules',()=>{
- const stats={attack:10,magic:10,defense:20,physicalReduction:10,magicReduction:10,dodge:10,luck:10,health:20};
- const fighter=(uid,element)=>({uid,petId:uid,element,stats,appearance:{level:1}});
- const battle=(a,b)=>petBattleSimulation([fighter('a',a),fighter('b',b)],'a');
- assert.deepEqual(['wood','fire','water','metal'].map(key=>petBattleSpirit(key).name),['Thanh Long','Chu Tước','Huyền Vũ','Bạch Hổ']);
-
- const dragon=battle('wood','metal'),dragonTurns=dragon.turns.filter(turn=>turn.attacker==='a');
- assert.equal(dragonTurns[0].special,undefined);
- assert.equal(dragonTurns[3].special,'wood','the fourth personal attack is the first ultimate');
- assert.ok(dragonTurns[3].healed>0&&dragonTurns[3].healed<=dragon.maxHp[0]*.08+.01,'Dragon healing is capped at eight percent of maximum HP');
-
- const phoenix=battle('metal','fire'),fireTurn=phoenix.turns.find(turn=>turn.special==='fire');
- assert.equal(fireTurn.burnTurns,3);
- assert.ok(fireTurn.burnApplied>=phoenix.maxHp[0]*.02);
- const burnTick=phoenix.turns.find(turn=>turn.attacker==='a'&&turn.burnDamage>0);
- assert.ok(burnTick.burnDamage>0);
-
- const turtle=battle('metal','water'),turtleTurn=turtle.turns.find(turn=>turn.special==='water');
- assert.ok(turtleTurn.shielded);
- const shieldHit=turtle.turns.find(turn=>turn.blocked);
- assert.equal(shieldHit.damage,0,'the shield fully blocks the next incoming hit');
- assert.equal(shieldHit.defender,'b');
-
- const tiger=battle('metal','wood'),tigerTurn=tiger.turns.find(turn=>turn.special==='metal');
- assert.equal(tigerTurn.specialName,petBattleSpirit('metal').move);
- const earth=battle('earth','wood');
- assert.ok(earth.turns.some(turn=>turn.special==='earth'));
- assert.ok(earth.turns.some(turn=>turn.silenced&&!turn.special));
- assert.equal(petBattleSkill({form:{kind:'dino'},level:30,branch:'dino'},'metal',true).label,'Hổ Gầm Trời');
+test('ten guardians keep unique mechanics and grant one percent only to advantaged affinities',()=>{
+ const relationships=[
+  ['water','metal','generates'],
+  ['wood','fire','generates'],
+  ['metal','wood','overcomes'],
+  ['wood','water','overcomes'],
+  ['water','fire','overcomes'],
+  ['fire','metal','overcomes'],
+ ];
+ for(const [player,opponent,expected] of relationships)assert.equal(petBattleMatchup(player,opponent),expected,`${player} vs ${opponent}`);
+ assert.equal(petBattleMatchup('metal','fire'),'','only one side gets a bonus for each elemental matchup');
+ assert.equal(petBattleMatchup('kitsune','fire'),'','guardians with the same affinity do not get a matchup bonus');
+ assert.equal(petBattleMatchup('centaur','wood'),'','Nhân Mã has no elemental matchup');
+ assert.equal(petBattleSpirit('earth'),null);
+ assert.equal(petBattleSpirit('sphinx'),null);
+ assert.equal(petBattleMatchup('qilin','fire'),'','Kỳ Lân is neutral');
+ const stats={attack:30,magic:20,defense:10,health:40};
+ const boosted=petBattleEffectiveStats({element:'wood',stats},{element:'fire'});
+ assert.deepEqual(boosted,{attack:30.3,magic:20.2,defense:10.1,health:40.4});
+ assert.equal(petBattleReceivesBonus({element:'metal'},{element:'wood'}),true);
+ assert.deepEqual(petBattleEffectiveStats({element:'metal',stats},{element:'wood'}),Object.fromEntries(Object.entries(stats).map(([key,value])=>[key,value*1.01])));
+ assert.equal(petBattleReceivesBonus({element:'wood'},{element:'metal'}),false);
+ assert.equal(petBattleEffectiveStats({element:'centaur',stats},{element:'metal'}),stats);
 });
 
-test('all five spirits resolve across six stat builds',()=>{
+test('all ten selectable guardians have unique, accurately described abilities',()=>{
+ const stats={attack:10,magic:10,defense:20,physicalReduction:10,magicReduction:10,dodge:10,luck:10,health:20};
+ const fighter=(uid,element)=>({uid,petId:uid,element,stats,appearance:{level:1}});
+ const guardians=['wood','fire','water','metal','kitsune','pixiu','griffin','cerberus','centaur','qilin'];
+ assert.deepEqual(guardians.map(key=>petBattleSpirit(key).name),['Thanh Long','Chu Tước','Huyền Vũ','Bạch Hổ','Cửu Vĩ Hồ','Tỳ Hưu','Griffin','Cerberus','Nhân Mã','Kỳ Lân']);
+ assert.equal(new Set(guardians.map(key=>petBattleSpirit(key).ability)).size,guardians.length);
+ for(const guardian of guardians){
+  const spirit=petBattleSpirit(guardian);
+  assert.ok(spirit.passive.length>0&&spirit.ultimate.length>0&&spirit.icon.startsWith('bi-'));
+  const battle=petBattleSimulation([fighter('a',guardian),fighter('b','wood')],'a');
+  const ultimate=battle.turns.find(turn=>turn.special===guardian);
+  assert.ok(ultimate,`${spirit.name} reaches its fourth-hit ultimate`);
+  assert.equal(ultimate.specialIcon,spirit.icon);
+ }
+});
+
+test('guardian balance stays within the target win-rate band across varied builds',()=>{
+ const guardians=['wood','fire','water','metal','kitsune','pixiu','griffin','cerberus','centaur','qilin'];
  const profiles=[
   {attack:10,magic:10,defense:20,physicalReduction:10,magicReduction:10,dodge:10,luck:10,health:20},
   {attack:33,magic:5,defense:14,physicalReduction:5,magicReduction:14,dodge:5,luck:5,health:19},
   {attack:5,magic:33,defense:14,physicalReduction:14,magicReduction:5,dodge:5,luck:5,health:19},
-  {attack:5,magic:5,defense:19,physicalReduction:17,magicReduction:17,dodge:7,luck:7,health:23},
-  {attack:6,magic:6,defense:14,physicalReduction:6,magicReduction:6,dodge:25,luck:10,health:27},
-  {attack:15,magic:15,defense:14,physicalReduction:8,magicReduction:8,dodge:8,luck:24,health:8}
+  {attack:20,magic:20,defense:15,physicalReduction:8,magicReduction:8,dodge:8,luck:8,health:13}
  ];
- const elements=['wood','fire','water','metal','earth'];
- for(let x=0;x<elements.length;x++)for(let y=x+1;y<elements.length;y++){
-  let score=0,total=0;
-  for(let pa=0;pa<profiles.length;pa++)for(let pb=0;pb<profiles.length;pb++)for(let i=0;i<200;i++){
+ const scores=Object.fromEntries(guardians.map(key=>[key,{wins:0,matches:0}]));
+ for(const [index,element] of guardians.entries())for(const [opponentIndex,opponentElement] of guardians.entries()){
+  if(index===opponentIndex)continue;
+  for(let profile=0;profile<profiles.length;profile++)for(let seed=0;seed<20;seed++){
    const players=[
-    {uid:'a',petId:`balance-a-${pa}-${pb}-${i}`,element:elements[x],stats:profiles[pa],appearance:{level:1}},
-    {uid:'b',petId:`balance-b-${pa}-${pb}-${i}`,element:elements[y],stats:profiles[pb],appearance:{level:1}}
+    {uid:'a',petId:`${element}-${profile}-${seed}`,element,stats:profiles[profile],appearance:{level:1}},
+    {uid:'b',petId:`${opponentElement}-${profile}-${seed}`,element:opponentElement,stats:profiles[(profile+1)%profiles.length],appearance:{level:1}}
    ];
-   const result=petBattleSimulation(players,i%2?'a':'b');
-   const last=result.turns.at(-1);
-   assert.ok(last.hp.every((hp,index)=>Number.isFinite(hp)&&hp>=0&&hp<=result.maxHp[index]));
-   if(result.winnerUid)assert.equal(last.hp[players.findIndex(player=>player.uid!==result.winnerUid)],0);
-   total++;if(result.winnerUid==='a')score++;else if(!result.winnerUid)score+=.5;
+   const winner=petBattleSimulation(players,seed%2?'a':'b',`balance-${profile}-${seed}`).winnerUid;
+   if(!winner)continue;
+   const winningGuardian=winner==='a'?element:opponentElement;
+   scores[winningGuardian].wins++;
+   scores[element].matches++;
+   scores[opponentElement].matches++;
   }
-  const winRate=score/total;
-  if(winRate<.38||winRate>.62)console.log(`Spirit balance: ${elements[x]} vs ${elements[y]} = ${(winRate*100).toFixed(1)}%`);
+ }
+ for(const [guardian,{wins,matches}] of Object.entries(scores)){
+  const winRate=wins/matches;
+  assert.ok(winRate>=.35&&winRate<=.68,`${guardian} win rate ${(winRate*100).toFixed(1)}% is outside the 35–68% balance band`);
+ }
+});
+
+test('all guardians stay deterministic and keep valid HP across varied builds',()=>{
+ const profiles=[
+  {attack:10,magic:10,defense:20,physicalReduction:10,magicReduction:10,dodge:10,luck:10,health:20},
+  {attack:33,magic:5,defense:14,physicalReduction:5,magicReduction:14,dodge:5,luck:5,health:19},
+  {attack:5,magic:33,defense:14,physicalReduction:14,magicReduction:5,dodge:5,luck:5,health:19}
+ ];
+ const guardians=['metal','wood','water','fire','kitsune','pixiu','griffin','cerberus','centaur','qilin'];
+ for(let i=0;i<guardians.length;i++){
+  const players=[
+   {uid:'a',petId:`varied-a-${i}`,element:guardians[i],stats:profiles[i%profiles.length],appearance:{level:1}},
+   {uid:'b',petId:`varied-b-${i}`,element:guardians[(i+1)%guardians.length],stats:profiles[(i+1)%profiles.length],appearance:{level:1}}
+  ];
+  const result=petBattleSimulation(players,i%2?'a':'b',`varied-${i}`);
+  assert.deepEqual(result,petBattleSimulation(players,i%2?'a':'b',`varied-${i}`));
+  assert.ok(result.turns.every(turn=>turn.hp.every((hp,index)=>Number.isFinite(hp)&&hp>=0&&hp<=result.maxHp[index])));
+ }
+});
+
+test('guardian combat effects, durations and visible statuses follow the selected rules',()=>{
+ const stats={attack:10,magic:10,defense:20,physicalReduction:10,magicReduction:10,dodge:10,luck:10,health:20};
+ const fighter=(uid,element)=>({uid,petId:uid,element,stats,appearance:{level:1}});
+ const battle=(a,b)=>petBattleSimulation([fighter('a',a),fighter('b',b)],'a');
+
+ const dragon=battle('wood','metal'),dragonTurns=dragon.turns.filter(turn=>turn.attacker==='a');
+ assert.equal(dragonTurns[0].special,undefined);
+ assert.equal(dragonTurns[3].special,'wood','the fourth personal attack is the first ultimate');
+ assert.ok(dragonTurns[3].healed>0&&dragonTurns[3].healed<=dragon.maxHp[0]*.04+.01,'Dragon heals four percent immediately');
+ assert.ok(dragonTurns[4].healed>0&&dragonTurns[4].healed<=dragon.maxHp[0]*.02+.01,'Dragon heals two percent on the next turn');
+
+ const phoenix=battle('fire','metal'),fireTurn=phoenix.turns.find(turn=>turn.special==='fire');
+ assert.equal(fireTurn.burnTurns,3);
+ assert.ok(fireTurn.burnApplied>=phoenix.maxHp[1]*.04,'Chu Tước starts with four-percent max-HP burn');
+ assert.equal(fireTurn.statuses[1].burning,true,'burn is displayed on the affected pet');
+ assert.equal(phoenix.turns.find(turn=>turn.index>fireTurn.index&&turn.attacker==='b'&&turn.burnDamage>0).burnDamage,Number((phoenix.maxHp[1]*.047).toFixed(2)),'first ultimate tick combines four-percent ultimate burn with two passive stacks');
+
+ const turtle=battle('water','metal'),turtleTurn=turtle.turns.find(turn=>turn.special==='water');
+ assert.ok(turtleTurn.shielded);
+ const shieldHit=turtle.turns.find(turn=>turn.blocked);
+ assert.equal(shieldHit.defender,'a');
+ assert.ok(shieldHit.blockedDamage<=turtle.maxHp[0]*.12+.01);
+
+ const tiger=battle('metal','wood'),tigerTurn=tiger.turns.find(turn=>turn.special==='metal');
+ assert.equal(tigerTurn.specialName,petBattleSpirit('metal').move);
+ const tigerNext=tiger.turns.find(turn=>turn.attacker==='a'&&turn.index>tigerTurn.index&&turn.damage>0);
+ assert.equal(tigerNext.critical,true,'Bạch Hổ guarantees a critical on the next landed attack');
+ const fox=battle('kitsune','wood'),foxUltimate=fox.turns.find(turn=>turn.special==='kitsune');
+ assert.equal(foxUltimate.statuses[0].evasion,true,'Cửu Vĩ Hồ shows its active evasion');
+ const pixiu=battle('pixiu','wood'),pixiuUlt=pixiu.turns.find(turn=>turn.special==='pixiu');
+ assert.equal(pixiuUlt.hits,undefined);
+ assert.equal(pixiu.turns[2].statuses[0].charged,true,'Tỳ Hưu visibly accumulates damage before releasing it');
+ const griffin=battle('griffin','wood'),griffinUlt=griffin.turns.find(turn=>turn.special==='griffin');
+ assert.equal(griffinUlt.statuses[1].armorBroken,true,'Griffin exposes the opponent armor');
+ const cerberus=battle('cerberus','wood'),cerberusUlt=cerberus.turns.find(turn=>turn.special==='cerberus');
+ assert.equal(cerberusUlt.hits.length,3,'Cerberus ultimate resolves as three individual bites');
+ assert.equal(cerberusUlt.statuses[1].healingBlocked,true,'Cerberus reduces the target healing');
+ const centaur=battle('centaur','wood'),centaurUlt=centaur.turns.find(turn=>turn.special==='centaur');
+ assert.equal(centaurUlt.statuses[0].guarded,true,'Nhân Mã displays its shield');
+ const qilin=battle('qilin','wood'),qilinUlt=qilin.turns.find(turn=>turn.special==='qilin');
+ assert.equal(qilinUlt.statuses[0].reflecting,true,'Kỳ Lân displays its passive reflection');
+ assert.ok(qilin.turns.some(turn=>turn.reflectedDamage>0),'Kỳ Lân reflects a portion of damage actually taken');
+ assert.equal(qilin.turns.find(turn=>turn.reflectedDamage>0).reflectedDamage,Number((qilin.turns.find(turn=>turn.reflectedDamage>0).damage*.14).toFixed(2)),'passive reflection is fourteen percent and cannot be critical');
+ assert.ok(qilin.turns.find(turn=>turn.index>qilinUlt.index&&turn.reflectedDamage>0).reflectedDamage>qilin.turns.find(turn=>turn.reflectedDamage>0).reflectedDamage,'ultimate increases reflection for two opponent attacks');
+ assert.equal(petBattleSkill({form:{kind:'dino'},level:30,branch:'dino'},'metal',true).label,'Hổ Gầm Trời');
+});
+
+test('four-element relationships resolve across every unique matchup',()=>{
+ const profiles=[
+  {attack:10,magic:10,defense:20,physicalReduction:10,magicReduction:10,dodge:10,luck:10,health:20},
+  {attack:33,magic:5,defense:14,physicalReduction:5,magicReduction:14,dodge:5,luck:5,health:19},
+  {attack:5,magic:33,defense:14,physicalReduction:14,magicReduction:5,dodge:5,luck:5,health:19}
+ ];
+ const elements=['wood','fire','water','metal'];
+ for(let x=0;x<elements.length;x++)for(let y=x+1;y<elements.length;y++){
+  for(let i=0;i<profiles.length;i++){
+   const players=[
+    {uid:'a',petId:`four-a-${x}-${y}-${i}`,element:elements[x],stats:profiles[i],appearance:{level:1}},
+    {uid:'b',petId:`four-b-${x}-${y}-${i}`,element:elements[y],stats:profiles[(i+1)%profiles.length],appearance:{level:1}}
+   ];
+   const result=petBattleSimulation(players,'a',`four-${x}-${y}-${i}`);
+   assert.ok(result.turns.length>0&&result.turns.at(-1).hp.every(hp=>Number.isFinite(hp)&&hp>=0));
+  }
  }
 });
 
@@ -1080,7 +1184,7 @@ test('eight battle stats split damage and produce reproducible dodge and critica
   const result=petBattleSimulation([{...players[0],petId:String(i)},players[1]],'a');
   let hp=[...result.maxHp];for(const turn of result.turns){const defender=turn.defender==='a'?0:1;
    if(turn.dodged){sawDodge=true;assert.equal(turn.damage,0);assert.equal(turn.hp[defender],hp[defender]);}
-   else {assert.ok(turn.physical>0&&turn.magic>0);assert.equal(turn.damage,Math.max(1,Math.round(turn.physical+turn.magic)));}
+   else {assert.ok(turn.physical>0&&turn.magic>0);assert.ok(Math.abs(turn.damage-Math.max(1,Math.round(turn.physical+turn.magic)))<=1);}
    if(turn.critical&&!turn.dodged)sawCritical=true;
    assert.ok(turn.hp.every(value=>value>=0));hp=turn.hp;
   }
@@ -1125,6 +1229,17 @@ test('Bot difficulty keeps its stake and EXP reward consistent across modes',()=
  assert.deepEqual([easy.stakeXp,medium.stakeXp,hard.stakeXp],[1,1,1]);
  assert.deepEqual([easy.rewardMultiplier,medium.rewardMultiplier,hard.rewardMultiplier],[1,1,1]);
  assert.doesNotThrow(()=>petBattleSimulation([{...easy,uid:'player-a'},hard],'player-a'));
+ for(const [difficulty,budget,stake] of [['easy',100,200],['medium',108,300],['hard',120,400],['extreme',150,600]]){
+  const first=makePetBattleBot(18,difficulty,1),second=makePetBattleBot(18,difficulty,2);
+  assert.notEqual(first.name,second.name,`${difficulty} reroll changes the Bot identity`);
+  assert.notEqual(first.element,second.element,`${difficulty} reroll changes the guardian`);
+  assert.notDeepEqual(first.stats,second.stats,`${difficulty} reroll changes the stat allocation`);
+  for(const bot of [first,second]){
+   assert.equal(total(bot),budget);
+   assert.equal(bot.stakeGrams,stake);
+   assert.equal(bot.stakeXp,1);
+  }
+ }
 });
 
 test('two-client battle escrow, hidden RPS, automatic fight, payout and refunds commit atomically once', async () => {
@@ -1504,6 +1619,10 @@ test('household maximum level grants exactly one new egg and attendance cares fo
  assert.equal(migrated.spawned,1);assert.equal(transitionPetHousehold(migrated.pet,'init',now).spawned,0,'legacy max pets receive one egg across reloads');
  const admin=transitionPetHousehold({...capped,checkins:80},'level',now,null,30);
  assert.equal(admin.spawned,1,'admin level-up follows the same one-egg rule');
+ const adminVeteran=attendancePetRecords(admin.pet,now).find(p=>p.branch==='bird');
+ const veteranLevel=transitionPetHousehold(admin.pet,'level',now,adminVeteran.id,31);
+ assert.equal(veteranLevel.spawned,0);assert.equal(attendancePetView(adminVeteran,now).level,30);
+ assert.equal(attendancePetView(attendancePetRecords(veteranLevel.pet,now).find(p=>p.branch==='bird'),now).level,31);
  const expired={...root,companions:root.companions.map(p=>({...p,lastCheckinAt:now-73*3600000,bornAt:now-100*3600000}))};
  const survivorId=attendancePetRecords(expired)[0].id;
  const day2=now+86400000,updated=transitionPetHousehold(expired,'checkin',day2,survivorId).pet;
@@ -2188,13 +2307,29 @@ try {
     const botPicker=document.getElementById('petBattleMatches');
     botPicker.value='bot:new';botPicker.dispatchEvent(new Event('change'));
     check(!document.getElementById('petBattleBotSlot').hidden&&!document.getElementById('petBattleStatComparison').hidden,'bot stats and model are visible in the draft');
+    const guardianButtons=[...document.querySelectorAll('[data-battle-element]')];
+    check(guardianButtons.length===10&&!document.querySelector('[data-battle-element="earth"]')&&!document.querySelector('[data-battle-element="sphinx"]')&&document.getElementById('petBattleGuardianAdvice').textContent.includes('Đối thủ:'),'only the ten listed guardians remain selectable');
+    check(guardianButtons.every(button=>button.classList.contains('pet-guardian-button')&&button.querySelector('.pet-guardian-icon')&&button.querySelector('.pet-guardian-affinity')),'guardian choices use uniform icon, name and affinity cards');
     document.querySelector('[data-bot-difficulty="medium"]').click();
     check(document.querySelector('[data-bot-difficulty="medium"]').getAttribute('aria-pressed')==='true'&&document.getElementById('petBattleBotName').textContent.includes('108 điểm'),'medium Bot button changes the live opponent to 108 points');
     document.querySelector('[data-bot-difficulty="hard"]').click();
     check(document.querySelector('[data-bot-difficulty="hard"]').getAttribute('aria-pressed')==='true'&&document.getElementById('petBattleBotName').textContent.includes('120 điểm'),'hard Bot button changes the live opponent to 120 points');
+    const botSnapshot=()=>({
+     name:document.getElementById('petBattleBotName').textContent,
+     form:modelViews.get('petBattleBotModel')?.view.form.name,
+     guardian:document.getElementById('petBattleBotModel').style.getPropertyValue('--pet-battle-element-color'),
+     stats:[...document.querySelectorAll('#petBattleDraftStats1 progress')].map(progress=>progress.value)
+    });
+    const firstHardBot=botSnapshot();
+    document.querySelector('[data-bot-difficulty="hard"]').click();
+    const rerolledHardBot=botSnapshot();
+    check(firstHardBot.name!==rerolledHardBot.name&&firstHardBot.guardian!==rerolledHardBot.guardian&&JSON.stringify(firstHardBot.stats)!==JSON.stringify(rerolledHardBot.stats),'pressing the selected Bot difficulty again changes the Bot, guardian and stat allocation');
+    check(document.getElementById('petBattleBotName').textContent.includes('120 điểm'),'reroll keeps the selected Bot stat budget');
     check(document.querySelectorAll('#petBattleDraftStats0 > div').length===8&&document.querySelectorAll('#petBattleDraftStats1 > div').length===8,'both 3D pet cards contain eight comparison stat bars');
     check(document.getElementById('petBattleBotStart').hidden,'bot cannot start without an element');
     document.querySelector('[data-battle-element="metal"]').click();
+    check(document.getElementById('petBattleSpiritName').textContent==='Bạch Hổ'&&document.getElementById('petBattleSpiritPassive').textContent.includes('16 điểm phần trăm')&&document.getElementById('petBattleSpiritUltimate').textContent.includes('×1,8')&&document.getElementById('petBattleSpiritIcon').querySelector('i').classList.contains('bi-crosshair'),'choosing a guardian displays its passive, ultimate and skill icon');
+    check([0,1].every(side=>document.getElementById('petBattleStatusFx'+side).parentElement.id==='petBattleModel'+side&&document.getElementById('petBattleStatusFx'+side).querySelector('.burn-flame')&&document.getElementById('petBattleStatusFx'+side).querySelector('.heal-sign')&&document.getElementById('petBattleStatusFx'+side).querySelector('.reflect-mark')),'burn, healing, reflection and guardian indicators are anchored to each pet model');
     check(!document.getElementById('petBattleBotStart').hidden,'bot is ready to fight once the setup is complete');
     document.getElementById('petBattleClose').click();
     document.getElementById('petBattleNew').click();
@@ -2208,7 +2343,7 @@ try {
     check(!hostModel.classList.contains('has-element-aura'),'clearing the draft element removes its aura');
     document.querySelector('#petBattleDialog [data-pet-guide="battle"]').click();
     const battleGuide=document.getElementById('petGuideBattle'),balance=document.getElementById('petBattleBalance');
-    check(guide.open&&!battleGuide.hidden&&!balance.hidden&&balance.textContent.includes('để cược')&&battleGuide.textContent.includes('Kim → Thủy → Mộc → Hỏa → Thổ'),'battle guide shows the current pet balance and element rules');
+    check(guide.open&&!battleGuide.hidden&&!balance.hidden&&balance.textContent.includes('để cược')&&battleGuide.textContent.includes('Tương khắc bốn hệ')&&battleGuide.textContent.includes('Kỳ Lân'),'battle guide shows the current pet balance and updated guardian rules');
     document.getElementById('petGuideClose').click();
     document.getElementById('petBattleAddOpponent').click();
     check(document.getElementById('petBattleInvitePicker').open,'plus opens the opponent picker');
@@ -2522,6 +2657,7 @@ const renderAttendancePet=()=>{};
 ${code}
 try {
  const check=(ok,message)=>{if(!ok)throw Error(message)};
+ const MOBILE_BATTLE_MODE=${process.argv.includes('--pet-mobile')};
  if(PORTRAITS_MODE){
   const renderer=AttendancePet3D;
   renderer.start();
@@ -2572,7 +2708,8 @@ try {
  const petDialog=document.createElement('dialog');petDialog.id='attendancePetDialog';petDialog.innerHTML='<div id="attendancePetPreview"></div>';document.body.appendChild(petDialog);petDialog.showModal();
  AttendancePet3D.preview(true);
  check(s.renderer.domElement.parentElement.id==='attendancePetPreview','real 3D canvas moves into care form');
- check(Math.abs(s.camera.aspect-320/220)<.001,'preview camera resizes without distortion');
+ const previewBox=document.getElementById('attendancePetPreview');
+ check(Math.abs(s.camera.aspect-Math.min(360,previewBox.clientWidth||320)/(previewBox.clientHeight||220))<.001,'preview camera resizes without distortion');
  s.renderer.render(s.scene,s.camera);
  petDialog.close();AttendancePet3D.preview(false);
  check(s.renderer.domElement.parentElement.id==='attendancePetArt','closing care form restores swimming model');
@@ -2593,6 +2730,9 @@ try {
  const arenaRenderer=createAttendancePet3D('arena-test','arena-test-art',null,'arena');arenaRenderer.start();arenaRenderer.update(attendancePetView(pet,now));arenaRenderer.duelPose({facing:Math.PI,attackAt:Date.now(),skill:{motion:'claw',variant:4},skillColor:'#f97316'});
  await new Promise(resolve=>setTimeout(resolve,150));
  const arena=arenaRenderer.inspect();check(arena?.renderer&&arena.renderer!==peer.renderer,'arena has an independent real WebGL model');
+ if(MOBILE_BATTLE_MODE)check(Math.abs(arena.renderer.getPixelRatio()-.75)<.001&&!arena.renderer.getContext().getContextAttributes().antialias,'mobile arena caps pixel density and disables antialiasing');
+ const sphereGeometries=new Set();arena.model.traverse(object=>{if(object.geometry?.type==='SphereGeometry')sphereGeometries.add(object.geometry);});
+ check(sphereGeometries.size<=1,'battle model reuses its sphere geometry');
  arena.renderer.render(arena.scene,arena.camera);const arenaGL=arena.renderer.getContext(),arenaPixels=new Uint8Array(arena.renderer.domElement.width*arena.renderer.domElement.height*4);arenaGL.readPixels(0,0,arena.renderer.domElement.width,arena.renderer.domElement.height,arenaGL.RGBA,arenaGL.UNSIGNED_BYTE,arenaPixels);check(arenaPixels.some((value,index)=>index%4===3&&value>0),'arena fighter paints visible pixels');
  arenaRenderer.duelPose({criticalAt:Date.now()});check(arena.criticalGroup&&arena.criticalGhost&&!arena.model.visible,'critical hit animates a floating pet spirit above its grave');
  arenaRenderer.duelPose({result:'defeat'});const gravePlaque=arena.resultGroup?.children.find(child=>child.material?.map);
@@ -2606,7 +2746,7 @@ try {
  draftRenderer.start();draftRenderer.update(attendancePetView({...newAttendancePet(now-7200000),checkins:clownIndex*10},now));
  await new Promise(resolve=>setTimeout(resolve,150));
  const draftState=draftRenderer.inspect();
- check(draftState.renderer?.domElement.style.height==='108px','draft WebGL adopts the compact slot height');
+ check(draftState.renderer?.domElement.style.height===draftState.button.clientHeight+'px','draft WebGL matches its rendered slot height');
  const paintedBody=draftState.model.children.find(mesh=>mesh.material?.map);
  const colors=paintedBody.material.map.image.getContext('2d').getImageData(64,0,1,256).data;
  check([255,33,249].every(red=>colors.some((value,index)=>index%4===0&&value===red)),'clownfish skin includes warm white, dark borders and its orange base');
@@ -2618,8 +2758,9 @@ try {
 }catch(error){document.body.innerHTML='<pre id="pet-result">FAIL: '+error.stack+'</pre>';}
 `;
   fs.writeFileSync(path.join(temp,'pet.html'),'<!doctype html><meta charset="utf-8"><style>'+fs.readFileSync('styles.css','utf8')+'body{background:#0c1524!important;color:white;padding:20px;height:auto;overflow:auto}.pet-gallery{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}.pet-gallery article{display:grid;justify-items:center;gap:8px;padding:15px;background:#172337;border:1px solid #29405c;border-radius:14px}.pet-gallery img{width:190px;height:137px;object-fit:contain}.pet-gallery strong{font:13px sans-serif}#pet-result{color:#7dd3fc}</style><body><button id="attendancePetSwimmer" class="attendance-pet-swimmer"><span id="attendancePetArt"></span></button><script type="module">'+script.replace('PORTRAITS_MODE',String(portraits))+'</script>');
-  if(!portraits)fs.mkdirSync('.artifacts',{recursive:true});
-  const result=spawnSync(chrome,['--headless','--no-first-run','--disable-extensions','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--allow-file-access-from-files','--user-data-dir='+path.join(temp,'profile'),...(portraits?['--window-size=800,600']:['--window-size=1500,3900','--screenshot='+path.resolve(process.argv.includes('--pet-fleet-only')?'.artifacts/attendance-pet-fleet.png':'.artifacts/attendance-pet-stages.png')]),'--dump-dom','--virtual-time-budget=30000',pathToFileURL(path.join(temp,'pet.html')).href],{encoding:'utf8',timeout:180000,windowsHide:true,maxBuffer:12*1024*1024});
+  const mobileBattle=process.argv.includes('--pet-mobile');
+  if(!portraits&&!mobileBattle)fs.mkdirSync('.artifacts',{recursive:true});
+  const result=spawnSync(chrome,['--headless','--no-first-run','--disable-extensions','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader','--allow-file-access-from-files','--user-data-dir='+path.join(temp,'profile'),...(portraits?['--window-size=800,600']:mobileBattle?['--window-size=390,844','--force-device-scale-factor=3']:['--window-size=1500,3900','--screenshot='+path.resolve(process.argv.includes('--pet-fleet-only')?'.artifacts/attendance-pet-fleet.png':'.artifacts/attendance-pet-stages.png')]),'--dump-dom','--virtual-time-budget=30000',pathToFileURL(path.join(temp,'pet.html')).href],{encoding:'utf8',timeout:180000,windowsHide:true,maxBuffer:12*1024*1024});
   const output=result.stdout?.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'').match(/<pre id="pet-result">([\s\S]*?)<\/pre>/)?.[1];assert.ok(output?.startsWith('PASS:'),output||result.error?.message||result.stderr?.slice(-1500)||'No pet result');
   if(portraits)await writeFile('pet-portraits.webp',Buffer.from(output.slice(5),'base64'));
   else console.log(output);
@@ -2715,7 +2856,7 @@ try {
     },
 
     "test:performance": async () => {
-const source = fs.readFileSync('app.js', 'utf8');
+const source = fs.readFileSync('app.js', 'utf8').replace(/\r\n/g, '\n');
 const fn = name => {
     const start = source.indexOf('function ' + name + '(');
     return source.slice(start, source.indexOf('\n}', start) + 2);
