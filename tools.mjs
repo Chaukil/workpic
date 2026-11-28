@@ -145,7 +145,7 @@ test('Firestore-only Bot settlement uses one idempotent client transaction', () 
     assert.match(mutateBot, /transaction\.update\(ref,\{petBotDailyBattles:usage,petBattleStatsByPet\}\)/);
     assert.match(client, /const BOT_DAILY_LIMIT=5/);
     const botBattle = backend.slice(backend.indexOf('async function botBattle('), backend.indexOf('async function ranking('));
-    assert.match(botBattle, /petBattleSimulation\(players, firstUid\)/);
+    assert.match(botBattle, /petBattleSimulation\(players, firstUid, id\)/);
     assert.match(botBattle, /db\.runTransaction/);
     assert.match(botBattle, /tx\.update\(ref,\{petBotDailyBattles:usage,petBattleStatsByPet:/);
     assert.match(botBattle, /tx\.update\(matchRef/);
@@ -1072,6 +1072,9 @@ test('eight battle stats split damage and produce reproducible dodge and critica
  assert.throws(()=>petBattleStats({...stats,magic:21},1));assert.throws(()=>petBattleStats({...stats,dodge:0,health:20},1));
  const players=[{uid:'a',stats,appearance:{level:1}},{uid:'b',stats:{...stats},appearance:{level:1}}];
  const battle=petBattleSimulation(players,'a');assert.deepEqual(battle,petBattleSimulation(JSON.parse(JSON.stringify(players)),'a'));
+ const seeded=petBattleSimulation(players,'a','room-1');
+ assert.deepEqual(seeded,petBattleSimulation(players,'a','room-1'));
+ assert.notDeepEqual(seeded.turns,petBattleSimulation(players,'a','room-2').turns);
  let sawDodge=false,sawCritical=false;
  for(let i=0;i<60;i++){
   const result=petBattleSimulation([{...players[0],petId:String(i)},players[1]],'a');
@@ -1111,6 +1114,10 @@ test('Bot difficulty keeps its stake and EXP reward consistent across modes',()=
  const easy=makePetBattleBot(18,'easy'),medium=makePetBattleBot(18,'medium'),hard=makePetBattleBot(18,'hard');
  const total=bot=>Object.values(bot.stats).reduce((sum,value)=>sum+value,0);
  assert.equal(total(easy),100);assert.equal(total(medium),108);assert.equal(total(hard),120);
+ const extreme=makePetBattleBot(18,'extreme');
+ assert.equal(total(extreme),150);
+ assert.equal(extreme.appearance.level,30);
+ assert.doesNotThrow(()=>petBattleSimulation([{...easy,uid:'player-a'},extreme],'player-a'));
  assert.deepEqual([easy.appearance.level,medium.appearance.level,hard.appearance.level],[1,9,15]);
  assert.equal(easy.petName,attendancePetCatalog(null)[0].name);assert.equal(medium.petName,attendancePetCatalog(null)[8].name);
  assert.ok(easy.stats.attack>1&&easy.stats.magic>1&&easy.stats.health>1,'Bot uses a purposeful combat allocation rather than random points');
@@ -1212,7 +1219,7 @@ test('two-client battle escrow, hidden RPS, automatic fight, payout and refunds 
  use('a',room);await game.mutate('commit',{hash:roomHashA,round:0});use('b',room);await game.mutate('commit',{hash:roomHashB,round:0});
  use('a',room);await game.mutate('reveal',{choice:'rock',nonce:'room-a',round:0});use('b',room);await game.mutate('reveal',{choice:'scissors',nonce:'room-b',round:0});
  m=battles.get(room);assert.equal(m.status,'fighting');assert.equal(m.firstUid,'a');assert.equal(m.startedAt,clock);
- assert.deepEqual(m.turns,petBattleSimulation(m.players,m.firstUid).turns);
+ assert.deepEqual(m.turns,petBattleSimulation(m.players,m.firstUid,room).turns);
  const startedWrites=writes;await game.mutate('ready');assert.equal(writes,startedWrites);
  clock+=5000+m.turns.length*1800+1;
  use('a',room);await game.mutate('claim');

@@ -242,7 +242,7 @@ async function battle(uid, data) {
                 match.ready = { ...match.ready, [uid]: true };
                 if (match.participantUids.every(member => match.ready[member])) {
                     const firstUid = match.participantUids[randomInt(2)];
-                    match = { ...match, ...petBattleSimulation(match.players, firstUid), status: 'fighting', firstUid, startedAt: now };
+                    match = { ...match, ...petBattleSimulation(match.players, firstUid, id), status: 'fighting', firstUid, startedAt: now };
                 }
             } else if (action === 'cancel' || action === 'reject') {
                 if (!waiting || uid !== (action === 'cancel' ? match.challengerUid : match.opponentUid)) {
@@ -264,7 +264,7 @@ async function battle(uid, data) {
 
 async function botBattle(uid, data) {
     if (data.action === 'start') {
-        const difficulty = ['easy', 'medium', 'hard'].includes(data.difficulty) ? data.difficulty : 'easy';
+        const difficulty = ['easy', 'medium', 'hard', 'extreme'].includes(data.difficulty) ? data.difficulty : 'easy';
         validateElement(data.element);
         const id = `bot-${randomUUID()}`, ref = profiles.doc(uid), matchRef = battles.doc(id);
         let match;
@@ -273,7 +273,7 @@ async function botBattle(uid, data) {
             if (!profile) throw new HttpsError('failed-precondition', 'Chưa mở hồ sơ thú cưng.');
             const day = new Date(now + 7 * 3600000).toISOString().slice(0, 10);
             const stored = profile.petBotDailyBattles?.day === day ? profile.petBotDailyBattles : {};
-            const usage = {day,easy:Math.max(0,Number(stored.easy)||0),medium:Math.max(0,Number(stored.medium)||0),hard:Math.max(0,Number(stored.hard)||0)};
+            const usage = {day,easy:Math.max(0,Number(stored.easy)||0),medium:Math.max(0,Number(stored.medium)||0),hard:Math.max(0,Number(stored.hard)||0),extreme:Math.max(0,Number(stored.extreme)||0)};
             if (usage[difficulty] >= botDailyLimit) throw new HttpsError('failed-precondition', `Đã dùng đủ ${botDailyLimit} trận Bot hôm nay.`);
             const player = petBattleFighter({ ...profile, displayName: profile.name }, uid,
                 requireId(data.petId), data.stats, now, data.element);
@@ -285,7 +285,7 @@ async function botBattle(uid, data) {
             match = { id, bot: true, botDifficulty: difficulty, rewardMultiplier: 1,
                 participantUids: [uid], players, stakeGrams: stake, stakeXp: 1,
                 status: 'fighting', createdMs: now, startedAt: now, firstUid, claims: {},
-                ...petBattleSimulation(players, firstUid) };
+                ...petBattleSimulation(players, firstUid, id) };
             tx.create(matchRef, match);
             tx.update(ref,{petBotDailyBattles:usage,petBattleStatsByPet:{...(profile.petBattleStatsByPet||{}),[player.petId]:player.stats}});
         }, { maxAttempts: 2 });
