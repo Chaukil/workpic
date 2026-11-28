@@ -2396,6 +2396,7 @@ try {
     document.getElementById('petBattleViewInvite').click();check(document.getElementById('petBattleDialog').open,'banner reopens invitation after dismissal');
     inviteSnapshot({id:incoming.id,exists:()=>true,data:()=>({...incoming,status:'rps',players:[fightOther,fightMe]})});
     check(document.getElementById('petBattleInvite').hidden&&!document.getElementById('petBattleRps').hidden,'acceptance clears invite and shows RPS without a combat turn');
+    check(document.getElementById('petBattleHp0').hidden&&document.getElementById('petBattleGuardianMark0').hidden,'human-duel waiting room keeps health and guardian identity hidden');
     check(modelViews.get('petBattleModel0')?.view.displayName===fightOther.petName&&modelViews.get('petBattleModel0')?.view.form.kind===fightOther.appearance.form.kind&&modelViews.get('petBattleModel1')?.view.displayName===fightMe.petName&&modelViews.get('petBattleModel1')?.view.form.kind===fightMe.appearance.form.kind,'accepted invitation renders the challenger pet and recipient pet on their correct sides');
     document.getElementById('petBattleClose').click();
     const battleSelect=document.getElementById('petBattleMatches');battleSelect.value=incoming.id;battleSelect.dispatchEvent(new Event('change'));
@@ -2409,7 +2410,7 @@ try {
     check(document.getElementById('petBattleDamage0').textContent===''&&document.getElementById('petBattleDamage1').textContent==='','fight countdown has no damage before the first turn');
     battleState.matches.set('ui-battle',battleFixture);PetBattleGame.open('ui-battle');
     check(!document.getElementById('petBattleRoom').hidden&&battleState.models.length===2,'accepted battle displays both pet renderers');
-    check(document.getElementById('petBattleRoom').classList.contains('is-human-duel')&&document.getElementById('petBattleHp0').hidden&&document.getElementById('petBattleHpText1').hidden&&!document.getElementById('petBattleStats0').textContent.includes('Bạch Hổ')&&!document.getElementById('petBattleStats1').textContent.includes('Chu Tước'),'human duels hide HP bars and guardian identities while retaining the duel');
+    check(document.getElementById('petBattleRoom').classList.contains('is-human-duel')&&!document.getElementById('petBattleHp0').hidden&&!document.getElementById('petBattleHpText1').hidden&&!document.getElementById('petBattleGuardianMark0').hidden&&document.getElementById('petBattleGuardianMark0').textContent==='⚔'&&!document.getElementById('petBattleStats0').textContent.includes('Bạch Hổ')&&!document.getElementById('petBattleStats1').textContent.includes('Chu Tước'),'human fights show HP and guardian icons while keeping guardian names out of labels');
     const fightPlay=petBattlePlayback(battleFixture);check(Number(document.getElementById('petBattleHp0').value)===fightPlay.hp[0]&&Number(document.getElementById('petBattleHp1').value)===fightPlay.hp[1],'room HP follows shared automatic turn timeline');
     check(document.getElementById('petBattleDialog').scrollWidth<=document.getElementById('petBattleDialog').clientWidth+1,'battle room has no horizontal clipping');
     check(document.querySelector('.pet-battle-skill')?.classList.contains('skill-fire'),'dinosaur attack has its own elemental visual');

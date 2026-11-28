@@ -10859,7 +10859,6 @@ async function actOnAttendancePet(action) {
     const generation = attendancePetGeneration, uid = currentUser.uid, ref = attendancePetRef, targetId=attendancePetSelected(attendancePetData,selectedAttendancePetId).id;
     const previousLevel = selectedAttendancePetView().level;
     if(action==='feed'){
-        AttendancePet3D.feed();
         attendancePetMessage('Đang đưa thức ăn…');
     }
     attendancePetBusy = true; renderAttendancePet();
@@ -10874,6 +10873,7 @@ async function actOnAttendancePet(action) {
         },{maxAttempts:2        });
         if (generation !== attendancePetGeneration || currentUser?.uid !== uid) return;
         attendancePetData = result.pet;
+        if(action==='feed'&&result.result==='fed')AttendancePet3D.feed();
         if(result.spawned)selectedAttendancePetId=attendancePetRecords(result.pet)[0].id;
         if(result.result==='renamed')delete document.getElementById('attendancePetNickname').dataset.dirty;
         const messages = {checked:'Điểm danh thành công! Thêm một ngày tiến hóa.',fed:'Măm măm! Cảm ơn bạn đã cho ăn.',revived:'Đã hồi sinh! Trứng sẽ nở sau 1 giờ.',dead:'Thú cưng đã chết. Bấm Hồi sinh để bắt đầu lại.',egg:'Trứng chưa nở, chưa thể cho ăn.',alive:'Thú cưng đã được hồi sinh rồi.', 'already-checked':'Bạn đã điểm danh hôm nay.', 'already-fed':'Hôm nay đã cho ăn rồi. Hẹn ngày mai!'};
@@ -11753,6 +11753,7 @@ const PetBattleGame=(()=>{
         stage.querySelector('.pet-battle-skill')?.remove();
         if(!play.last||Date.now()-petBattleTime(m.startedAt)-(m.introMs===5000?5000:2000)-(play.count-1)*PET_BATTLE_STEP_MS>1200)return;
         const attacker=m.players.find(p=>p.uid===play.last.attacker);if(!attacker)return;
+        const inCombat=m.status==='fighting'||m.status==='finished';
         const hideGuardianIdentity=!m.bot;
         const level=attacker.appearance.level,tier=Math.min(3,Math.floor((level-1)/8));
         const specialSpirit=hideGuardianIdentity?null:petBattleSpirit(play.last.special),skill=petBattleSkill(attacker.appearance,attacker.element,!!specialSpirit),{effect,label,variant}=skill;
@@ -11878,7 +11879,6 @@ const PetBattleGame=(()=>{
         const hideGuardianIdentity=!m.bot;
         el('petBattleRoom').classList.toggle('is-human-duel',hideGuardianIdentity);
         const effectiveStats=m.players.map((p,i)=>petBattleEffectiveStats(p,m.players[1-i]));
-        const inCombat=m.status==='fighting'||m.status==='finished';
         renderStatComparison(inCombat?m.players:[],inCombat?effectiveStats:[]);
         const guestPetId=incoming&&el('petBattlePet').value;
         const guestView=guestPetId?attendancePetView(attendancePetSelected(attendancePetData,guestPetId)):null;
@@ -11912,9 +11912,9 @@ const PetBattleGame=(()=>{
             const elementKey=p?.element||(guest?el('petBattleElement').value:'');
             const element=PET_BATTLE_ELEMENTS.get(elementKey);
             const guardianMark=el(`petBattleGuardianMark${i}`);
-            guardianMark.hidden=!p;
-            guardianMark.textContent=hideGuardianIdentity?'✦':element?.icon||'✦';
-            guardianMark.setAttribute('aria-label',hideGuardianIdentity?'Thần thú hộ mệnh':element?.label||'Thần thú hộ mệnh');
+            guardianMark.hidden=!p||!inCombat;
+            guardianMark.textContent=hideGuardianIdentity&&!inCombat?'✦':element?.icon||'✦';
+            guardianMark.setAttribute('aria-label',hideGuardianIdentity&&!inCombat?'Thần thú hộ mệnh':element?.label||'Thần thú hộ mệnh');
             const matchup=p?petBattleMatchup(p.element,m.players[1-i]?.element):'';
             const bonus=matchup?` · Tương ${matchup==='generates'?'sinh':'khắc'} +1%`:'';
             el(`petBattleName${i}`).textContent=p?`${p.petName} · ${p.name}`:guest?.displayName||'Chờ đối thủ vào phòng';
@@ -11935,8 +11935,8 @@ const PetBattleGame=(()=>{
             const label=isReady?'Đã sẵn sàng':'Chưa sẵn sàng';
             if(badge.textContent!==label)badge.textContent=label;
             el(`petBattleHp${i}`).max=full[i]||100;el(`petBattleHp${i}`).value=hp[i]??full[i]??100;el(`petBattleHpText${i}`).textContent=p?`${hp[i]??full[i]} / ${full[i]} HP`:'';
-            el(`petBattleHp${i}`).hidden=!p||hideGuardianIdentity;
-            el(`petBattleHpText${i}`).hidden=!p||hideGuardianIdentity;
+            el(`petBattleHp${i}`).hidden=!p||hideGuardianIdentity&&!inCombat;
+            el(`petBattleHpText${i}`).hidden=!p||hideGuardianIdentity&&!inCombat;
             const at=petBattleTime(m.startedAt)+(m.introMs===5000?5000:2000)+(play.count-1)*PET_BATTLE_STEP_MS,attacking=!!p&&!!play.last&&play.last.attacker===p.uid,hit=!!p&&!!play.last&&play.last.defender===p.uid;
             const result=battleEnded&&m.winnerUid&&p?(m.winnerUid===p.uid?'victory':'defeat'):null;
             const impact=hit&&play.last.damage>0?at+630:0;
