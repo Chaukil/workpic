@@ -10282,7 +10282,7 @@ let attendancePetData = null;
 let selectedAttendancePetId=null;
 function selectedAttendancePetView(){return attendancePetView(attendancePetSelected(attendancePetData,selectedAttendancePetId));}
 const petWeightLabel=grams=>new Intl.NumberFormat('vi-VN',{minimumFractionDigits:1,maximumFractionDigits:1}).format(grams/1000)+' kg';
-const petPowerLabel=value=>new Intl.NumberFormat('vi-VN').format(value);
+const petPowerLabel=value=>new Intl.NumberFormat('vi-VN',{maximumFractionDigits:0}).format(Math.round(value));
 let petComparisonCache=null;
 const petRankingByBranch=new Map(),petHistoryById=new Map();
 let petRankingSourceCache=null;
@@ -11876,6 +11876,7 @@ const PetBattleGame=(()=>{
         el('petBattleSetup').querySelectorAll('button').forEach(button=>button.disabled=state.busy);
         if(draft||incoming)syncDraftControls();
         if(!m){disposeModels();if(!state.botDraft||!state.bot)renderStatComparison([],[]);return;}
+        const inCombat=m.status==='fighting'||m.status==='finished';
         const hideGuardianIdentity=!m.bot;
         el('petBattleRoom').classList.toggle('is-human-duel',hideGuardianIdentity);
         const effectiveStats=m.players.map((p,i)=>petBattleEffectiveStats(p,m.players[1-i]));
@@ -11934,7 +11935,9 @@ const PetBattleGame=(()=>{
             badge.classList.toggle('is-ready',isReady);
             const label=isReady?'Đã sẵn sàng':'Chưa sẵn sàng';
             if(badge.textContent!==label)badge.textContent=label;
-            el(`petBattleHp${i}`).max=full[i]||100;el(`petBattleHp${i}`).value=hp[i]??full[i]??100;el(`petBattleHpText${i}`).textContent=p?`${hp[i]??full[i]} / ${full[i]} HP`:'';
+            const displayedHp=Math.round(hp[i]??full[i]??100),displayedMaxHp=Math.round(full[i]??100);
+            el(`petBattleHp${i}`).max=displayedMaxHp;el(`petBattleHp${i}`).value=displayedHp;
+            el(`petBattleHpText${i}`).textContent=p?`${displayedHp.toLocaleString('vi-VN')} / ${displayedMaxHp.toLocaleString('vi-VN')} HP`:'';
             el(`petBattleHp${i}`).hidden=!p||hideGuardianIdentity&&!inCombat;
             el(`petBattleHpText${i}`).hidden=!p||hideGuardianIdentity&&!inCombat;
             const at=petBattleTime(m.startedAt)+(m.introMs===5000?5000:2000)+(play.count-1)*PET_BATTLE_STEP_MS,attacking=!!p&&!!play.last&&play.last.attacker===p.uid,hit=!!p&&!!play.last&&play.last.defender===p.uid;

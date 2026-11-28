@@ -2411,7 +2411,10 @@ try {
     battleState.matches.set('ui-battle',battleFixture);PetBattleGame.open('ui-battle');
     check(!document.getElementById('petBattleRoom').hidden&&battleState.models.length===2,'accepted battle displays both pet renderers');
     check(document.getElementById('petBattleRoom').classList.contains('is-human-duel')&&!document.getElementById('petBattleHp0').hidden&&!document.getElementById('petBattleHpText1').hidden&&!document.getElementById('petBattleGuardianMark0').hidden&&document.getElementById('petBattleGuardianMark0').textContent==='⚔'&&!document.getElementById('petBattleStats0').textContent.includes('Bạch Hổ')&&!document.getElementById('petBattleStats1').textContent.includes('Chu Tước'),'human fights show HP and guardian icons while keeping guardian names out of labels');
-    const fightPlay=petBattlePlayback(battleFixture);check(Number(document.getElementById('petBattleHp0').value)===fightPlay.hp[0]&&Number(document.getElementById('petBattleHp1').value)===fightPlay.hp[1],'room HP follows shared automatic turn timeline');
+    const fightPlay=petBattlePlayback(battleFixture);
+    check(Number(document.getElementById('petBattleHp0').value)===Math.round(fightPlay.hp[0])&&Number(document.getElementById('petBattleHp1').value)===Math.round(fightPlay.hp[1])
+     &&document.getElementById('petBattleHpText0').textContent===Math.round(fightPlay.hp[0]).toLocaleString('vi-VN')+' / '+Math.round(battleFixture.maxHp[0]).toLocaleString('vi-VN')+' HP','room HP bar and label round displayed values while following the shared turn timeline');
+    check(!document.getElementById('petBattlePower0').textContent.includes(',')&&document.getElementById('petBattlePower0').textContent===petPowerLabel(Math.round(Number(document.getElementById('petBattlePower0').textContent.replaceAll('.','')))),'battle power badge displays a whole-number value');
     check(document.getElementById('petBattleDialog').scrollWidth<=document.getElementById('petBattleDialog').clientWidth+1,'battle room has no horizontal clipping');
     check(document.querySelector('.pet-battle-skill')?.classList.contains('skill-fire'),'dinosaur attack has its own elemental visual');
     const botFixture={...battleFixture,id:'ui-bot-battle',bot:true,players:[{...fightMe,element:'metal'},{...fightOther,element:'fire'}]};
