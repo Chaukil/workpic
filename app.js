@@ -646,17 +646,17 @@ const PET_BATTLE_ELEMENTS = new Map([
     ['pixiu', {label:'Kim · Tỳ Hưu', icon:'🪙', color:'#f5c451', affinity:'metal', gives:'water', overcomes:'wood'}],
     ['griffin', {label:'Mộc · Griffin', icon:'🦅', color:'#c4a878', affinity:'wood', overcomes:'water'}],
     ['cerberus', {label:'Thủy · Cerberus', icon:'🐺', color:'#8b83f6', affinity:'water', overcomes:'fire'}],
-    ['centaur', {label:'Nhân Mã', icon:'♞', color:'#d9a441', affinity:null}],
-    ['qilin', {label:'Kỳ Lân', icon:'🦄', color:'#c084fc', affinity:null}],
+    ['centaur', {label:'Thổ · Nhân Mã', icon:'♞', color:'#d9a441', affinity:'earth'}],
+    ['qilin', {label:'Thổ · Kỳ Lân', icon:'🦄', color:'#c084fc', affinity:'earth'}],
 ]);
 const PET_BATTLE_SPIRITS={
     wood:{name:'Thanh Long',move:'Long Vũ Tái Sinh',icon:'bi-heart-pulse',passive:'+3% HP tối đa.',ultimate:'Hồi 4% HP tối đa ngay; hồi thêm 2% mỗi lượt trong 2 lượt tiếp theo.',color:'#48e0ad',motion:'slam',effect:'wave',ability:'heal'},
     fire:{name:'Chu Tước',move:'Liệt Diễm Tam Thức',icon:'bi-fire',passive:'Đòn trúng gây Thiêu Đốt 0,35% HP tối đa mỗi lượt trong 2 lượt, tối đa 2 cộng dồn.',ultimate:'Thiêu Đốt lần lượt 4%, 3% và 2% HP tối đa trong 3 lượt.',color:'#ff633d',motion:'dive',effect:'fire',ability:'burn'},
     water:{name:'Huyền Vũ',move:'Huyền Giáp Hộ Thân',icon:'bi-shield-shaded',passive:'Giảm 6% sát thương nhận.',ultimate:'Chặn sát thương của đòn kế tiếp tối đa bằng 12% HP tối đa; phần vượt giới hạn vẫn gây sát thương. Chỉ chặn một đòn.',color:'#48c9ee',motion:'shield',effect:'wave',ability:'shield'},
     metal:{name:'Bạch Hổ',move:'Hổ Gầm Trời',icon:'bi-crosshair',passive:'Tăng 12 điểm phần trăm chí mạng; yếu trước né tránh và khiên.',ultimate:'Trong 2 lượt đánh tiếp theo, đòn đánh chắc chắn chí mạng nếu trúng; sát thương chí mạng ×1,6.',color:'#f5d477',motion:'claw',effect:'claw',ability:'critical'},
-    kitsune:{name:'Cửu Vĩ Hồ',move:'Cửu Ảnh Mê Tung',icon:'bi-eye',passive:'Có 8% né đòn. Mỗi lần bị trúng tăng thêm 2,5 điểm phần trăm né (tối đa cộng thêm 30%); né thành công hồi 1,5% HP tối đa.',ultimate:'Tăng né đòn thêm 20 điểm phần trăm trong 2 lượt đối thủ tấn công. Né thành công trong thời gian này sẽ xóa Thiêu Đốt.',color:'#fb7185',motion:'dive',effect:'wind',ability:'evasion'},
+    kitsune:{name:'Cửu Vĩ Hồ',move:'Cửu Ảnh Mê Tung',icon:'bi-eye',passive:'Có 8% né đòn. Mỗi lần bị trúng tăng thêm 2,5 điểm phần trăm né (tối đa cộng thêm 30%).',ultimate:'Tăng né đòn thêm 20 điểm phần trăm trong 2 lượt đối thủ tấn công. Mỗi lần né thành công trong thời gian này hồi 1,5% HP tối đa và xóa Thiêu Đốt.',color:'#fb7185',motion:'dive',effect:'wind',ability:'evasion'},
     pixiu:{name:'Tỳ Hưu',move:'Tích Lũy Chiêu Tài',icon:'bi-coin',passive:'Tích trữ 25% sát thương gây ra, tối đa bằng 16% HP tối đa của bản thân.',ultimate:'Giải phóng toàn bộ sát thương đã tích trữ thành sát thương cộng thêm; phần này không thể chí mạng.',color:'#f5c451',motion:'shield',effect:'wave',ability:'charge'},
-    griffin:{name:'Griffin',move:'Thiên Ưng Liệt Trảo',icon:'bi-wind',passive:'Tăng 15% sát thương gây ra.',ultimate:'Giảm 55% Phòng thủ của đối thủ trong 2 đòn đánh tiếp theo.',color:'#c4a878',motion:'dive',effect:'wind',ability:'pierce'},
+    griffin:{name:'Griffin',move:'Thiên Ưng Liệt Trảo',icon:'bi-wind',passive:'Tăng 15% sát thương gây ra.',ultimate:'Giảm 55% Phòng thủ của đối thủ (ít nhất 10 điểm) trong 2 đòn đánh tiếp theo. Phòng thủ có thể xuống âm và làm tăng sát thương nhận.',color:'#c4a878',motion:'dive',effect:'wind',ability:'pierce'},
     cerberus:{name:'Cerberus',move:'Tam Đầu U Minh Viêm',icon:'bi-emoji-angry',passive:'Đòn trúng làm giảm 35% hiệu quả hồi máu của đối thủ trong 3 lượt.',ultimate:'Cắn 3 lần, mỗi lần gây 65% sát thương đòn thường. Từng cú cắn được tính riêng.',color:'#8b83f6',motion:'bite',effect:'fire',ability:'hellfire'},
     centaur:{name:'Nhân Mã',move:'Thiên Mã Hộ Thể',icon:'bi-shield-plus',passive:'Giảm 4% sát thương nhận; khi HP dưới 50%, tổng giảm sát thương tăng lên 6%.',ultimate:'Tạo khiên bằng 8% HP tối đa trong 2 lượt, giảm thêm 8% sát thương nhận khi khiên còn. Khi khiên vỡ, hồi 2% HP tối đa.',color:'#d9a441',motion:'slam',effect:'wave',ability:'guardian-shield'},
     qilin:{name:'Kỳ Lân',move:'Lân Giáp Phản Chấn',icon:'bi-arrow-repeat',passive:'Phản lại 14% sát thương thực nhận lên đối thủ; sát thương phản không thể chí mạng.',ultimate:'Tăng phản sát thương lên 30% trong 2 đòn đối thủ tiếp theo.',color:'#c084fc',motion:'slam',effect:'wave',ability:'reflection'},
@@ -668,8 +668,12 @@ function petBattleMatchup(playerElement,opponentElement){
     if(!playerAffinity||!opponentAffinity)return '';
     const playerType=[...PET_BATTLE_ELEMENTS.values()].find(value=>value.affinity===playerAffinity);
     const opponentType=[...PET_BATTLE_ELEMENTS.values()].find(value=>value.affinity===opponentAffinity);
-    if(opponentType?.gives===playerAffinity)return 'generates';
-    if(playerType?.overcomes===opponentAffinity)return 'overcomes';
+    if(opponentType?.gives===playerAffinity||
+        (opponentAffinity==='fire'&&playerAffinity==='earth')||
+        (opponentAffinity==='earth'&&playerAffinity==='metal'))return 'generates';
+    if(playerType?.overcomes===opponentAffinity||
+        (playerAffinity==='wood'&&opponentAffinity==='earth')||
+        (playerAffinity==='earth'&&opponentAffinity==='water'))return 'overcomes';
     return '';
 }
 function petBattleReceivesBonus(player,opponent){
@@ -719,7 +723,6 @@ function petBattleSimulation(players,firstUid,matchId=''){
     while(hp.every(value=>value>0)&&turns.length<PET_BATTLE_MAX_TURNS){
         const defender=1-attacker,a=stats[attacker],d=stats[defender],attack=a.attack;
         const self=effects[attacker],target=effects[defender],element=players[attacker].element,rival=players[defender].element;
-        const defense=d.defense*(target.armorBreak>0?.45:1);
         const modern=Object.hasOwn(a,'magic')||Object.hasOwn(d,'magic');
         const spirit=petBattleSpirit(element);
         const special=++self.count%4===0&&!!spirit;
@@ -734,9 +737,6 @@ function petBattleSimulation(players,firstUid,matchId=''){
                 statuses:effects.map((effect,index)=>petBattleStatus(effect,players[index].element)),hp:[...hp]});
             break;
         }
-        const normalBase=modern
-            ?(5+attack*2)*100/(100+defense)*100/(100+(d.physicalReduction||0)*2)+(a.magic||0)*2*100/(100+defense)*100/(100+(d.magicReduction||0)*2)
-            :(10+attack*2)*100/(100+defense);
         const hits=element==='cerberus'&&special?3:1;
         const hitResults=[];
         let damage=0,critical=false,dodged=false,healed=0,foxHealed=0,appliedBurn=0,physical=0,magic=0,landed=0,foxDodges=0;
@@ -747,16 +747,15 @@ function petBattleSimulation(players,firstUid,matchId=''){
             const guaranteed=self.criticalTurns>0&&!hitDodged;
             const hitCritical=!hitDodged&&(guaranteed||roll()<critChance);
             const hitMultiplier=hitCritical?(guaranteed&&element==='metal'?1.6:1.5):1;
-            const armorFactor=target.armorBreak>0?.45:1;
-            const hitDefense=d.defense*armorFactor;
-            const hitPhysical=modern?(5+attack*2)*100/(100+hitDefense)*100/(100+(d.physicalReduction||0)*2):normalBase;
-            const hitMagic=modern?(a.magic||0)*2*100/(100+hitDefense)*100/(100+(d.magicReduction||0)*2):0;
+            const hitDefense=d.defense-(target.armorBreak>0?Math.max(10,d.defense*.55):0);
+            const defenseMultiplier=100/(100+hitDefense);
+            const hitPhysical=modern?(5+attack*2)*defenseMultiplier*100/(100+(d.physicalReduction||0)*2):(10+attack*2)*defenseMultiplier;
+            const hitMagic=modern?(a.magic||0)*2*defenseMultiplier*100/(100+(d.magicReduction||0)*2):0;
             let hitDamage=hitDodged?0:Math.max(1,Math.round((modern?hitPhysical+hitMagic:hitPhysical)*hitMultiplier*(element==='griffin'?1.15:1)*(element==='cerberus'&&special?.65:1)));
             if(target.armorBreak>0)target.armorBreak--;
             if(hitDodged&&rival==='kitsune'){
-                foxDodges++;
                 target.foxDodgeBonus=0;
-                if(target.evasion>0){target.burns=[];target.ultimateBurns=[];}
+                if(target.evasion>0){foxDodges++;target.burns=[];target.ultimateBurns=[];}
             }
             if(!hitDodged)landed++;
             hitResults.push({damage:hitDamage,dodged:hitDodged,critical:hitCritical});
@@ -11424,7 +11423,7 @@ const PetBattleGame=(()=>{
         advice.textContent=rivalElement
             ?suggestions.length?`Đối thủ: ${names[rivalElement]}. Gợi ý: ${suggestions.join(' hoặc ')} · +1% toàn bộ chỉ số trong trận.`
                 :'Đối thủ: '+names[rivalElement]+'. Không có lợi thế quan hệ chỉ số; chọn hộ mệnh theo tuyệt chiêu phù hợp.'
-            :'Tương khắc bốn hệ: Mộc khắc Thủy, Thủy khắc Hỏa, Hỏa khắc Kim, Kim khắc Mộc. Kim sinh Thủy và Hỏa sinh Mộc. Quan hệ có lợi nhận +1% toàn bộ chỉ số; Nhân Mã không thuộc hệ.';
+            :'Nhân Mã và Kỳ Lân thuộc Thổ. Hỏa sinh Thổ, Thổ sinh Kim. Mộc khắc Thổ, Thổ khắc Thủy. Bên có lợi thế nhận +1% toàn bộ chỉ số.';
     }
     function cyclePet(){
         const pet=el('petBattlePet');

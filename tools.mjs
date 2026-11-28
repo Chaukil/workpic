@@ -1021,10 +1021,15 @@ test('ten guardians keep unique mechanics and grant one percent only to advantag
  for(const [player,opponent,expected] of relationships)assert.equal(petBattleMatchup(player,opponent),expected,`${player} vs ${opponent}`);
  assert.equal(petBattleMatchup('metal','fire'),'','only one side gets a bonus for each elemental matchup');
  assert.equal(petBattleMatchup('kitsune','fire'),'','guardians with the same affinity do not get a matchup bonus');
- assert.equal(petBattleMatchup('centaur','wood'),'','Nhân Mã has no elemental matchup');
+ for(const earth of ['centaur','qilin']){
+  assert.equal(petBattleMatchup(earth,'kitsune'),'generates');
+  assert.equal(petBattleMatchup('pixiu',earth),'generates');
+  assert.equal(petBattleMatchup('griffin',earth),'overcomes');
+  assert.equal(petBattleMatchup(earth,'cerberus'),'overcomes');
+ }
+ assert.equal(petBattleMatchup('centaur','qilin'),'');
  assert.equal(petBattleSpirit('earth'),null);
  assert.equal(petBattleSpirit('sphinx'),null);
- assert.equal(petBattleMatchup('qilin','fire'),'','Kỳ Lân is neutral');
  const stats={attack:30,magic:20,defense:10,health:40};
  const boosted=petBattleEffectiveStats({element:'wood',stats},{element:'fire'});
  assert.deepEqual(boosted,{attack:30.3,magic:20.2,defense:10.1,health:40.4});
@@ -1128,11 +1133,33 @@ test('guardian combat effects, durations and visible statuses follow the selecte
  assert.ok(tigerNextTurns.every(turn=>turn.dodged||turn.critical),'Bạch Hổ guarantees critical hits when its next two attacks land');
  const fox=battle('kitsune','wood'),foxUltimate=fox.turns.find(turn=>turn.special==='kitsune');
  assert.equal(foxUltimate.statuses[0].evasion,true,'Cửu Vĩ Hồ shows its active evasion');
+ let healedDuringUltimate=false,dodgedOutsideUltimate=false;
+ for(let seed=0;seed<12;seed++){
+  const result=petBattleSimulation([fighter('a','kitsune'),fighter('b','wood')],'a',String(seed));
+  let remaining=0;
+  for(const turn of result.turns){
+   if(turn.special==='kitsune')remaining=2;
+   if(turn.defender!=='a')continue;
+   if(turn.dodgeHealed){
+    assert.ok(remaining>0&&turn.dodged);
+    assert.ok(turn.dodgeHealed<=Number((result.maxHp[0]*.015).toFixed(2)));
+    healedDuringUltimate=true;
+   }
+   if(!remaining&&turn.dodged)dodgedOutsideUltimate=true;
+   remaining=Math.max(0,remaining-1);
+  }
+ }
+ assert.ok(healedDuringUltimate&&dodgedOutsideUltimate);
  const pixiu=battle('pixiu','wood'),pixiuUlt=pixiu.turns.find(turn=>turn.special==='pixiu');
  assert.equal(pixiuUlt.hits,undefined);
  assert.equal(pixiu.turns[2].statuses[0].charged,true,'Tỳ Hưu visibly accumulates damage before releasing it');
  const griffin=battle('griffin','wood'),griffinUlt=griffin.turns.find(turn=>turn.special==='griffin');
  assert.equal(griffinUlt.statuses[1].armorBroken,true,'Griffin exposes the opponent armor');
+ const fragile={attack:10,defense:3,health:70};
+ const lowArmor=petBattleSimulation([
+  {...fighter('a','griffin'),stats:fragile},{...fighter('b','wood'),stats:fragile}
+ ],'a').turns.filter(turn=>turn.attacker==='a');
+ assert.deepEqual(lowArmor.slice(3,7).map(turn=>turn.damage),[33,37,37,33]);
  const cerberus=battle('cerberus','wood'),cerberusUlt=cerberus.turns.find(turn=>turn.special==='cerberus');
  assert.equal(cerberusUlt.hits.length,3,'Cerberus ultimate resolves as three individual bites');
  assert.equal(cerberusUlt.statuses[1].healingBlocked,true,'Cerberus reduces the target healing');
@@ -2348,7 +2375,7 @@ try {
     check(!hostModel.classList.contains('has-element-aura'),'clearing the draft element removes its aura');
     document.querySelector('#petBattleDialog [data-pet-guide="battle"]').click();
     const battleGuide=document.getElementById('petGuideBattle'),balance=document.getElementById('petBattleBalance');
-    check(guide.open&&!battleGuide.hidden&&!balance.hidden&&balance.textContent.includes('để cược')&&battleGuide.textContent.includes('Tương khắc bốn hệ')&&battleGuide.textContent.includes('Kỳ Lân'),'battle guide shows the current pet balance and updated guardian rules');
+    check(guide.open&&!battleGuide.hidden&&!balance.hidden&&balance.textContent.includes('để cược')&&battleGuide.textContent.includes('Tương sinh và tương khắc')&&battleGuide.textContent.includes('Kỳ Lân'),'battle guide shows the current pet balance and updated guardian rules');
     document.getElementById('petGuideClose').click();
     document.getElementById('petBattleAddOpponent').click();
     check(document.getElementById('petBattleInvitePicker').open,'plus opens the opponent picker');
