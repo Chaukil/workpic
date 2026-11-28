@@ -310,11 +310,11 @@ const ATTENDANCE_PET_BRANCHES={
         petForm('Cá voi xanh khổng lồ','whale','blue','#285c7a',1.7,{crest:true}),
         petForm('Thủy quái Leviathan','dino','sea','#326b68',1.8,{crest:true})]},
     dino:{name:'Khủng long',icon:'bi-globe-americas',forms:[
-        petForm('Khủng long con','dino','baby','#71966b',.8),
+        petForm('Coelophysis','dino','raptor','#8e9a58',.8),
         petForm('Khủng long ba sừng','dino','triceratops','#8f825f',1),
         petForm('Khủng long giáp lưng','dino','stego','#687c59',1.1),
         petForm('Khủng long bọc giáp','dino','ankylosaur','#7e7659',1.15),
-        petForm('Khủng long săn mồi','dino','raptor','#978056',1.1),
+        petForm('Deinonychus','dino','raptor','#978056',1.1,{crest:true}),
         petForm('Khủng long bạo chúa','dino','trex','#6b7854',1.3),
         petForm('Khủng long gai lưng','dino','spino','#96724f',1.4),
         petForm('Khủng long cổ dài','dino','brachio','#708976',1.5),
@@ -332,7 +332,7 @@ const ATTENDANCE_PET_BRANCHES={
         petForm('Phượng hoàng','bird','phoenix','#cf642c',1.45),
         petForm('Phượng hoàng thiên giới','bird','phoenix','#c6a455',1.6,{crest:true})]},
     beast:{name:'Hổ / Sư tử',icon:'bi-heart',forms:[
-        petForm('Mèo rừng con','beast','cub','#b09b76',.65),
+        petForm('Mèo rừng','beast','cub','#b09b76',.65),
         petForm('Linh miêu','beast','lynx','#a68d68',.8),
         petForm('Báo hoa mai','beast','leopard','#c39c58',.95,{spots:true}),
         petForm('Báo đen','beast','panther','#303a41',1),
@@ -349,13 +349,42 @@ const PET_BRANCH_FINALS={
     bird:petForm('Chu Tước','bird','phoenix','#f27639',1.68,{crest:true}),
     beast:petForm('Bạch Hổ','beast','tiger','#ece5df',1.65,{stripes:true,crest:true})
 };
-// Every regular branch species has a juvenile and mature form.
+const PET_BRANCH_ADDITIONS={
+    fish:[
+        ['Cá mập thằn lằn','shark','frilled','#615b76'],['Cá mập hổ','shark','tigerShark','#867967'],
+        ['Cá mập yêu tinh','shark','goblin','#b97574'],['Cá voi vây','whale','finwhale','#4b6375'],
+        ['Cá nhà táng cổ đại','whale','livyatan','#766b70'],['Xà ngư','fish','eel','#536e8d'],
+        ['Cá đao đại dương','shark','sawfish','#758f87'],['Dunkleosteus','shark','armoredFish','#625c64'],
+        ['Thủy long','dino','seaDragon','#32577f'],['Mosasaurus','dino','mosasaur','#48775a']
+    ],
+    dino:[
+        ['Dilophosaurus','dino','dilophosaurus','#9e6544'],['Styracosaurus','dino','styracosaurus','#a36c4a'],
+        ['Kentrosaurus','dino','kentrosaurus','#8c6042'],['Euoplocephalus','dino','euoplocephalus','#665f49'],
+        ['Utahraptor','dino','utahraptor','#965749'],['Giganotosaurus','dino','giganotosaurus','#7b5544'],
+        ['Suchomimus','dino','suchomimus','#667656'],['Diplodocus','dino','diplodocus','#8f8058'],
+        ['Wyvern','dino','wyvern','#77536e'],['Rồng giáp nham','dino','lavaDragon','#623647']
+    ],
+    bird:[
+        ['Chim gõ kiến','bird','woodpecker','#79534c'],['Vẹt mào','bird','cockatoo','#dbbfa2'],
+        ['Cú đại bàng','bird','eagleOwl','#805938'],['Chim ưng','bird','falcon','#59768a'],
+        ['Chim thư ký','bird','secretary','#aab3bd'],['Trĩ vàng','bird','pheasant','#c69336'],
+        ['Kền kền râu','bird','beardedVulture','#735844'],['Chim sấm','bird','thunderbird','#5864a1'],
+        ['Hỏa điểu','bird','firebird','#b74938'],['Kim Sí Điểu','bird','garuda','#c89443']
+    ],
+    beast:[
+        ['Mèo cá','beast','fishingCat','#857765'],['Linh miêu Caracal','beast','caracal','#a96243'],
+        ['Báo săn','beast','cheetah','#d4a460'],['Báo tuyết','beast','snowLeopard','#b2c4cf'],
+        ['Báo đốm Mỹ','beast','jaguar','#a56b32'],['Hổ Siberia','beast','siberianTiger','#bd713a'],
+        ['Hổ băng','beast','frostTiger','#7fabc4'],['Sư tử hang động','beast','caveLion','#946b49'],
+        ['Sư tử Nemea','beast','nemeanLion','#c18c43'],['Hổ giáp đá','beast','stoneTiger','#6b777e']
+    ]
+};
 for(const [key,branch] of Object.entries(ATTENDANCE_PET_BRANCHES)){
     const [small,large]={fish:[.65,1.8],dino:[.6,1.75],bird:[.5,1.6],beast:[.5,1.5]}[key];
-    const stages=branch.forms.flatMap(form=>[
-        {...form,name:form.name.endsWith(' con')?form.name.slice(0,-4)+' sơ sinh':form.name+(form.kind==='bird'?' non':' con'),juvenile:true},
-        {...form,juvenile:false}
-    ]);
+    const stages=branch.forms.flatMap((form,index)=>{
+        const [name,kind,shape,color]=PET_BRANCH_ADDITIONS[key][index];
+        return [form,petForm(name,kind,shape,color,1)];
+    });
     branch.forms=stages.map((form,index)=>({...form,scale:Number((small+(large-small)*index/(stages.length-1)).toFixed(3))}));
     branch.forms.push(PET_BRANCH_FINALS[key]);
 }
@@ -390,7 +419,7 @@ function attendancePetMotion(view) {
     if(view?.egg || view?.dead)return 'rest';
     if(view?.branch==='dino'&&view.level>=ATTENDANCE_PET_MAX_LEVEL)return 'fly';
     if(view?.form.kind==='bird')return 'fly';
-    return view?.form.kind==='beast'||view?.form.kind==='dino' && view?.form.shape!=='sea' ? 'walk' : 'swim';
+    return view?.form.kind==='beast'||view?.form.kind==='dino'&&!['sea','seaDragon','mosasaur'].includes(view.form.shape) ? 'walk' : 'swim';
 }
 
 function attendancePetTravelBounds(view,width,height) {
@@ -662,26 +691,27 @@ const PET_BATTLE_SPIRITS={
     qilin:{name:'Kỳ Lân',move:'Lân Giáp Phản Chấn',icon:'bi-arrow-repeat',passive:'Phản lại 14% sát thương thực nhận lên đối thủ; sát thương phản không thể chí mạng.',ultimate:'Tăng phản sát thương lên 30% trong 2 đòn đối thủ tiếp theo.',color:'#c084fc',motion:'slam',effect:'wave',ability:'reflection'},
 };
 function petBattleSpirit(element){return PET_BATTLE_SPIRITS[element]||null;}
+function petBattleCounters(source,target){
+    return source?.overcomes===target||
+        (source?.affinity==='wood'&&target==='earth')||
+        (source?.affinity==='earth'&&target==='water');
+}
 function petBattleMatchup(playerElement,opponentElement){
-    const playerAffinity=PET_BATTLE_ELEMENTS.get(playerElement)?.affinity;
-    const opponentAffinity=PET_BATTLE_ELEMENTS.get(opponentElement)?.affinity;
+    const playerType=PET_BATTLE_ELEMENTS.get(playerElement),opponentType=PET_BATTLE_ELEMENTS.get(opponentElement);
+    const playerAffinity=playerType?.affinity,opponentAffinity=opponentType?.affinity;
     if(!playerAffinity||!opponentAffinity)return '';
-    const playerType=[...PET_BATTLE_ELEMENTS.values()].find(value=>value.affinity===playerAffinity);
-    const opponentType=[...PET_BATTLE_ELEMENTS.values()].find(value=>value.affinity===opponentAffinity);
     if(opponentType?.gives===playerAffinity||
         (opponentAffinity==='fire'&&playerAffinity==='earth')||
         (opponentAffinity==='earth'&&playerAffinity==='metal'))return 'generates';
-    if(playerType?.overcomes===opponentAffinity||
-        (playerAffinity==='wood'&&opponentAffinity==='earth')||
-        (playerAffinity==='earth'&&opponentAffinity==='water'))return 'overcomes';
+    if(petBattleCounters(playerType,opponentAffinity))return 'overcomes';
+    if(petBattleCounters(opponentType,playerAffinity))return 'countered';
     return '';
 }
-function petBattleReceivesBonus(player,opponent){
-    return !!petBattleMatchup(player.element,opponent?.element);
-}
 function petBattleEffectiveStats(player,opponent){
-    if(!petBattleReceivesBonus(player,opponent))return player.stats;
-    return Object.fromEntries(Object.entries(player.stats).map(([key,value])=>[key,value*1.01]));
+    const relation=petBattleMatchup(player.element,opponent?.element);
+    const multiplier=relation==='generates'?1.01:relation==='countered'?.99:1;
+    if(multiplier===1)return player.stats;
+    return Object.fromEntries(Object.entries(player.stats).map(([key,value])=>[key,value*multiplier]));
 }
 function petBattleNumber(value){return Number(value.toFixed(2));}
 function petBattleMaxHp(stats,appearance={}){
@@ -778,13 +808,13 @@ function petBattleSimulation(players,firstUid,matchId=''){
             self.storedDamage=special?0:Math.min(maxHp[attacker]*.16,self.storedDamage+damage*.25);
             if(special&&landed)damage=petBattleNumber(damage+released);
         }
-        let blocked=0,shieldBroken=false;
+        let blocked=0,absorbed=0,shieldBroken=false;
         if(target.blockDamage>0){
             blocked=Math.min(damage,target.blockDamage);
             damage-=blocked;target.blockDamage=0;
         }
         if(target.shieldHp>0){
-            const absorbed=Math.min(damage,target.shieldHp);
+            absorbed=Math.min(damage,target.shieldHp);
             target.shieldHp=petBattleNumber(target.shieldHp-absorbed);
             damage-=absorbed;
             shieldBroken=target.shieldHp===0;
@@ -832,7 +862,7 @@ function petBattleSimulation(players,firstUid,matchId=''){
             physical:modern&&damage?physical:0,
             magic:modern&&damage?magic:0,
             ...(special?{special:players[attacker].element,specialName:spirit.move,spiritName:spirit.name,specialIcon:spirit.icon}:{}),
-            ...(blocked?{blocked:true,blockedDamage:blocked}:{}),...(reflectedDamage?{reflectedDamage}:{}),...(scorched?{burnDamage:scorched}:{}),
+            ...(blocked||absorbed?{blocked:true,blockedDamage:petBattleNumber(blocked+absorbed)}:{}),...(reflectedDamage?{reflectedDamage}:{}),...(scorched?{burnDamage:scorched}:{}),
             ...(appliedBurn?{burnApplied:appliedBurn,burnTurns:special&&element==='fire'?3:2}:{}),
             ...(healed?{healed}:{}),...(special&&element==='water'?{shielded:true}:{}),
             ...(foxHealed?{dodgeHealed:foxHealed}:{}),
@@ -952,7 +982,7 @@ function petBattleCompletePet(root,petId,match,uid,xpDelta,weightDelta,now){
 const PET_BATTLE_SKILL_NAMES={
     base:['Bọt Ngân','Vẫy Kim Lân','Vũ Điệu San Hô','Cánh Nước','Đuôi Chớp','Gai Xoáy','Cầu Gai','Mũi Kiếm','Lướt Đáy Biển'],
     fish:['Búa Xé Sóng','Hàm Trắng','Vây Sát Thủ','Đuôi Lưng Gù','Âm Vang Đại Dương','Khúc Ca Biển','Sóng Lam','Nanh Cổ Đại','Đại Triều Xanh','Vực Leviathan','Mai Huyền Vũ'],
-    dino:['Cú Đạp Non','Tam Giác Xung Kích','Phiến Giáp','Chùy Giáp','Móng Liềm','Hàm Bạo Chúa','Sống Gai','Quật Cổ Dài','Hơi Thở Rồng','Long Viêm Cổ','Thanh Long Giáng Thế'],
+    dino:['Móng Xé','Tam Giác Xung Kích','Phiến Giáp','Chùy Giáp','Móng Liềm','Hàm Bạo Chúa','Sống Gai','Quật Cổ Dài','Hơi Thở Rồng','Long Viêm Cổ','Thanh Long Giáng Thế'],
     bird:['Mũi Mổ Lam','Lông Vũ Ngũ Sắc','Đêm Tuyết','Ưng Lao','Hạc Xuyên Mây','Quạt Công','Sải Cánh Andes','Gió Hải Âu','Phượng Hỏa','Thiên Hỏa','Chu Tước Hỏa Vũ'],
     beast:['Vồ Cỏ','Chớp Tai Nhọn','Vuốt Hoa Mai','Bóng Đen','Vồ Vách Đá','Hổ Vồ Xé Gió','Vuốt Băng','Sư Tử Gầm','Bờm Ánh Trăng','Nanh Kiếm','Bạch Hổ Phá Sơn']
 };
@@ -962,12 +992,12 @@ function petBattleSkill({form,level,branch},element=null,special=false){
     const branchLevel=level-ATTENDANCE_PET_FORMS.length-1;
     const key=branchLevel>=0&&PET_BATTLE_SKILL_NAMES[branch]?branch:'base';
     const index=key==='base'?level-1:Math.floor(branchLevel/2);
-    const label=PET_BATTLE_SKILL_NAMES[key][index]||form.name;
-    const variant=Object.keys(PET_BATTLE_SKILL_NAMES).indexOf(key)*32+Math.max(0,index)*2+Number(!form.juvenile);
+    const label=(key!=='base'&&branchLevel%2?form.name:PET_BATTLE_SKILL_NAMES[key][index])||form.name;
+    const variant=Object.keys(PET_BATTLE_SKILL_NAMES).indexOf(key)*32+Math.max(0,key==='base'?index:branchLevel);
     const motion=form.kind==='bird'?'dive':form.kind==='beast'?'claw':form.shape==='tortoise'?'shield'
         :form.shape==='mermaid'?'song':form.kind==='dino'?'slam':form.kind==='shark'?'bite':'swim';
     const effect={dive:'wind',claw:'claw',shield:'wave',song:'water',slam:'fire',bite:'fang',swim:form.kind==='whale'?'wave':'water'}[motion];
-    return {label:form.juvenile?`${label} Non`:label,motion,effect,variant};
+    return {label,motion,effect,variant};
 }
 async function petBattleCommitment(id,uid,round,choice,nonce){
     const data=new TextEncoder().encode([id,uid,round,choice,nonce].join('|'));
@@ -8993,23 +9023,12 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
         if(state?.previewMode)document.getElementById(previewId).innerHTML=art.innerHTML.replaceAll(artId+'-egg-light',previewId+'-egg-light').replaceAll(artId+'-fish-light',previewId+'-fish-light');
     };
     function disposeModel(s) {
-        disposeBattleCritical(s);
+        
         disposeBattleResult(s);
         if (!s.model) return;
         const geometries=new Set(),materials=new Set(),textures=new Set();
         s.model.traverse(object=>{if(object.geometry)geometries.add(object.geometry);const mats=object.material?Array.isArray(object.material)?object.material:[object.material]:[];mats.forEach(mat=>materials.add(mat));});
         s.scene.remove(s.model);geometries.forEach(value=>value.dispose());materials.forEach(value=>{for(const key of ['map','bumpMap','roughnessMap'])if(value[key])textures.add(value[key]);value.dispose();});textures.forEach(value=>value.dispose());
-    }
-    function disposeBattleCritical(s){
-        if(!s.criticalGroup)return;
-        s.scene.remove(s.criticalGroup);
-        const materials=new Set(),textures=new Set();
-        s.criticalGroup.traverse(object=>{if(object.material)(Array.isArray(object.material)?object.material:[object.material]).forEach(material=>{materials.add(material);for(const key of ['map','alphaMap','emissiveMap'])if(material[key])textures.add(material[key]);});});
-        materials.forEach(material=>material.dispose());
-        textures.forEach(texture=>texture.dispose());
-        s.criticalGeometries?.forEach(geometry=>geometry.dispose());
-        s.criticalGroup=null;s.criticalGhost=null;s.criticalSpirit=null;s.criticalMotes=null;s.criticalAt=0;
-        if(s.model)s.model.visible=true;
     }
     function disposeBattleResult(s){
         if(!s.resultGroup)return;
@@ -9025,7 +9044,6 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
         const T=s.THREE,group=new T.Group();
         const makeMaterial=(color,options={})=>{
             const material=new T.MeshStandardMaterial({color,roughness:.82,...options});
-            material.userData.baseOpacity=material.opacity;
             return material;
         };
         const add=(geometry,mat,x,y,z,target=group)=>{const mesh=new T.Mesh(geometry,mat);mesh.position.set(x,y,z);target.add(mesh);geometries.push(geometry);return mesh;};
@@ -9082,28 +9100,9 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
         }
         return {group,ghost,spirit,motes,geometries};
     }
-    function fadeGraveSpirit(group,opacity){
-        group.traverse(object=>{
-            if(!object.material)return;
-            for(const material of Array.isArray(object.material)?object.material:[object.material]){
-                material.transparent=true;
-                material.opacity=(material.userData.baseOpacity??1)*opacity;
-            }
-        });
-    }
-    function startBattleCritical(s,at){
-        if(!at||s.criticalStartedAt===at||s.result||!s.model||!s.THREE)return;
-        disposeBattleCritical(s);
-        s.criticalStartedAt=at;
-        const spirit=createGraveSpirit(s,[]);
-        s.criticalGroup=spirit.group;s.criticalGhost=spirit.ghost;s.criticalSpirit=spirit.spirit;
-        s.criticalMotes=spirit.motes;s.criticalGeometries=spirit.geometries;s.criticalAt=at;
-        s.criticalGroup.scale.setScalar(.08);s.criticalGroup.position.y=-.15;
-        s.model.visible=false;s.scene.add(s.criticalGroup);
-    }
     function setBattleResult(s,result){
         if(s.result===result)return;
-        disposeBattleCritical(s);disposeBattleResult(s);
+        disposeBattleResult(s);
         if(s.model)s.model.visible=true;
         s.result=result;
         if(result!=='defeat'||!s.model||!s.THREE)return;
@@ -9189,7 +9188,6 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
                 }
             }
             if(s.duel?.result)setBattleResult(s,s.duel.result);
-            else startBattleCritical(s,s.duel?.criticalAt);
         };
         const variant=!!view.form.crest;
         const mainColor=new T.Color(view.form.color);
@@ -9305,7 +9303,15 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
             for(let i=0;i<10;i++){const angle=i*2.399;const y=-.5+i*.105;const r=.61*Math.sqrt(Math.max(.1,1-y*y));sphere(group,Math.sin(angle)*r,y,Math.cos(angle)*r,.05,.07,.025,material(i%2?'#bfaa77':'#adc4c7'));}
             group.rotation.z=.07;applyBattleResult();return;
         }
-        const shape=view.form.shape,kind=view.form.kind;
+        const species=view.form.shape,kind=view.form.kind;
+        const shape=({dilophosaurus:'raptor',utahraptor:'raptor',styracosaurus:'triceratops',kentrosaurus:'stego',
+            euoplocephalus:'ankylosaur',giganotosaurus:'trex',suchomimus:'spino',diplodocus:'brachio',wyvern:'dragon',lavaDragon:'dragon',
+            woodpecker:'kingfisher',cockatoo:'parrot',eagleOwl:'owl',falcon:'eagle',secretary:'crane',pheasant:'peacock',
+            beardedVulture:'condor',thunderbird:'eagle',firebird:'phoenix',garuda:'phoenix',
+            fishingCat:'cub',caracal:'lynx',cheetah:'leopard',snowLeopard:'leopard',jaguar:'panther',
+            siberianTiger:'tiger',frostTiger:'tiger',caveLion:'lion',nemeanLion:'lion',stoneTiger:'sabertooth',
+            frilled:'shark',tigerShark:'shark',goblin:'shark',finwhale:'blue',livyatan:'sperm',eel:'small',
+            sawfish:'sword',armoredFish:'puffer',seaDragon:'sea',mosasaur:'sea'})[species]||species;
         if(shape==='tortoise'){
             const shell=material('#294b47'),rim=material('#acd7b6');
             const jade=material('#388477');
@@ -9399,15 +9405,26 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
             applyBattleResult();return;
         }
         if(shape==='sea'){
-            sphere(group,-.15,0,0,1.05,.34,.34,bodyMat);sphere(group,.85,.06,0,.62,.22,.25,bodyMat);sphere(group,1.18,-.08,0,.48,.08,.24,cream);eyes(group,1.02,.13,.24);
-            const tail=cone(group,-1.55,.03,0,.25,1.3,finMat,Math.PI/2);s.rig.push({mesh:tail,axis:'y',amount:.25,phase:0});
+            const dragon=species==='seaDragon',mosasaur=species==='mosasaur';
+            sphere(group,-.15,0,0,1.05,.34,.34,bodyMat);sphere(group,.85,.06,0,mosasaur?.82:.62,.22,.25,bodyMat);sphere(group,1.18,-.08,0,mosasaur?.62:.48,.08,.24,cream);eyes(group,1.02,.13,.24);
+            const tail=new T.Group();tail.position.x=-.89;group.add(tail);
+            tube(tail,[[0,0,0],[-.45,.04,0],[-.92,-.08,.06],[-1.35,.03,.13]],[.23,.15,.075,.006],bodyMat);
+            if(mosasaur)fin(tail,[[-.72,0],[-1.36,.39],[-1.22,-.12],[-1.45,-.5],[-.90,-.18]],finMat);
+            if(dragon){
+                for(let i=0;i<7;i++)fin(group,[[-.93+i*.24,.24],[-.98+i*.24,.64],[-.69+i*.24,.29]],finMat);
+                for(const side of [-1,1])tube(group,[[1.01,.18,side*.18],[.82,.43,side*.28],[.60,.58,side*.29]],[.065,.041,.003],cream);
+            }
+            s.rig.push({mesh:tail,axis:'y',amount:.25,phase:0});
             for(const side of [-1,1])for(const x of [-.5,.5]){const flipper=fin(group,[[x,.03],[x-.4,-.7],[x+.2,-.1]],finMat,side*.25);flipper.rotation.x=side*.8;s.rig.push({mesh:flipper,axis:'x',base:side*.8,amount:.25,phase:side+x});}
             for(let i=0;i<6;i++)cone(group,.75+i*.13,-.04,.24,.025,.1,cream,Math.PI);
             applyBattleResult();return;
         }
         if(['trex','raptor','spino'].includes(shape)){
             // Horizontal torso, muscular hips, S-shaped neck and long counterbalancing tail.
-            organicBody([[-.22,.03,0,.87,.48,.37],[.18,-.14,0,.57,.36,.33],[.37,.33,0,.32,.4,.27],[.51,.64,0,.25,.37,.23],[.92,.82,0,.52,.28,.26],[1.18,.8,0,.38,.23,.25]],bodyMat);
+            const lean=shape==='raptor',longJaw=shape==='spino'||species==='giganotosaurus';
+            organicBody([[-.22,.03,0,.87,lean?.36:.48,lean?.27:.39],[.18,-.14,0,.57,.36,.33],
+                [.37,.33,0,.32,.4,.27],[.51,.64,0,.25,.37,.23],[.92,.82,0,.52,lean?.20:.28,.26],
+                [longJaw?1.29:1.18,.8,0,longJaw?.51:.38,shape==='spino'?.16:.23,.25]],bodyMat);
             sphere(group,1.12,.59,0,.47,.10,.245,finMat);
             const gum=material('#61433a'),ivory=material('#dfd2ab');
             for(const side of [-1,1]){
@@ -9440,8 +9457,17 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
             tube(tailPivot,[[0,0,0],[-.48,-.05,0],[-1.05,.02,.04],[-1.65,.18,.08]],[.3,.22,.12,.005],bodyMat);
             s.rig.push({mesh:tailPivot,axis:'y',amount:.12,phase:0});
             for(let i=0;i<17;i++)sphere(group,-.84+i*.092,.39+Math.sin(i/17*Math.PI)*.1,0,.038,.042,.052,finMat);
-            if(shape==='spino')fin(group,[[-.85,.37],[-.6,1.18],[-.05,1.35],[.35,.55]],finMat);
-            if(shape==='raptor'){for(let i=0;i<7;i++)cone(group,-.4+i*.13,.48,0,.04,.15,finMat);}
+            if(shape==='spino'){
+                const sail=species==='suchomimus'?.72:1.32;
+                fin(group,[[-.98,.34],[-.64,sail*.85],[-.23,sail],[.12,sail*.94],[.45,.44]],finMat);
+                for(let i=0;i<6;i++)tube(group,[[-.8+i*.20,.38,.025],[-.66+i*.17,sail*(.68+Math.sin(i*.5)*.23),.025]],[.017,.005],ivory);
+            }
+            if(species==='dilophosaurus')for(const side of [-1,1])
+                fin(group,[[.61,1],[.84,1.29],[1.07,1.32],[1.26,1.03]],finMat,side*.14);
+            if(lean){
+                for(let i=0;i<7;i++)cone(group,-.71+i*.14,.39,0,.05,.16+(i%3)*.06,finMat);
+                for(const side of [-1,1])tube(group,[[-.24,-.93,side*.39],[-.04,-.79,side*.43],[.1,-.91,side*.43]],[.065,.04,.003],ivory);
+            }
             group.scale.setScalar(.87);
             if(shape==='raptor')group.scale.y*=.88;
             applyBattleResult();return;
@@ -9560,6 +9586,8 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
             }
             if(shape==='triceratops'){
                 sphere(group,.84,.93,0,.13,.48,.56,finMat);cone(group,1.13,1.2,.22,.07,.5,cream,-.4);cone(group,1.13,1.2,-.22,.07,.5,cream,-.4);cone(group,1.54,.83,0,.07,.27,cream,-.7);
+                if(species==='styracosaurus')for(let i=-3;i<=3;i++)
+                    tube(group,[[.80,.92,i*.14],[.61,1.43-Math.abs(i)*.08,i*.22]],[.075,.003],cream);
             }
             if(shape==='ankylosaur'){
                 for(let row=0;row<3;row++)for(let i=0;i<7;i++)sphere(group,-.72+i*.2,.43+Math.sin(i/7*Math.PI)*.11,(row-1)*.23,.12,.09,.12,finMat);
@@ -9568,6 +9596,7 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
             if(shape==='brachio'){
                 tube(group,[[.65,.4,0],[.83,.85,0],[.92,1.27,0],[1.03,1.4,0]],[.22,.18,.13,.1],bodyMat);
                 sphere(group,1.1,1.4,0,.26,.15,.16,bodyMat);eyes(group,1.24,1.45,.14);group.scale.setScalar(.82);
+                if(species==='diplodocus')tube(tail,[[-1.2,.22,.07],[-1.85,.35,.10],[-2.27,.51,.22]],[.085,.043,.002],bodyMat);
             }
             if(shape==='stego'){
                 for(let i=0;i<7;i++){
@@ -9575,12 +9604,23 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
                     fin(group,[[x-.16,.33],[x-.08,.33+h*.75],[x+.04,.33+h],[x+.15,.34]],finMat,i%2?.10:-.10);
                 }
                 for(const side of [-1,1])for(const x of [-1.36,-1.08])tube(tail,[[x,.18,side*.05],[x-.12,.38,side*.26]],[.063,.003],cream);
+                if(species==='kentrosaurus')for(const side of [-1,1])for(let i=0;i<5;i++)
+                    tube(group,[[-1.1+i*.28,.29,side*.26],[-1.25+i*.28,.66,side*.64]],[.075,.002],cream);
             }
             if(shape==='dragon'||variant){
                 const count=variant?7+view.level%7:shape==='dragon'?9:6;
                 for(let i=0;i<count;i++)cone(group,-1.15+i*.25,.5+Math.sin(i/count*Math.PI)*.2,0,.13,.35+(i%2)*.15,material(shape==='stego'?'#fbbf24':'#e9d5ff'));
             }
-            if(shape==='dragon')[-1,1].forEach(side=>{const wing=fin(group,[[-.4,.2],[-.8,1.3],[.15,.95],[.45,.25]],material('#c4b5fd'),side*.35);wing.rotation.x=side*.8;s.rig.push({mesh:wing,axis:'x',base:side*.8,amount:.2,phase:side});});
+            if(shape==='dragon')for(const side of [-1,1]){
+                const membrane=material(species==='lavaDragon'?'#c64e38':species==='wyvern'?'#9f70ab':'#c4b5fd');
+                const wingRoot=new T.Group();wingRoot.position.z=side*.31;group.add(wingRoot);
+                const wingPeak=species==='wyvern'?1.95:1.52;
+                const points=[[.42,.26],[.10,.83],[-.85,wingPeak],[-1.45,.68],[-1.13,.80],[-.78,.49],[-.54,.63],[-.21,.24]];
+                fin(wingRoot,points,membrane);
+                for(const [x,y] of [points[2],points[3],points[5]])tube(wingRoot,[[.24,.30,0],[-.10,.69,0],[x,y,0]],[.058,.030,.004],bodyMat);
+                wingRoot.rotation.x=side*.72;s.rig.push({mesh:wingRoot,axis:'x',base:side*.72,amount:.21,phase:side});
+                tube(group,[[.79,.83,side*.19],[.59,1.11,side*.28],[.35,1.24,side*.28]],[.10,.059,.003],cream);
+            }
             applyBattleResult();return;
         }
         if(clown){
@@ -9813,6 +9853,9 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
                     const pose=s.previewAttack||s.duel||{},attackAge=(Date.now()-(pose.attackAt||0))/1000,hitAge=(Date.now()-(pose.hitAt||0))/1000;
                     const lunge=attackAge>=0&&attackAge<.9?Math.sin(attackAge/.9*Math.PI):0,hurt=hitAge>=0&&hitAge<.5?(1-hitAge/.5):0;
                     const direction=pose.facing? -1:1;s.model.rotation.y=pose.facing||0;
+                    const criticalAge=Date.now()-(pose.criticalAt||0);
+                    if(!pose.result&&!reduced&&criticalAge>=0&&criticalAge<800)
+                        s.model.scale.multiplyScalar(1+.26*Math.sin(Math.PI*criticalAge/800));
                     if(pose.result==='defeat'&&s.resultGhost){
                         s.resultSpirit.position.y=.22+Math.sin(s.t*2.3)*.045;
                         s.resultGhost.rotation.z=Math.sin(s.t*1.4)*.055;
@@ -9839,24 +9882,6 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
                 }else if(staged){
                     s.model.rotation.y=reduced?-.28:presentation==='showcase'?s.t*.62-.28:Math.sin(s.t*1.3)*.24-.2;
                     s.model.position.y=reduced?0:Math.sin(s.t*2)*.055;
-                }
-                if(s.criticalGroup){
-                    const age=(Date.now()-s.criticalAt)/1000;
-                    if(age>=1.72)disposeBattleCritical(s);
-                    else if(age<0){s.criticalGroup.visible=false;s.model.visible=true;}
-                    else{
-                        s.criticalGroup.visible=true;s.model.visible=false;
-                        const rise=Math.min(1,age/.32),fade=age<1.22?1:Math.max(0,(1.72-age)/.5);
-                        s.criticalGroup.scale.setScalar(.08+rise*.84);
-                        s.criticalGroup.position.y=-.15+rise*.12;
-                        s.criticalSpirit.position.y=.22+rise*.5+Math.sin(s.t*4)*.045;
-                        s.criticalGhost.rotation.z=Math.sin(s.t*2.4)*.08;
-                        s.criticalMotes?.forEach((mote,i)=>{
-                            const angle=s.t*3+mote.userData.orbit;
-                            mote.position.set(Math.cos(angle)*(.46+i%2*.08),.18+Math.sin(angle)*.18,.18+Math.sin(angle*2)*.04);
-                        });
-                        fadeGraveSpirit(s.criticalGroup,fade);
-                    }
                 }
                 s.renderer.render(s.scene,s.camera);
             }
@@ -9919,7 +9944,7 @@ function createAttendancePet3D(buttonId='attendancePetSwimmer',artId='attendance
         fallback(view);const art=document.getElementById(artId);
         return art?.querySelector('svg')?'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(art.innerHTML):null;
     }
-    return {start,stop,update,preview,thumbnail,duelPose:pose=>{if(state){state.duel=pose;const result=pose.result||null;setBattleResult(state,result);if(!result)startBattleCritical(state,pose.criticalAt);}},castSkill:skill=>{if(state?.view&&!state.view.dead&&!state.view.egg)state.previewAttack={attackAt:Date.now(),facing:0,kind:state.view.form.kind,level:state.view.level,skill,skillColor:state.view.form.color};},feed:()=>{if(state)state.fedAt=state.t;}};
+    return {start,stop,update,preview,thumbnail,duelPose:pose=>{if(state){state.duel=pose;setBattleResult(state,pose.result||null);}},castSkill:skill=>{if(state?.view&&!state.view.dead&&!state.view.egg)state.previewAttack={attackAt:Date.now(),facing:0,kind:state.view.form.kind,level:state.view.level,skill,skillColor:state.view.form.color};},feed:()=>{if(state)state.fedAt=state.t;}};
 }
 const AttendancePet3D=createAttendancePet3D();
 
@@ -10853,7 +10878,7 @@ function renderAttendancePetBranches(view){
             </section>`;
         }).join('');
         road.innerHTML=`<ol class="pet-road-shared" aria-label="Các cấp tiến hóa chung">${sharedNodes}</ol>
-            <div class="pet-road-fork"><strong>Cá đuối cấp ${shared.length} mở 4 nhánh</strong><small>Từ cấp 10 đến 29 có dạng non và trưởng thành. Cấp 30 là hình thái cuối; mỗi cấp sau đó cộng thêm 1 điểm chỉ số.</small></div>
+            <div class="pet-road-fork"><strong>Cá đuối cấp ${shared.length} mở 4 nhánh</strong><small>Từ cấp 10 đến 29, mỗi cấp mở một thú cưng khác. Cấp 30 tiến hóa thành thần thú; mỗi cấp sau đó cộng thêm 1 điểm chỉ số.</small></div>
             <div class="pet-road-branches">${branches}</div>`;
     }
 }
@@ -11403,6 +11428,7 @@ const PetBattleGame=(()=>{
         info.dataset.spirit=element||'';
         el('petBattleSpiritName').textContent=spirit?.name||'Chọn hộ mệnh để xem kỹ năng';
         el('petBattleSpiritPassive').textContent=spirit?.passive||'Chọn một thần thú bên trên.';
+        el('petBattleSpiritMove').textContent=spirit?.move||'Tuyệt chiêu';
         el('petBattleSpiritUltimate').textContent=spirit?.ultimate||'Kỹ năng đặc biệt kích hoạt ở đòn đánh thứ 4.';
         el('petBattleSpiritIcon').firstElementChild.className=`bi ${spirit?.icon||'bi-stars'}`;
         info.classList.toggle('has-spirit',!!spirit);
@@ -11413,17 +11439,22 @@ const PetBattleGame=(()=>{
         const suggestions=[];
         for(const [key] of PET_BATTLE_ELEMENTS){
             const relation=petBattleMatchup(key,rivalElement);
-            if(relation)suggestions.push(`${names[key]} (${relation==='generates'?'tương sinh':'tương khắc'})`);
+            const recommended=relation==='generates'||relation==='overcomes';
+            const effect={generates:'Được tương sinh, +1% chỉ số bản thân',overcomes:'Khắc đối thủ, −1% chỉ số đối thủ',countered:'Bị khắc, −1% chỉ số bản thân'}[relation];
+            if(recommended)suggestions.push(`${names[key]} (${effect.toLowerCase()})`);
             const button=el('petBattleSetup').querySelector(`[data-battle-element="${key}"]`);
-            button.classList.toggle('is-recommended',!!relation);
-            button.title=relation?`${relation==='generates'?'Tương sinh':'Tương khắc'} với ${names[rivalElement]}: +1% toàn bộ chỉ số`:rivalElement?'Không có lợi thế quan hệ chỉ số trước đối thủ này':'';
+            button.classList.toggle('is-recommended',recommended);
+            button.dataset.matchupLabel={generates:'TƯƠNG SINH +1%',overcomes:'KHẮC ĐỐI THỦ',countered:'BỊ KHẮC −1%'}[relation]||'';
+            button.classList.toggle('is-countered',relation==='countered');
+            button.querySelector('.pet-guardian-move').textContent=petBattleSpirit(key).move;
+            button.title=effect||'';
         }
         const advice=el('petBattleGuardianAdvice');
         advice.hidden=humanMatch;
         advice.textContent=rivalElement
-            ?suggestions.length?`Đối thủ: ${names[rivalElement]}. Gợi ý: ${suggestions.join(' hoặc ')} · +1% toàn bộ chỉ số trong trận.`
+            ?suggestions.length?`Đối thủ: ${names[rivalElement]}. Gợi ý: ${suggestions.join(' hoặc ')}.`
                 :'Đối thủ: '+names[rivalElement]+'. Không có lợi thế quan hệ chỉ số; chọn hộ mệnh theo tuyệt chiêu phù hợp.'
-            :'Nhân Mã và Kỳ Lân thuộc Thổ. Hỏa sinh Thổ, Thổ sinh Kim. Mộc khắc Thổ, Thổ khắc Thủy. Bên có lợi thế nhận +1% toàn bộ chỉ số.';
+            :'Bên được tương sinh nhận +1% toàn bộ chỉ số. Bên bị khắc chịu −1% toàn bộ chỉ số.';
     }
     function cyclePet(){
         const pet=el('petBattlePet');
@@ -11920,7 +11951,7 @@ const PetBattleGame=(()=>{
             guardianMark.textContent=hideGuardianIdentity&&!inCombat?'✦':element?.icon||'✦';
             guardianMark.setAttribute('aria-label',hideGuardianIdentity&&!inCombat?'Thần thú hộ mệnh':element?.label||'Thần thú hộ mệnh');
             const matchup=p?petBattleMatchup(p.element,m.players[1-i]?.element):'';
-            const bonus=matchup?` · Tương ${matchup==='generates'?'sinh':'khắc'} +1%`:'';
+            const bonus=inCombat?({generates:' · Được sinh +1%',overcomes:' · Khắc đối thủ',countered:' · Bị khắc −1%'}[matchup]||''):'';
             el(`petBattleName${i}`).textContent=p?`${p.petName} · ${p.name}`:guest?.displayName||'Chờ đối thủ vào phòng';
             const view=p?.appearance||guest;
             el(`petBattleStats${i}`).textContent=view
@@ -11950,8 +11981,35 @@ const PetBattleGame=(()=>{
             const status=play.last?.statuses?.[i]||{};
             setElementAura(el(`petBattleModel${i}`),spiritActive&&!hideGuardianIdentity?elementKey:'',spiritActive&&hideGuardianIdentity);
             const statusFx=el(`petBattleStatusFx${i}`);
-            statusFx.classList.toggle('is-burning',!!status.burning);
-            statusFx.classList.toggle('is-healing',attacking&&!!play.last?.healed||hit&&!!(play.last?.shieldHeal||play.last?.dodgeHealed)||!!status.healing);
+            statusFx.classList.toggle('is-burning',!battleEnded&&!!status.burning);
+            const healing=Boolean(attacking&&play.last?.healed||hit&&(play.last?.shieldHeal||play.last?.dodgeHealed));
+            const turnKey=m.id+':'+play.count;
+            const healKey=healing?turnKey:'';
+            if(statusFx.dataset.healTurn!==healKey){
+                statusFx.dataset.healTurn=healKey;
+                for(const icon of statusFx.querySelectorAll('.heal-sign')){
+                    for(const animation of icon.getAnimations())animation.cancel();
+                    if(healing&&!matchMedia('(prefers-reduced-motion: reduce)').matches)
+                        icon.animate([{opacity:0,transform:'translateY(8px)'},
+                            {opacity:1,offset:.2},{opacity:0,transform:'translateY(-58px)'}],
+                            {duration:820,delay:Number(icon.dataset.delay)});
+                }
+            }
+            statusFx.classList.toggle('is-healing',healing);
+            const cast=el('petBattleCast'+i);
+            if(!inCombat||cast.dataset.room!==m.id){cast.hidden=true;cast.dataset.castTurn='';}
+            cast.dataset.room=m.id;
+            if(attacking&&play.last.specialName&&cast.dataset.castTurn!==turnKey){
+                cast.dataset.castTurn=turnKey;
+                const remaining=PET_BATTLE_STEP_MS+1000-(Date.now()-at);
+                cast.textContent=play.last.specialName;
+                cast.hidden=remaining<=0;
+                for(const animation of cast.getAnimations())animation.cancel();
+                if(remaining>0){
+                    const animation=cast.animate([{opacity:1},{opacity:1,offset:.93},{opacity:0}],{duration:remaining,fill:'forwards'});
+                    animation.onfinish=()=>{cast.hidden=true;};
+                }
+            }
             statusFx.classList.toggle('is-shielded',!!status.shielded);
             statusFx.classList.toggle('is-evasive',!!status.evasion);
             statusFx.classList.toggle('is-charged',!!status.charged);
@@ -11959,15 +12017,17 @@ const PetBattleGame=(()=>{
             statusFx.classList.toggle('is-heal-blocked',!!status.healingBlocked);
             statusFx.classList.toggle('is-reflecting',!!status.reflecting);
             state.models[i]?.duelPose({facing:i?Math.PI:0,attackAt:attacking?at:0,hitAt:impact,
-                criticalAt:impact&&play.last?.critical?impact:0,defeated:result==='defeat',result,
+                criticalAt:attacking&&play.last?.critical?at+480:0,defeated:result==='defeat',result,
                 kind:p?.appearance.form.kind,level:p?.appearance.level,skill:attacking?petBattleSkill(p.appearance,p.element,!!play.last?.special&&!hideGuardianIdentity):null,
                 skillColor:hideGuardianIdentity?p?.appearance.form.color:element?.color||p?.appearance.form.color});
             el(`petBattleSide${i}`).classList.toggle('is-attacking',!!attacking&&Date.now()-at<1000);el(`petBattleSide${i}`).classList.toggle('is-hit',!!hit&&Date.now()-at<1000);
             const damage=el(`petBattleDamage${i}`),dodged=hit&&play.last?.dodged,critical=hit&&!dodged&&play.last?.critical;
             const notes=[];
-            if(hit)notes.push(play.last?.blocked?`${hideGuardianIdentity?'CHẶN':'HUYỀN VŨ · CHẶN'} ${play.last.blockedDamage||''} HP`:dodged?'NÉ ĐÒN':Number.isFinite(play.last?.damage)?`${critical?'CHÍ MẠNG · ':''}−${play.last.damage}`:'');
+            if(hit&&play.last?.blocked)notes.push(`ĐỠ ĐÒN · CHẶN ${play.last.blockedDamage||''} HP`);
+            if(dodged||hit&&play.last.hits?.some(strike=>strike.dodged))notes.push('NÉ ĐÒN');
+            if(hit&&!dodged&&(!play.last.blocked||play.last.damage>0))notes.push(`${critical?'CHÍ MẠNG · ':''}−${play.last.damage}`);
             if(attacking&&play.last?.healed)notes.push(`HỒI +${play.last.healed} HP`);
-            if(hit&&play.last?.dodgeHealed)notes.push(`NÉ THÀNH CÔNG · HỒI +${play.last.dodgeHealed} HP`);
+            if(hit&&play.last?.dodgeHealed)notes.push(`HỒI +${play.last.dodgeHealed} HP`);
             if(attacking&&play.last?.burnApplied)notes.push('GÂY THIÊU ĐỐT');
             if(hit&&play.last?.shieldHeal)notes.push(`KHIÊN VỠ · HỒI +${play.last.shieldHeal} HP`);
             if(attacking&&play.last?.reflectedDamage)notes.push(`PHẢN CHẤN −${play.last.reflectedDamage} HP`);
@@ -11981,10 +12041,15 @@ const PetBattleGame=(()=>{
             if(!hideGuardianIdentity&&attacking&&play.last?.special==='kitsune')notes.push('CỬU VĨ · NÉ TRÁNH 2 LƯỢT');
             if(!hideGuardianIdentity&&attacking&&play.last?.special==='water')notes.push('HUYỀN VŨ · CHẮN ĐÒN KẾ TIẾP');
             if(attacking&&play.last?.shielded)notes.push(hideGuardianIdentity?'KHIÊN KÍCH HOẠT':'THẦN THUẪN KÍCH HOẠT');
-            if(attacking&&play.last?.specialName)notes.unshift(hideGuardianIdentity?'✦ TUYỆT CHIÊU':`✦ ${play.last.specialName}`);
-            damage.textContent=notes.filter(Boolean).join(' · ');
+            const noteText=notes.filter(Boolean).join(' · '),noteKey=noteText?turnKey:'';
+            if(damage.dataset.noteTurn!==noteKey){
+                damage.dataset.noteTurn=noteKey;
+                damage.textContent=noteText;
+                damage.classList.remove('is-visible');
+                if(noteText){void damage.offsetWidth;damage.classList.add('is-visible');}
+            }
             damage.classList.toggle('is-dodged',!!dodged);damage.classList.toggle('is-critical',!!critical);
-            damage.classList.toggle('is-special',!!play.last?.special&&attacking);
+            damage.classList.toggle('is-heal',healing);
         }
         el('petBattleRps').hidden=m.status!=='rps';el('petBattleRpsStatus').textContent=m.commits?.[state.uid]?'Đã khóa lựa chọn. Chờ cả hai bên để mở kết quả.':m.rpsRound?'Vừa hòa. Cả hai cùng chọn lại.':'Lựa chọn được giữ kín đến khi cả hai đã chọn.';
         el('petBattleRps').querySelectorAll('button').forEach(button=>button.disabled=state.busy||!!m.commits?.[state.uid]);
@@ -12016,7 +12081,7 @@ const PetBattleGame=(()=>{
                     if(turn.damage>=Math.max(1,average*1.5))notes.push(`đòn mạnh ${turn.damage} sát thương`);
                     if(turn.blocked)notes.push(`${m.bot?'Huyền Vũ chặn':'Chặn'} ${turn.blockedDamage||0} sát thương`);
                     if(turn.healed)notes.push(`hồi ${turn.healed} HP`);
-                    if(turn.specialName)notes.push(m.bot?turn.specialName:'tung tuyệt chiêu');
+                    if(turn.specialName)notes.push(turn.specialName);
                     const before=turns[i-1]?.hp;
                     if(before&&m.winnerUid){
                         const side=m.players.findIndex(p=>p.uid===m.winnerUid);

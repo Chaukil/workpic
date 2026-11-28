@@ -33,7 +33,7 @@ try {
     const inlineJs = result.code.replace(/<\/script/gi, '<\\/script');
     const inlineCss = styles.replace(/<\/style/gi, '<\\/style');
     const replacements = [
-        ['<link rel="stylesheet" href="styles.css">', `<style>\n${inlineCss}\n</style>`],
+        [template.match(/<link rel="stylesheet" href="styles\.css(?:\?[^"\s]*)?">/)?.[0] || '<link rel="stylesheet" href="styles.css">', `<style>\n${inlineCss}\n</style>`],
         [template.match(/<script type="module" src="app\.js(?:\?[^"\s]*)?"><\/script>/)?.[0] || '<script type="module" src="app.js"></script>', `<script type="module">\n${inlineJs}\n</script>`]
     ];
     let html = template;
@@ -51,8 +51,8 @@ console.log(`Deploy dist/: index.html (${((await stat('dist/index.html')).size /
 
     "test": async () => {
 const helperSource = fs.readFileSync('app.js', 'utf8').replace(/\r\n/g,'\n').split('// BEGIN SHARED HELPERS\n')[1].split('// END SHARED HELPERS')[0];
-const helperModule = helperSource + '\nexport { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater, attendancePetDay, newAttendancePet, attendancePetView, transitionAttendancePet, adjustAdminPet, attendancePetMotion, attendancePetTravelBounds, attendancePetCatalog, attendancePetScale, ATTENDANCE_PET_BRANCHES, normalizePetNickname, attendancePetRecords, attendancePetSelected, attendancePetHouseholdDay, transitionPetHousehold, attendancePetWeight, attendancePetActivityTime, buildPetComparison, unchangedPetAdminAction, petBattleBudget, petBattleStats, petBattleMaxHp, petBattlePower, petBattleRps, petBattleSimulation, petBattlePlayback, petBattleChangeWeight, petBattleFighter, petBattleClaimAmount, petBattleSettleXp, petBattleCompletePet, petBattleMatchup, petBattleReceivesBonus, petBattleEffectiveStats, makePetBattleBot, petBattleSpirit, petBattleSkill, petBattleCommitment };';
-const { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater, attendancePetDay, newAttendancePet, attendancePetView, transitionAttendancePet, adjustAdminPet, attendancePetMotion, attendancePetTravelBounds, attendancePetCatalog, attendancePetScale, ATTENDANCE_PET_BRANCHES, normalizePetNickname, attendancePetRecords, attendancePetSelected, attendancePetHouseholdDay, transitionPetHousehold, attendancePetWeight, attendancePetActivityTime, buildPetComparison, unchangedPetAdminAction, petBattleBudget, petBattleStats, petBattleMaxHp, petBattlePower, petBattleRps, petBattleSimulation, petBattlePlayback, petBattleChangeWeight, petBattleFighter, petBattleClaimAmount, petBattleSettleXp, petBattleCompletePet, petBattleMatchup, petBattleReceivesBonus, petBattleEffectiveStats, makePetBattleBot, petBattleSpirit, petBattleSkill, petBattleCommitment } = await import('data:text/javascript;base64,' + Buffer.from(helperModule).toString('base64'));
+const helperModule = helperSource + '\nexport { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater, attendancePetDay, newAttendancePet, attendancePetView, transitionAttendancePet, adjustAdminPet, attendancePetMotion, attendancePetTravelBounds, attendancePetCatalog, attendancePetScale, ATTENDANCE_PET_BRANCHES, normalizePetNickname, attendancePetRecords, attendancePetSelected, attendancePetHouseholdDay, transitionPetHousehold, attendancePetWeight, attendancePetActivityTime, buildPetComparison, unchangedPetAdminAction, petBattleBudget, petBattleStats, petBattleMaxHp, petBattlePower, petBattleRps, petBattleSimulation, petBattlePlayback, petBattleChangeWeight, petBattleFighter, petBattleClaimAmount, petBattleSettleXp, petBattleCompletePet, petBattleMatchup,  petBattleEffectiveStats, makePetBattleBot, petBattleSpirit, petBattleSkill, petBattleCommitment };';
+const { convertWorkHoursRows, resolveApiUrl, vietnameseLunar, dateKey, monthPair, holidaysForYear, personalEventOccurs, checklistFromText, compareScheduleEntries, reconcileChildren, reconcileMarkup, createScheduleCache, jobColorStyle, advanceStormWater, scoopStormWater, loadStormWater, saveStormWater, attendancePetDay, newAttendancePet, attendancePetView, transitionAttendancePet, adjustAdminPet, attendancePetMotion, attendancePetTravelBounds, attendancePetCatalog, attendancePetScale, ATTENDANCE_PET_BRANCHES, normalizePetNickname, attendancePetRecords, attendancePetSelected, attendancePetHouseholdDay, transitionPetHousehold, attendancePetWeight, attendancePetActivityTime, buildPetComparison, unchangedPetAdminAction, petBattleBudget, petBattleStats, petBattleMaxHp, petBattlePower, petBattleRps, petBattleSimulation, petBattlePlayback, petBattleChangeWeight, petBattleFighter, petBattleClaimAmount, petBattleSettleXp, petBattleCompletePet, petBattleMatchup,  petBattleEffectiveStats, makePetBattleBot, petBattleSpirit, petBattleSkill, petBattleCommitment } = await import('data:text/javascript;base64,' + Buffer.from(helperModule).toString('base64'));
 
 
 
@@ -935,7 +935,8 @@ test('four evolution branches unlock at ray level, finish at 30 and keep gaining
   assert.equal(attendancePetCatalog(branch).length,30);
   const stages=ATTENDANCE_PET_BRANCHES[branch].forms;
   for(let i=1;i<stages.length;i++)assert.ok(stages[i].scale>stages[i-1].scale,'each evolution grows larger');
-  for(let i=0;i+1<stages.length;i+=2){assert.equal(stages[i].juvenile,true);assert.equal(stages[i+1].juvenile,false);}
+  assert.ok(stages.every(form=>!form.juvenile));
+  for(let i=1;i<stages.length;i++)assert.notEqual(stages[i].shape,stages[i-1].shape,'each level changes species silhouette');
 
   const change=transitionAttendancePet(pet,'branch:'+branch,now);
   assert.equal(change.pet.checkins,80);assert.equal(change.pet.branch,branch);
@@ -1009,7 +1010,7 @@ test('battle stats, RPS and automatic turn timeline are deterministic for both v
  assert.notEqual(await petBattleCommitment('id','a',0,'rock','nonce'),await petBattleCommitment('id','a',1,'rock','nonce'));
 });
 
-test('ten guardians keep unique mechanics and grant one percent only to advantaged affinities',()=>{
+test('ten guardians keep unique mechanics and give one percent to generated affinities and subtract one percent from countered affinities',()=>{
  const relationships=[
   ['water','metal','generates'],
   ['wood','fire','generates'],
@@ -1019,7 +1020,7 @@ test('ten guardians keep unique mechanics and grant one percent only to advantag
   ['fire','metal','overcomes'],
  ];
  for(const [player,opponent,expected] of relationships)assert.equal(petBattleMatchup(player,opponent),expected,`${player} vs ${opponent}`);
- assert.equal(petBattleMatchup('metal','fire'),'','only one side gets a bonus for each elemental matchup');
+ assert.equal(petBattleMatchup('metal','fire'),'countered');
  assert.equal(petBattleMatchup('kitsune','fire'),'','guardians with the same affinity do not get a matchup bonus');
  for(const earth of ['centaur','qilin']){
   assert.equal(petBattleMatchup(earth,'kitsune'),'generates');
@@ -1033,9 +1034,10 @@ test('ten guardians keep unique mechanics and grant one percent only to advantag
  const stats={attack:30,magic:20,defense:10,health:40};
  const boosted=petBattleEffectiveStats({element:'wood',stats},{element:'fire'});
  assert.deepEqual(boosted,{attack:30.3,magic:20.2,defense:10.1,health:40.4});
- assert.equal(petBattleReceivesBonus({element:'metal'},{element:'wood'}),true);
- assert.deepEqual(petBattleEffectiveStats({element:'metal',stats},{element:'wood'}),Object.fromEntries(Object.entries(stats).map(([key,value])=>[key,value*1.01])));
- assert.equal(petBattleReceivesBonus({element:'wood'},{element:'metal'}),false);
+ assert.equal(petBattleEffectiveStats({element:'metal',stats},{element:'wood'}),stats);
+ assert.deepEqual(petBattleEffectiveStats({element:'wood',stats},{element:'metal'}),{attack:29.7,magic:19.8,defense:9.9,health:39.6});
+ assert.equal(petBattleMatchup('qilin','griffin'),'countered');
+ assert.equal(petBattleMatchup('cerberus','centaur'),'countered');
  assert.equal(petBattleEffectiveStats({element:'centaur',stats},{element:'metal'}),stats);
 });
 
@@ -2213,7 +2215,7 @@ try {
 
     petRecord.attendancePet={...petRecord.attendancePet,checkins:90};attendancePetData=petRecord.attendancePet;renderAttendancePet();
     check(document.querySelectorAll('.pet-road-shared li').length===10&&document.querySelectorAll('.pet-road-branch').length===4,'journey shows the shared path and all four branches');
-    check([...document.querySelectorAll('.pet-road-branch')].every(branch=>branch.querySelectorAll('li').length===11&&branch.textContent.includes('Cấp 30')),'every branch shows ten species and a final evolution');
+    check([...document.querySelectorAll('.pet-road-branch')].every(branch=>branch.querySelectorAll('li').length===21&&branch.textContent.includes('Cấp 30')),'every branch shows twenty species and a final evolution');
     const guide=document.getElementById('petGuideDialog');
     document.querySelector('[data-pet-guide="care"]').click();
     check(guide.open&&!document.getElementById('petGuideCare').hidden&&document.getElementById('attendancePetRoad').closest('dialog')===guide,'care guide opens separately with the evolution journey');
@@ -2776,7 +2778,15 @@ try {
  const sphereGeometries=new Set();arena.model.traverse(object=>{if(object.geometry?.type==='SphereGeometry')sphereGeometries.add(object.geometry);});
  check(sphereGeometries.size<=1,'battle model reuses its sphere geometry');
  arena.renderer.render(arena.scene,arena.camera);const arenaGL=arena.renderer.getContext(),arenaPixels=new Uint8Array(arena.renderer.domElement.width*arena.renderer.domElement.height*4);arenaGL.readPixels(0,0,arena.renderer.domElement.width,arena.renderer.domElement.height,arenaGL.RGBA,arenaGL.UNSIGNED_BYTE,arenaPixels);check(arenaPixels.some((value,index)=>index%4===3&&value>0),'arena fighter paints visible pixels');
- arenaRenderer.duelPose({criticalAt:Date.now()});check(arena.criticalGroup&&arena.criticalGhost&&!arena.model.visible,'critical hit animates a floating pet spirit above its grave');
+ const originalScale=arena.model.scale.x;
+ const clock=Date.now,criticalFrame=clock();
+ try {
+  Date.now=()=>criticalFrame;
+  arenaRenderer.duelPose({criticalAt:criticalFrame-360});
+  arena.last=0;
+  await new Promise(resolve=>requestAnimationFrame(resolve));
+ } finally {Date.now=clock;}
+ check(arena.model.visible&&!arena.resultGroup&&arena.model.scale.x>originalScale,'critical hit grows the attacking pet while keeping its model visible');
  arenaRenderer.duelPose({result:'defeat'});const gravePlaque=arena.resultGroup?.children.find(child=>child.material?.map);
  check(arena.resultGroup&&arena.resultGhost&&!arena.model.visible&&gravePlaque?.material.map.image.width===512,'defeated pet shows a grave with a high-resolution name plaque and clear ghost');
  check(arena.resultSpirit.children.some(child=>child.material?.color?.getHexString()==='163448'),'ghost has a visible face');
