@@ -653,7 +653,7 @@ const PET_BATTLE_SPIRITS={
     wood:{name:'Thanh Long',move:'Long Vũ Tái Sinh',icon:'bi-heart-pulse',passive:'+3% HP tối đa.',ultimate:'Hồi 4% HP tối đa ngay; hồi thêm 2% mỗi lượt trong 2 lượt tiếp theo.',color:'#48e0ad',motion:'slam',effect:'wave',ability:'heal'},
     fire:{name:'Chu Tước',move:'Liệt Diễm Tam Thức',icon:'bi-fire',passive:'Đòn trúng gây Thiêu Đốt 0,35% HP tối đa mỗi lượt trong 2 lượt, tối đa 2 cộng dồn.',ultimate:'Thiêu Đốt lần lượt 4%, 3% và 2% HP tối đa trong 3 lượt.',color:'#ff633d',motion:'dive',effect:'fire',ability:'burn'},
     water:{name:'Huyền Vũ',move:'Huyền Giáp Hộ Thân',icon:'bi-shield-shaded',passive:'Giảm 6% sát thương nhận.',ultimate:'Chặn sát thương của đòn kế tiếp tối đa bằng 12% HP tối đa; phần vượt giới hạn vẫn gây sát thương. Chỉ chặn một đòn.',color:'#48c9ee',motion:'shield',effect:'wave',ability:'shield'},
-    metal:{name:'Bạch Hổ',move:'Hổ Gầm Trời',icon:'bi-crosshair',passive:'Tăng 16 điểm phần trăm chí mạng.',ultimate:'Đòn đánh kế tiếp chắc chắn chí mạng nếu trúng, sát thương chí mạng ×1,8. Chỉ áp dụng một đòn.',color:'#f5d477',motion:'claw',effect:'claw',ability:'critical'},
+    metal:{name:'Bạch Hổ',move:'Hổ Gầm Trời',icon:'bi-crosshair',passive:'Tăng 12 điểm phần trăm chí mạng; yếu trước né tránh và khiên.',ultimate:'Trong 2 lượt đánh tiếp theo, đòn đánh chắc chắn chí mạng nếu trúng; sát thương chí mạng ×1,6.',color:'#f5d477',motion:'claw',effect:'claw',ability:'critical'},
     kitsune:{name:'Cửu Vĩ Hồ',move:'Cửu Ảnh Mê Tung',icon:'bi-eye',passive:'Có 8% né đòn. Mỗi lần bị trúng tăng thêm 2,5 điểm phần trăm né (tối đa cộng thêm 30%); né thành công hồi 1,5% HP tối đa.',ultimate:'Tăng né đòn thêm 20 điểm phần trăm trong 2 lượt đối thủ tấn công. Né thành công trong thời gian này sẽ xóa Thiêu Đốt.',color:'#fb7185',motion:'dive',effect:'wind',ability:'evasion'},
     pixiu:{name:'Tỳ Hưu',move:'Tích Lũy Chiêu Tài',icon:'bi-coin',passive:'Tích trữ 25% sát thương gây ra, tối đa bằng 16% HP tối đa của bản thân.',ultimate:'Giải phóng toàn bộ sát thương đã tích trữ thành sát thương cộng thêm; phần này không thể chí mạng.',color:'#f5c451',motion:'shield',effect:'wave',ability:'charge'},
     griffin:{name:'Griffin',move:'Thiên Ưng Liệt Trảo',icon:'bi-wind',passive:'Tăng 15% sát thương gây ra.',ultimate:'Giảm 55% Phòng thủ của đối thủ trong 2 đòn đánh tiếp theo.',color:'#c4a878',motion:'dive',effect:'wind',ability:'pierce'},
@@ -711,7 +711,7 @@ function petBattleSimulation(players,firstUid,matchId=''){
         !p.budgetVersion&&Object.values(p.stats||{}).reduce((sum,value)=>sum+Number(value),0)===petBattleBudget(p.appearance.level,true),p.statBudget));
     const stats=players.map((player,index)=>petBattleEffectiveStats(player,players[1-index]));
     const hp=stats.map((value,index)=>petBattleNumber(petBattleMaxHp(value,players[index].appearance)*(players[index].element==='wood'?1.03:1))),maxHp=[...hp],turns=[];
-    const effects=players.map(()=>({count:0,burns:[],ultimateBurns:[],regen:0,criticalReady:false,foxDodgeBonus:0,evasion:0,storedDamage:0,armorBreak:0,healingReduction:0,healingReductionTurns:0,blockDamage:0,shieldHp:0,shieldTurns:0,reflectTurns:0}));
+    const effects=players.map(()=>({count:0,burns:[],ultimateBurns:[],regen:0,criticalTurns:0,foxDodgeBonus:0,evasion:0,storedDamage:0,armorBreak:0,healingReduction:0,healingReductionTurns:0,blockDamage:0,shieldHp:0,shieldTurns:0,reflectTurns:0}));
     let attacker=players.findIndex(p=>p.uid===firstUid);
     let seed=2166136261;for(const c of JSON.stringify([players,firstUid],(key,value)=>key==='element'?undefined:value))seed=Math.imul(seed^c.charCodeAt(0),16777619)>>>0;
     for(const char of matchId)seed=Math.imul(seed^char.charCodeAt(0),16777619)>>>0;
@@ -743,16 +743,15 @@ function petBattleSimulation(players,firstUid,matchId=''){
         for(let hit=0;hit<hits;hit++){
             const dodgeChance=Math.min(.75,(d.dodge||0)/200+(rival==='kitsune'?.08:0)+target.foxDodgeBonus+(target.evasion>0?.2:0));
             const hitDodged=modern&&roll()<dodgeChance;
-            const critChance=Math.min(.75,Math.max(0,Math.min(.35,(a.luck||0)/200)+(element==='metal'?.16:0)));
-            const guaranteed=self.criticalReady&&!hitDodged;
+            const critChance=Math.min(.75,Math.max(0,Math.min(.35,(a.luck||0)/200)+(element==='metal'?.12:0)));
+            const guaranteed=self.criticalTurns>0&&!hitDodged;
             const hitCritical=!hitDodged&&(guaranteed||roll()<critChance);
-            const hitMultiplier=hitCritical?(guaranteed&&element==='metal'?1.8:1.5):1;
+            const hitMultiplier=hitCritical?(guaranteed&&element==='metal'?1.6:1.5):1;
             const armorFactor=target.armorBreak>0?.45:1;
             const hitDefense=d.defense*armorFactor;
             const hitPhysical=modern?(5+attack*2)*100/(100+hitDefense)*100/(100+(d.physicalReduction||0)*2):normalBase;
             const hitMagic=modern?(a.magic||0)*2*100/(100+hitDefense)*100/(100+(d.magicReduction||0)*2):0;
             let hitDamage=hitDodged?0:Math.max(1,Math.round((modern?hitPhysical+hitMagic:hitPhysical)*hitMultiplier*(element==='griffin'?1.15:1)*(element==='cerberus'&&special?.65:1)));
-            if(guaranteed)self.criticalReady=false;
             if(target.armorBreak>0)target.armorBreak--;
             if(hitDodged&&rival==='kitsune'){
                 foxDodges++;
@@ -766,6 +765,7 @@ function petBattleSimulation(players,firstUid,matchId=''){
             magic+=hitDodged?0:hitMagic*hitMultiplier;
             critical ||= hitCritical;
         }
+        if(self.criticalTurns>0)self.criticalTurns--;
         dodged=hitResults.every(hit=>hit.dodged);
         if(foxDodges){
             const foxHeal=Math.min(maxHp[defender]-hp[defender],petBattleNumber(maxHp[defender]*.015*foxDodges*(1-(target.healingReductionTurns>0?target.healingReduction:0))));
@@ -821,7 +821,7 @@ function petBattleSimulation(players,firstUid,matchId=''){
             target.shieldTurns=0;
         }
         if(special&&element==='water')self.blockDamage=petBattleNumber(maxHp[attacker]*.12);
-        if(special&&element==='metal')self.criticalReady=true;
+        if(special&&element==='metal')self.criticalTurns=2;
         if(special&&element==='kitsune')self.evasion=2;
         if(special&&element==='griffin')target.armorBreak=2;
         if(special&&element==='centaur'){self.shieldHp=petBattleNumber(maxHp[attacker]*.08);self.shieldTurns=2;}
@@ -11965,7 +11965,7 @@ const PetBattleGame=(()=>{
             if(attacking&&play.last?.burnApplied)notes.push('GÂY THIÊU ĐỐT');
             if(hit&&play.last?.shieldHeal)notes.push(`KHIÊN VỠ · HỒI +${play.last.shieldHeal} HP`);
             if(attacking&&play.last?.reflectedDamage)notes.push(`PHẢN CHẤN −${play.last.reflectedDamage} HP`);
-            if(!hideGuardianIdentity&&attacking&&play.last?.special==='metal')notes.push('CƯỜNG HÓA CHÍ MẠNG · ĐÒN KẾ TIẾP');
+            if(!hideGuardianIdentity&&attacking&&play.last?.special==='metal')notes.push('HỔ GẦM · BẢO ĐẢM CHÍ MẠNG 2 LƯỢT');
             if(!hideGuardianIdentity&&attacking&&play.last?.special==='centaur')notes.push('THIÊN MÃ · DỰNG KHIÊN');
             if(!hideGuardianIdentity&&attacking&&play.last?.special==='qilin')notes.push('KỲ LÂN · PHẢN CHẤN 2 ĐÒN');
             if(!hideGuardianIdentity&&attacking&&play.last?.special==='pixiu'&&play.last.damage>0)notes.push('TỲ HƯU · GIẢI PHÓNG TÍCH TRỮ');

@@ -1123,8 +1123,9 @@ test('guardian combat effects, durations and visible statuses follow the selecte
 
  const tiger=battle('metal','wood'),tigerTurn=tiger.turns.find(turn=>turn.special==='metal');
  assert.equal(tigerTurn.specialName,petBattleSpirit('metal').move);
- const tigerNext=tiger.turns.find(turn=>turn.attacker==='a'&&turn.index>tigerTurn.index&&turn.damage>0);
- assert.equal(tigerNext.critical,true,'Bạch Hổ guarantees a critical on the next landed attack');
+ const tigerNextTurns=tiger.turns.filter(turn=>turn.attacker==='a'&&turn.index>tigerTurn.index).slice(0,2);
+ assert.equal(tigerNextTurns.length,2,'Bạch Hổ critical buff lasts for two of its attack turns');
+ assert.ok(tigerNextTurns.every(turn=>turn.dodged||turn.critical),'Bạch Hổ guarantees critical hits when its next two attacks land');
  const fox=battle('kitsune','wood'),foxUltimate=fox.turns.find(turn=>turn.special==='kitsune');
  assert.equal(foxUltimate.statuses[0].evasion,true,'Cửu Vĩ Hồ shows its active evasion');
  const pixiu=battle('pixiu','wood'),pixiuUlt=pixiu.turns.find(turn=>turn.special==='pixiu');
@@ -2328,7 +2329,7 @@ try {
     check(document.querySelectorAll('#petBattleDraftStats0 > div').length===8&&document.querySelectorAll('#petBattleDraftStats1 > div').length===8,'both 3D pet cards contain eight comparison stat bars');
     check(document.getElementById('petBattleBotStart').hidden,'bot cannot start without an element');
     document.querySelector('[data-battle-element="metal"]').click();
-    check(document.getElementById('petBattleSpiritName').textContent==='Bạch Hổ'&&document.getElementById('petBattleSpiritPassive').textContent.includes('16 điểm phần trăm')&&document.getElementById('petBattleSpiritUltimate').textContent.includes('×1,8')&&document.getElementById('petBattleSpiritIcon').querySelector('i').classList.contains('bi-crosshair'),'choosing a guardian displays its passive, ultimate and skill icon');
+    check(document.getElementById('petBattleSpiritName').textContent==='Bạch Hổ'&&document.getElementById('petBattleSpiritPassive').textContent.includes('12 điểm phần trăm')&&document.getElementById('petBattleSpiritUltimate').textContent.includes('×1,6')&&document.getElementById('petBattleSpiritUltimate').textContent.includes('2 lượt')&&document.getElementById('petBattleSpiritIcon').querySelector('i').classList.contains('bi-crosshair'),'choosing a guardian displays its updated passive, two-turn ultimate and skill icon');
     check([0,1].every(side=>{
      const model=document.getElementById('petBattleModel'+side),statusFx=document.getElementById('petBattleStatusFx'+side),statusStyle=getComputedStyle(statusFx);
      return statusFx.parentElement===model&&statusStyle.left==='50%'&&statusStyle.top==='55%'&&statusStyle.width!=='100%'
