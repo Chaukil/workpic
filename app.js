@@ -11402,8 +11402,8 @@ const PetBattleGame=(()=>{
         el('petBattleSpiritUltimate').textContent=spirit?.ultimate||'Kỹ năng đặc biệt kích hoạt ở đòn đánh thứ 4.';
         el('petBattleSpiritIcon').firstElementChild.className=`bi ${spirit?.icon||'bi-stars'}`;
         info.classList.toggle('has-spirit',!!spirit);
-        const currentMatch=match();
-        const rival=state.botDraft?state.bot:currentMatch?.players?.find(player=>player.uid!==state.uid);
+        const currentMatch=match(),humanMatch=!!currentMatch&&!currentMatch.bot;
+        const rival=state.botDraft?state.bot:humanMatch?null:currentMatch?.players?.find(player=>player.uid!==state.uid);
         const rivalElement=rival?.element;
         const names=Object.fromEntries([...PET_BATTLE_ELEMENTS].map(([key,value])=>[key,value.label.split(' · ').pop()]));
         const suggestions=[];
@@ -11415,6 +11415,7 @@ const PetBattleGame=(()=>{
             button.title=relation?`${relation==='generates'?'Tương sinh':'Tương khắc'} với ${names[rivalElement]}: +1% toàn bộ chỉ số`:rivalElement?'Không có lợi thế quan hệ chỉ số trước đối thủ này':'';
         }
         const advice=el('petBattleGuardianAdvice');
+        advice.hidden=humanMatch;
         advice.textContent=rivalElement
             ?suggestions.length?`Đối thủ: ${names[rivalElement]}. Gợi ý: ${suggestions.join(' hoặc ')} · +1% toàn bộ chỉ số trong trận.`
                 :'Đối thủ: '+names[rivalElement]+'. Không có lợi thế quan hệ chỉ số; chọn hộ mệnh theo tuyệt chiêu phù hợp.'

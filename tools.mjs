@@ -2382,12 +2382,13 @@ try {
     battleState.matches.set(outgoing.id,outgoing);PetBattleGame.open(outgoing.id);
     check(document.getElementById('petBattleDamage1').textContent===''&&!document.getElementById('petBattleSide1').classList.contains('is-hit'),'outgoing invite with missing opponent has no phantom damage or render error');
     document.getElementById('petBattleClose').click();
-    const incoming={...outgoing,id:'ui-incoming',challengerUid:'opponent',opponentUid:'me',participantUids:['opponent','me'],players:[fightOther]};
+    const incoming={...outgoing,id:'ui-incoming',challengerUid:'opponent',opponentUid:'me',participantUids:['opponent','me'],players:[{...fightOther,element:'fire'}]};
     const savedDirectory=usersDirectorySnapshot;
     usersDirectorySnapshot={docs:[{id:'opponent',data:()=>({uid:'opponent',displayName:'Rival',petBattleLocks:{'ui-incoming':{role:'challenger',peerUid:'me',createdAt:Date.now(),expiresAt:incoming.expiresAt}}})}]};
     PetBattleGame.sync();const inviteSnapshot=noteSnapshot;
     inviteSnapshot({id:incoming.id,exists:()=>true,data:()=>incoming});
     check(document.getElementById('petBattleDialog').open&&battleState.active===incoming.id&&!document.getElementById('petBattleAccept').hidden,'directory invitation opens recipient room with accept button');
+    check(document.getElementById('petBattleGuardianAdvice').hidden&&guardianButtons.every(button=>!button.classList.contains('is-recommended')&&!button.title.includes('Chu Tước')),'human-duel setup hides opponent-specific guardian recommendations and matchup hints');
     check(!document.getElementById('petBattleInvite').hidden&&document.getElementById('petBattleBadge').textContent==='1','incoming invite has a persistent banner and count');
     document.getElementById('petBattleClose').click();inviteSnapshot({id:incoming.id,exists:()=>true,data:()=>incoming});
     check(!document.getElementById('petBattleDialog').open,'repeat snapshots do not repeatedly reopen dismissed invitations');
