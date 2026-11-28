@@ -10578,7 +10578,12 @@ function renderAttendancePetFleet(){
         if(!entry){
             const button=document.createElement('button'),art=document.createElement('span');
             const suffix=pet.id.replace(/[^a-z0-9-]/gi,'');button.id='pet-peer-'+suffix;art.id=button.id+'-art';button.type='button';button.className='attendance-pet-swimmer';button.appendChild(art);document.body.appendChild(button);
-            button.addEventListener('click',()=>{if(attendancePetBusy)return;selectAttendancePet(pet.id);document.getElementById('attendancePetToggle').click();});
+            button.addEventListener('click',()=>{
+                if(attendancePetBusy||!attendancePetReady)return;
+                selectAttendancePet(pet.id);
+                const view=selectedAttendancePetView();
+                actOnAttendancePet(view.dead?'revive':'feed');
+            });
             entry={button,renderer:createAttendancePet3D(button.id,art.id,null)};attendancePetFleet.set(pet.id,entry);entry.renderer.start();
         }
         const view=attendancePetView(pet);entry.button.dataset.petSlot=peerIndex+1;entry.button.title=`${view.displayName} · Cấp ${view.level} · Bấm để chăm sóc`;entry.button.setAttribute('aria-label',entry.button.title);entry.button.disabled=attendancePetBusy;entry.renderer.update(view);
@@ -11753,7 +11758,6 @@ const PetBattleGame=(()=>{
         stage.querySelector('.pet-battle-skill')?.remove();
         if(!play.last||Date.now()-petBattleTime(m.startedAt)-(m.introMs===5000?5000:2000)-(play.count-1)*PET_BATTLE_STEP_MS>1200)return;
         const attacker=m.players.find(p=>p.uid===play.last.attacker);if(!attacker)return;
-        const inCombat=m.status==='fighting'||m.status==='finished';
         const hideGuardianIdentity=!m.bot;
         const level=attacker.appearance.level,tier=Math.min(3,Math.floor((level-1)/8));
         const specialSpirit=hideGuardianIdentity?null:petBattleSpirit(play.last.special),skill=petBattleSkill(attacker.appearance,attacker.element,!!specialSpirit),{effect,label,variant}=skill;
