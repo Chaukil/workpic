@@ -2329,7 +2329,11 @@ try {
     check(document.getElementById('petBattleBotStart').hidden,'bot cannot start without an element');
     document.querySelector('[data-battle-element="metal"]').click();
     check(document.getElementById('petBattleSpiritName').textContent==='Bạch Hổ'&&document.getElementById('petBattleSpiritPassive').textContent.includes('16 điểm phần trăm')&&document.getElementById('petBattleSpiritUltimate').textContent.includes('×1,8')&&document.getElementById('petBattleSpiritIcon').querySelector('i').classList.contains('bi-crosshair'),'choosing a guardian displays its passive, ultimate and skill icon');
-    check([0,1].every(side=>document.getElementById('petBattleStatusFx'+side).parentElement.id==='petBattleModel'+side&&document.getElementById('petBattleStatusFx'+side).querySelector('.burn-flame')&&document.getElementById('petBattleStatusFx'+side).querySelector('.heal-sign')&&document.getElementById('petBattleStatusFx'+side).querySelector('.reflect-mark')),'burn, healing, reflection and guardian indicators are anchored to each pet model');
+    check([0,1].every(side=>{
+     const model=document.getElementById('petBattleModel'+side),statusFx=document.getElementById('petBattleStatusFx'+side),statusStyle=getComputedStyle(statusFx);
+     return statusFx.parentElement===model&&statusStyle.left==='50%'&&statusStyle.top==='55%'&&statusStyle.width!=='100%'
+      &&model.querySelector('.pet-battle-guardian-mark')&&statusFx.querySelector('.burn-flame')&&statusFx.querySelector('.heal-sign')&&statusFx.querySelector('.reflect-mark');
+    }),'combat effects stay centered on each pet, with separate guardian icon badges');
     check(!document.getElementById('petBattleBotStart').hidden,'bot is ready to fight once the setup is complete');
     document.getElementById('petBattleClose').click();
     document.getElementById('petBattleNew').click();
@@ -2373,7 +2377,7 @@ try {
     check(!defeatBubble.hidden&&defeatBubble.textContent==='Tôi đã thua trận khi thách đấu Rival','defeat bubble names the opponent');
     renderPetHungerBubble(auraButton,attendancePetView({...defeatedPet,victoryAuraUntil:Date.now()-1001,defeatAuraUntil:Date.now()-1}));
     check(!auraButton.classList.contains('pet-victory-aura')&&!auraButton.classList.contains('pet-defeat-aura')&&!defeatBubble.textContent.includes('Rival'),'result aura and message disappear after expiry');
-    const battleFixture={id:'ui-battle',status:'fighting',challengerUid:'me',opponentUid:'opponent',participantUids:['me','opponent'],players:[fightMe,fightOther],stakeGrams:200,createdMs:Date.now(),startedAt:Date.now()-3000,claims:{},commits:{},reveals:{},...timeline};
+    const battleFixture={id:'ui-battle',status:'fighting',challengerUid:'me',opponentUid:'opponent',participantUids:['me','opponent'],players:[{...fightMe,element:'metal'},{...fightOther,element:'fire'}],stakeGrams:200,createdMs:Date.now(),startedAt:Date.now()-3000,claims:{},commits:{},reveals:{},...timeline};
     const outgoing={...battleFixture,id:'ui-outgoing',status:'invited',players:[fightMe],turns:[],maxHp:[],startedAt:null,winnerUid:null,expiresAt:Date.now()+600000};
     battleState.matches.set(outgoing.id,outgoing);PetBattleGame.open(outgoing.id);
     check(document.getElementById('petBattleDamage1').textContent===''&&!document.getElementById('petBattleSide1').classList.contains('is-hit'),'outgoing invite with missing opponent has no phantom damage or render error');
@@ -2403,9 +2407,14 @@ try {
     check(document.getElementById('petBattleDamage0').textContent===''&&document.getElementById('petBattleDamage1').textContent==='','fight countdown has no damage before the first turn');
     battleState.matches.set('ui-battle',battleFixture);PetBattleGame.open('ui-battle');
     check(!document.getElementById('petBattleRoom').hidden&&battleState.models.length===2,'accepted battle displays both pet renderers');
+    check(document.getElementById('petBattleRoom').classList.contains('is-human-duel')&&document.getElementById('petBattleHp0').hidden&&document.getElementById('petBattleHpText1').hidden&&!document.getElementById('petBattleStats0').textContent.includes('Bạch Hổ')&&!document.getElementById('petBattleStats1').textContent.includes('Chu Tước'),'human duels hide HP bars and guardian identities while retaining the duel');
     const fightPlay=petBattlePlayback(battleFixture);check(Number(document.getElementById('petBattleHp0').value)===fightPlay.hp[0]&&Number(document.getElementById('petBattleHp1').value)===fightPlay.hp[1],'room HP follows shared automatic turn timeline');
     check(document.getElementById('petBattleDialog').scrollWidth<=document.getElementById('petBattleDialog').clientWidth+1,'battle room has no horizontal clipping');
     check(document.querySelector('.pet-battle-skill')?.classList.contains('skill-fire'),'dinosaur attack has its own elemental visual');
+    const botFixture={...battleFixture,id:'ui-bot-battle',bot:true,players:[{...fightMe,element:'metal'},{...fightOther,element:'fire'}]};
+    battleState.matches.set(botFixture.id,botFixture);PetBattleGame.open(botFixture.id);
+    check(!document.getElementById('petBattleRoom').classList.contains('is-human-duel')&&!document.getElementById('petBattleHp0').hidden&&document.getElementById('petBattleStats0').textContent.includes('Bạch Hổ'),'bot battles keep HP bars and guardian identities visible');
+    PetBattleGame.open('ui-battle');
     const revealFixture={...battleFixture,id:'ui-rps-result',firstUid:'me',introMs:5000,startedAt:Date.now(),reveals:{me:{choice:'rock'},opponent:{choice:'scissors'}}};
     battleState.matches.set(revealFixture.id,revealFixture);PetBattleGame.open(revealFixture.id);
     check(!document.getElementById('petBattleRpsReveal').hidden&&document.getElementById('petBattleRpsWinner').textContent.includes('Trainer')&&document.getElementById('petBattleRpsHands').textContent.includes('✌'),'RPS reveal shows both hands and first attacker');
